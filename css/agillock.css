@@ -1,0 +1,131 @@
+#SegundaVia {
+    position: relative;
+    background-image: url('../table.jpeg');
+    background-size: cover;
+    text-align: center;
+    color:white;
+}
+#SegundaVia .mask {
+    width: 100%;
+    height: 100%;
+    top: 0;
+    position: absolute;
+    z-index: 0;
+    background-color: rgba(0,0,0,.5);
+}
+
+#SegundaVia h1 {
+    margin-bottom: 8px;
+}
+
+#SegundaVia span {
+    display: block;
+    margin-bottom:8px;
+}
+
+.dropdown-access #navbarDropdown {		
+	padding-top: 15px;
+	padding-bottom: 15px;
+	background-color: transparent;
+	border: transparent;
+	font-weight: bold;
+	color: #f6bf01;
+	text-transform: uppercase;
+    font-family: Montserrat,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-weight: 400;
+    letter-spacing: 1px;
+  
+}
+
+.dropdown-access .badge-primary { 
+	background-color: #f6bf01;
+}
+
+.dropdown-access .dropdown-item {
+	padding: 10px;
+    display: inline-block;
+    width: 100%;
+	color: #3c3c3c !important;
+	font-size: 12px;
+	font-weight: bold;
+	animation: all 300ms ease-out;
+} 
+
+.dropdown-access .dropdown-item:hover {
+	font-weight: bold;
+	animation: all 300ms ease-out;
+} 
+.dropdown-access .dropdown-item:hover {
+	text-decoration: none;
+} 
+#Loading {
+	display: none; 
+}
+
+#Loading.show{
+	position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    width: 100%;
+    height: 110vh;
+    background-color: rgba(0,0,0,.7);
+    text-align: center;
+    bottom: 0;
+    line-height: 100vh;
+}
+
+.lds-ring {
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+.lds-ring div {
+  box-sizing: border-box;
+  display: block;
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  margin: 8px;
+  border: 8px solid #fff;
+  border-radius: 50%;
+  animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  border-color: #fff transparent transparent transparent;
+}
+.lds-ring div:nth-child(1) {
+  animation-delay: -0.45s;
+}
+.lds-ring div:nth-child(2) {
+  animation-delay: -0.3s;
+}
+.lds-ring div:nth-child(3) {
+  animation-delay: -0.15s;
+}
+@keyframes lds-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+
+@media(max-width:999px) {
+	
+	.dropdown-access #navbarDropdown {		
+		width: 100%;
+		text-align: left;
+		padding-left: 15px;
+	}
+	.dropdown-access .dropdown-menu {
+		padding-left: 20px;
+		padding-top: 0;
+		background-color: rgba(255,255,255,0.1);
+	}
+	.dropdown-access .dropdown-item {
+		color: white !important;    
+		padding: 20px 10px;
+	} 
+}
