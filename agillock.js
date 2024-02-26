@@ -54,7 +54,7 @@ $('document').ready(function(){
 		else{
 			//não está no topo
 			if(position == 0){
-				$('.brand > img').attr('style','height:120px;-webkit-transition: height 1s ease-in-out;');
+				$('.brand > img').attr('style','height:100px;-webkit-transition: height 1s ease-in-out;');
 			}
 			else{
 				$('.brand > img').attr('style','height:50px;-webkit-transition: height 1s ease-in-out;');
