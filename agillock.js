@@ -45,8 +45,8 @@ $('document').ready(function(){
 			}
 		}
 	});
-	
-	$(document).scroll(function(){
+
+	const handleScroll = (doc) => {
 		var position = $(this).scrollTop();
 		if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
 			$('.brand > img').attr('style','height:50px;-webkit-transition: height 1s ease-in-out;');
@@ -60,7 +60,12 @@ $('document').ready(function(){
 				$('.brand > img').attr('style','height:50px;-webkit-transition: height 1s ease-in-out;');
 			}
 		}
-		
+	};
+
+	handleScroll(document);
+	
+	$(document).scroll(function(){
+		handleScroll(document);
 	});
 	
 	
