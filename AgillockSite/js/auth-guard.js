@@ -334,4 +334,13 @@
     confirmar: confirmar,
     isHoje: isHoje,
   };
+
+  // ─── Fix altura real no mobile (Chrome Android / iOS) ───────────────────
+  // window.innerHeight é a altura visível real, sem a barra do browser.
+  // Define --real-vh para ser usado no CSS em vez de 100vh.
+  function setRealVH() {
+    document.documentElement.style.setProperty('--real-vh', window.innerHeight + 'px');
+  }
+  setRealVH();
+  window.addEventListener('resize', setRealVH);
 })();

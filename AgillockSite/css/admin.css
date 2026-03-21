@@ -786,10 +786,11 @@ html.dark-theme .filter-bar { background: #1e2530; }
     .wizard-step { padding: 10px 4px; font-size: 11px; }
     .wizard-step .step-label { display: none; }
 
-    /* Corrige a altura no iOS: 100vh inclui a barra do browser (fica maior que
-       a área visível). 100dvh ajusta dinamicamente e resolve o overflow. */
-    body            { height: 100dvh !important; }
-    .admin-content  { height: 100dvh !important; }
+    /* Corrige a altura no mobile: 100vh no Chrome/Safari inclui a barra do
+       browser, causando overflow. --real-vh é setado via JS (window.innerHeight)
+       e sempre reflete a altura visível real. Fallback: 100dvh. */
+    body            { height: var(--real-vh, 100dvh) !important; }
+    .admin-content  { height: var(--real-vh, 100dvh) !important; }
 
     /* Sidebar mais compacto para caber na tela sem precisar rolar */
     .sidebar-brand       { padding: 11px 16px; }
