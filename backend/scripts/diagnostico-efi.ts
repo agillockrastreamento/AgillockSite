@@ -1,5 +1,5 @@
 /**
- * Script diagnóstico — inspeciona métodos da instância SDK EFI e testa carnês.
+ * Script diagnóstico — testa detailCarnet com formato correto e listCharges sem filtro.
  */
 import 'dotenv/config';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -15,62 +15,56 @@ const client = new EfiPay({
   sandbox:       process.env.EFI_SANDBOX !== 'false',
 });
 
-async function main() {
-  console.log(`Sandbox: ${process.env.EFI_SANDBOX !== 'false'}`);
-
-  // 1. Inspecionar métodos da INSTÂNCIA (gerados dinamicamente)
-  console.log('\n=== MÉTODOS DA INSTÂNCIA (client) ===');
-  const instanceMethods = Object.keys(client)
-    .filter(k => typeof (client as any)[k] === 'function')
-    .sort();
-  console.log(instanceMethods.join('\n') || '(nenhum em Object.keys)');
-
-  // 2. Tudo que existe no objeto (incluindo não-enumeráveis)
-  console.log('\n=== Object.getOwnPropertyNames(client) ===');
-  const ownNames = Object.getOwnPropertyNames(client)
-    .filter(k => typeof (client as any)[k] === 'function')
-    .sort();
-  console.log(ownNames.join('\n') || '(nenhum)');
-
-  // 3. Prototype chain completa
-  console.log('\n=== TODA A PROTOTYPE CHAIN ===');
-  const allMethods = new Set<string>();
-  let proto = client;
-  while (proto) {
-    Object.getOwnPropertyNames(proto)
-      .filter(k => k !== 'constructor' && typeof (client as any)[k] === 'function')
-      .forEach(k => allMethods.add(k));
-    proto = Object.getPrototypeOf(proto);
-  }
-  console.log([...allMethods].sort().join('\n'));
-
-  // 4. Métodos com "carnet" (case-insensitive) em toda a chain
-  const carnetMethods = [...allMethods].filter(m => m.toLowerCase().includes('carnet'));
-  console.log('\n=== MÉTODOS COM "carnet" ===');
-  console.log(carnetMethods.join('\n') || '(nenhum)');
-
-  // 5. Testar detailCarnet com erro completo
-  console.log('\n=== detailCarnet com id=29491 (erro completo) ===');
+async function tryCall(label: string, fn: () => Promise<any>) {
+  console.log(`\n=== ${label} ===`);
   try {
-    const r = await (client as any).detailCarnet({ id: 29491 });
+    const r = await fn();
     console.log(JSON.stringify(r, null, 2));
   } catch (e: any) {
-    console.log('Tipo:', typeof e);
-    console.log('JSON:', JSON.stringify(e));
+    console.log('ERRO JSON:', JSON.stringify(e));
     console.log('message:', e?.message);
     console.log('code:', e?.code);
-    console.log('body:', e?.body);
-    console.log('response:', JSON.stringify(e?.response));
+    console.log('error:', e?.error);
+    console.log('error_description:', JSON.stringify(e?.error_description));
+  }
+}
+
+async function main() {
+  console.log(`Sandbox: ${process.env.EFI_SANDBOX !== 'false'}\n`);
+
+  // ID do carnê que sabemos existir (criado via API hoje)
+  // Link: .../A4CL-381777-29491-LUADO9/... → id numérico = 29491
+  const carnetId = 29491;
+
+  // Testar diferentes formatos de parâmetro para detailCarnet
+  await tryCall('detailCarnet { params: { id } }', () =>
+    client.detailCarnet({ params: { id: carnetId } })
+  );
+
+  await tryCall('detailCarnet { params: { id: string } }', () =>
+    client.detailCarnet({ params: { id: String(carnetId) } })
+  );
+
+  // listCharges sem charge_type — erro completo
+  await tryCall('listCharges SEM charge_type (2026)', () =>
+    client.listCharges({ begin_date: '2026-01-01', end_date: '2026-03-21', limit: 10 })
+  );
+
+  // listCharges com todos os charge_types possíveis
+  for (const ct of ['billet', 'link', 'subscription']) {
+    await tryCall(`listCharges charge_type:${ct} (2026)`, () =>
+      client.listCharges({ begin_date: '2026-01-01', end_date: '2026-03-21', charge_type: ct, limit: 10 })
+    );
   }
 
-  // 6. Ver o conteúdo bruto do require para entender a estrutura
-  console.log('\n=== SDK package.json ===');
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pkg = require('sdk-node-apis-efi/package.json');
-    console.log('version:', pkg.version);
-    console.log('main:', pkg.main);
-  } catch (e: any) { console.log(e.message); }
+  // Testar se há charges de qualquer tipo em anos anteriores
+  await tryCall('listCharges charge_type:billet (2024)', () =>
+    client.listCharges({ begin_date: '2024-01-01', end_date: '2024-12-31', charge_type: 'billet', limit: 10 })
+  );
+
+  await tryCall('listCharges charge_type:carnet (2024)', () =>
+    client.listCharges({ begin_date: '2024-01-01', end_date: '2024-12-31', charge_type: 'carnet', limit: 10 })
+  );
 }
 
 main()
