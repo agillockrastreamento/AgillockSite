@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { requireRoles } from '../middleware/roles.middleware';
 import prisma from '../utils/prisma';
@@ -37,7 +38,7 @@ async function criarUsuario(
     return;
   }
   const senhaHash = await bcrypt.hash(senha, 10);
-  const data: Record<string, unknown> = { nome, email, senhaHash, role };
+  const data: Prisma.UserCreateInput = { nome, email, senhaHash, role };
   if (role === 'COLABORADOR') {
     data.podeExcluirCliente    = dados.podeExcluirCliente    ?? true;
     data.podeEditarCliente     = dados.podeEditarCliente     ?? true;
