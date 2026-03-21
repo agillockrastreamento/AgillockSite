@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Detalhe do Cliente — AgilLock Colaborador</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    .detail-page-tabs {
+      display: flex;
+      border-bottom: 2px solid #eee;
+      margin-bottom: 20px;
+      background: #fff;
+      border-radius: 8px 8px 0 0;
+    }
+
+    html.dark-theme .detail-page-tabs {
+      background: #1e2530;
+      border-bottom-color: #2d3748;
+    }
+
+    .detail-page-tabs button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 14px 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #888;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color .2s, border-color .2s;
+    }
+
+    .detail-page-tabs button:hover {
+      color: #555;
+    }
+
+    .detail-page-tabs button.active {
+      color: #cea40f;
+      border-bottom-color: #cea40f;
+    }
+
+    html.dark-theme .detail-page-tabs button {
+      color: #adb5bd;
+    }
+
+    html.dark-theme .detail-page-tabs button.active {
+      color: #cea40f;
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    .card-section {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .07);
+      margin-bottom: 20px;
+    }
+
+    html.dark-theme .card-section {
+      background: #1e2530;
+      color: #c9d1d9;
+    }
+
+    .cobranca-group {
+      border: 1px solid #eee;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    html.dark-theme .cobranca-group {
+      border-color: #2d3748;
+    }
+
+    .cobranca-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 16px;
+      cursor: pointer;
+      background: #f9fafb;
+      font-weight: 600;
+      font-size: 13px;
+      user-select: none;
+    }
+
+    html.dark-theme .cobranca-group-header {
+      background: #252d3d;
+      color: #c9d1d9;
+    }
+
+    .cobranca-group-header:hover {
+      background: #f0f2f5;
+    }
+
+    html.dark-theme .cobranca-group-header:hover {
+      background: #2d3748;
+    }
+
+    .cobranca-group-body {
+      display: none;
+      padding: 0;
+    }
+
+    .cobranca-group-body.open {
+      display: block;
+    }
+
+    .placa-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .placa-tab {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 2px solid #ddd;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .2s;
+      color: #555;
+    }
+
+    .placa-tab:hover {
+      border-color: #cea40f;
+      color: #a07d0a;
+    }
+
+    .placa-tab.active {
+      border-color: #cea40f;
+      background: #cea40f;
+      color: #222;
+    }
+
+    html.dark-theme .placa-tab {
+      border-color: #3d4a5c;
+      color: #adb5bd;
+    }
+
+    html.dark-theme .placa-tab.active {
+      background: #cea40f;
+      color: #222;
+      border-color: #cea40f;
+    }
+
+    .filter-cobrancas {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    html.dark-theme .filter-cobrancas {
+      background: #252d3d;
+    }
+
+    .filter-cobrancas label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 0;
+    }
+
+    html.dark-theme .filter-cobrancas label {
+      color: #adb5bd;
+    }
+
+    .boleto-actions {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .btn-loading {
+      opacity: .7;
+      pointer-events: none;
+    }
+
+    body {
+      overflow: hidden !important;
+      height: 100vh;
+    }
+
+    .admin-content {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 0 !important;
+    }
+
+    #content-area:not([style*="none"]) {
+      display: flex !important;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .detail-page-tabs {
+      flex-shrink: 0;
+      margin-bottom: 12px;
+    }
+
+    .tab-pane.active {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      padding-bottom: 16px;
+    }
+
+    #tab-dados .card-section,
+    #tab-placas .card-section {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 0;
+    }
+
+    #tab-placas .card-section>div:first-child {
+      position: sticky;
+      top: -24px;
+      margin: -24px -24px 16px -24px;
+      padding: 24px 24px 14px 24px;
+      background: #fff;
+      z-index: 10;
+    }
+
+    html.dark-theme #tab-placas .card-section>div:first-child {
+      background: #1e2530;
+      border-bottom-color: #2d3748;
+    }
+
+    #tab-cobrancas .card-section {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      margin-bottom: 0;
+    }
+
+    #tab-cobrancas .card-section>div:not(#cobrancas-content) {
+      flex-shrink: 0;
+    }
+
+    #cobrancas-content {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 6px;
+      margin-top: 4px;
+    }
+
+    #tab-cobrancas div[style*="background:#f0f2f5"] {
+      background-color: #f8f9fa !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      padding: 14px 16px !important;
+    }
+
+    html.dark-theme #tab-cobrancas div[style*="background:#f0f2f5"] {
+      background-color: #252d3d !important;
+      border-bottom: 1px solid #3d4a5c !important;
+    }
+
+    .cobranca-group {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    }
+
+    html.dark-theme .cobranca-group {
+      border-color: #3d4a5c;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .cobranca-group-header {
+      padding: 14px 16px;
+      font-size: 13.5px;
+    }
+
+    .cobranca-group-body table {
+      border-top: 1px solid #e2e8f0;
+    }
+
+    html.dark-theme .cobranca-group-body table {
+      border-top: 1px solid #3d4a5c;
+    }
+
+    .cobranca-group-body table thead th {
+      background: #fff;
+      color: #888;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 10px 16px;
+      border-bottom: 2px solid #f0f2f5;
+    }
+
+    html.dark-theme .cobranca-group-body table thead th {
+      background: #1a1f29;
+      color: #adb5bd;
+      border-bottom: 2px solid #2d3748;
+    }
+
+    .cobranca-group-body table tbody td {
+      padding: 12px 16px;
+      vertical-align: middle;
+      font-size: 13px;
+      border-bottom: 1px solid #f0f2f5;
+    }
+
+    html.dark-theme .cobranca-group-body table tbody td {
+      border-bottom: 1px solid #2d3748;
+      color: #c9d1d9;
+      background: #1e2530;
+    }
+
+    .cobranca-group-body table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .cobranca-group-body table tbody tr:hover td {
+      background-color: #fafbfc;
+    }
+
+    html.dark-theme .cobranca-group-body table tbody tr:hover td {
+      background-color: #252d3d;
+    }
+
+    .boleto-actions {
+      justify-content: flex-end;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;"
+        onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li class="active"><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <a href="clientes.html" class="btn btn-default btn-sm"><i class="fa fa-arrow-left"></i></a>
+        <h2 class="topbar-title" id="page-nome">Carregando…</h2>
+        <span id="page-status"></span>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div id="loading-state" class="text-center" style="padding:60px;color:#999;">
+      <i class="fa fa-spinner fa-spin fa-2x"></i>
+      <p style="margin-top:12px;">Carregando...</p>
+    </div>
+
+    <div id="content-area" style="display:none;">
+      <div class="detail-page-tabs" id="page-tabs">
+        <button class="active" data-tab="dados"><i class="fa fa-id-card-o"></i> Dados</button>
+        <button data-tab="placas"><i class="fa fa-car"></i> Placas</button>
+        <button data-tab="cobrancas"><i class="fa fa-money"></i> Cobranças</button>
+      </div>
+
+      <div id="tab-dados" class="tab-pane active"></div>
+      <div id="tab-placas" class="tab-pane"></div>
+      <div id="tab-cobrancas" class="tab-pane"></div>
+    </div>
+  </div>
+
+  <!-- Modal Placa -->
+  <div class="modal fade" id="modal-placa" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#1e2530;">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title" style="color:#fff;">Adicionar Placa</h4>
+        </div>
+        <div class="modal-body">
+          <div id="modal-placa-alert"></div>
+          <div class="form-group"><label>Placa *</label><input class="form-control" id="mp-placa" placeholder="ABC1234"
+              style="text-transform:uppercase;" maxlength="7" /></div>
+          <div class="form-group"><label>Descrição</label><input class="form-control" id="mp-desc" maxlength="40" /><small id="ctr-mp-desc" style="display:block;text-align:right;color:#aaa;font-size:11px;margin-top:2px;">0/40</small></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary-al" id="btn-salvar-placa">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Unificar -->
+  <div class="modal fade" id="modal-unificar" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#1e2530;">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title" style="color:#fff;"><i class="fa fa-compress"></i> Unificar Carnês</h4>
+        </div>
+        <div class="modal-body">
+          <div id="modal-unif-alert"></div>
+          <p class="text-muted" style="font-size:13px;">Os carnês individuais de todas as placas ativas serão cancelados
+            e um novo carnê unificado será gerado com o valor total.</p>
+          <div id="modal-unif-placas" style="margin-bottom:12px;"></div>
+          <div class="row">
+            <div class="col-sm-6">
+              <div class="form-group"><label>1° Vencimento *</label><input type="date" class="form-control"
+                  id="unif-vencimento" /></div>
+            </div>
+            <div class="col-sm-6">
+              <div class="form-group">
+                <label>Nº de Parcelas *</label>
+                <select class="form-control" id="unif-parcelas">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="6">6</option>
+                  <option value="12" selected>12</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary-al" id="btn-confirmar-unif">
+            <span id="unif-txt"><i class="fa fa-compress"></i> Unificar</span>
+            <span id="unif-spin" style="display:none;"><i class="fa fa-spinner fa-spin"></i> Processando…</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Alterar Vencimento -->
+  <div class="modal fade" id="modal-editar-boleto" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#1e2530;">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title" style="color:#fff;"><i class="fa fa-calendar"></i> Alterar Vencimento</h4>
+        </div>
+        <div class="modal-body">
+          <div id="modal-edit-alert"></div>
+          <input type="hidden" id="edit-boleto-id" />
+          <div class="form-group"><label>Nova Data de Vencimento</label><input type="date" class="form-control"
+              id="edit-data" /></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary-al" id="btn-salvar-edit">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+      if (!currentUser) return;
+      var isAdmin = currentUser.role === 'ADMIN';
+      // Permissões granulares (admin sempre tem tudo; colaborador usa os campos do JWT)
+      var canEditarCliente  = isAdmin || (currentUser.podeEditarCliente   !== false);
+      var canDeletePlaca    = isAdmin || (currentUser.podeExcluirPlaca    !== false);
+      var canInativarPlaca  = isAdmin || (currentUser.podeInativarPlaca   !== false);
+      var canBaixaManual    = isAdmin || (currentUser.podeBaixaManual     !== false);
+      var canCancelarCarne  = isAdmin || (currentUser.podeCancelarCarne   !== false);
+      var canAlterarVencto  = isAdmin || (currentUser.podeAlterarVencimento !== false);
+
+      document.getElementById('user-nome').textContent = currentUser.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = currentUser.role;
+      ub.className = 'al-badge ' + (isAdmin ? 'badge-ativo' : 'badge-pendente');
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      var clienteId = new URLSearchParams(window.location.search).get('id');
+      if (!clienteId) { window.location.href = 'clientes.html'; return; }
+
+      var clienteData = null;
+      var placaSelecionada = null;
+
+      // ── Tabs ─────────────────────────────────────────────────────────────
+      document.querySelectorAll('.detail-page-tabs button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.detail-page-tabs button').forEach(function (b) { b.classList.remove('active'); });
+          this.classList.add('active');
+          var tab = this.dataset.tab;
+          document.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
+          document.getElementById('tab-' + tab).classList.add('active');
+          if (tab === 'cobrancas') carregarCobrancas();
+        });
+      });
+
+      // ── Carregar dados do cliente ─────────────────────────────────────────
+      function carregarCliente() {
+        AL.apiGet('/api/clientes/' + clienteId)
+          .then(function (c) {
+            clienteData = c;
+            document.getElementById('page-nome').textContent = c.nome;
+            document.getElementById('page-status').innerHTML = AL.badgeStatus(c.status);
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('content-area').style.display = 'block';
+            renderDados(c);
+            renderPlacas(c);
+          })
+          .catch(function (err) {
+            document.getElementById('loading-state').innerHTML =
+              '<div class="text-danger" style="padding:40px;">' + err.message + '</div>';
+          });
+      }
+
+      // ── Aba Dados ─────────────────────────────────────────────────────────
+      function renderDados(c) {
+        var div = document.getElementById('tab-dados');
+        div.innerHTML = '<div class="card-section">' +
+          '<form id="form-dados">' +
+          '<div class="row"><div class="col-sm-8"><div class="form-group"><label>Nome</label><input class="form-control" id="d-nome" value="' + esc(c.nome) + '" /></div></div>' +
+          '<div class="col-sm-4"><div class="form-group"><label>CPF/CNPJ</label><input class="form-control" id="d-cpfcnpj" value="' + esc(c.cpfCnpj || '') + '" /></div></div></div>' +
+          '<div class="row"><div class="col-sm-6"><div class="form-group"><label>Telefone</label><input class="form-control" id="d-telefone" value="' + esc(c.telefone || '') + '" /></div></div>' +
+          '<div class="col-sm-6"><div class="form-group"><label>E-mail</label><input type="email" class="form-control" id="d-email" value="' + esc(c.email || '') + '" /></div></div></div>' +
+          '<div class="row"><div class="col-sm-4"><div class="form-group"><label>CEP</label><input class="form-control" id="d-cep" value="' + esc(c.cep || '') + '" placeholder="00000-000" maxlength="9" /></div></div>' +
+          '<div class="col-sm-8"><div class="form-group"><label>Logradouro</label><input class="form-control" id="d-logradouro" value="' + esc(c.logradouro || '') + '" /></div></div></div>' +
+          '<div class="row"><div class="col-sm-3"><div class="form-group"><label>Número</label><input class="form-control" id="d-numero" value="' + esc(c.numero || '') + '" /></div></div>' +
+          '<div class="col-sm-4"><div class="form-group"><label>Complemento</label><input class="form-control" id="d-complemento" value="' + esc(c.complemento || '') + '" /></div></div>' +
+          '<div class="col-sm-5"><div class="form-group"><label>Bairro</label><input class="form-control" id="d-bairro" value="' + esc(c.bairro || '') + '" /></div></div></div>' +
+          '<div class="row"><div class="col-sm-8"><div class="form-group"><label>Cidade</label><input class="form-control" id="d-cidade" value="' + esc(c.cidade || '') + '" /></div></div>' +
+          '<div class="col-sm-4"><div class="form-group"><label>UF</label><input class="form-control" id="d-estado" value="' + esc(c.estado || '') + '" maxlength="2" style="text-transform:uppercase;" /></div></div></div>' +
+          '<div class="form-group"><label>Notas</label><textarea class="form-control" id="d-notas" rows="2">' + esc(c.notas || '') + '</textarea></div>' +
+          '<div class="form-group"><label>Vendedor</label>' +
+          '<div style="position:relative;">' +
+          '<input type="text" class="form-control" id="d-vendedor-busca" placeholder="Digite nome ou e-mail do vendedor…" autocomplete="off" style="padding-right:32px;" />' +
+          '<button type="button" id="d-vendedor-limpar" title="Limpar vendedor" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;line-height:1;padding:0;">&times;</button>' +
+          '<div id="d-vendedor-resultados" style="position:absolute;z-index:200;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;display:none;"></div>' +
+          '</div></div>' +
+          (canEditarCliente ? '<button type="button" style="margin-top:30px;" class="btn btn-primary-al" id="btn-salvar-dados"><i class="fa fa-save"></i> Salvar alterações</button>' : '') +
+          '</form></div>';
+
+        AL.maskCpfCnpj(document.getElementById('d-cpfcnpj'));
+        AL.maskPhone(document.getElementById('d-telefone'));
+
+        document.getElementById('d-cep').addEventListener('blur', function () {
+          var cep = this.value.replace(/\D/g, '');
+          if (cep.length !== 8) return;
+          fetch('https://viacep.com.br/ws/' + cep + '/json/')
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d.erro) return;
+              document.getElementById('d-logradouro').value = d.logradouro || '';
+              document.getElementById('d-bairro').value = d.bairro || '';
+              document.getElementById('d-cidade').value = d.localidade || '';
+              document.getElementById('d-estado').value = d.uf || '';
+            }).catch(function () { });
+        });
+
+        // Autocomplete vendedor
+        var dVendedorId = c.vendedorId || null;
+        if (c.vendedor) {
+          document.getElementById('d-vendedor-busca').value = c.vendedor.nome;
+          document.getElementById('d-vendedor-limpar').style.display = '';
+        }
+        var dVendTimer = null;
+        document.getElementById('d-vendedor-busca').addEventListener('input', function () {
+          var q = this.value.trim();
+          clearTimeout(dVendTimer);
+          dVendedorId = null;
+          document.getElementById('d-vendedor-limpar').style.display = 'none';
+          if (q.length < 2) { document.getElementById('d-vendedor-resultados').style.display = 'none'; return; }
+          dVendTimer = setTimeout(function () {
+            AL.apiGet('/api/vendedores?busca=' + encodeURIComponent(q)).then(function (list) {
+              var div = document.getElementById('d-vendedor-resultados');
+              if (!list || !list.length) {
+                div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum vendedor encontrado.</div>';
+                div.style.display = 'block'; return;
+              }
+              div.innerHTML = list.map(function (v) {
+                return '<div class="d-vend-item" data-id="' + v.id + '" data-nome="' + v.nome + '" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;">' +
+                  '<strong>' + v.nome + '</strong>' + (v.email ? ' <small class="text-muted">— ' + v.email + '</small>' : '') + '</div>';
+              }).join('');
+              div.style.display = 'block';
+              div.querySelectorAll('.d-vend-item').forEach(function (item) {
+                item.addEventListener('click', function () {
+                  dVendedorId = this.dataset.id;
+                  document.getElementById('d-vendedor-busca').value = this.dataset.nome;
+                  document.getElementById('d-vendedor-limpar').style.display = '';
+                  document.getElementById('d-vendedor-resultados').style.display = 'none';
+                });
+              });
+            }).catch(function () { });
+          }, 300);
+        });
+        document.getElementById('d-vendedor-limpar').addEventListener('click', function () {
+          dVendedorId = null;
+          document.getElementById('d-vendedor-busca').value = '';
+          this.style.display = 'none';
+          document.getElementById('d-vendedor-busca').focus();
+        });
+        document.addEventListener('click', function dVendClose(e) {
+          var wrap = document.getElementById('d-vendedor-busca') && document.getElementById('d-vendedor-busca').parentNode;
+          if (wrap && !wrap.contains(e.target)) document.getElementById('d-vendedor-resultados').style.display = 'none';
+        });
+
+        if (canEditarCliente) document.getElementById('btn-salvar-dados').addEventListener('click', function () {
+          var payload = {
+            nome: document.getElementById('d-nome').value.trim(),
+            cpfCnpj: document.getElementById('d-cpfcnpj').value.replace(/\D/g, ''),
+            telefone: document.getElementById('d-telefone').value.trim(),
+            email: document.getElementById('d-email').value.trim(),
+            cep: document.getElementById('d-cep').value.replace(/\D/g, ''),
+            logradouro: document.getElementById('d-logradouro').value.trim(),
+            numero: document.getElementById('d-numero').value.trim(),
+            complemento: document.getElementById('d-complemento').value.trim(),
+            bairro: document.getElementById('d-bairro').value.trim(),
+            cidade: document.getElementById('d-cidade').value.trim(),
+            estado: document.getElementById('d-estado').value.trim().toUpperCase(),
+            notas: document.getElementById('d-notas').value.trim(),
+            vendedorId: dVendedorId || null,
+          };
+          AL.apiPut('/api/clientes/' + clienteId, payload)
+            .then(function () { AL.showAlert('Dados salvos.', 'success'); carregarCliente(); })
+            .catch(function (err) { AL.showAlert(err.message); });
+        });
+      }
+
+      // ── Aba Placas ────────────────────────────────────────────────────────
+      function renderPlacas(c) {
+        var div = document.getElementById('tab-placas');
+        var placas = c.placas || [];
+        var html = '<div class="card-section">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+          '<h5 style="margin:0;font-weight:700;">Placas Cadastradas</h5>' +
+          '<button class="btn btn-sm btn-primary-al" id="btn-nova-placa"><i class="fa fa-plus"></i> Adicionar Placa</button></div>';
+        if (!placas.length) {
+          html += '<p class="text-muted text-center" style="padding:20px 0;">Nenhuma placa cadastrada.</p>';
+        } else {
+          html += placas.map(function (p) {
+            return '<div class="placa-item"><div>' +
+              '<strong>' + p.placa + '</strong>' +
+              (p.descricao ? '<br><small class="text-muted">' + esc(p.descricao) + '</small>' : '') +
+              '</div><div style="display:flex;gap:6px;align-items:center;">' +
+              (p.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO')) +
+              (canInativarPlaca ? '<button class="btn btn-xs ' + (p.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle-placa" data-pid="' + p.id + '" title="' + (p.ativo ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button>' : '') +
+              (canDeletePlaca ? '<button class="btn btn-xs btn-danger btn-del-placa" data-pid="' + p.id + '" title="Excluir"><i class="fa fa-trash"></i></button>' : '') +
+              '</div></div>';
+          }).join('');
+        }
+        html += '</div>';
+        div.innerHTML = html;
+
+        document.getElementById('btn-nova-placa').addEventListener('click', function () {
+          document.getElementById('mp-placa').value = '';
+          document.getElementById('mp-desc').value = '';
+          document.getElementById('modal-placa-alert').innerHTML = '';
+          document.getElementById('ctr-mp-desc').textContent = '0/40';
+          document.getElementById('ctr-mp-desc').style.color = '#aaa';
+          $('#modal-placa').modal('show');
+        });
+
+        div.querySelectorAll('.btn-toggle-placa').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            AL.apiPatch('/api/placas/' + this.dataset.pid + '/status', {})
+              .then(function () { carregarCliente(); })
+              .catch(function (err) { AL.showAlert(err.message); });
+          });
+        });
+
+        if (canDeletePlaca) {
+          div.querySelectorAll('.btn-del-placa').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              var pid = this.dataset.pid;
+              AL.confirmar({
+                titulo: 'Excluir Placa',
+                mensagem: 'Deseja excluir esta placa?',
+                consequencias: 'A placa será removida permanentemente do sistema.',
+                btnTexto: '<i class="fa fa-trash"></i> Excluir',
+              }).then(function (ok) {
+                if (!ok) return;
+                AL.apiDelete('/api/placas/' + pid)
+                  .then(function () { carregarCliente(); })
+                  .catch(function (err) { AL.showAlert(err.message); });
+              });
+            });
+          });
+        }
+      }
+
+      document.getElementById('mp-desc').addEventListener('input', function () {
+        var len = this.value.length;
+        var ctr = document.getElementById('ctr-mp-desc');
+        ctr.textContent = len + '/40';
+        ctr.style.color = len >= 40 ? '#dc3545' : '#aaa';
+      });
+
+      document.getElementById('btn-salvar-placa').addEventListener('click', function () {
+        var placa = document.getElementById('mp-placa').value.trim().toUpperCase();
+        if (!placa) {
+          document.getElementById('modal-placa-alert').innerHTML = '<div class="alert alert-danger">Placa é obrigatória.</div>';
+          return;
+        }
+        AL.apiPost('/api/clientes/' + clienteId + '/placas', {
+          placa: placa, descricao: document.getElementById('mp-desc').value.trim()
+        }).then(function () {
+          $('#modal-placa').modal('hide');
+          carregarCliente();
+          AL.showAlert('Placa adicionada.', 'success');
+        }).catch(function (err) {
+          document.getElementById('modal-placa-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
+        });
+      });
+
+      // ── Aba Cobranças ─────────────────────────────────────────────────────
+      var carnesData = null;
+      var placaTabAtiva = null;
+      var filtroDataDe = '';
+      var filtroDataAte = '';
+      var filtroStatus = '';
+      var filtroTipo = '';
+
+      function carregarCobrancas() {
+        var div = document.getElementById('tab-cobrancas');
+        div.innerHTML = '<div class="text-center" style="padding:40px;color:#999;"><i class="fa fa-spinner fa-spin fa-2x"></i></div>';
+        AL.apiGet('/api/clientes/' + clienteId + '/carnes')
+          .then(function (carnes) {
+            carnesData = carnes || [];
+            renderCobrancas();
+          })
+          .catch(function (err) {
+            div.innerHTML = '<div class="text-danger" style="padding:24px;">' + err.message + '</div>';
+          });
+      }
+
+      function renderCobrancas() {
+        var div = document.getElementById('tab-cobrancas');
+        if (!carnesData || !carnesData.length) {
+          div.innerHTML = '<div class="card-section">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+            '<h5 style="margin:0;font-weight:700;">Cobranças</h5>' +
+            '<a href="gerar-cobranca.html?clienteId=' + clienteId + '" class="btn btn-sm btn-primary-al"><i class="fa fa-plus"></i> Gerar Cobrança</a>' +
+            '</div>' +
+            '<p class="text-muted text-center" style="padding:20px 0;">Nenhuma cobrança gerada.</p></div>';
+          return;
+        }
+
+        var temUnificado = carnesData.some(function (cn) {
+          return cn.tipo === 'UNIFICADO' && cn.boletos.some(function (b) {
+            return b.status === 'PENDENTE' || b.status === 'ATRASADO';
+          });
+        });
+
+        var placasMap = {};
+        carnesData.forEach(function (cn) {
+          if (cn.tipo === 'INDIVIDUAL') {
+            cn.boletos.forEach(function (b) {
+              if (b.placa && (b.status === 'PENDENTE' || b.status === 'ATRASADO')) {
+                placasMap[b.placa.id] = { id: b.placa.id, placa: b.placa.placa, valor: Number(b.valor) };
+              }
+            });
+          }
+        });
+        var placasLista = Object.values(placasMap);
+
+        var html = '<div class="card-section">';
+
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+          '<h5 style="margin:0;font-weight:700;">Cobranças Encontradas</h5>' +
+          '<a href="gerar-cobranca.html?clienteId=' + clienteId + '" class="btn btn-sm btn-primary-al"><i class="fa fa-plus"></i> Gerar Cobrança</a>' +
+          '</div>';
+
+        // Filtros
+        html += '<div class="filter-cobrancas">' +
+          '<label>Vencimento:</label>' +
+          '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+          '<span style="font-size:12px;color:#888;">De</span>' +
+          '<input type="date" class="form-control" id="filtro-data-de" style="width:auto;" value="' + filtroDataDe + '" />' +
+          '<span style="font-size:12px;color:#888;">Até</span>' +
+          '<input type="date" class="form-control" id="filtro-data-ate" style="width:auto;" value="' + filtroDataAte + '" />' +
+          '</div>' +
+          '<label style="margin-left:8px;">Status:</label>' +
+          '<select class="form-control" id="filtro-status" style="width:auto;">' +
+          '<option value="">Todos</option>' +
+          '<option value="hoje"' + (filtroStatus === 'hoje' ? ' selected' : '') + '>Hoje</option>' +
+          '<option value="aberto"' + (filtroStatus === 'aberto' ? ' selected' : '') + '>Em aberto</option>' +
+          '<option value="ATRASADO"' + (filtroStatus === 'ATRASADO' ? ' selected' : '') + '>Atrasado</option>' +
+          '<option value="PAGO"' + (filtroStatus === 'PAGO' ? ' selected' : '') + '>Pago</option>' +
+          '<option value="CANCELADO"' + (filtroStatus === 'CANCELADO' ? ' selected' : '') + '>Cancelado</option>' +
+          '</select>' +
+          '<label style="margin-left:8px;">Tipo:</label>' +
+          '<select class="form-control" id="filtro-tipo" style="width:auto;">' +
+          '<option value="">Todos</option>' +
+          '<option value="INDIVIDUAL"' + (filtroTipo === 'INDIVIDUAL' ? ' selected' : '') + '>Individual</option>' +
+          '<option value="UNIFICADO"' + (filtroTipo === 'UNIFICADO' ? ' selected' : '') + '>Unificado</option>' +
+          '</select>' +
+          '<button class="btn btn-xs btn-default" style="margin-left:8px;" id="btn-limpar-filtro">Limpar</button>' +
+          '</div>';
+
+        // Botão unificar (múltiplas placas, sem unificado ativo) — disponível para COLABORADOR e ADMIN
+        if (!temUnificado && placasLista.length >= 2) {
+          html += '<div style="margin-bottom:12px;">' +
+            '<button class="btn btn-sm btn-default" id="btn-unificar"><i class="fa fa-compress"></i> Unificar Carnês</button></div>';
+        }
+
+        // Tabs de placas
+        if (!temUnificado && placasLista.length > 0) {
+          html += '<div class="placa-tabs" id="placa-tabs-cobranca">';
+          placasLista.forEach(function (p, i) {
+            var isAtiva = !placaTabAtiva ? (i === 0) : (placaTabAtiva === p.id);
+            html += '<button class="placa-tab' + (isAtiva ? ' active' : '') + '" data-placa-id="' + p.id + '" data-placa-nome="' + esc(p.placa) + '">' + p.placa + '</button>';
+          });
+          if (!placaTabAtiva && placasLista.length > 0) placaTabAtiva = placasLista[0].id;
+          html += '</div>';
+        }
+
+        html += '<div id="cobrancas-content"></div></div>';
+        div.innerHTML = html;
+
+        document.getElementById('filtro-data-de').addEventListener('change', function () { filtroDataDe = this.value; renderCobrancasContent(); });
+        document.getElementById('filtro-data-ate').addEventListener('change', function () { filtroDataAte = this.value; renderCobrancasContent(); });
+        document.getElementById('filtro-status').addEventListener('change', function () { filtroStatus = this.value; renderCobrancasContent(); });
+        document.getElementById('filtro-tipo').addEventListener('change', function () { filtroTipo = this.value; renderCobrancasContent(); });
+        document.getElementById('btn-limpar-filtro').addEventListener('click', function () {
+          filtroDataDe = ''; filtroDataAte = ''; filtroStatus = ''; filtroTipo = '';
+          document.getElementById('filtro-data-de').value = '';
+          document.getElementById('filtro-data-ate').value = '';
+          document.getElementById('filtro-status').value = '';
+          document.getElementById('filtro-tipo').value = '';
+          renderCobrancasContent();
+        });
+
+        if (!temUnificado && placasLista.length > 0) {
+          div.querySelectorAll('.placa-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              div.querySelectorAll('.placa-tab').forEach(function (b) { b.classList.remove('active'); });
+              this.classList.add('active');
+              placaTabAtiva = this.dataset.placaId;
+              renderCobrancasContent();
+            });
+          });
+        }
+
+        if (document.getElementById('btn-unificar')) {
+          document.getElementById('btn-unificar').addEventListener('click', function () {
+            abrirModalUnificar(placasLista);
+          });
+        }
+
+        renderCobrancasContent();
+      }
+
+      function renderCobrancasContent() {
+        var container = document.getElementById('cobrancas-content');
+        if (!container) return;
+
+        var temUnificado = carnesData.some(function (cn) {
+          return cn.tipo === 'UNIFICADO' && cn.boletos.some(function (b) {
+            return b.status === 'PENDENTE' || b.status === 'ATRASADO';
+          });
+        });
+
+        var carnesFiltrados;
+        if (filtroTipo) {
+          carnesFiltrados = carnesData.filter(function (cn) { return cn.tipo === filtroTipo; });
+        } else if (temUnificado) {
+          carnesFiltrados = carnesData;
+        } else if (placaTabAtiva) {
+          carnesFiltrados = carnesData.filter(function (cn) {
+            return cn.tipo === 'INDIVIDUAL' && cn.boletos.some(function (b) {
+              return b.placa && b.placa.id === placaTabAtiva;
+            });
+          });
+        } else {
+          carnesFiltrados = carnesData.filter(function (cn) { return cn.tipo === 'INDIVIDUAL'; });
+        }
+
+        if (!carnesFiltrados.length) {
+          container.innerHTML = '<p class="text-muted text-center" style="padding:20px 0;">Nenhuma cobrança para esta placa.</p>';
+          return;
+        }
+
+        var html = '';
+        carnesFiltrados.forEach(function (cn) {
+          var boletos = cn.boletos.filter(function (b) {
+            if (!filtroTipo && !temUnificado && placaTabAtiva && cn.tipo === 'INDIVIDUAL') {
+              if (!b.placa || b.placa.id !== placaTabAtiva) return false;
+            }
+            if (filtroDataDe && b.vencimento < filtroDataDe) return false;
+            if (filtroDataAte && b.vencimento > filtroDataAte + 'T23:59:59') return false;
+            if (filtroStatus) {
+              if (filtroStatus === 'hoje') {
+                if (!AL.isHoje(b.vencimento) || (b.status !== 'PENDENTE' && b.status !== 'ATRASADO')) return false;
+              } else if (filtroStatus === 'aberto') {
+                if (b.status !== 'PENDENTE' && b.status !== 'ATRASADO') return false;
+              } else {
+                if (b.status !== filtroStatus) return false;
+              }
+            }
+            return true;
+          });
+          if (!boletos.length) return;
+
+          var totalCarne = boletos.reduce(function (s, b) { return s + Number(b.valor); }, 0);
+          html += '<div style="border:1px solid #edf0f3;border-radius:8px;margin-bottom:16px;overflow:hidden;">';
+          html += '<div style="padding:10px 14px;background:#f0f2f5;display:flex;align-items:center;justify-content:space-between;">' +
+            '<div>' +
+            '<span class="al-badge ' + (cn.tipo === 'UNIFICADO' ? 'badge-pendente' : 'badge-ativo') + '" style="margin-right:8px;font-size:11px;">' + cn.tipo + '</span>' +
+            '<small class="text-muted">Carnê #' + cn.id.substr(-6) + ' &bull; ' + cn.numeroParcelas + ' parcelas</small>' +
+            '</div>' +
+            (canCancelarCarne && cn.boletos.some(function (b) { return b.status === 'PENDENTE' || b.status === 'ATRASADO'; }) ? '<button class="btn btn-xs btn-danger btn-cancelar-carne" data-carne-id="' + cn.id + '" title="Cancelar Carnê"><i class="fa fa-ban"></i> Cancelar Carnê</button>' : '') +
+            (canCancelarCarne && cn.boletos.length > 0 && cn.boletos.every(function (b) { return b.status === 'CANCELADO'; }) ? '<button class="btn btn-xs btn-default btn-excluir-carne" data-carne-id="' + cn.id + '" title="Excluir Carnê"><i class="fa fa-trash"></i> Excluir Carnê</button>' : '') +
+            '</div>';
+
+          var grupos = { aberto: [], pago: [], cancelado: [] };
+          boletos.forEach(function (b) {
+            if (b.status === 'PAGO') grupos.pago.push(b);
+            else if (b.status === 'CANCELADO') grupos.cancelado.push(b);
+            else grupos.aberto.push(b);
+          });
+
+          function renderGrupo(key, titulo, cor, items) {
+            if (!items.length) return '';
+            var rows = items.map(function (b) {
+              var placaInfo = '';
+              if (cn.tipo === 'UNIFICADO' && b.placasUnificadas && b.placasUnificadas.length) {
+                placaInfo = '<br><small class="text-muted">' + b.placasUnificadas.map(function (bp) { return bp.placa ? bp.placa.placa : ''; }).join(', ') + '</small>';
+              } else if (b.placa) {
+                placaInfo = '<br><small class="text-muted">' + b.placa.placa + '</small>';
+              }
+              var acoes = '';
+              if (b.linkBoleto) {
+                acoes += '<a href="' + b.linkBoleto + '" target="_blank" class="btn btn-xs btn-info" title="Ver boleto PDF"><i class="fa fa-file-pdf-o"></i> PDF</a> ';
+              }
+              if (b.status !== 'PAGO' && b.status !== 'CANCELADO') {
+                if (canBaixaManual) acoes += '<button class="btn btn-xs btn-success btn-baixa" data-bid="' + b.id + '" title="Confirmar pagamento"><i class="fa fa-check"></i> Baixa</button> ';
+                if (canAlterarVencto) acoes += '<button class="btn btn-xs btn-warning btn-editar-data" data-bid="' + b.id + '" data-venc="' + (b.vencimento || '').split('T')[0] + '" title="Alterar vencimento"><i class="fa fa-calendar"> Alterar Vencimento</i></button>';
+              }
+              var isHojeBoleto = AL.isHoje(b.vencimento) && (b.status === 'PENDENTE' || b.status === 'ATRASADO');
+              return '<tr>' +
+                '<td>Parc. ' + (b.numeroParcela || '—') + placaInfo + '</td>' +
+                '<td>' + (AL.fmtDate(b.vencimento) || '—') + '</td>' +
+                '<td>' + AL.fmtMoney(b.valor) + '</td>' +
+                '<td>' + (isHojeBoleto ? '<span class="al-badge" style="background:#17a2b8;color:#fff;">Dia do pagamento</span>' : AL.badgeStatus(b.status)) + '</td>' +
+                '<td><div class="boleto-actions">' + acoes + '</div></td>' +
+                '</tr>';
+            }).join('');
+            return '<div class="cobranca-group">' +
+              '<div class="cobranca-group-header" data-group="' + key + '">' +
+              '<span style="color:' + cor + ';">' + titulo + '</span>' +
+              '<span><small style="color:#999;font-weight:400;">' + items.length + ' boleto(s)</small> <i class="fa fa-chevron-down"></i></span></div>' +
+              '<div class="cobranca-group-body' + (key === 'aberto' ? ' open' : '') + '">' +
+              '<table class="table table-condensed" style="margin:0;">' +
+              '<thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Status</th><th></th></tr></thead>' +
+              '<tbody>' + rows + '</tbody></table></div></div>';
+          }
+
+          html += renderGrupo('aberto', 'Em aberto', '#e67e22', grupos.aberto);
+          html += renderGrupo('pago', 'Pagos', '#27ae60', grupos.pago);
+          html += renderGrupo('cancelado', 'Cancelados', '#95a5a6', grupos.cancelado);
+          html += '</div>';
+        });
+
+        container.innerHTML = html || '<p class="text-muted text-center" style="padding:20px 0;">Nenhum boleto encontrado.</p>';
+
+        // Collapsible grupos
+        container.querySelectorAll('.cobranca-group-header').forEach(function (header) {
+          header.addEventListener('click', function () {
+            var body = this.nextElementSibling;
+            body.classList.toggle('open');
+            var icon = this.querySelector('.fa');
+            icon.className = body.classList.contains('open') ? 'fa fa-chevron-up' : 'fa fa-chevron-down';
+          });
+        });
+
+        // Cancelar carnê (admin)
+        container.querySelectorAll('.btn-cancelar-carne').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var cid = this.dataset.carneId;
+            var self = this;
+            AL.confirmar({
+              titulo: 'Cancelar Carnê',
+              mensagem: 'Deseja cancelar este carnê?',
+              consequencias: 'Todos os boletos pendentes e atrasados serão cancelados no EFI Bank. Boletos já pagos não são afetados.',
+              btnTexto: '<i class="fa fa-ban"></i> Cancelar Carnê',
+            }).then(function (ok) {
+              if (!ok) return;
+              self.disabled = true;
+              self.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Cancelando…';
+              AL.apiDelete('/api/carnes/' + cid)
+                .then(function () { AL.showAlert('Carnê cancelado.', 'success'); carregarCobrancas(); })
+                .catch(function (err) { self.disabled = false; self.innerHTML = '<i class="fa fa-ban"></i> Cancelar Carnê'; AL.showAlert(err.message); });
+            });
+          });
+        });
+
+        // Excluir carnê (admin)
+        container.querySelectorAll('.btn-excluir-carne').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var cid = this.dataset.carneId;
+            AL.confirmar({
+              titulo: 'Excluir Carnê',
+              mensagem: 'Deseja excluir este carnê do sistema?',
+              consequencias: 'O registro do carnê e seus boletos serão removidos permanentemente do banco de dados.',
+              btnTexto: '<i class="fa fa-trash"></i> Excluir',
+            }).then(function (ok) {
+              if (!ok) return;
+              AL.apiDelete('/api/carnes/' + cid)
+                .then(function () { AL.showAlert('Carnê excluído.', 'success'); carregarCobrancas(); })
+                .catch(function (err) { AL.showAlert(err.message); });
+            });
+          });
+        });
+
+        // Baixa manual (admin)
+        container.querySelectorAll('.btn-baixa').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var bid = this.dataset.bid;
+            var self = this;
+            AL.confirmar({
+              titulo: 'Confirmar Baixa',
+              mensagem: 'Confirmar pagamento manual deste boleto?',
+              consequencias: 'O boleto será marcado como pago e a comissão do vendedor será calculada automaticamente.',
+              btnTexto: '<i class="fa fa-check"></i> Confirmar Baixa',
+              btnClasse: 'btn-success',
+            }).then(function (ok) {
+              if (!ok) return;
+              self.disabled = true;
+              self.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+              AL.apiPatch('/api/boletos/' + bid + '/baixa', {})
+                .then(function () {
+                  AL.showAlert('Baixa registrada.', 'success');
+                  carregarCobrancas();
+                })
+                .catch(function (err) {
+                  self.disabled = false;
+                  self.innerHTML = '<i class="fa fa-check"></i> Baixa';
+                  AL.showAlert(err.message);
+                });
+            });
+          });
+        });
+
+        // Alterar vencimento (admin)
+        container.querySelectorAll('.btn-editar-data').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            document.getElementById('edit-boleto-id').value = this.dataset.bid;
+            document.getElementById('edit-data').value = this.dataset.venc;
+            document.getElementById('modal-edit-alert').innerHTML = '';
+            $('#modal-editar-boleto').modal('show');
+          });
+        });
+      }
+
+      document.getElementById('btn-salvar-edit').addEventListener('click', function () {
+        var bid = document.getElementById('edit-boleto-id').value;
+        var dt = document.getElementById('edit-data').value;
+        if (!dt) {
+          document.getElementById('modal-edit-alert').innerHTML = '<div class="alert alert-danger">Informe a data.</div>';
+          return;
+        }
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando…';
+        AL.apiPatch('/api/boletos/' + bid + '/editar', { dataVencimento: dt })
+          .then(function () {
+            $('#modal-editar-boleto').modal('hide');
+            AL.showAlert('Vencimento atualizado.', 'success');
+            carregarCobrancas();
+          })
+          .catch(function (err) {
+            document.getElementById('modal-edit-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
+          })
+          .finally(function () {
+            btn.disabled = false;
+            btn.innerHTML = 'Salvar';
+          });
+      });
+
+      // Modal Unificar
+      function abrirModalUnificar(placasLista) {
+        var d = new Date(); d.setDate(d.getDate() + 5);
+        var ano = d.getFullYear(), mes = String(d.getMonth() + 1).padStart(2, '0'), dia = String(d.getDate()).padStart(2, '0');
+        document.getElementById('unif-vencimento').value = ano + '-' + mes + '-' + dia;
+        document.getElementById('modal-unif-alert').innerHTML = '';
+        document.getElementById('unif-txt').style.display = 'inline';
+        document.getElementById('unif-spin').style.display = 'none';
+        var total = placasLista.reduce(function (s, p) { return s + (p.valor || 0); }, 0);
+        var pDiv = document.getElementById('modal-unif-placas');
+        pDiv.innerHTML = '<p style="font-size:13px;font-weight:600;margin-bottom:8px;">Placas a unificar:</p>' +
+          '<div style="border:1px solid #ddd;border-radius:6px;overflow:hidden;margin-bottom:12px;">' +
+          placasLista.map(function (p) {
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #eee;">' +
+              '<span class="al-badge badge-ativo">' + esc(p.placa) + '</span>' +
+              '<strong style="font-size:13px;">' + AL.fmtMoney(p.valor) + '<small class="text-muted">/mês</small></strong>' +
+              '</div>';
+          }).join('') +
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8f9fa;font-weight:700;">' +
+          '<span>Total unificado:</span>' +
+          '<span style="color:#27ae60;">' + AL.fmtMoney(total) + '<small class="text-muted">/mês</small></span>' +
+          '</div></div>';
+        $('#modal-unificar').modal('show');
+      }
+
+      document.getElementById('btn-confirmar-unif').addEventListener('click', function () {
+        var venc = document.getElementById('unif-vencimento').value;
+        var parc = parseInt(document.getElementById('unif-parcelas').value);
+        if (!venc || !parc) {
+          document.getElementById('modal-unif-alert').innerHTML = '<div class="alert alert-danger">Preencha vencimento e parcelas.</div>';
+          return;
+        }
+        document.getElementById('unif-txt').style.display = 'none';
+        document.getElementById('unif-spin').style.display = 'inline';
+        document.getElementById('btn-confirmar-unif').disabled = true;
+        AL.apiPost('/api/carnes/unificar', {
+          clienteId: clienteId,
+          dataVencimento: venc,
+          numeroParcelas: parc,
+        }).then(function () {
+          $('#modal-unificar').modal('hide');
+          document.getElementById('btn-confirmar-unif').disabled = false;
+          AL.showAlert('Carnês unificados com sucesso!', 'success');
+          carregarCobrancas();
+        }).catch(function (err) {
+          document.getElementById('btn-confirmar-unif').disabled = false;
+          document.getElementById('unif-txt').style.display = 'inline';
+          document.getElementById('unif-spin').style.display = 'none';
+          document.getElementById('modal-unif-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
+        });
+      });
+
+      function esc(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      carregarCliente();
+    })();
+  </script>
+</body>
+
+</html>

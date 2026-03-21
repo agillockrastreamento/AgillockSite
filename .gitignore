@@ -1,0 +1,26 @@
+# Arquivos internos do projeto (não devem ir para o repositório público)
+Ajustes.txt
+EscopoAlteracoesSite.txt
+
+# Claude Code — memórias e configurações locais
+.claude/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backend — segredos e artefatos (cobertos também por backend/.gitignore)
+backend/.env
+backend/dist/
+backend/node_modules/
+backend/cert/*.p12
+backend/cert/*.pem
+backend/cert/*.key
+backend/cert/*.pfx

@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: agillock
+      POSTGRES_USER: agillock_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - agillock_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agillock_user -d agillock"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://agillock_user:${POSTGRES_PASSWORD}@postgres:5432/agillock
+    volumes:
+      - ./cert:/app/cert:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - agillock_net
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    networks:
+      - agillock_net
+
+networks:
+  agillock_net:
+
+volumes:
+  postgres_data:

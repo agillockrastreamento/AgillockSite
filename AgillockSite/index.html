@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <!-- Anti-FOUC: aplica tema escuro antes de renderizar -->
+    <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+
+    <meta charset="utf-8">
+    <link href="favicon.ico" rel="icon" type="image/x-icon">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Conheça a Agillock Rastreamento. Proteja seus bens e sua vida. Monitoramento pessoa física ou jurídica. Rastreamento de veículos, assistência veicular 24h e seguro.">
+
+    <title>Ágillock - Rastreamento de Veículos</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="css/agency.css" rel="stylesheet">
+    <link href="css/agillock.css" rel="stylesheet">
+    <!-- Font Awesome 4.7 (CDN) — inclui fa-whatsapp, fa-instagram -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Kaushan+Script" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic,700italic" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Slab:400,100,300,700" rel="stylesheet">
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           VARIÁVEIS DE TEMA
+        ═══════════════════════════════════════════════════════════════════ */
+        :root {
+            --al-bg:                #ffffff;
+            --al-bg-alt:            #f8f8f8;
+            --al-text:              #222222;
+            --al-text-muted:        #666666;
+            --al-heading:           #222222;
+            --al-card-bg:           #ffffff;
+            --al-card-border:       #e5e5e5;
+            --al-card-shadow:       0 4px 18px rgba(0,0,0,0.07);
+            --al-card-shadow-hover: 0 16px 40px rgba(0,0,0,0.13);
+            --al-timeline-bg:       #ffffff;
+            --al-timeline-border:   #e7e7e7;
+            --al-transition:        0.3s ease;
+        }
+        html.dark-theme {
+            --al-bg:                #111111;
+            --al-bg-alt:            #181818;
+            --al-text:              #e0e0e0;
+            --al-text-muted:        #999999;
+            --al-heading:           #f0f0f0;
+            --al-card-bg:           #1e1e1e;
+            --al-card-border:       #2a2a2a;
+            --al-card-shadow:       0 4px 18px rgba(0,0,0,0.35);
+            --al-card-shadow-hover: 0 16px 40px rgba(0,0,0,0.55);
+            --al-timeline-bg:       #1e1e1e;
+            --al-timeline-border:   #2a2a2a;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           TEMA ESCURO — OVERRIDES
+        ═══════════════════════════════════════════════════════════════════ */
+        html.dark-theme body                   { background-color: var(--al-bg); transition: background-color 0.3s; }
+        html.dark-theme section#services,
+        html.dark-theme section#about          { background-color: var(--al-bg) !important; }
+        html.dark-theme .section-heading       { color: var(--al-heading) !important; }
+        html.dark-theme .section-subheading,
+        html.dark-theme .text-muted            { color: var(--al-text-muted) !important; }
+        html.dark-theme .service-heading       { color: var(--al-heading) !important; }
+        html.dark-theme .subheading            { color: var(--al-heading) !important; }
+        html.dark-theme .timeline-body p       { color: var(--al-text-muted) !important; }
+        html.dark-theme .timeline-panel        { background: var(--al-timeline-bg) !important; border-color: var(--al-timeline-border) !important; }
+        /* Setas do timeline */
+        html.dark-theme .timeline > li > .timeline-panel:before                      { border-right-color: var(--al-timeline-border) !important; }
+        html.dark-theme .timeline > li > .timeline-panel:after                       { border-right-color: var(--al-timeline-bg) !important; }
+        html.dark-theme .timeline > li.timeline-inverted > .timeline-panel:before    { border-left-color: var(--al-timeline-border) !important; }
+        html.dark-theme .timeline > li.timeline-inverted > .timeline-panel:after     { border-left-color: var(--al-timeline-bg) !important; }
+        /* Navbar */
+        html.dark-theme .navbar-default        { background-color: #1a1a1a !important; border-color: #222 !important; }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           HERO — centralizado
+        ═══════════════════════════════════════════════════════════════════ */
+        header .intro-text {
+            padding-top: 130px;
+            text-align: center !important;
+        }
+        header .intro-text .pensou-title {
+            display: block;
+            font-size: 12px !important;
+            font-weight: 300;          /* menos negrito */
+            margin-bottom: 5px !important;
+            line-height: 28px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+        /* "Conheça a Ágil Lock!" — negrito */
+        header .intro-text .intro-lead-in { font-weight: 700 !important; }
+
+        @media (min-width: 768px) {
+            header .intro-text .intro-lead-in  { margin-bottom: 60px; }
+            header .intro-text .pensou-title   { font-size: 22px !important; line-height: 32px; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           NAVBAR — botão de tema (mobile fora do drawer, desktop dentro)
+        ═══════════════════════════════════════════════════════════════════ */
+        .btn-tema {
+            background: transparent;
+            border: 1.5px solid rgba(255,255,255,0.35);
+            color: rgba(255,255,255,0.85);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 33px;
+            text-align: center;
+            transition: all var(--al-transition);
+            vertical-align: middle;
+        }
+        .btn-tema:hover, .btn-tema:focus { outline: none; background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.8); color: #fff; }
+        html.dark-theme .btn-tema             { border-color: rgba(255,204,0,0.5); color: #ffcc00; }
+        html.dark-theme .btn-tema:hover,
+        html.dark-theme .btn-tema:focus       { background: rgba(255,204,0,0.12); border-color: #ffcc00; }
+
+        /* Versão mobile (dentro de navbar-header, fora do drawer) */
+        .btn-tema-xs {
+            float: right;
+            margin: 8px 6px 8px 0;
+            display: none;     /* escondido por padrão */
+        }
+        @media (max-width: 767px) {
+            .btn-tema-xs    { display: block; }    /* aparece no mobile */
+            .btn-tema-nav   { display: none !important; }  /* some no mobile */
+        }
+
+        /* Versão desktop (dentro do collapse, ao lado do dropdown Acessar) */
+        .btn-tema-nav-wrap {
+            display: inline-block;
+            margin-left: 10px;   /* espaço extra entre "Acessar" e o toggle */
+            vertical-align: middle;
+            padding-top: 7px;    /* centraliza verticalmente na navbar de 50px */
+            margin-top: -2px;    /* ajuste fino de alinhamento */
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SERVIÇOS — altura igual + imagens sem overflow
+        ═══════════════════════════════════════════════════════════════════ */
+        /* Colunas com mesma altura */
+        @media (min-width: 576px) {
+            #services .row-cards {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: stretch;
+            }
+            #services .row-cards > [class*="col-"] {
+                display: flex;
+                flex-direction: column;
+            }
+        }
+
+        .servico-card {
+            border-radius: 12px;
+            padding: 25px 20px 28px;
+            background: var(--al-card-bg);
+            transition: transform var(--al-transition), box-shadow var(--al-transition), background-color 0.3s;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            width: 100%;
+        }
+        .servico-card:hover { transform: translateY(-10px); box-shadow: var(--al-card-shadow-hover); }
+        .servico-card .service-heading { margin-top: 8px; margin-bottom: 12px; }
+        .servico-card p.text-muted     { flex: 1; margin-bottom: 0; }
+
+        /* Caixa da imagem — sem overflow */
+        .servico-img {
+            height: 110px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        .servico-img img {
+            max-height: 100%;
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            display: block;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           HOVER — timeline, botões, social
+        ═══════════════════════════════════════════════════════════════════ */
+        .timeline-image          { transition: transform var(--al-transition); }
+        .timeline-image:hover    { transform: scale(1.06); }
+        .timeline-image img      { transition: box-shadow var(--al-transition); }
+        .timeline-image:hover img{ box-shadow: 0 8px 25px rgba(0,0,0,0.22); }
+
+        .btn                     { transition: transform var(--al-transition), box-shadow var(--al-transition) !important; }
+        .btn:hover               { transform: scale(1.04); box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important; }
+        .btn:active              { transform: scale(0.97) !important; }
+
+        .social-buttons li a     { display: inline-block; transition: transform var(--al-transition), background-color var(--al-transition); }
+        .social-buttons li a:hover { transform: scale(1.2); background-color: #f6bf01 !important; border-color: #f6bf01 !important; color: #111 !important; }
+
+        /* Sublinhado animado nos links da navbar */
+        .navbar-nav > li > a     { position: relative; transition: color var(--al-transition); }
+        .navbar-nav > li > a::after { content: ''; position: absolute; bottom: 6px; left: 50%; right: 50%; height: 2px; background: #f6bf01; transition: left var(--al-transition), right var(--al-transition); }
+        .navbar-nav > li > a:hover::after { left: 15%; right: 15%; }
+
+        /* Nav active — fundo amarelo com borda arredondada */
+        .navbar-default .navbar-nav > .active > a,
+        .navbar-default .navbar-nav > .active > a:hover,
+        .navbar-default .navbar-nav > .active > a:focus { border-radius: 18px !important; }
+
+        /* Logo menor no mobile */
+        @media (max-width: 767px) {
+            .brand img { height: 50px !important; padding: 6px !important; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLL REVEAL
+        ═══════════════════════════════════════════════════════════════════ */
+        .reveal       { opacity: 0; transform: translateY(40px);  transition: opacity 0.7s ease, transform 0.7s ease; }
+        .reveal-left  { opacity: 0; transform: translateX(-40px); transition: opacity 0.7s ease, transform 0.7s ease; }
+        .reveal-right { opacity: 0; transform: translateX(40px);  transition: opacity 0.7s ease, transform 0.7s ease; }
+        .reveal.revealed, .reveal-left.revealed, .reveal-right.revealed { opacity: 1; transform: none; }
+        .rv-d1 { transition-delay: 0.10s !important; }
+        .rv-d2 { transition-delay: 0.22s !important; }
+        .rv-d3 { transition-delay: 0.34s !important; }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           WHATSAPP FLUTUANTE
+        ═══════════════════════════════════════════════════════════════════ */
+        .whatsapp-icon         { position: fixed; bottom: 0; left: -10px; z-index: 99999; border-radius: 50%; }
+        .whatsapp-icon img     { width: 120px; display: block; }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           2ª VIA BOLETO
+        ═══════════════════════════════════════════════════════════════════ */
+        #SegundaVia p.dica { margin-top: 6px; font-size: 14px; opacity: 0.85; }
+        .segunda-via-form  { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px; }
+        .segunda-via-form input {
+            flex: 1 1 240px;
+            max-width: 340px;
+            padding: 11px 16px;
+            border: none;
+            border-radius: 5px;
+            font-size: 15px;
+            outline: none;
+            color: #222222;          /* texto visível (evita herdar color:white da section) */
+            background-color: #fff;
+        }
+        .segunda-via-form input::placeholder { color: #888; }
+        .segunda-via-form input:focus { box-shadow: 0 0 0 3px rgba(246,191,1,0.55); }
+        #segunda-via-resultado     { margin-top: 16px; font-size: 14px; min-height: 24px; }
+        #segunda-via-resultado a   { color: #f4d03f; font-weight: bold; text-decoration: underline; }
+        #segunda-via-resultado ul  { list-style: none; padding: 0; margin: 8px 0 0; }
+        #segunda-via-resultado li  { background: rgba(255,255,255,0.1); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; backdrop-filter: blur(4px); }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CONTATO — botão WhatsApp
+        ═══════════════════════════════════════════════════════════════════ */
+        .contato-whatsapp-btn {
+            display: inline-block;
+            background-color: #25d366;
+            color: #fff !important;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 17px;
+            font-weight: bold;
+            text-decoration: none;
+            margin-top: 22px;
+            transition: background-color var(--al-transition), transform var(--al-transition), box-shadow var(--al-transition);
+        }
+        .contato-whatsapp-btn:hover { background-color: #1ebe5d; color: #fff !important; text-decoration: none; transform: translateY(-3px); box-shadow: 0 8px 22px rgba(37,211,102,0.4); }
+        .contato-whatsapp-btn i    { margin-right: 8px; }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVO
+        ═══════════════════════════════════════════════════════════════════ */
+        @media (max-width: 767px) {
+            .servico-card          { margin-bottom: 20px; }
+            #SegundaVia .container { padding: 40px 20px; }
+            footer .col-md-4       { text-align: center; margin-bottom: 12px; }
+        }
+    </style>
+</head>
+
+<body id="page-top" class="index">
+
+    <!-- WhatsApp flutuante -->
+    <div class="whatsapp-icon">
+        <a target="_blank" href="https://wa.me/558541010103?text=Ol%C3%A1!%20Gostaria%20de%20mais%20informa%C3%A7%C3%B5es%20sobre%20o%20Rastreamento.">
+            <img src="img/whatsappicon.png" alt="WhatsApp">
+        </a>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         NAVBAR
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <nav class="navbar navbar-default navbar-fixed-top">
+        <div class="container">
+
+            <!-- Brand + hamburger + toggle mobile (todos fora do collapse) -->
+            <div class="navbar-header page-scroll">
+
+                <!-- Hambúrguer (Bootstrap) -->
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-nav-collapse">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+
+                <!-- Toggle tema — MOBILE: fora do drawer, ao lado do hambúrguer -->
+                <button class="btn-tema btn-tema-xs" onclick="toggleTema()" title="Alternar tema" aria-label="Alternar tema">
+                    <i class="fa fa-moon-o tema-icon"></i>
+                </button>
+
+                <!-- Logo -->
+                <a class="brand page-scroll" href="#page-top">
+                    <img class="img-responsive" src="img/logo_agillock_white_new.png" alt="Ágillock">
+                </a>
+            </div>
+
+            <!-- Links (colapsa no mobile) -->
+            <div class="collapse navbar-collapse" id="bs-nav-collapse">
+                <ul class="nav navbar-nav navbar-right">
+                    <li class="hidden"><a href="#page-top"></a></li>
+                    <li><a class="page-scroll" href="#services">Serviços</a></li>
+                    <li><a class="page-scroll" href="#about">Sobre nós</a></li>
+                    <li><a class="page-scroll" href="#contact">Contato</a></li>
+
+                    <!-- Dropdown de acesso -->
+                    <li class="nav-item dropdown dropdown-access">
+                        <button class="btn btn-secondary dropdown-toggle" role="button"
+                                id="navbarDropdown" data-toggle="dropdown"
+                                aria-haspopup="true" aria-expanded="false">
+                            Acessar <span class="caret"></span>
+                        </button>
+                        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                            <a class="dropdown-item access-admin" href="https://agillock.monitorando.me/admin">
+                                <i class="fa fa-map-marker"></i> Acesso ao Rastreador
+                            </a>
+                            <a class="dropdown-item access-admin" href="admin/login.html">
+                                <i class="fa fa-lock"></i> Acesso Administrativo
+                            </a>
+                        </div>
+                    </li>
+
+                    <!-- Toggle tema — DESKTOP: dentro do collapse, ao lado de "Acessar" -->
+                    <li class="btn-tema-nav">
+                        <div class="btn-tema-nav-wrap">
+                            <button class="btn-tema" onclick="toggleTema()" title="Alternar tema" aria-label="Alternar tema">
+                                <i class="fa fa-moon-o tema-icon"></i>
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         HERO
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <header>
+        <div class="container">
+            <div class="intro-text">
+                <div class="pensou-title reveal">Pensou em segurança com agilidade?</div>
+                <div class="intro-lead-in reveal rv-d1">Conheça a Ágil Lock!</div>
+                <div class="intro-heading reveal rv-d2">
+                    <div><img src="img/agillock_new_symbol.png" width="20" alt=""> ASSISTÊNCIA VEICULAR 24H</div>
+                    <div><img src="img/agillock_new_symbol.png" width="20" alt=""> RASTREAMENTO 24H</div>
+                    <div><img src="img/agillock_new_symbol.png" width="20" alt=""> SEGURO</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SERVIÇOS
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <section id="services">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12 text-center">
+                    <h2 class="section-heading reveal">Serviços</h2>
+                    <h3 class="section-subheading text-muted reveal rv-d1">Conheça o nosso trabalho.</h3>
+                </div>
+            </div>
+
+            <!-- row-cards usa flexbox para altura igual entre os cards -->
+            <div class="row row-cards text-center">
+                <div class="col-md-6 col-sm-6">
+                    <div class="servico-card reveal reveal-left">
+                        <div class="servico-img">
+                            <img src="img/todos_veiculos.png" alt="Rastreamento veicular">
+                        </div>
+                        <h4 class="service-heading">Proteja seu(s) veículo(s), seus bens e sua vida.</h4>
+                        <p class="text-muted">
+                            Disponibilizamos para nossos clientes um sistema via computador ou smartphone, simples de operar porém completo, com todos os recursos de localização e bloqueio para seu(s) veículo(s). Nossa equipe está disponível 24hs para qualquer emergência, incluindo reboque.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-sm-6">
+                    <div class="servico-card reveal reveal-right">
+                        <div class="servico-img">
+                            <img src="img/caminhao.png" alt="Monitoramento de frota">
+                        </div>
+                        <h4 class="service-heading">Monitoramento específico Pessoa Jurídica</h4>
+                        <p class="text-muted">
+                            Serviço de alto desempenho para transportadoras e frotistas: histórico completo da rota com paradas, tempo de permanência, quilometragem e alertas em tempo real — evitando fraudes e garantindo controle total da frota.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         2ª VIA BOLETO
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <section id="SegundaVia">
+        <div class="mask"></div>
+        <div class="container" style="position:relative; z-index:1; padding-top:60px; padding-bottom:60px;">
+            <div class="row">
+                <div class="col-md-8 col-md-offset-2 col-sm-10 col-sm-offset-1 reveal">
+                    <h1>2ª Via de Conta</h1>
+                    <span>Perdeu o boleto ou deseja atualizar o valor com vencimento atual?</span>
+                    <p class="dica">Informe seu <strong>CPF</strong>, <strong>CNPJ</strong> ou a <strong>placa do veículo</strong> para localizar seu boleto.</p>
+                    <div class="segunda-via-form">
+                        <input type="text" id="segunda-via-busca"
+                               placeholder="CPF, CNPJ ou placa (ex: ABC1234)"
+                               maxlength="20" autocomplete="off">
+                        <button class="btn btn-warning" onclick="buscarBoleto()">
+                            <i class="fa fa-search"></i> Buscar Boleto
+                        </button>
+                    </div>
+                    <div id="segunda-via-resultado"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SOBRE NÓS
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <section id="about">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12 text-center">
+                    <h2 class="section-heading reveal">Sobre nós</h2>
+                    <h3 class="section-subheading text-muted reveal rv-d1">Conheça a Ágillock</h3>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-12">
+                    <ul class="timeline">
+                        <li>
+                            <div class="timeline-image reveal">
+                                <img class="img-circle img-responsive" src="img/about/3.jpg" alt="Empresa">
+                            </div>
+                            <div class="timeline-panel reveal reveal-left rv-d1">
+                                <div class="timeline-heading">
+                                    <h4 class="subheading">Empresa</h4>
+                                </div>
+                                <div class="timeline-body">
+                                    <p class="text-muted">
+                                        Iniciamos em 2010 com monitoramento 24hs em tempo real para qualquer veículo ou base móvel, complementando o seguro do seu veículo. Visando proteger bens materiais e, o mais importante, sua vida.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="timeline-panel inverted reveal reveal-right rv-d2">
+                                <div class="timeline-heading">
+                                    <h4 class="subheading">Qualidade e excelência</h4>
+                                </div>
+                                <div class="timeline-body">
+                                    <p class="text-muted">
+                                        Prezamos por qualidade, excelência e satisfação do cliente. A AGILLOCK possui equipe especializada em localização e resgate em caso de sinistro, dispondo de reboque 24hs.
+                                    </p>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="timeline">
+                            <div class="timeline-image reveal">
+                                <img class="img-circle img-responsive" src="img/office.jpg" alt="Monitoramento" style="height:100%;">
+                            </div>
+                            <div class="timeline-panel reveal reveal-left rv-d1">
+                                <div class="timeline-heading">
+                                    <h4 class="subheading">Monitoramento</h4>
+                                </div>
+                                <div class="timeline-body">
+                                    <p class="text-muted">
+                                        O sistema AGILLOCK é uma Plataforma Múltipla, capaz de fornecer rastreamento veicular completo, ideal para pessoas físicas e jurídicas — transportadoras e frotistas.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="timeline-panel inverted reveal reveal-right rv-d2">
+                                <div class="timeline-heading">
+                                    <h4 class="subheading">Agilidade</h4>
+                                </div>
+                                <div class="timeline-body">
+                                    <p class="text-muted">
+                                        Com mais agilidade na localização, o cliente AGILLOCK conta com rastreamento 24hs, monitoramento em tempo real, histórico do veículo, base móvel e bloqueio total.
+                                    </p>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         CONTATO
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <section id="contact">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12 text-center">
+                    <h2 class="section-heading reveal">Fale conosco</h2>
+                    <h3 class="section-subheading text-muted reveal rv-d1" style="color:white;">Responderemos o mais rápido possível.</h3>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1 text-center reveal">
+                    <h3 class="section-heading">
+                        Atendimento ágil:<br>
+                        (85) 3034-3511 &nbsp;|&nbsp; (85) 4101-0103
+                    </h3>
+                    <p style="color:white; font-size:1.7rem; margin-bottom:0;">
+                        agillockrastreamento@gmail.com
+                    </p>
+                    <a class="contato-whatsapp-btn" target="_blank"
+                       href="https://wa.me/558541010103?text=Ol%C3%A1!%20Gostaria%20de%20mais%20informa%C3%A7%C3%B5es%20sobre%20o%20Rastreamento.">
+                        <i class="fa fa-whatsapp"></i> Falar pelo WhatsApp
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         FOOTER
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 text-center">
+                    <span class="copyright">Copyright &copy; Ágillock 2026</span>
+                </div>
+                <div class="col-md-4 text-center">
+                    <ul class="list-inline social-buttons">
+                        <li>
+                            <a href="https://www.facebook.com/agillock.gestaoderisco" target="_blank" title="Facebook">
+                                <i class="fa fa-facebook"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://wa.me/558541010103" target="_blank" title="WhatsApp">
+                                <i class="fa fa-whatsapp"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.instagram.com/agillock_rastreamento/" target="_blank" title="Instagram">
+                                <i class="fa fa-instagram"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="col-md-4 text-center">
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading spinner -->
+    <div id="Loading">
+        <div class="lds-ring"><div></div><div></div><div></div><div></div></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SCRIPTS
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <script src="js/jquery.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.3/jquery.easing.min.js"></script>
+    <script src="js/classie.js"></script>
+    <script src="js/cbpAnimatedHeader.js"></script>
+    <script src="js/agency.js"></script>
+    <script src="agillock.js"></script>
+    <script src="js/config.js"></script>
+
+    <script>
+        // ─── Toggle de tema ──────────────────────────────────────────────
+        function toggleTema() {
+            var dark = document.documentElement.classList.toggle('dark-theme');
+            // Atualiza TODOS os ícones de tema (mobile + desktop)
+            document.querySelectorAll('.tema-icon').forEach(function (i) {
+                i.className = (dark ? 'fa fa-sun-o' : 'fa fa-moon-o') + ' tema-icon';
+            });
+            localStorage.setItem('al-theme', dark ? 'dark' : 'light');
+        }
+
+        // Aplica ícone correto conforme tema inicial (já aplicado no <head>)
+        (function () {
+            if (document.documentElement.classList.contains('dark-theme')) {
+                document.querySelectorAll('.tema-icon').forEach(function (i) {
+                    i.className = 'fa fa-sun-o tema-icon';
+                });
+            }
+        })();
+
+        // ─── Scroll reveal ───────────────────────────────────────────────
+        (function () {
+            var selectors = '.reveal, .reveal-left, .reveal-right';
+            if (!('IntersectionObserver' in window)) {
+                document.querySelectorAll(selectors).forEach(function (el) { el.classList.add('revealed'); });
+                return;
+            }
+            var obs = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) {
+                    if (e.isIntersecting) { e.target.classList.add('revealed'); obs.unobserve(e.target); }
+                });
+            }, { threshold: 0.12 });
+            document.querySelectorAll(selectors).forEach(function (el) { obs.observe(el); });
+        })();
+
+        // ─── 2ª Via Boleto ───────────────────────────────────────────────
+        function buscarBoleto() {
+            var busca     = document.getElementById('segunda-via-busca').value.trim();
+            var resultado = document.getElementById('segunda-via-resultado');
+
+            if (!busca) {
+                resultado.innerHTML = '<span style="color:#f39c12;">Por favor, informe um CPF, CNPJ ou placa.</span>';
+                return;
+            }
+
+            resultado.innerHTML = '<span><i class="fa fa-spinner fa-spin"></i> Buscando...</span>';
+
+            fetch((window.API_URL || 'https://api.agillock.com.br') + '/api/segunda-via?busca=' + encodeURIComponent(busca))
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.boletos || !data.boletos.length) {
+                        resultado.innerHTML = '<span style="color:#f39c12;">Nenhum boleto pendente encontrado. Fale conosco pelo <a href="https://wa.me/558541010103" target="_blank">WhatsApp</a>.</span>';
+                        return;
+                    }
+                    var html = '<p style="font-weight:bold;margin-bottom:8px;">Boleto(s) encontrado(s):</p><ul>';
+                    data.boletos.forEach(function (b) {
+                        var atrasado = b.status === 'ATRASADO' ? ' <span style="color:#a31e10;font-weight:bold;">(Atrasado)</span>' : '';
+                        html += '<li>Vencimento: <strong>' + b.vencimento + '</strong> &mdash; Valor: <strong>R$ ' + b.valor + '</strong>' + atrasado;
+                        if (b.linkBoleto) html += ' &mdash; <a href="' + b.linkBoleto + '" target="_blank">Baixar boleto</a>';
+                        html += '</li>';
+                    });
+                    resultado.innerHTML = html + '</ul>';
+                })
+                .catch(function () {
+                    resultado.innerHTML = '<span style="color:#a31e10;">Não foi possível consultar. Entre em contato: <a href="https://wa.me/558541010103" target="_blank">(85) 4101-0103</a>.</span>';
+                });
+        }
+
+        document.getElementById('segunda-via-busca').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') buscarBoleto();
+        });
+    </script>
+
+</body>
+</html>

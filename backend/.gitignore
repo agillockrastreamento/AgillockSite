@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.env
+cert/*.p12
+cert/*.pem

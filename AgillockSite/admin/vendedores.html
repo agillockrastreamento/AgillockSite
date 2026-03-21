@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Vendedores — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css?v=2" />
+
+  <style>
+    /* ════════════════════════════════════════════════════════════════
+       EFEITO APP: VENDEDORES COM STICKY CASCATA (TABELA + SUBTABELA)
+    ════════════════════════════════════════════════════════════════ */
+    
+    /* 1. Desliga scroll da página e ajusta área principal */
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
+    
+    /* 2. Trava alertas e filtros */
+    #al-alert-container, .filter-bar { flex-shrink: 0; }
+    
+    /* 3. A MÁGICA 1: Tabela rolável */
+    .table-responsive {
+        flex: 1;
+        overflow-y: auto;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.05);
+        margin-bottom: 0; 
+    }
+    html.dark-theme .table-responsive { background: #141820; }
+    
+    /* 4. A MÁGICA 2: Cabeçalho principal colado no topo (posição 0) */
+    .admin-table > document > thead > tr > th,
+    .admin-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 20; /* Fica acima da sub-tabela */
+        box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
+    }
+    
+  </style>
+
+</head>
+
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;"
+        onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li class="active"><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Vendedores</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-primary-al" id="btn-novo"><i class="fa fa-plus"></i> Novo Vendedor</button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-6">
+          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por nome ou e-mail…" />
+        </div>
+        <div class="col-sm-3">
+          <select id="filtro-status" class="form-control">
+            <option value="">Todos os status</option>
+            <option value="ATIVO">Ativo</option>
+            <option value="INATIVO">Inativo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Clientes</th>
+            <th>Status</th>
+            <th>Criado em</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal fade" id="modal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title" id="modal-titulo">Novo Vendedor</h4>
+        </div>
+        <div class="modal-body">
+          <div id="modal-alert"></div>
+          <form id="form">
+            <input type="hidden" id="f-id" />
+            <div class="form-group"><label>Nome *</label><input class="form-control" id="f-nome" required /></div>
+            <div class="form-group"><label>E-mail *</label><input type="email" class="form-control" id="f-email"
+                required /></div>
+            <div id="senha-wrap">
+              <div class="form-group">
+                <label id="senha-label">Senha *</label>
+                <div class="input-group">
+                  <input type="password" class="form-control" id="f-senha" />
+                  <span class="input-group-btn"><button class="btn btn-default btn-toggle-senha" type="button"
+                      data-target="f-senha"><i class="fa fa-eye"></i></button></span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label id="senha2-label">Confirmar Senha *</label>
+                <div class="input-group">
+                  <input type="password" class="form-control" id="f-senha2" />
+                  <span class="input-group-btn"><button class="btn btn-default btn-toggle-senha" type="button"
+                      data-target="f-senha2"><i class="fa fa-eye"></i></button></span>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary-al" id="btn-salvar">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = user.role; ub.className = 'al-badge badge-ativo';
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      var lista = [];
+
+      // Toggle visibilidade senha
+      document.querySelectorAll('.btn-toggle-senha').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var input = document.getElementById(this.dataset.target);
+          if (input.type === 'password') {
+            input.type = 'text';
+            this.querySelector('i').className = 'fa fa-eye-slash';
+          } else {
+            input.type = 'password';
+            this.querySelector('i').className = 'fa fa-eye';
+          }
+        });
+      });
+
+      function load() {
+        var tb = document.getElementById('tbody');
+        tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i></td></tr>';
+        AL.apiGet('/api/vendedores')
+          .then(function (data) {
+            lista = data || [];
+            filtrar();
+          })
+          .catch(function (err) {
+            tb.innerHTML = '<tr><td colspan="6" class="text-danger text-center">' + err.message + '</td></tr>';
+          });
+      }
+
+      var _debounce = null;
+      function filtrar() {
+        var busca = document.getElementById('filtro-busca').value.toLowerCase().trim();
+        var status = document.getElementById('filtro-status').value;
+        var filtrado = lista.filter(function (v) {
+          var matchBusca = !busca || (v.nome + ' ' + v.email).toLowerCase().indexOf(busca) !== -1;
+          var matchStatus = !status || (status === 'ATIVO' ? v.ativo : !v.ativo);
+          return matchBusca && matchStatus;
+        });
+        renderTabela(filtrado);
+      }
+      document.getElementById('filtro-busca').addEventListener('input', function () {
+        clearTimeout(_debounce);
+        _debounce = setTimeout(filtrar, 300);
+      });
+      document.getElementById('filtro-status').addEventListener('change', filtrar);
+
+      function renderTabela(dados) {
+        var tb = document.getElementById('tbody');
+        var items = dados !== undefined ? dados : lista;
+        if (!items.length) {
+          tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum vendedor.</td></tr>';
+          return;
+        }
+        var html = '';
+        items.forEach(function (v) {
+          html += '<tr class="tr-vendedor" style="cursor:pointer;" data-id="' + v.id + '" data-nome="' + encodeURIComponent(v.nome) + '">' +
+            '<td><i class="fa fa-briefcase fa-fw" style="color:#aaa;margin-right:4px;"></i> ' + v.nome + '</td>' +
+            '<td>' + v.email + '</td>' +
+            '<td><span class="badge" style="background:#6c757d;">' + (v._count ? v._count.clientesVendidos : 0) + '</span></td>' +
+            '<td>' + (v.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO')) + '</td>' +
+            '<td>' + AL.fmtDate(v.criadoEm || v.createdAt) + '</td>' +
+            '<td onclick="event.stopPropagation();">' +
+            '<button class="btn btn-xs btn-default btn-edit" data-id="' + v.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' +
+            '<button class="btn btn-xs ' + (v.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + v.id + '" title="' + (v.ativo ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button> ' +
+            '<button class="btn btn-xs btn-danger btn-del" data-id="' + v.id + '" data-nome="' + v.nome + '" title="Excluir"><i class="fa fa-trash"></i></button>' +
+            '</td></tr>';
+        });
+        tb.innerHTML = html;
+
+        // Clique na linha → abre carteira do vendedor
+        tb.querySelectorAll('.tr-vendedor').forEach(function (tr) {
+          tr.addEventListener('click', function () {
+            var id = this.dataset.id;
+            var nome = this.dataset.nome;
+            window.location.href = '../vendedor/carteira.html?vendedorId=' + id + '&adminBack=1&nomeVendedor=' + nome;
+          });
+        });
+
+        tb.querySelectorAll('.btn-edit').forEach(function (btn) {
+          btn.addEventListener('click', function () { abrirModal(this.dataset.id); });
+        });
+        tb.querySelectorAll('.btn-toggle').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            AL.apiPatch('/api/vendedores/' + this.dataset.id + '/status', {})
+              .then(load).catch(function (err) { AL.showAlert(err.message); });
+          });
+        });
+        tb.querySelectorAll('.btn-del').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var id = this.dataset.id;
+            var nome = this.dataset.nome;
+            AL.confirmar({
+              titulo: 'Excluir Vendedor',
+              mensagem: 'Excluir o vendedor <strong>' + nome + '</strong>?',
+              consequencias: 'O vendedor será removido permanentemente do sistema e não poderá mais acessar o painel.',
+              btnTexto: '<i class="fa fa-trash"></i> Excluir',
+            }).then(function (ok) {
+              if (!ok) return;
+              AL.apiDelete('/api/vendedores/' + id)
+                .then(function () { load(); AL.showAlert('Vendedor excluído.', 'success'); })
+                .catch(function (err) { AL.showAlert(err.message); });
+            });
+          });
+        });
+      }
+
+      function abrirModal(id) {
+        document.getElementById('modal-alert').innerHTML = '';
+        document.getElementById('f-id').value = '';
+        document.getElementById('f-nome').value = '';
+        document.getElementById('f-email').value = '';
+        document.getElementById('f-senha').value = '';
+        document.getElementById('f-senha2').value = '';
+
+        if (id) {
+          document.getElementById('modal-titulo').textContent = 'Editar Vendedor';
+          document.getElementById('senha-wrap').style.display = 'block';
+          document.getElementById('senha-label').textContent = 'Nova Senha (opcional)';
+          document.getElementById('senha2-label').textContent = 'Confirmar Nova Senha';
+          var v = lista.find(function (x) { return x.id === id; });
+          if (v) {
+            document.getElementById('f-id').value = v.id;
+            document.getElementById('f-nome').value = v.nome;
+            document.getElementById('f-email').value = v.email;
+          }
+        } else {
+          document.getElementById('modal-titulo').textContent = 'Novo Vendedor';
+          document.getElementById('senha-wrap').style.display = 'block';
+          document.getElementById('senha-label').textContent = 'Senha *';
+          document.getElementById('senha2-label').textContent = 'Confirmar Senha *';
+        }
+        $('#modal').modal('show');
+      }
+
+      document.getElementById('btn-novo').addEventListener('click', function () { abrirModal(null); });
+
+      document.getElementById('btn-salvar').addEventListener('click', function () {
+        var id = document.getElementById('f-id').value;
+        var nome = document.getElementById('f-nome').value.trim();
+        var email = document.getElementById('f-email').value.trim();
+        var senha = document.getElementById('f-senha').value;
+        var senha2 = document.getElementById('f-senha2').value;
+
+        if (!nome || !email) {
+          document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">Nome e e-mail são obrigatórios.</div>';
+          return;
+        }
+        if (!id && (!senha || senha !== senha2)) {
+          document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">Senhas são obrigatórias e devem coincidir.</div>';
+          return;
+        }
+        if (id && senha && senha !== senha2) {
+          document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">As senhas não coincidem.</div>';
+          return;
+        }
+
+        var payload = { nome: nome, email: email };
+        if (senha) payload.senha = senha;
+
+        var req = id
+          ? AL.apiPut('/api/vendedores/' + id, payload)
+          : AL.apiPost('/api/vendedores', payload);
+
+        req.then(function () {
+          $('#modal').modal('hide');
+          load();
+          AL.showAlert(id ? 'Vendedor atualizado.' : 'Vendedor criado.', 'success');
+        }).catch(function (err) {
+          document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
+        });
+      });
+
+      load();
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Minha Carteira — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    /* ── Seletor de mês ───────────────────────────────────────── */
+    .mes-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mes-nav-btn {
+      background: none;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      width: 30px;
+      height: 30px;
+      color: #1e2530;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+      transition: background .15s;
+    }
+    .mes-nav-btn:hover { background: rgba(0,0,0,.05); }
+    .mes-label {
+      font-weight: 700;
+      font-size: 14px;
+      color: #1e2530;
+      min-width: 150px;
+      text-align: center;
+    }
+    html.dark-theme .mes-nav-btn {
+      border-color: rgba(255,255,255,.3);
+      color: rgba(255,255,255,.9);
+    }
+    html.dark-theme .mes-nav-btn:hover { background: rgba(255,255,255,.1); }
+    html.dark-theme .mes-label { color: rgba(255,255,255,.9); }
+
+    /* ── Toggle buttons ───────────────────────────────────────── */
+    .carteira-toggle-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 30px;
+      justify-content: space-around;
+    }
+    .btn-ct {
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: 2px solid #ddd;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      color: #555;
+      transition: all .2s;
+    }
+    html.dark-theme .btn-ct { border-color: #3d4a5c; color: #fff; }
+    .btn-ct:hover:not(.ct-active) { border-color: #aaa; }
+    .btn-ct.ct-atrasado  { border-color: #dc3545; background: #dc3545; color: #fff; }
+    .btn-ct.ct-garantido { border-color: #28a745; background: #28a745; color: #fff; }
+    .btn-ct.ct-futuro    { border-color: #17a2b8; background: #17a2b8; color: #fff; }
+
+    /* ── Card principal ───────────────────────────────────────── */
+    .cmc {
+      border-radius: 14px;
+      padding: 36px 28px;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
+      transition: background .3s;
+    }
+    .cmc-icone  { font-size: 30px; opacity: .8; margin-bottom: 8px; }
+    .cmc-valor  { font-size: 44px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+    .cmc-label  { font-size: 15px; opacity: .85; margin-top: 6px; }
+    .cmc-sub    { font-size: 12px; opacity: .9; margin-top: 4px; }
+
+    /* ── Cards percentual ─────────────────────────────────────── */
+    .pct-card {
+      border-radius: 10px;
+      padding: 22px 20px;
+      background: #fff;
+      cursor: pointer;
+      border: 1px solid #edf0f3;
+      height: 100%;
+      transition: box-shadow .2s, transform .15s;
+    }
+    html.dark-theme .pct-card { background: #1e2530; border-color: #2d3748; }
+    .pct-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,.12); transform: translateY(-2px); }
+    .pct-legenda { font-size: 22px; color: #cea40f; margin-top: 4px; font-weight: 600; margin-bottom: 2px; }
+    .pct-valor { font-size: 28px; font-weight: 700; line-height: 1; }
+    html.dark-theme .pct-legenda { color: #cea40f; }
+    .pct-hint { font-size: 11px; color: #bbb; margin-top: 8px; }
+
+    /* ── Sem dados ────────────────────────────────────────────── */
+    .sem-dados-box {
+      text-align: center;
+      padding: 24px;
+      color: #aaa;
+      font-size: 14px;
+    }
+    html.dark-theme .sem-dados-box { color: #6c757d; }
+  </style>
+</head>
+
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li class="active"><a href="carteira.html"><i class="fa fa-briefcase fa-fw"></i> Minha Carteira</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+
+    <!-- Topbar -->
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <a id="btn-admin-back" href="../admin/vendedores.html" class="btn btn-default btn-sm" style="display:none;color:inherit;" title="Voltar para Vendedores">
+          <i class="fa fa-arrow-left"></i>
+        </a>
+        <h2 class="topbar-title" id="carteira-titulo">Minha Carteira</h2>
+      </div>
+      <div class="mes-selector">
+        <button class="mes-nav-btn" id="btn-mes-prev" title="Mês anterior"><i class="fa fa-chevron-left"></i></button>
+        <span class="mes-label" id="mes-display">—</span>
+        <button class="mes-nav-btn" id="btn-mes-next" title="Próximo mês"><i class="fa fa-chevron-right"></i></button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div style="padding:0 2px;">
+
+      <!-- Toggle buttons -->
+      <div class="carteira-toggle-group" id="toggle-group">
+        <button class="btn-ct" id="btn-toggle-atrasado" data-t="atrasado">
+          <i class="fa fa-exclamation-circle" style="margin-right: 5px;"></i> Deixando de Ganhar
+        </button>
+        <button class="btn-ct" id="btn-toggle-garantido" data-t="garantido">
+          <i class="fa fa-check-circle" style="margin-right: 5px;"></i> Ganhos Garantidos
+        </button>
+        <button class="btn-ct" id="btn-toggle-futuro" data-t="futuro">
+          <i class="fa fa-clock-o" style="margin-right: 5px;"></i> Ganhos Futuros
+        </button>
+      </div>
+
+      <!-- Spinner -->
+      <div id="ct-loading" style="text-align:center;padding:48px;color:#aaa;">
+        <i class="fa fa-spinner fa-spin fa-2x"></i>
+        <p style="margin-top:12px;font-size:14px;">Carregando...</p>
+      </div>
+
+      <!-- Área de cards (oculta durante loading) -->
+      <div id="ct-cards" style="display:none;">
+
+        <!-- Card principal -->
+        <div class="cmc" id="ct-main-card">
+          <div class="cmc-icone"><i id="cmc-icone" class="fa fa-briefcase"></i></div>
+          <div class="cmc-valor" id="cmc-valor">R$ 0,00</div>
+          <div class="cmc-label" id="cmc-label">—</div>
+          <div class="cmc-sub"   id="cmc-sub"></div>
+        </div>
+
+        <!-- Cards de percentual -->
+        <div class="row">
+          <div class="col-sm-6" style="margin-bottom:16px;">
+            <div class="pct-card" id="card-pct12">
+              <div class="pct-legenda" id="pct12-legenda">Comissão —%</div>
+              <div class="pct-valor" id="pct12-valor">R$ 0,00</div>
+              <div class="pct-hint"><i class="fa fa-search"></i> Ver detalhes</div>
+            </div>
+          </div>
+          <div class="col-sm-6" style="margin-bottom:16px;">
+            <div class="pct-card" id="card-pct18">
+              <div class="pct-legenda" id="pct18-legenda">Comissão —%</div>
+              <div class="pct-valor" id="pct18-valor">R$ 0,00</div>
+              <div class="pct-hint"><i class="fa fa-search"></i> Ver detalhes</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mensagem sem dados -->
+        <div id="sem-dados" class="sem-dados-box" style="display:none;">
+          <i class="fa fa-inbox fa-2x" style="display:block;margin-bottom:8px;"></i>
+          Nenhuma comissão encontrada neste período.
+        </div>
+
+      </div><!-- /ct-cards -->
+
+    </div>
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var currentUser = AL.requireAuth(['VENDEDOR', 'ADMIN']);
+      if (!currentUser) return;
+
+      document.getElementById('user-nome').textContent = currentUser.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = currentUser.role;
+      ub.className = 'al-badge ' + (currentUser.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      // ── Parâmetros de admin ───────────────────────────────────
+      var urlParams    = new URLSearchParams(window.location.search);
+      var adminVendId  = urlParams.get('vendedorId') || '';
+      var adminBack    = urlParams.get('adminBack') === '1';
+      var nomeVendedor = urlParams.get('nomeVendedor') ? decodeURIComponent(urlParams.get('nomeVendedor')) : '';
+
+      if (adminBack) {
+        document.getElementById('btn-admin-back').style.display = 'inline-flex';
+        // Substitui sidebar por ambiente admin
+        document.querySelector('.sidebar-nav').innerHTML =
+          '<li><a href="../admin/dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>' +
+          '<li><a href="../admin/clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>' +
+          '<li><a href="../admin/gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>' +
+          '<li><a href="../admin/cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>' +
+          '<li><a href="../admin/colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>' +
+          '<li class="active"><a href="../admin/vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>' +
+          '<li><a href="../admin/configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>';
+      }
+      if (adminVendId && nomeVendedor) {
+        document.getElementById('carteira-titulo').textContent = 'Carteira de ' + nomeVendedor;
+      }
+
+      // ── Estado ────────────────────────────────────────────────
+      var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+      var hoje       = new Date();
+      var currentMes = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0');
+      var activeToggle = 'garantido';
+      var cartData   = null;
+      var configs    = null;
+
+      // ── Helpers de mês ────────────────────────────────────────
+      function isMesPassado(mesStr) {
+        var p = mesStr.split('-');
+        var hj = new Date();
+        var ano = parseInt(p[0]), mes = parseInt(p[1]);
+        return ano < hj.getFullYear() || (ano === hj.getFullYear() && mes < hj.getMonth() + 1);
+      }
+
+      function fmtMesPT(mesStr) {
+        var p = mesStr.split('-');
+        return MESES_PT[parseInt(p[1]) - 1] + ' / ' + p[0];
+      }
+
+      function addMes(mesStr, delta) {
+        var p = mesStr.split('-');
+        var d = new Date(parseInt(p[0]), parseInt(p[1]) - 1 + delta, 1);
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      }
+
+      // ── Toggle buttons ────────────────────────────────────────
+      var CORES = {
+        atrasado:  { bg: '#dc3545', icone: 'fa-exclamation-circle', label: 'Comissões Atrasadas',  sub: 'Boletos vencidos não pagos' },
+        garantido: { bg: '#28a745', icone: 'fa-check-circle',       label: 'Comissões Garantidas', sub: 'Boletos pagos no mês' },
+        futuro:    { bg: '#17a2b8', icone: 'fa-clock-o',            label: 'Comissões Futuras',    sub: 'Boletos a vencer no mês' },
+      };
+
+      function updateToggles() {
+        var passado = isMesPassado(currentMes);
+        var btnFuturo = document.getElementById('btn-toggle-futuro');
+        btnFuturo.style.display = passado ? 'none' : '';
+        // Se mês passou e estava em futuro → volta para garantido
+        if (passado && activeToggle === 'futuro') activeToggle = 'garantido';
+
+        ['atrasado', 'garantido', 'futuro'].forEach(function (t) {
+          var btn = document.getElementById('btn-toggle-' + t);
+          if (!btn) return;
+          btn.className = 'btn-ct' + (activeToggle === t ? ' ct-' + t : '');
+        });
+      }
+
+      function setToggle(t) {
+        activeToggle = t;
+        updateToggles();
+        if (cartData) renderCards();
+      }
+
+      ['atrasado', 'garantido', 'futuro'].forEach(function (t) {
+        document.getElementById('btn-toggle-' + t).addEventListener('click', function () { setToggle(t); });
+      });
+
+      // ── Navegação de mês ──────────────────────────────────────
+      function updateMesDisplay() {
+        document.getElementById('mes-display').textContent = fmtMesPT(currentMes);
+      }
+
+      document.getElementById('btn-mes-prev').addEventListener('click', function () {
+        currentMes = addMes(currentMes, -1);
+        updateMesDisplay();
+        updateToggles();
+        loadCarteira();
+      });
+      document.getElementById('btn-mes-next').addEventListener('click', function () {
+        currentMes = addMes(currentMes, 1);
+        updateMesDisplay();
+        updateToggles();
+        loadCarteira();
+      });
+
+      // ── Render cards ──────────────────────────────────────────
+      function fmtPct(val) {
+        // formata 12.5 → "12,5"
+        return String(val).replace('.', ',');
+      }
+
+      function renderCards() {
+        var d   = cartData[activeToggle];
+        var cor = CORES[activeToggle];
+        var pMenor = configs ? Number(configs.percentualMenor) : 12.5;
+        var pMaior = configs ? Number(configs.percentualMaior) : 18;
+
+        // Card principal
+        document.getElementById('ct-main-card').style.background = cor.bg;
+        document.getElementById('cmc-icone').className  = 'fa ' + cor.icone;
+        document.getElementById('cmc-valor').textContent = AL.fmtMoney(d.total);
+        document.getElementById('cmc-label').textContent = cor.label;
+        document.getElementById('cmc-sub').textContent   = cor.sub;
+
+        // Cards de percentual
+        document.getElementById('pct12-valor').textContent   = AL.fmtMoney(d.pct12);
+        document.getElementById('pct12-legenda').textContent = 'Comissão ' + fmtPct(pMenor) + '%';
+        document.getElementById('pct12-valor').style.color   = cor.bg;
+
+        document.getElementById('pct18-valor').textContent   = AL.fmtMoney(d.pct18);
+        document.getElementById('pct18-legenda').textContent = 'Comissão ' + fmtPct(pMaior) + '%';
+        document.getElementById('pct18-valor').style.color   = cor.bg;
+
+        // Sem dados
+        document.getElementById('sem-dados').style.display =
+          (d.total === 0 && d.pct12 === 0 && d.pct18 === 0) ? '' : 'none';
+      }
+
+      // Clique nos cards de percentual → detalhes
+      function buildDetalhesUrl(percentual) {
+        var url = 'carteira-detalhes.html?toggle=' + activeToggle + '&percentual=' + percentual + '&mes=' + currentMes;
+        if (adminVendId) url += '&vendedorId=' + adminVendId;
+        if (adminBack)   url += '&adminBack=1';
+        if (nomeVendedor) url += '&nomeVendedor=' + encodeURIComponent(nomeVendedor);
+        return url;
+      }
+      document.getElementById('card-pct12').addEventListener('click', function () {
+        window.location.href = buildDetalhesUrl(12);
+      });
+      document.getElementById('card-pct18').addEventListener('click', function () {
+        window.location.href = buildDetalhesUrl(18);
+      });
+
+      // ── Carregar dados ────────────────────────────────────────
+      function setLoading(v) {
+        document.getElementById('ct-loading').style.display = v ? '' : 'none';
+        document.getElementById('ct-cards').style.display   = v ? 'none' : '';
+      }
+
+      function loadCarteira() {
+        setLoading(true);
+        var configsPromise = configs
+          ? Promise.resolve(configs)
+          : AL.apiGet('/api/configuracoes');
+
+        var carteiraUrl = '/api/vendedor/carteira?mes=' + currentMes + (adminVendId ? '&vendedorId=' + adminVendId : '');
+        Promise.all([
+          AL.apiGet(carteiraUrl),
+          configsPromise,
+        ]).then(function (results) {
+          cartData = results[0];
+          configs  = results[1];
+          setLoading(false);
+          renderCards();
+        }).catch(function (err) {
+          setLoading(false);
+          AL.showAlert(err.message || 'Erro ao carregar carteira.', 'danger');
+        });
+      }
+
+      // ── Init ──────────────────────────────────────────────────
+      updateMesDisplay();
+      updateToggles();
+      loadCarteira();
+    })();
+  </script>
+</body>
+</html>

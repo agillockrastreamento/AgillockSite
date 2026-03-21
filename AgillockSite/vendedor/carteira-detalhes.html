@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Detalhes da Carteira — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body {
+      overflow: hidden !important;
+      height: 100vh;
+    }
+    .admin-content {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 24px !important;
+    }
+    #al-alert-container, .filter-bar { flex-shrink: 0; }
+    .table-responsive {
+      flex: 1;
+      overflow-y: auto;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.05);
+      margin-bottom: 0;
+    }
+    html.dark-theme .table-responsive { background: #141820; }
+    .admin-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 2px -1px rgba(0,0,0,.1);
+    }
+
+    /* Mini card total */
+    .mini-total-card {
+      border-radius: 10px;
+      padding: 14px 20px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .mini-total-card .mtc-valor { font-size: 24px; font-weight: 700; }
+    .mini-total-card .mtc-label { font-size: 13px; opacity: .85; }
+
+    /* Ações da tabela */
+    .boleto-acoes { display: flex; gap: 4px; flex-wrap: wrap; }
+  </style>
+</head>
+
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="carteira.html"><i class="fa fa-briefcase fa-fw"></i> Minha Carteira</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+
+    <!-- Topbar -->
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <a id="btn-back" href="carteira.html" class="btn btn-default btn-sm" style="color:inherit;">
+          <i class="fa fa-arrow-left"></i>
+        </a>
+        <h2 class="topbar-title" id="page-title">Detalhes</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros -->
+    <div class="filter-bar" style="padding-bottom:10;">
+      <!-- Mini card de total -->
+      <div class="mini-total-card" id="mini-card" style="display:none;">
+        <div>
+          <div class="mtc-label" id="mini-label">—</div>
+          <div class="mtc-valor" id="mini-valor">R$ 0,00</div>
+        </div>
+        <i class="fa fa-2x" id="mini-icone"></i>
+      </div>
+      <!-- Busca + exportar -->
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por cliente ou placa…" />
+        </div>
+        <button class="btn btn-default" id="btn-exportar">
+          <i class="fa fa-download"></i> Exportar CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Telefone</th>
+            <th>Placa</th>
+            <th>Vencimento</th>
+            <th id="th-pgto">Data Pgto</th>
+            <th>Boleto (R$)</th>
+            <th>Comissão</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="detalhes-tbody">
+          <tr><td colspan="8" class="text-center text-muted">Carregando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var currentUser = AL.requireAuth(['VENDEDOR', 'ADMIN']);
+      if (!currentUser) return;
+
+      document.getElementById('user-nome').textContent = currentUser.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = currentUser.role;
+      ub.className = 'al-badge ' + (currentUser.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      // ── Parâmetros da URL ─────────────────────────────────────
+      var params       = new URLSearchParams(window.location.search);
+      var toggle       = params.get('toggle')      || 'garantido';
+      var percentual   = params.get('percentual')  || '12';
+      var mes          = params.get('mes')         || '';
+      var adminVendId  = params.get('vendedorId')  || '';
+      var adminBack    = params.get('adminBack') === '1';
+      var nomeVendedor = params.get('nomeVendedor') ? decodeURIComponent(params.get('nomeVendedor')) : '';
+
+      var MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+      function fmtMesPT(mesStr) {
+        if (!mesStr) return '';
+        var p = mesStr.split('-');
+        return MESES_PT[parseInt(p[1]) - 1] + ' / ' + p[0];
+      }
+
+      var TOGGLE_INFO = {
+        atrasado:  { bg: '#dc3545', icone: 'fa-exclamation-circle', label: 'Atrasados'  },
+        garantido: { bg: '#28a745', icone: 'fa-check-circle',       label: 'Garantidos' },
+        futuro:    { bg: '#17a2b8', icone: 'fa-clock-o',            label: 'Futuros'    },
+      };
+
+      // ── Títulos e cores ───────────────────────────────────────
+      var info = TOGGLE_INFO[toggle] || TOGGLE_INFO.garantido;
+
+      // Substitui sidebar por ambiente admin quando necessário
+      if (adminBack) {
+        document.querySelector('.sidebar-nav').innerHTML =
+          '<li><a href="../admin/dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>' +
+          '<li><a href="../admin/clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>' +
+          '<li><a href="../admin/gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>' +
+          '<li><a href="../admin/cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>' +
+          '<li><a href="../admin/colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>' +
+          '<li class="active"><a href="../admin/vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>' +
+          '<li><a href="../admin/configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>';
+      }
+
+      // Configura botão voltar com params corretos
+      (function () {
+        var backUrl = 'carteira.html?';
+        if (mes) backUrl += 'mes=' + mes + '&';
+        if (adminVendId) backUrl += 'vendedorId=' + adminVendId + '&';
+        if (adminBack)   backUrl += 'adminBack=1&';
+        if (nomeVendedor) backUrl += 'nomeVendedor=' + encodeURIComponent(nomeVendedor) + '&';
+        document.getElementById('btn-back').href = backUrl.replace(/&$/, '');
+      })();
+
+      // Esconde coluna Data Pgto para atrasado/futuro
+      if (toggle !== 'garantido') {
+        document.getElementById('th-pgto').style.display = 'none';
+      }
+
+      // ── Dados ─────────────────────────────────────────────────
+      var todosItens = [];
+      var configs    = null;
+
+      function buildTitle(pMenor, pMaior) {
+        var pctLabel = percentual === '12'
+          ? String(pMenor).replace('.', ',') + '%'
+          : String(pMaior).replace('.', ',') + '%';
+        var titulo = 'Comissão ' + pctLabel + ' — ' + info.label + ' — ' + fmtMesPT(mes);
+        document.getElementById('page-title').textContent = titulo;
+      }
+
+      function waLink(telefone, nome, item) {
+        if (!telefone) return null;
+        var digits = telefone.replace(/\D/g, '');
+        if (digits.length < 8) return null;
+        if (digits.length <= 11) digits = '55' + digits;
+
+        var isUnificado = item.placa === 'Boleto Unificado';
+
+        var diasAtraso = 0;
+        if (item.vencimento && toggle !== 'garantido') {
+          var venc = new Date(item.vencimento);
+          venc.setHours(0, 0, 0, 0);
+          var hj = new Date();
+          hj.setHours(0, 0, 0, 0);
+          diasAtraso = Math.floor((hj - venc) / 86400000);
+          if (diasAtraso < 0) diasAtraso = 0;
+        }
+
+        var msg = 'Olá ' + nome + '! ';
+        msg += isUnificado
+          ? 'O seu boleto unificado de rastreamento'
+          : 'O seu boleto de rastreamento';
+
+        if (item.vencimento) {
+          msg += ' com vencimento em ' + AL.fmtDate(item.vencimento);
+        }
+
+        if (diasAtraso > 0) {
+          msg += ' está com ' + diasAtraso + ' dia(s) de atraso';
+        } else {
+          msg += ' está disponível';
+        }
+
+        if (item.linkBoleto) {
+          msg += ': ' + item.linkBoleto;
+        } else {
+          msg += '.';
+        }
+
+        msg += ' Caso precise de ajuda, fale comigo!';
+
+        return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(msg);
+      }
+
+      function renderTabela(itens) {
+        var tbody = document.getElementById('detalhes-tbody');
+        if (!itens.length) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nenhum resultado encontrado.</td></tr>';
+          return;
+        }
+
+        var totalComissao = itens.reduce(function (s, i) { return s + Number(i.comissao); }, 0);
+
+        // Mini card
+        var mc = document.getElementById('mini-card');
+        mc.style.background = info.bg;
+        mc.style.display = '';
+        document.getElementById('mini-label').textContent = info.label + ' — ' + fmtMesPT(mes);
+        document.getElementById('mini-valor').textContent = AL.fmtMoney(totalComissao);
+        document.getElementById('mini-icone').className = 'fa fa-2x ' + info.icone;
+
+        tbody.innerHTML = itens.map(function (item) {
+          var wa   = waLink(item.telefone, item.cliente, item);
+          var link = item.linkBoleto;
+          var pgtoTd = toggle === 'garantido'
+            ? '<td>' + (item.dataPagamento ? AL.fmtDate(item.dataPagamento) : '—') + '</td>'
+            : '';
+
+          return '<tr>' +
+            '<td><strong>' + item.cliente + '</strong></td>' +
+            '<td>' + (item.telefone || '—') + '</td>' +
+            '<td><span class="al-badge badge-ativo">' + item.placa + '</span></td>' +
+            '<td>' + AL.fmtDate(item.vencimento) + '</td>' +
+            pgtoTd +
+            '<td>' + AL.fmtMoney(item.valorBoleto) + '</td>' +
+            '<td style="color:' + info.bg + ';font-weight:700;">' + AL.fmtMoney(item.comissao) + '</td>' +
+            '<td>' +
+              '<div class="boleto-acoes">' +
+                (link
+                  ? '<a href="' + link + '" target="_blank" class="btn btn-xs btn-default" title="Ver boleto"><i class="fa fa-file-pdf-o"></i> Boleto</a>'
+                  : '<button class="btn btn-xs btn-default" disabled title="Boleto indisponível"><i class="fa fa-file-pdf-o"></i> Boleto</button>') +
+                (wa
+                  ? '<a href="' + wa + '" target="_blank" class="btn btn-xs btn-success" title="Falar no WhatsApp"><i class="fa fa-whatsapp"></i></a>'
+                  : '') +
+              '</div>' +
+            '</td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      function aplicarFiltro() {
+        var q = document.getElementById('filtro-busca').value.trim().toLowerCase();
+        if (!q) { renderTabela(todosItens); return; }
+        var filtrado = todosItens.filter(function (i) {
+          return i.cliente.toLowerCase().indexOf(q) !== -1 ||
+                 i.placa.toLowerCase().indexOf(q) !== -1;
+        });
+        renderTabela(filtrado);
+      }
+
+      var debTimer = null;
+      document.getElementById('filtro-busca').addEventListener('input', function () {
+        clearTimeout(debTimer);
+        debTimer = setTimeout(aplicarFiltro, 300);
+      });
+
+      // ── Exportar CSV ─────────────────────────────────────────
+      document.getElementById('btn-exportar').addEventListener('click', function () {
+        var token = localStorage.getItem('al_token');
+        var url   = window.API_URL + '/api/vendedor/carteira/exportar?toggle=' + toggle + '&mes=' + mes + (adminVendId ? '&vendedorId=' + adminVendId : '');
+        fetch(url, { headers: { 'Authorization': 'Bearer ' + token } })
+          .then(function (r) { return r.blob(); })
+          .then(function (blob) {
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'carteira-' + mes + '-' + toggle + '.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+          })
+          .catch(function () { AL.showAlert('Erro ao exportar CSV.', 'danger'); });
+      });
+
+      // ── Carregar dados ────────────────────────────────────────
+      function carregarDetalhes() {
+        var tbody = document.getElementById('detalhes-tbody');
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i> Carregando…</td></tr>';
+
+        var qs = '/api/vendedor/carteira/detalhes?toggle=' + toggle +
+                 '&percentual=' + percentual +
+                 (mes ? '&mes=' + mes : '') +
+                 (adminVendId ? '&vendedorId=' + adminVendId : '');
+
+        Promise.all([
+          AL.apiGet(qs),
+          AL.apiGet('/api/configuracoes'),
+        ]).then(function (results) {
+          var data = results[0];
+          configs  = results[1];
+
+          var pMenor = configs ? Number(configs.percentualMenor) : 12.5;
+          var pMaior = configs ? Number(configs.percentualMaior) : 18;
+          buildTitle(pMenor, pMaior);
+
+          todosItens = data.itens || [];
+          renderTabela(todosItens);
+        }).catch(function (err) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">' + (err.message || 'Erro ao carregar.') + '</td></tr>';
+        });
+      }
+
+      // ── Init ─────────────────────────────────────────────────
+      carregarDetalhes();
+    })();
+  </script>
+</body>
+</html>

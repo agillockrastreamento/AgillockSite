@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Colaboradores — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+
+  <style>
+    /* ════════════════════════════════════════════════════════════════
+       EFEITO APP: TRAVAR FILTROS E ROLAR APENAS A TABELA
+    ════════════════════════════════════════════════════════════════ */
+    
+    /* 1. Desliga o scroll geral da página */
+    body { 
+        overflow: hidden !important; 
+        height: 100vh; 
+    }
+    
+    /* 2. O fundo principal ocupa a tela toda verticalmente */
+    .admin-content { 
+        height: 100vh; 
+        display: flex; 
+        flex-direction: column; 
+        padding-bottom: 24px !important; 
+    }
+    
+    /* 3. Impede que os alertas e a barra de filtros sejam "espremidos" */
+    #al-alert-container,
+    .filter-bar {
+        flex-shrink: 0;
+    }
+    
+    /* 4. A MÁGICA: O container da tabela preenche o resto do espaço e rola */
+    .table-responsive {
+        flex: 1;
+        overflow-y: auto;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.05);
+        margin-bottom: 0; 
+    }
+
+    /* 5. Ajuste de cor do container para o Tema Escuro 
+    */
+    html.dark-theme .table-responsive {
+        background: #141820;
+    }
+    
+    /* 6. BÔNUS: O cabeçalho da tabela (th) fica grudado no topo enquanto a lista rola */
+    .admin-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); /* Uma sombrinha sutil para separar as linhas do cabeçalho */
+    }
+  </style>
+
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li class="active"><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <span id="user-nome" class="sidebar-user-nome">—</span>
+          <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+        </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Colaboradores</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-primary-al" id="btn-novo"><i class="fa fa-plus"></i> Novo Colaborador</button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-6">
+          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por nome ou e-mail…" />
+        </div>
+        <div class="col-sm-3">
+          <select id="filtro-status" class="form-control">
+            <option value="">Todos os status</option>
+            <option value="ATIVO">Ativo</option>
+            <option value="INATIVO">Inativo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Status</th>
+            <th>Criado em</th>
+            <th>Permissões</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal fade" id="modal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title" id="modal-titulo">Novo Colaborador</h4>
+        </div>
+        <div class="modal-body">
+          <div id="modal-alert"></div>
+          <form id="form">
+            <input type="hidden" id="f-id" />
+            <div class="form-group"><label>Nome *</label><input class="form-control" id="f-nome" required /></div>
+            <div class="form-group"><label>E-mail *</label><input type="email" class="form-control" id="f-email" required /></div>
+            <div id="senha-wrap">
+              <div class="form-group">
+                <label id="senha-label">Senha *</label>
+                <div class="input-group">
+                  <input type="password" class="form-control" id="f-senha" />
+                  <span class="input-group-btn"><button class="btn btn-default btn-toggle-senha" type="button" data-target="f-senha"><i class="fa fa-eye"></i></button></span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label id="senha2-label">Confirmar Senha *</label>
+                <div class="input-group">
+                  <input type="password" class="form-control" id="f-senha2" />
+                  <span class="input-group-btn"><button class="btn btn-default btn-toggle-senha" type="button" data-target="f-senha2"><i class="fa fa-eye"></i></button></span>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:12px;">
+              <label style="font-weight:700;display:block;margin-bottom:8px;">Permissões</label>
+              <div style="background:#f8f9fa;border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-excluir" checked /> Pode excluir clientes
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-editar" checked /> Pode editar dados do cliente
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-inativar-cliente" checked /> Pode inativar/ativar clientes
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-excluir-placa" checked /> Pode excluir placas
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-inativar-placa" checked /> Pode inativar/ativar placas
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-baixa" checked /> Pode dar baixa manual em boletos
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-cancelar" checked /> Pode cancelar/excluir carnês
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-vencimento" checked /> Pode alterar data de vencimento
+                </label>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary-al" id="btn-salvar">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var user = AL.requireAuth(['ADMIN']);
+    if (!user) return;
+
+    document.getElementById('user-nome').textContent = user.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = user.role; ub.className = 'al-badge badge-ativo';
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    var lista = [];
+
+    // Toggle visibilidade senha
+    document.querySelectorAll('.btn-toggle-senha').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var input = document.getElementById(this.dataset.target);
+        if (input.type === 'password') {
+          input.type = 'text';
+          this.querySelector('i').className = 'fa fa-eye-slash';
+        } else {
+          input.type = 'password';
+          this.querySelector('i').className = 'fa fa-eye';
+        }
+      });
+    });
+
+    function load() {
+      var tb = document.getElementById('tbody');
+      tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i></td></tr>';
+      AL.apiGet('/api/colaboradores')
+        .then(function (data) {
+          lista = data || [];
+          renderTabela();
+        })
+        .catch(function (err) {
+          tb.innerHTML = '<tr><td colspan="6" class="text-danger text-center">' + err.message + '</td></tr>';
+        });
+    }
+
+    // Filtro local
+    var _debounce = null;
+    function filtrar() {
+      var busca  = document.getElementById('filtro-busca').value.toLowerCase().trim();
+      var status = document.getElementById('filtro-status').value;
+      var filtrado = lista.filter(function (c) {
+        var matchBusca  = !busca  || (c.nome + ' ' + c.email).toLowerCase().indexOf(busca) !== -1;
+        var matchStatus = !status || (status === 'ATIVO' ? c.ativo : !c.ativo);
+        return matchBusca && matchStatus;
+      });
+      renderTabela(filtrado);
+    }
+    document.getElementById('filtro-busca').addEventListener('input', function () {
+      clearTimeout(_debounce);
+      _debounce = setTimeout(filtrar, 300);
+    });
+    document.getElementById('filtro-status').addEventListener('change', filtrar);
+
+    function permBadges(c) {
+      var icons = [];
+      if (c.podeExcluirCliente)    icons.push('<span title="Excluir clientes" style="color:#e74c3c;"><i class="fa fa-user-times"></i></span>');
+      if (c.podeEditarCliente)     icons.push('<span title="Editar clientes" style="color:#8e44ad;"><i class="fa fa-pencil"></i></span>');
+      if (c.podeInativarCliente)   icons.push('<span title="Inativar/ativar clientes" style="color:#d35400;"><i class="fa fa-power-off"></i></span>');
+      if (c.podeExcluirPlaca)      icons.push('<span title="Excluir placas" style="color:#c0392b;"><i class="fa fa-car"></i></span>');
+      if (c.podeInativarPlaca)     icons.push('<span title="Inativar/ativar placas" style="color:#16a085;"><i class="fa fa-toggle-on"></i></span>');
+      if (c.podeBaixaManual)       icons.push('<span title="Baixa manual" style="color:#27ae60;"><i class="fa fa-check-circle"></i></span>');
+      if (c.podeCancelarCarne)     icons.push('<span title="Cancelar carnê" style="color:#e67e22;"><i class="fa fa-ban"></i></span>');
+      if (c.podeAlterarVencimento) icons.push('<span title="Alterar vencimento" style="color:#3498db;"><i class="fa fa-calendar"></i></span>');
+      return icons.length ? icons.join(' ') : '<span class="text-muted" style="font-size:11px;">Nenhuma</span>';
+    }
+
+    function renderTabela(dados) {
+      var tb = document.getElementById('tbody');
+      var items = dados !== undefined ? dados : lista;
+      if (!items.length) {
+        tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum colaborador.</td></tr>';
+        return;
+      }
+      tb.innerHTML = items.map(function (c) {
+        return '<tr>' +
+          '<td>' + c.nome + '</td>' +
+          '<td>' + c.email + '</td>' +
+          '<td>' + (c.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO')) + '</td>' +
+          '<td>' + AL.fmtDate(c.criadoEm || c.createdAt) + '</td>' +
+          '<td>' + permBadges(c) + '</td>' +
+          '<td>' +
+          '<button class="btn btn-xs btn-default btn-edit" data-id="' + c.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' +
+          '<button class="btn btn-xs ' + (c.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + c.id + '" title="' + (c.ativo ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button> ' +
+          '<button class="btn btn-xs btn-danger btn-del" data-id="' + c.id + '" data-nome="' + c.nome + '" title="Excluir"><i class="fa fa-trash"></i></button>' +
+          '</td></tr>';
+      }).join('');
+
+      tb.querySelectorAll('.btn-edit').forEach(function (btn) {
+        btn.addEventListener('click', function () { abrirModal(this.dataset.id); });
+      });
+      tb.querySelectorAll('.btn-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          AL.apiPatch('/api/colaboradores/' + this.dataset.id + '/status', {})
+            .then(load).catch(function (err) { AL.showAlert(err.message); });
+        });
+      });
+      tb.querySelectorAll('.btn-del').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = this.dataset.id;
+          var nome = this.dataset.nome;
+          AL.confirmar({
+            titulo: 'Excluir Colaborador',
+            mensagem: 'Excluir o colaborador <strong>' + nome + '</strong>?',
+            consequencias: 'O colaborador será removido permanentemente do sistema e não poderá mais acessar o painel.',
+            btnTexto: '<i class="fa fa-trash"></i> Excluir',
+          }).then(function (ok) {
+            if (!ok) return;
+            AL.apiDelete('/api/colaboradores/' + id)
+              .then(function () { load(); AL.showAlert('Colaborador excluído.', 'success'); })
+              .catch(function (err) { AL.showAlert(err.message); });
+          });
+        });
+      });
+      // Aplicar máscara de telefone se houver campo
+    }
+
+    function abrirModal(id) {
+      document.getElementById('modal-alert').innerHTML = '';
+      document.getElementById('f-id').value = '';
+      document.getElementById('f-nome').value = '';
+      document.getElementById('f-email').value = '';
+      document.getElementById('f-senha').value = '';
+      document.getElementById('f-senha2').value = '';
+      // Permissões: default true
+      document.getElementById('f-pode-excluir').checked           = true;
+      document.getElementById('f-pode-editar').checked            = true;
+      document.getElementById('f-pode-inativar-cliente').checked  = true;
+      document.getElementById('f-pode-excluir-placa').checked     = true;
+      document.getElementById('f-pode-inativar-placa').checked    = true;
+      document.getElementById('f-pode-baixa').checked             = true;
+      document.getElementById('f-pode-cancelar').checked          = true;
+      document.getElementById('f-pode-vencimento').checked        = true;
+
+      if (id) {
+        document.getElementById('modal-titulo').textContent = 'Editar Colaborador';
+        document.getElementById('senha-label').textContent = 'Nova Senha (opcional)';
+        document.getElementById('senha2-label').textContent = 'Confirmar Nova Senha';
+        var c = lista.find(function (x) { return x.id === id; });
+        if (c) {
+          document.getElementById('f-id').value = c.id;
+          document.getElementById('f-nome').value = c.nome;
+          document.getElementById('f-email').value = c.email;
+          document.getElementById('f-pode-excluir').checked           = c.podeExcluirCliente    !== false;
+          document.getElementById('f-pode-editar').checked            = c.podeEditarCliente     !== false;
+          document.getElementById('f-pode-inativar-cliente').checked  = c.podeInativarCliente   !== false;
+          document.getElementById('f-pode-excluir-placa').checked     = c.podeExcluirPlaca      !== false;
+          document.getElementById('f-pode-inativar-placa').checked    = c.podeInativarPlaca     !== false;
+          document.getElementById('f-pode-baixa').checked             = c.podeBaixaManual       !== false;
+          document.getElementById('f-pode-cancelar').checked          = c.podeCancelarCarne     !== false;
+          document.getElementById('f-pode-vencimento').checked        = c.podeAlterarVencimento !== false;
+        }
+      } else {
+        document.getElementById('modal-titulo').textContent = 'Novo Colaborador';
+        document.getElementById('senha-label').textContent = 'Senha *';
+        document.getElementById('senha2-label').textContent = 'Confirmar Senha *';
+      }
+      $('#modal').modal('show');
+    }
+
+    document.getElementById('btn-novo').addEventListener('click', function () { abrirModal(null); });
+
+    document.getElementById('btn-salvar').addEventListener('click', function () {
+      var id    = document.getElementById('f-id').value;
+      var nome  = document.getElementById('f-nome').value.trim();
+      var email = document.getElementById('f-email').value.trim();
+      var senha = document.getElementById('f-senha').value;
+      var senha2 = document.getElementById('f-senha2').value;
+
+      if (!nome || !email) {
+        document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">Nome e e-mail são obrigatórios.</div>';
+        return;
+      }
+      if (!id && (!senha || senha !== senha2)) {
+        document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">Senhas são obrigatórias e devem coincidir.</div>';
+        return;
+      }
+      if (id && senha && senha !== senha2) {
+        document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">As senhas não coincidem.</div>';
+        return;
+      }
+
+      var payload = {
+        nome: nome, email: email,
+        podeExcluirCliente:    document.getElementById('f-pode-excluir').checked,
+        podeEditarCliente:     document.getElementById('f-pode-editar').checked,
+        podeInativarCliente:   document.getElementById('f-pode-inativar-cliente').checked,
+        podeExcluirPlaca:      document.getElementById('f-pode-excluir-placa').checked,
+        podeInativarPlaca:     document.getElementById('f-pode-inativar-placa').checked,
+        podeBaixaManual:       document.getElementById('f-pode-baixa').checked,
+        podeCancelarCarne:     document.getElementById('f-pode-cancelar').checked,
+        podeAlterarVencimento: document.getElementById('f-pode-vencimento').checked,
+      };
+      if (senha) payload.senha = senha;
+
+      var req = id
+        ? AL.apiPut('/api/colaboradores/' + id, payload)
+        : AL.apiPost('/api/colaboradores', payload);
+
+      req.then(function () {
+        $('#modal').modal('hide');
+        load();
+        AL.showAlert(id ? 'Colaborador atualizado.' : 'Colaborador criado.', 'success');
+      }).catch(function (err) {
+        document.getElementById('modal-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
+      });
+    });
+
+    load();
+  })();
+  </script>
+</body>
+</html>

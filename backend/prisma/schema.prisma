@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  COLABORADOR
+  VENDEDOR
+}
+
+enum StatusCliente {
+  ATIVO
+  INATIVO
+}
+
+enum TipoCarne {
+  INDIVIDUAL
+  UNIFICADO
+}
+
+enum StatusBoleto {
+  PENDENTE
+  PAGO
+  ATRASADO
+  CANCELADO
+}
+
+model User {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  role      Role
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Permissões granulares para COLABORADOR (ignoradas para outros roles)
+  podeExcluirCliente    Boolean @default(true)
+  podeEditarCliente     Boolean @default(true)
+  podeInativarCliente   Boolean @default(true)
+  podeExcluirPlaca      Boolean @default(true)
+  podeInativarPlaca     Boolean @default(true)
+  podeBaixaManual       Boolean @default(true)
+  podeCancelarCarne     Boolean @default(true)
+  podeAlterarVencimento Boolean @default(true)
+
+  clientesCriados  Cliente[]          @relation("ClienteCriador")
+  clientesVendidos Cliente[]          @relation("ClienteVendedor")
+  carnesGerados    Carne[]            @relation("CarneGeradoPor")
+  carnesVendidos   Carne[]            @relation("CarneVendedor")
+  placasVendidas   Placa[]            @relation("PlacaVendedor")
+  comissoes        ComissaoVendedor[]
+}
+
+model Cliente {
+  id          String        @id @default(uuid())
+  nome        String
+  cpfCnpj     String?
+  telefone    String?
+  email       String?
+  notas       String?
+  status      StatusCliente @default(ATIVO)
+  cep         String?
+  logradouro  String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  estado      String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  criadoPorId String
+  criadoPor   User   @relation("ClienteCriador", fields: [criadoPorId], references: [id])
+  vendedorId  String?
+  vendedor    User?  @relation("ClienteVendedor", fields: [vendedorId], references: [id])
+
+  placas Placa[]
+  carnes Carne[]
+}
+
+model Placa {
+  id          String   @id @default(uuid())
+  placa       String
+  descricao   String?
+  ativo       Boolean  @default(true)
+  valorPadrao Decimal? @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clienteId  String
+  cliente    Cliente @relation(fields: [clienteId], references: [id])
+  vendedorId String?
+  vendedor   User?   @relation("PlacaVendedor", fields: [vendedorId], references: [id])
+
+  boletos           Boleto[]
+  boletosUnificados BoletoPlaca[]
+}
+
+model Carne {
+  id             String    @id @default(uuid())
+  tipo           TipoCarne
+  efiCarneId     String?   @unique
+  efiCarneLink   String?
+  valorTotal     Decimal   @db.Decimal(10, 2)
+  numeroParcelas Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  clienteId   String
+  cliente     Cliente @relation(fields: [clienteId], references: [id])
+  geradoPorId String
+  geradoPor   User    @relation("CarneGeradoPor", fields: [geradoPorId], references: [id])
+  vendedorId  String?
+  vendedor    User?   @relation("CarneVendedor", fields: [vendedorId], references: [id])
+
+  boletos Boleto[]
+}
+
+model Boleto {
+  id            String       @id @default(uuid())
+  numeroParcela Int
+  valor         Decimal      @db.Decimal(10, 2)
+  vencimento    DateTime
+  status        StatusBoleto @default(PENDENTE)
+  dataPagamento DateTime?
+  valorPago     Decimal?     @db.Decimal(10, 2)
+  efiChargeId   String?      @unique
+  linkBoleto    String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  carneId String
+  carne   Carne  @relation(fields: [carneId], references: [id])
+  placaId String?
+  placa   Placa? @relation(fields: [placaId], references: [id])
+
+  placasUnificadas BoletoPlaca[]
+  comissoes        ComissaoVendedor[]
+}
+
+model BoletoPlaca {
+  valorPlaca Decimal @db.Decimal(10, 2)
+
+  boletoId String
+  boleto   Boleto @relation(fields: [boletoId], references: [id])
+  placaId  String
+  placa    Placa  @relation(fields: [placaId], references: [id])
+
+  @@id([boletoId, placaId])
+}
+
+model ComissaoVendedor {
+  id                 String   @id @default(uuid())
+  valorReferencia    Decimal  @db.Decimal(10, 2)
+  percentualAplicado Decimal  @db.Decimal(5, 2)
+  valorComissao      Decimal  @db.Decimal(10, 2)
+  pago               Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  vendedorId String
+  vendedor   User   @relation(fields: [vendedorId], references: [id])
+  boletoId   String
+  boleto     Boleto @relation(fields: [boletoId], references: [id])
+}
+
+model Configuracoes {
+  id              String   @id @default("1")
+  percentualMenor Decimal  @default(12.50) @db.Decimal(5, 2)
+  percentualMaior Decimal  @default(18.00) @db.Decimal(5, 2)
+  valorReferencia Decimal  @default(50.00) @db.Decimal(10, 2)
+  multaPercentual Decimal  @default(5.00)  @db.Decimal(5, 2)
+  jurosDiarios    Decimal  @default(0.33)  @db.Decimal(5, 2)
+  updatedAt       DateTime @updatedAt
+}

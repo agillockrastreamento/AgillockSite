@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Clientes — AgilLock Colaborador</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+
+  <style>
+    body {
+      overflow: hidden !important;
+      height: 100vh;
+    }
+
+    .admin-content {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 24px !important;
+    }
+
+    #al-alert-container,
+    .filter-bar {
+      flex-shrink: 0;
+    }
+
+    .table-responsive {
+      flex: 1;
+      overflow-y: auto;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .05);
+      margin-bottom: 0;
+    }
+
+    html.dark-theme .table-responsive {
+      background: #141820;
+    }
+
+    .admin-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    #fc-notas {
+      resize: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;"
+        onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li class="active"><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Clientes</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-primary-al" id="btn-novo-cliente">
+          <i class="fa fa-plus"></i> Novo Cliente
+        </button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-6">
+          <input type="text" id="filtro-busca" class="form-control"
+            placeholder="Buscar por nome, CPF/CNPJ ou telefone…" />
+        </div>
+        <div class="col-sm-3">
+          <select id="filtro-status" class="form-control">
+            <option value="">Todos os status</option>
+            <option value="ATIVO">Ativo</option>
+            <option value="INATIVO">Inativo</option>
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <select id="filtro-vendedor" class="form-control">
+            <option value="">Todos os vendedores</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>CPF/CNPJ</th>
+            <th>Telefone</th>
+            <th>Vendedor</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="clientes-tbody">
+          <tr>
+            <td colspan="6" class="text-center text-muted">Carregando…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ MODAL CLIENTE ═══════════════ -->
+  <div class="modal fade" id="modal-cliente" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title" id="modal-cliente-titulo">Novo Cliente</h4>
+        </div>
+        <div class="modal-body">
+          <form id="form-cliente">
+            <input type="hidden" id="fc-id" />
+            <div class="row">
+              <div class="col-sm-8">
+                <div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="fc-nome"
+                    required /></div>
+              </div>
+              <div class="col-sm-4">
+                <div class="form-group"><label>CPF/CNPJ *</label><input type="text" class="form-control" id="fc-cpfcnpj"
+                    placeholder="Apenas números" required maxlength="18" /></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-6">
+                <div class="form-group"><label>Telefone *</label><input type="text" class="form-control"
+                    id="fc-telefone" required maxlength="15" /></div>
+              </div>
+              <div class="col-sm-6">
+                <div class="form-group"><label>E-mail *</label><input type="email" class="form-control" id="fc-email"
+                    required /></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-4">
+                <div class="form-group"><label>CEP</label><input type="text" class="form-control" id="fc-cep"
+                    placeholder="00000-000" maxlength="9" /></div>
+              </div>
+              <div class="col-sm-8">
+                <div class="form-group"><label>Logradouro</label><input type="text" class="form-control"
+                    id="fc-logradouro" /></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-3">
+                <div class="form-group"><label>Número</label><input type="text" class="form-control" id="fc-numero" />
+                </div>
+              </div>
+              <div class="col-sm-4">
+                <div class="form-group"><label>Complemento</label><input type="text" class="form-control"
+                    id="fc-complemento" /></div>
+              </div>
+              <div class="col-sm-5">
+                <div class="form-group"><label>Bairro</label><input type="text" class="form-control" id="fc-bairro" />
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-8">
+                <div class="form-group"><label>Cidade</label><input type="text" class="form-control" id="fc-cidade" />
+                </div>
+              </div>
+              <div class="col-sm-4">
+                <div class="form-group"><label>UF</label><input type="text" class="form-control" id="fc-estado"
+                    maxlength="2" style="text-transform:uppercase;" /></div>
+              </div>
+            </div>
+            <div class="form-group"><label>Notas</label><textarea class="form-control" id="fc-notas"
+                rows="2"></textarea></div>
+            <div class="form-group">
+              <label>Vendedor</label>
+              <div style="position:relative;">
+                <input type="text" class="form-control" id="fc-vendedor-busca" placeholder="Digite nome ou e-mail do vendedor…" autocomplete="off" style="padding-right:32px;" />
+                <button type="button" id="fc-vendedor-limpar" title="Limpar vendedor" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;line-height:1;padding:0;">&times;</button>
+                <div id="fc-vendedor-resultados" style="position:absolute;z-index:300;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:180px;overflow-y:auto;display:none;"></div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary-al" id="btn-salvar-cliente">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+      if (!currentUser) return;
+      var isAdmin = currentUser.role === 'ADMIN';
+      var canDelete   = isAdmin || (currentUser.podeExcluirCliente  !== false);
+      var canEditar   = isAdmin || (currentUser.podeEditarCliente   !== false);
+      var canInativar = isAdmin || (currentUser.podeInativarCliente !== false);
+
+      document.getElementById('user-nome').textContent = currentUser.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = currentUser.role;
+      ub.className = 'al-badge ' + (isAdmin ? 'badge-ativo' : 'badge-pendente');
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      // ── Vendedores (para filtro + modal) ─────────────────────
+      // Carrega vendedores só para o filtro da lista
+      AL.apiGet('/api/vendedores').then(function (list) {
+        var selFiltro = document.getElementById('filtro-vendedor');
+        (list || []).forEach(function (v) {
+          selFiltro.insertAdjacentHTML('beforeend', '<option value="' + v.id + '">' + v.nome + '</option>');
+        });
+      }).catch(function () { });
+
+      // Autocomplete vendedor do modal
+      var fcVendedorId = null;
+      var fcVendTimer = null;
+      document.getElementById('fc-vendedor-busca').addEventListener('input', function () {
+        var q = this.value.trim();
+        clearTimeout(fcVendTimer);
+        fcVendedorId = null;
+        document.getElementById('fc-vendedor-limpar').style.display = 'none';
+        if (q.length < 2) { document.getElementById('fc-vendedor-resultados').style.display = 'none'; return; }
+        fcVendTimer = setTimeout(function () {
+          AL.apiGet('/api/vendedores?busca=' + encodeURIComponent(q)).then(function (list) {
+            var div = document.getElementById('fc-vendedor-resultados');
+            if (!list || !list.length) {
+              div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum vendedor encontrado.</div>';
+              div.style.display = 'block'; return;
+            }
+            div.innerHTML = list.map(function (v) {
+              return '<div class="fc-vend-item" data-id="' + v.id + '" data-nome="' + v.nome + '" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;">' +
+                '<strong>' + v.nome + '</strong>' + (v.email ? ' <small class="text-muted">— ' + v.email + '</small>' : '') + '</div>';
+            }).join('');
+            div.style.display = 'block';
+            div.querySelectorAll('.fc-vend-item').forEach(function (item) {
+              item.addEventListener('click', function () {
+                fcVendedorId = this.dataset.id;
+                document.getElementById('fc-vendedor-busca').value = this.dataset.nome;
+                document.getElementById('fc-vendedor-limpar').style.display = '';
+                document.getElementById('fc-vendedor-resultados').style.display = 'none';
+              });
+            });
+          }).catch(function () { });
+        }, 300);
+      });
+      document.getElementById('fc-vendedor-limpar').addEventListener('click', function () {
+        fcVendedorId = null;
+        document.getElementById('fc-vendedor-busca').value = '';
+        this.style.display = 'none';
+        document.getElementById('fc-vendedor-busca').focus();
+      });
+
+      // ── Listagem de clientes ──────────────────────────────────
+      var clientes = [];
+      function loadClientes() {
+        var params = [];
+        var busca = document.getElementById('filtro-busca').value.trim();
+        var status = document.getElementById('filtro-status').value;
+        var vendedor = document.getElementById('filtro-vendedor').value;
+        if (busca) params.push('busca=' + encodeURIComponent(busca));
+        if (status) params.push('status=' + encodeURIComponent(status));
+        if (vendedor) params.push('vendedorId=' + encodeURIComponent(vendedor));
+
+        var qs = params.length ? '?' + params.join('&') : '';
+        var tbody = document.getElementById('clientes-tbody');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i> Carregando…</td></tr>';
+
+        AL.apiGet('/api/clientes' + qs)
+          .then(function (data) {
+            clientes = data || [];
+            renderTabela();
+          })
+          .catch(function (err) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">' + err.message + '</td></tr>';
+          });
+      }
+
+      function renderTabela() {
+        var tbody = document.getElementById('clientes-tbody');
+        if (!clientes.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum cliente encontrado.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = clientes.map(function (c) {
+          var vendNome = c.vendedor ? c.vendedor.nome : '—';
+          var acoes = (canEditar ? '<button class="btn btn-xs btn-default btn-editar" data-id="' + c.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' : '') +
+            (canInativar ? '<button class="btn btn-xs ' + (c.status === 'ATIVO' ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + c.id + '" data-status="' + c.status + '" title="' + (c.status === 'ATIVO' ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button>' : '');
+          if (canDelete) {
+            acoes += ' <button class="btn btn-xs btn-danger btn-excluir" data-id="' + c.id + '" data-nome="' + c.nome + '" title="Excluir"><i class="fa fa-trash"></i></button>';
+          }
+          return '<tr class="tr-cliente" data-id="' + c.id + '" style="cursor:pointer;">' +
+            '<td>' + c.nome + '</td>' +
+            '<td>' + AL.fmtCpfCnpj(c.cpfCnpj) + '</td>' +
+            '<td>' + (c.telefone || '—') + '</td>' +
+            '<td>' + vendNome + '</td>' +
+            '<td>' + AL.badgeStatus(c.status) + '</td>' +
+            '<td onclick="event.stopPropagation();">' + acoes + '</td>' +
+            '</tr>';
+        }).join('');
+
+        // Clique na linha → detalhe
+        tbody.querySelectorAll('.tr-cliente').forEach(function (tr) {
+          tr.addEventListener('click', function () {
+            window.location.href = 'cliente-detalhe.html?id=' + this.dataset.id;
+          });
+        });
+
+        // Editar
+        if (canEditar) {
+          tbody.querySelectorAll('.btn-editar').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+              e.stopPropagation();
+              abrirModalCliente(this.dataset.id);
+            });
+          });
+        }
+
+        // Toggle status
+        tbody.querySelectorAll('.btn-toggle').forEach(function (btn) {
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var id = this.dataset.id;
+            AL.apiPatch('/api/clientes/' + id + '/status', {})
+              .then(function () { loadClientes(); })
+              .catch(function (err) { AL.showAlert(err.message); });
+          });
+        });
+
+        // Excluir
+        if (canDelete) {
+          tbody.querySelectorAll('.btn-excluir').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+              e.stopPropagation();
+              var id = this.dataset.id;
+              var nome = this.dataset.nome;
+              AL.confirmar({
+                titulo: 'Excluir Cliente',
+                mensagem: 'Excluir o cliente <strong>' + nome + '</strong>?',
+                consequencias: 'Todos os dados do cliente (placas, carnês cancelados/pagos) serão removidos permanentemente. Esta ação é irreversível.',
+                btnTexto: '<i class="fa fa-trash"></i> Excluir',
+              }).then(function (ok) {
+                if (!ok) return;
+                AL.apiDelete('/api/clientes/' + id)
+                  .then(function () { loadClientes(); AL.showAlert('Cliente excluído.', 'success'); })
+                  .catch(function (err) { AL.showAlert(err.message); });
+              });
+            });
+          });
+        }
+      }
+
+      loadClientes();
+      var _debounceTimer = null;
+      document.getElementById('filtro-busca').addEventListener('input', function () {
+        clearTimeout(_debounceTimer);
+        _debounceTimer = setTimeout(loadClientes, 400);
+      });
+      document.getElementById('filtro-status').addEventListener('change', loadClientes);
+      document.getElementById('filtro-vendedor').addEventListener('change', loadClientes);
+
+      // ── Modal Novo/Editar Cliente ─────────────────────────────
+      function abrirModalCliente(id) {
+        ['fc-id', 'fc-nome', 'fc-cpfcnpj', 'fc-telefone', 'fc-email', 'fc-cep', 'fc-logradouro',
+          'fc-numero', 'fc-complemento', 'fc-bairro', 'fc-cidade', 'fc-estado', 'fc-notas'].forEach(function (fid) {
+            document.getElementById(fid).value = '';
+          });
+        // Reset autocomplete vendedor
+        fcVendedorId = null;
+        document.getElementById('fc-vendedor-busca').value = '';
+        document.getElementById('fc-vendedor-limpar').style.display = 'none';
+
+        if (id) {
+          document.getElementById('modal-cliente-titulo').textContent = 'Editar Cliente';
+          var c = clientes.find(function (x) { return x.id === id; });
+          if (c) {
+            document.getElementById('fc-id').value = c.id;
+            document.getElementById('fc-nome').value = c.nome || '';
+            document.getElementById('fc-cpfcnpj').value = c.cpfCnpj || '';
+            document.getElementById('fc-telefone').value = c.telefone || '';
+            document.getElementById('fc-email').value = c.email || '';
+            document.getElementById('fc-cep').value = c.cep || '';
+            document.getElementById('fc-logradouro').value = c.logradouro || '';
+            document.getElementById('fc-numero').value = c.numero || '';
+            document.getElementById('fc-complemento').value = c.complemento || '';
+            document.getElementById('fc-bairro').value = c.bairro || '';
+            document.getElementById('fc-cidade').value = c.cidade || '';
+            document.getElementById('fc-estado').value = c.estado || '';
+            document.getElementById('fc-notas').value = c.notas || '';
+            if (c.vendedor) {
+              fcVendedorId = c.vendedorId;
+              document.getElementById('fc-vendedor-busca').value = c.vendedor.nome;
+              document.getElementById('fc-vendedor-limpar').style.display = '';
+            }
+          }
+        } else {
+          document.getElementById('modal-cliente-titulo').textContent = 'Novo Cliente';
+        }
+        $('#modal-cliente').modal('show');
+        AL.maskCpfCnpj(document.getElementById('fc-cpfcnpj'));
+        AL.maskPhone(document.getElementById('fc-telefone'));
+      }
+
+      document.getElementById('btn-novo-cliente').addEventListener('click', function () {
+        abrirModalCliente(null);
+      });
+
+      document.getElementById('btn-salvar-cliente').addEventListener('click', function () {
+        var id = document.getElementById('fc-id').value;
+        var payload = {
+          nome: document.getElementById('fc-nome').value.trim(),
+          cpfCnpj: document.getElementById('fc-cpfcnpj').value.replace(/\D/g, ''),
+          telefone: document.getElementById('fc-telefone').value.trim(),
+          email: document.getElementById('fc-email').value.trim(),
+          cep: document.getElementById('fc-cep').value.replace(/\D/g, ''),
+          logradouro: document.getElementById('fc-logradouro').value.trim(),
+          numero: document.getElementById('fc-numero').value.trim(),
+          complemento: document.getElementById('fc-complemento').value.trim(),
+          bairro: document.getElementById('fc-bairro').value.trim(),
+          cidade: document.getElementById('fc-cidade').value.trim(),
+          estado: document.getElementById('fc-estado').value.trim().toUpperCase(),
+          notas: document.getElementById('fc-notas').value.trim(),
+          vendedorId: fcVendedorId || null,
+        };
+        if (!payload.nome || !payload.cpfCnpj || !payload.telefone || !payload.email) {
+          AL.showAlert('Nome, CPF/CNPJ, Telefone e E-mail são obrigatórios.', 'warning');
+          return;
+        }
+        var req = id ? AL.apiPut('/api/clientes/' + id, payload) : AL.apiPost('/api/clientes', payload);
+        req.then(function () {
+          $('#modal-cliente').modal('hide');
+          loadClientes();
+          AL.showAlert(id ? 'Cliente atualizado.' : 'Cliente criado.', 'success');
+        }).catch(function (err) {
+          AL.showAlert(err.message);
+        });
+      });
+
+      // ── ViaCEP auto-fill ──────────────────────────────────────
+      document.getElementById('fc-cep').addEventListener('blur', function () {
+        var cep = this.value.replace(/\D/g, '');
+        if (cep.length !== 8) return;
+        fetch('https://viacep.com.br/ws/' + cep + '/json/')
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.erro) return;
+            document.getElementById('fc-logradouro').value = d.logradouro || '';
+            document.getElementById('fc-bairro').value = d.bairro || '';
+            document.getElementById('fc-cidade').value = d.localidade || '';
+            document.getElementById('fc-estado').value = d.uf || '';
+          }).catch(function () { });
+      });
+    })();
+  </script>
+</body>
+
+</html>

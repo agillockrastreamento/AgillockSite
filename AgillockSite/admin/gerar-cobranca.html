@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Gerar Cobrança — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+
+  <style>
+    /* ════════════════════════════════════════════════════════════════
+       EFEITO APP: TRAVAR WIZARD STEPS E ROLAR APENAS O FORMULÁRIO
+    ════════════════════════════════════════════════════════════════ */
+    
+    /* 1. Desliga o scroll geral da página */
+    body { 
+        overflow: hidden !important; 
+        height: 100vh; 
+    }
+    
+    /* 2. O fundo principal ocupa a tela toda */
+    .admin-content { 
+        height: 100vh; 
+        display: flex; 
+        flex-direction: column; 
+        padding-bottom: 24px !important; /* Espaço no rodapé */
+    }
+    
+    /* 3. Garante que os alertas e os botões de passo não encolham */
+    #al-alert-container,
+    #wizard-steps {
+        flex-shrink: 0;
+    }
+    
+    /* 4. A MÁGICA: A caixa branca preenche o resto da tela e ganha rolagem interna */
+    #wizard-content {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    /* Step 2 — cabeçalho e busca fixos, lista de placas com scroll */
+    #wizard-content.step2-ativo {
+        overflow-y: hidden;
+    }
+    #step-2 {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    #step2-header {
+        flex-shrink: 0;
+    }
+    #step2-body {
+        flex: 1;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+    #step2-footer {
+        flex-shrink: 0;
+        padding-top: 12px;
+    }
+    /* Fix 4: permite que #step-2 encolha corretamente no flex pai */
+    #step-2 { min-height: 0; }
+    /* Fix 2: remove scroll horizontal e permite encolhimento */
+    #step2-body { overflow-x: hidden; min-height: 0; }
+    /* Fix 3: garante que o conteúdo do form de unificação não fique tapado pelo padding do container */
+    #form-unif { padding-bottom: 8px; }
+    /* Fix 2: dark mode para a área do wizard e formulário de unificação */
+    html.dark-theme #wizard-content { background: #1e2530 !important; }
+    html.dark-theme #sugestao-unif .alert-info { background: #1a3040; border-color: #1a6374; color: #9ecfdb; }
+    html.dark-theme #prompt-add-unif .alert-warning { background: #362a10; border-color: #6d4e0a; color: #ffda6a; }
+    html.dark-theme #form-unif { color: #c9d1d9; }
+    html.dark-theme .unif-total-bar { background: #252d3d !important; }
+    html.dark-theme #form-unif .input-group-addon { background: #2d3748; border-color: #4a5568; color: #c9d1d9; }
+    html.dark-theme .unif-total-bar strong { color: #c9d1d9 !important; }
+  </style>
+
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li class="active"><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <span id="user-nome" class="sidebar-user-nome">—</span>
+          <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+        </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Gerar Cobrança</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Wizard steps indicator -->
+    <div class="wizard-steps" id="wizard-steps">
+      <div class="wizard-step active" data-step="1">1. Cliente</div>
+      <div class="wizard-step" data-step="2">2. Placa</div>
+      <div class="wizard-step" data-step="3">3. Cobrança</div>
+      <div class="wizard-step" data-step="4">4. Confirmar</div>
+    </div>
+
+    <!-- Conteúdo de cada step -->
+    <div id="wizard-content" style="background:white;border-radius:10px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+
+      <!-- ── Step 1: Cliente ── -->
+      <div id="step-1">
+        <h4 style="margin-top:0;">Selecione o Cliente</h4>
+        <div class="form-group">
+          <div style="position:relative;">
+            <input type="text" class="form-control" id="busca-cliente" placeholder="Digite nome, CPF ou CNPJ…" autocomplete="off" />
+            <div id="busca-resultados" style="position:absolute;z-index:200;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:220px;overflow-y:auto;display:none;"></div>
+          </div>
+        </div>
+
+        <div id="cliente-selecionado-card" style="display:none;background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:16px;border-left:4px solid #fed136;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <strong id="cs-nome">—</strong><br />
+              <small class="text-muted" id="cs-cpf">—</small><br />
+              <small class="text-muted" id="cs-telefone">—</small>
+            </div>
+            <button class="btn btn-xs btn-default" id="btn-trocar-cliente"><i class="fa fa-times"></i> Trocar</button>
+          </div>
+        </div>
+
+        <!-- Mini-form novo cliente -->
+        <div id="novo-cliente-wrap" style="display:none;background:#fffbf0;border:1px solid #fed136;border-radius:8px;padding:16px;margin-bottom:16px;">
+          <h5 style="margin-top:0;color:#333;">Novo Cliente</h5>
+          <div class="row">
+            <div class="col-sm-6"><div class="form-group"><label style="color:#555;">Nome *</label><input class="form-control" id="nc-nome" /></div></div>
+            <div class="col-sm-6"><div class="form-group"><label style="color:#555;">CPF/CNPJ *</label><input class="form-control" id="nc-cpfcnpj" placeholder="000.000.000-00" maxlength="18" /></div></div>
+          </div>
+          <div class="row">
+            <div class="col-sm-6"><div class="form-group"><label style="color:#555;">Telefone *</label><input class="form-control" id="nc-telefone" maxlength="15" /></div></div>
+            <div class="col-sm-6"><div class="form-group"><label style="color:#555;">E-mail *</label><input type="email" class="form-control" id="nc-email" /></div></div>
+          </div>
+          <div class="row">
+            <div class="col-sm-4"><div class="form-group"><label style="color:#555;">CEP</label><input class="form-control" id="nc-cep" placeholder="00000-000" maxlength="9" /></div></div>
+            <div class="col-sm-8"><div class="form-group"><label style="color:#555;">Logradouro</label><input class="form-control" id="nc-logradouro" /></div></div>
+          </div>
+          <div class="row">
+            <div class="col-sm-3"><div class="form-group"><label style="color:#555;">Número</label><input class="form-control" id="nc-numero" /></div></div>
+            <div class="col-sm-4"><div class="form-group"><label style="color:#555;">Complemento</label><input class="form-control" id="nc-complemento" /></div></div>
+            <div class="col-sm-5"><div class="form-group"><label style="color:#555;">Bairro</label><input class="form-control" id="nc-bairro" /></div></div>
+          </div>
+          <div class="row">
+            <div class="col-sm-8"><div class="form-group"><label style="color:#555;">Cidade</label><input class="form-control" id="nc-cidade" /></div></div>
+            <div class="col-sm-4"><div class="form-group"><label style="color:#555;">UF</label><input class="form-control" id="nc-estado" maxlength="2" style="text-transform:uppercase;" /></div></div>
+          </div>
+          <div id="nc-alert"></div>
+          <button class="btn btn-primary-al" id="btn-criar-cliente-inline"><i class="fa fa-check"></i> Criar Cliente</button>
+          <button class="btn btn-default" id="btn-cancelar-nc" style="margin-left:8px;">Cancelar</button>
+        </div>
+
+        <button class="btn btn-default" id="btn-mostrar-nc" style="margin-bottom:16px;">
+          <i class="fa fa-user-plus"></i> Novo Cliente
+        </button>
+
+        <div style="text-align:right; margin-top:30px;">
+          <button class="btn btn-primary-al" id="btn-step1-next" disabled>Próximo <i class="fa fa-arrow-right"></i></button>
+        </div>
+      </div>
+
+      <!-- ── Step 2: Placa ── -->
+      <div id="step-2" style="display:none;">
+        <div id="step2-header">
+          <h4 style="margin-top:0;">Selecione a Placa</h4>
+          <div id="alerta-carne-ativo" class="alert alert-warning" style="display:none;">
+            <i class="fa fa-exclamation-triangle"></i> Este cliente já possui um carnê ativo. Gerar novo substituirá o existente.
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <input type="text" class="form-control" id="busca-placa" placeholder="Buscar placa…" autocomplete="off" />
+          </div>
+        </div>
+
+        <div id="step2-body">
+          <!-- ─ Sugestão de unificação (cenários 2 e 3) ─ -->
+          <div id="sugestao-unif" style="display:none;margin-bottom:14px;">
+            <div class="alert alert-info" style="margin-bottom:8px;">
+              <i class="fa fa-info-circle"></i> <span id="sugestao-unif-texto"></span>
+            </div>
+            <button class="btn btn-primary-al btn-sm" id="btn-sim-unificar"><i class="fa fa-link"></i> Sim, gerar boleto unificado</button>
+            <button class="btn btn-default btn-sm" id="btn-nao-unificar" style="margin-left:8px;">Não, selecionar individualmente</button>
+          </div>
+
+          <div id="lista-placas" style="margin-bottom:16px;"></div>
+
+          <!-- ─ Prompt Ajuste 1: placa nova + carnê unificado existente ─ -->
+          <div id="prompt-add-unif" style="display:none;margin-bottom:12px;">
+            <div class="alert alert-warning" style="margin-bottom:8px;">
+              <i class="fa fa-exclamation-triangle"></i> <span id="prompt-add-unif-texto"></span>
+            </div>
+            <button class="btn btn-warning btn-sm" id="btn-sim-add-unif"><i class="fa fa-plus-circle"></i> Sim, adicionar ao boleto unificado</button>
+            <button class="btn btn-default btn-sm" id="btn-nao-add-unif" style="margin-left:8px;">Não, gerar carnê individual</button>
+          </div>
+
+          <div id="nova-placa-wrap" style="display:none;background:#fffbf0;border:1px solid #fed136;border-radius:8px;padding:16px;margin-bottom:16px;">
+            <h5 style="margin-top:0;">Nova Placa</h5>
+            <div class="row">
+              <div class="col-sm-6"><div class="form-group"><label>Placa *</label><input class="form-control" id="np-placa" style="text-transform:uppercase;" placeholder="ABC1234" maxlength="7" /></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>Descrição</label><input class="form-control" id="np-desc" maxlength="40" /><small id="ctr-np-desc" style="display:block;text-align:right;color:#aaa;font-size:11px;margin-top:2px;">0/40</small></div></div>
+            </div>
+            <div id="np-alert"></div>
+            <button class="btn btn-primary-al" id="btn-criar-placa-inline"><i class="fa fa-check"></i> Adicionar Placa</button>
+            <button class="btn btn-default" id="btn-cancelar-np" style="margin-left:8px;">Cancelar</button>
+          </div>
+
+          <button class="btn btn-default" id="btn-mostrar-np" style="margin-bottom:16px;">
+            <i class="fa fa-plus"></i> Nova Placa
+          </button>
+
+          <!-- ─ Formulário de unificação ─ -->
+          <div id="form-unif" style="display:none;padding-top:4px;">
+            <div id="form-unif-placas"></div>
+            <div class="unif-total-bar" style="background:#f8f9fa;border-radius:6px;padding:10px 14px;margin:10px 0 14px;display:flex;justify-content:space-between;align-items:center;">
+              <strong style="color:#555;">Total mensal:</strong>
+              <span id="unif-total" style="font-size:20px;font-weight:700;color:#28a745;">R$ 0,00</span>
+            </div>
+            <div class="row">
+              <div class="col-sm-6">
+                <div class="form-group"><label>Data 1° Vencimento *</label><input type="date" class="form-control" id="unif-vencimento" /></div>
+              </div>
+              <div class="col-sm-6">
+                <div class="form-group">
+                  <label>Nº de Parcelas *</label>
+                  <select class="form-control" id="unif-parcelas">
+                    <option value="">Selecione</option>
+                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                    <option value="4">4</option><option value="6">6</option><option value="12">12</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Vendedor Responsável</label>
+              <div style="position:relative;">
+                <input type="text" class="form-control" id="unif-vendedor-busca" placeholder="Digite nome ou e-mail do vendedor…" autocomplete="off" style="padding-right:32px;" />
+                <button type="button" id="unif-vendedor-limpar" title="Limpar" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;line-height:1;padding:0;">&times;</button>
+                <div id="unif-vendedor-resultados" style="position:absolute;z-index:200;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;display:none;"></div>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:8px;">
+              <label>Descrição (aparecerá no boleto)</label>
+              <input type="text" class="form-control" id="unif-descricao" maxlength="100" placeholder="Ex.: Rastreamento veicular — Ref. Jan/2025" />
+              <small id="ctr-unif-descricao" style="display:block;text-align:right;color:#aaa;font-size:11px;margin-top:2px;">0/100</small>
+            </div>
+            <div id="form-unif-alert"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:16px;padding-bottom:4px;">
+              <button class="btn btn-default" id="btn-unif-cancelar"><i class="fa fa-arrow-left"></i> Cancelar</button>
+              <button class="btn btn-primary-al" id="btn-unif-gerar">
+                <span id="btn-unif-gerar-texto"><i class="fa fa-link"></i> Gerar Boleto Unificado</span>
+                <span id="btn-unif-gerar-spinner" style="display:none;"><i class="fa fa-spinner fa-spin"></i> Gerando…</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="step2-footer" style="display:flex;justify-content:space-between;">
+          <button class="btn btn-default" id="btn-step2-back"><i class="fa fa-arrow-left"></i> Voltar</button>
+          <button class="btn btn-primary-al" id="btn-step2-next" disabled>Próximo <i class="fa fa-arrow-right"></i></button>
+        </div>
+      </div>
+
+      <!-- ── Step 3: Cobrança ── -->
+      <div id="step-3" style="display:none;">
+        <h4 style="margin-top:0;">Dados da Cobrança</h4>
+        <div class="row">
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Valor (R$) *</label>
+              <input type="number" class="form-control" id="cb-valor" step="0.01" min="0.01" placeholder="0,00" />
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Data 1° Vencimento *</label>
+              <input type="date" class="form-control" id="cb-vencimento" />
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Nº de Parcelas *</label>
+              <select class="form-control" id="cb-parcelas">
+                <option value="">Selecione</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="6">6</option>
+                <option value="12">12</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Vendedor Responsável</label>
+          <div style="position:relative;">
+            <input type="text" class="form-control" id="cb-vendedor-busca" placeholder="Digite nome ou e-mail do vendedor…" autocomplete="off" style="padding-right:32px;" />
+            <button type="button" id="cb-vendedor-limpar" title="Limpar vendedor" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;line-height:1;padding:0;">&times;</button>
+            <div id="cb-vendedor-resultados" style="position:absolute;z-index:200;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;display:none;"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Descrição (aparecerá no boleto)</label>
+          <input type="text" class="form-control" id="cb-descricao" maxlength="100" placeholder="Ex.: Rastreamento veicular — Ref. Jan/2025" />
+          <small id="ctr-cb-descricao" style="display:block;text-align:right;color:#aaa;font-size:11px;margin-top:2px;">0/100</small>
+        </div>
+
+        <div style="display:flex;justify-content:space-between; margin-top: 50px;">
+          <button class="btn btn-default" id="btn-step3-back"><i class="fa fa-arrow-left"></i> Voltar</button>
+          <button class="btn btn-primary-al" id="btn-step3-next">Próximo <i class="fa fa-arrow-right"></i></button>
+        </div>
+      </div>
+
+      <!-- ── Step 4: Confirmar ── -->
+      <div id="step-4" style="display:none;">
+        <h4 style="margin-top:0;">Confirmar e Gerar</h4>
+
+        <div id="resumo-card" style="background:#f8f9fa;border-radius:8px;padding:20px;margin-bottom:24px;">
+          <table class="table table-condensed" style="margin:0;">
+            <tbody>
+              <tr><td style="width:40%;color:#666;">Cliente</td><td id="res-cliente" style="font-weight:600;">—</td></tr>
+              <tr><td style="color:#666;">CPF/CNPJ</td><td id="res-cpf">—</td></tr>
+              <tr><td style="color:#666;">Placa</td><td id="res-placa" style="font-weight:600;">—</td></tr>
+              <tr><td style="color:#666;">Valor</td><td id="res-valor" style="font-weight:600;color:#28a745;">—</td></tr>
+              <tr><td style="color:#666;">Parcelas</td><td id="res-parcelas">—</td></tr>
+              <tr><td style="color:#666;">1° Vencimento</td><td id="res-vencimento">—</td></tr>
+              <tr><td style="color:#666;">Vendedor</td><td id="res-vendedor">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Resultado após gerar -->
+        <div id="resultado-ok" style="display:none;background:#d4edda;border-radius:8px;padding:20px;margin-bottom:16px;text-align:center;">
+          <i class="fa fa-check-circle fa-2x" style="color:#28a745;"></i>
+          <h4 style="color:#155724;margin:8px 0;">Carnê gerado com sucesso!</h4>
+          <p>Clique para abrir os boletos:</p>
+          <div id="links-boletos" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
+          <button class="btn btn-default" id="btn-gerar-outro" style="margin-top:16px;">
+            <i class="fa fa-plus"></i> Gerar outro carnê
+          </button>
+        </div>
+
+        <div id="resultado-erro" style="display:none;"></div>
+
+        <div id="step4-actions" style="display:flex;justify-content:space-between; margin-top: 30px;">
+          <button class="btn btn-default" id="btn-step4-back"><i class="fa fa-arrow-left"></i> Voltar</button>
+          <button class="btn btn-primary-al btn-lg" id="btn-gerar">
+            <span id="btn-gerar-texto"><i class="fa fa-file-text"></i> Gerar Carnê</span>
+            <span id="btn-gerar-spinner" style="display:none;"><i class="fa fa-spinner fa-spin"></i> Gerando…</span>
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /wizard-content -->
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+    if (!currentUser) return;
+    var isAdmin = currentUser.role === 'ADMIN';
+
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge ' + (isAdmin ? 'badge-ativo' : 'badge-pendente');
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    // ── Estado do wizard ──────────────────────────────────────
+    var state = {
+      step: 1,
+      cliente: null,
+      placa: null,
+      valor: null,
+      vencimento: null,
+      parcelas: null,
+      vendedorId: null,
+      vendedorNome: null,
+      descricao: null,
+    };
+    // ── Unificação ────────────────────────────────────────────
+    var carneUnificadoAtivo = null; // {id, placas:[{placaId,placa,valor}]}
+    var placaValoresAtivos  = {};   // placaId → valor do boleto ativo
+    var unifPlacas          = [];   // [{placaId,placa,valor,descricao}]
+    var unifVendedorId      = null;
+    var unifVendedorTimer   = null;
+    var unifVarTimer        = null; // debounce para salvar valorPadrao no banco
+    var clienteVendedorId   = null; // vendedor padrão do cliente (pré-preenchimento)
+    var clienteVendedorNome = null;
+    // ── Autocomplete vendedor ─────────────────────────────────
+    var vendedorTimer = null;
+    var vendedorSelecionadoId = null;
+
+    document.getElementById('cb-vendedor-busca').addEventListener('input', function () {
+      var q = this.value.trim();
+      clearTimeout(vendedorTimer);
+      document.getElementById('cb-vendedor-limpar').style.display = 'none';
+      vendedorSelecionadoId = null;
+      if (q.length < 2) { document.getElementById('cb-vendedor-resultados').style.display = 'none'; return; }
+      vendedorTimer = setTimeout(function () { buscarVendedores(q); }, 300);
+    });
+
+    function buscarVendedores(q) {
+      AL.apiGet('/api/vendedores?busca=' + encodeURIComponent(q))
+        .then(function (list) {
+          var div = document.getElementById('cb-vendedor-resultados');
+          if (!list || !list.length) {
+            div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum vendedor encontrado.</div>';
+            div.style.display = 'block'; return;
+          }
+          div.innerHTML = list.map(function (v) {
+            return '<div class="vendedor-item" data-id="' + v.id + '" data-nome="' + v.nome + '" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;">' +
+              '<strong>' + v.nome + '</strong>' + (v.email ? ' <small class="text-muted">— ' + v.email + '</small>' : '') + '</div>';
+          }).join('');
+          div.style.display = 'block';
+          div.querySelectorAll('.vendedor-item').forEach(function (item) {
+            item.addEventListener('click', function () {
+              selecionarVendedor(this.dataset.id, this.dataset.nome);
+            });
+          });
+        }).catch(function () {});
+    }
+
+    function selecionarVendedor(id, nome) {
+      vendedorSelecionadoId = id;
+      document.getElementById('cb-vendedor-busca').value = nome;
+      document.getElementById('cb-vendedor-limpar').style.display = 'block';
+      document.getElementById('cb-vendedor-resultados').style.display = 'none';
+    }
+
+    document.getElementById('cb-vendedor-limpar').addEventListener('click', function () {
+      vendedorSelecionadoId = null;
+      document.getElementById('cb-vendedor-busca').value = '';
+      this.style.display = 'none';
+      document.getElementById('cb-vendedor-busca').focus();
+    });
+
+    document.addEventListener('click', function (e) {
+      var wrap = document.getElementById('cb-vendedor-busca').parentNode;
+      if (!wrap.contains(e.target)) document.getElementById('cb-vendedor-resultados').style.display = 'none';
+    });
+
+    // Pré-selecionar cliente via ?clienteId= (vindo de cliente-detalhe.html)
+    var preClienteId = new URLSearchParams(window.location.search).get('clienteId');
+    if (preClienteId) {
+      AL.apiGet('/api/clientes/' + preClienteId)
+        .then(function (c) {
+          if (c && c.id) {
+            selecionarCliente(c);
+          }
+        })
+        .catch(function () {});
+    }
+
+    // ── Navegação de steps ────────────────────────────────────
+    function goStep(n) {
+      for (var i = 1; i <= 4; i++) {
+        // step-2 usa display:flex (layout de scroll interno); os demais usam block
+        document.getElementById('step-' + i).style.display = (i === n) ? (i === 2 ? 'flex' : 'block') : 'none';
+      }
+      document.querySelectorAll('.wizard-step').forEach(function (el) {
+        var s = parseInt(el.dataset.step);
+        el.classList.remove('active', 'done');
+        if (s === n) el.classList.add('active');
+        else if (s < n) el.classList.add('done');
+      });
+      // Step 2 tem scroll interno — desativa o scroll do wizard-content
+      var wc = document.getElementById('wizard-content');
+      if (n === 2) wc.classList.add('step2-ativo');
+      else wc.classList.remove('step2-ativo');
+      state.step = n;
+    }
+
+    // ── Step 1: Busca de clientes ─────────────────────────────
+    var debounceTimer = null;
+    document.getElementById('busca-cliente').addEventListener('input', function () {
+      var q = this.value.trim();
+      clearTimeout(debounceTimer);
+      if (q.length < 2) { document.getElementById('busca-resultados').style.display = 'none'; return; }
+      debounceTimer = setTimeout(function () { buscarClientes(q); }, 400);
+    });
+
+    function buscarClientes(q) {
+      AL.apiGet('/api/clientes?busca=' + encodeURIComponent(q))
+        .then(function (list) {
+          var div = document.getElementById('busca-resultados');
+          if (!list || !list.length) {
+            div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum resultado.</div>';
+            div.style.display = 'block';
+            return;
+          }
+          div.innerHTML = list.map(function (c) {
+            return '<div class="busca-item" data-id="' + c.id + '" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;">' +
+              '<strong>' + c.nome + '</strong> &mdash; ' + AL.fmtCpfCnpj(c.cpfCnpj) +
+              (c.telefone ? ' &mdash; ' + c.telefone : '') +
+              '</div>';
+          }).join('');
+          div.style.display = 'block';
+
+          div.querySelectorAll('.busca-item').forEach(function (item) {
+            item.addEventListener('click', function () {
+              var id = this.dataset.id;
+              var c = list.find(function (x) { return x.id === id; });
+              selecionarCliente(c);
+            });
+            //item.addEventListener('mouseover', function () { this.style.background = '#f5f5f5'; });
+            //item.addEventListener('mouseout', function () { this.style.background = ''; });
+          });
+        })
+        .catch(function () {});
+    }
+
+    function selecionarCliente(c) {
+      state.cliente = c;
+      document.getElementById('busca-resultados').style.display = 'none';
+      document.getElementById('busca-cliente').value = c.nome;
+      document.getElementById('cs-nome').textContent = c.nome;
+      document.getElementById('cs-cpf').textContent = AL.fmtCpfCnpj(c.cpfCnpj);
+      document.getElementById('cs-telefone').textContent = c.telefone || '';
+      document.getElementById('cliente-selecionado-card').style.display = 'block';
+      document.getElementById('busca-cliente').style.display = 'none';
+      document.getElementById('btn-mostrar-nc').style.display = 'none';
+      document.getElementById('novo-cliente-wrap').style.display = 'none';
+      document.getElementById('btn-step1-next').disabled = false;
+    }
+
+    document.getElementById('btn-trocar-cliente').addEventListener('click', function () {
+      state.cliente = null;
+      document.getElementById('cliente-selecionado-card').style.display = 'none';
+      document.getElementById('busca-cliente').style.display = 'block';
+      document.getElementById('busca-cliente').value = '';
+      document.getElementById('btn-mostrar-nc').style.display = 'inline-block';
+      document.getElementById('btn-step1-next').disabled = true;
+    });
+
+    // Novo cliente inline
+    document.getElementById('btn-mostrar-nc').addEventListener('click', function () {
+      document.getElementById('novo-cliente-wrap').style.display = 'block';
+      this.style.display = 'none';
+    });
+    document.getElementById('btn-cancelar-nc').addEventListener('click', function () {
+      document.getElementById('novo-cliente-wrap').style.display = 'none';
+      document.getElementById('btn-mostrar-nc').style.display = 'inline-block';
+    });
+    // ViaCEP para novo cliente
+    document.getElementById('nc-cep').addEventListener('blur', function () {
+      var cep = this.value.replace(/\D/g, '');
+      if (cep.length !== 8) return;
+      fetch('https://viacep.com.br/ws/' + cep + '/json/')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.erro) return;
+          document.getElementById('nc-logradouro').value = d.logradouro || '';
+          document.getElementById('nc-bairro').value     = d.bairro     || '';
+          document.getElementById('nc-cidade').value     = d.localidade || '';
+          document.getElementById('nc-estado').value     = d.uf         || '';
+        }).catch(function () {});
+    });
+    // Máscaras no novo cliente
+    AL.maskCpfCnpj(document.getElementById('nc-cpfcnpj'));
+    AL.maskPhone(document.getElementById('nc-telefone'));
+
+    document.getElementById('btn-criar-cliente-inline').addEventListener('click', function () {
+      var nome   = document.getElementById('nc-nome').value.trim();
+      var cpf    = document.getElementById('nc-cpfcnpj').value.replace(/\D/g, '');
+      var telefone = document.getElementById('nc-telefone').value.trim();
+      var email    = document.getElementById('nc-email').value.trim();
+      if (!nome || !cpf || !telefone || !email) {
+        document.getElementById('nc-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;margin:4px 0;">Nome, CPF/CNPJ, Telefone e E-mail são obrigatórios.</div>';
+        return;
+      }
+      AL.apiPost('/api/clientes', {
+        nome: nome, cpfCnpj: cpf,
+        telefone: telefone,
+        email: email,
+        cep:      document.getElementById('nc-cep').value.replace(/\D/g, ''),
+        logradouro:  document.getElementById('nc-logradouro').value.trim(),
+        numero:      document.getElementById('nc-numero').value.trim(),
+        complemento: document.getElementById('nc-complemento').value.trim(),
+        bairro:      document.getElementById('nc-bairro').value.trim(),
+        cidade:      document.getElementById('nc-cidade').value.trim(),
+        estado:      document.getElementById('nc-estado').value.trim().toUpperCase(),
+      }).then(function (c) {
+        selecionarCliente(c);
+        document.getElementById('nc-alert').innerHTML = '';
+      }).catch(function (err) {
+        document.getElementById('nc-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;margin:4px 0;">' + err.message + '</div>';
+      });
+    });
+
+    document.getElementById('btn-step1-next').addEventListener('click', function () {
+      if (!state.cliente) return;
+      goStep(2);
+      carregarPlacas();
+    });
+
+    // ── Step 2: Placas ────────────────────────────────────────
+    var todasPlacas = [];
+
+    function renderPlacasLista(placas, placasComCarne, placasComCarneUnificado) {
+      if (!placas.length) {
+        document.getElementById('lista-placas').innerHTML = '<p class="text-muted">Nenhuma placa ativa. Adicione uma abaixo.</p>';
+        return;
+      }
+      var busca = (document.getElementById('busca-placa') ? document.getElementById('busca-placa').value.trim().toUpperCase() : '');
+      var filtradas = busca ? placas.filter(function (p) { return p.placa.indexOf(busca) !== -1 || (p.descricao || '').toUpperCase().indexOf(busca) !== -1; }) : placas;
+      if (!filtradas.length) {
+        document.getElementById('lista-placas').innerHTML = '<p class="text-muted">Nenhuma placa encontrada.</p>';
+        return;
+      }
+      document.getElementById('lista-placas').innerHTML = filtradas.map(function (p) {
+        var temCarne = placasComCarne[p.id];
+        var temCarneUnificado = placasComCarneUnificado[p.id];
+        var badges = '';
+        if (temCarneUnificado) badges += ' <span class="al-badge badge-pendente" style="font-size:10px;vertical-align:middle;">Carnê Unificado</span>';
+        else if (temCarne) badges += ' <span class="al-badge badge-atrasado" style="font-size:10px;vertical-align:middle;">Possui Carnê</span>';
+        return '<label style="display:flex;align-items:center;gap:10px;padding:10px;border:2px solid #eee;border-radius:8px;margin-bottom:8px;cursor:pointer;">' +
+          '<input type="radio" name="placa" value="' + p.id + '" data-placa="' + p.placa + '" style="margin:0;" />' +
+          '<div style="flex:1;"><strong>' + p.placa + '</strong>' + badges +
+          (p.descricao ? '<br><small class="text-muted">' + p.descricao + '</small>' : '') + '</div>' +
+          '</label>';
+      }).join('');
+
+      document.querySelectorAll('input[name="placa"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+          state.placa = { id: this.value, placa: this.dataset.placa };
+          document.getElementById('btn-step2-next').disabled = false;
+          document.querySelectorAll('input[name="placa"]').forEach(function (r) {
+            r.closest('label').style.borderColor = r.checked ? '#fed136' : '#eee';
+          });
+          // Ajuste 1: placa selecionada não está no carnê unificado ativo
+          document.getElementById('prompt-add-unif').style.display = 'none';
+          if (carneUnificadoAtivo && document.getElementById('sugestao-unif').style.display === 'none') {
+            var estaNoUnif = carneUnificadoAtivo.placas.some(function (p) { return p.placaId === state.placa.id; });
+            if (!estaNoUnif) {
+              var nomesUnif = carneUnificadoAtivo.placas.map(function (p) { return p.placa; }).join(', ');
+              document.getElementById('prompt-add-unif-texto').textContent =
+                'Esta placa não faz parte do boleto unificado atual (' + nomesUnif + '). ' +
+                'Deseja adicioná-la? O carnê unificado atual será cancelado e um novo será gerado.';
+              document.getElementById('prompt-add-unif').style.display = 'block';
+            }
+          }
+        });
+      });
+    }
+
+    function carregarPlacas() {
+      document.getElementById('lista-placas').innerHTML = '<div class="text-muted"><i class="fa fa-spinner fa-spin"></i></div>';
+      document.getElementById('btn-step2-next').disabled = true;
+      document.getElementById('busca-placa').value = '';
+      document.getElementById('sugestao-unif').style.display = 'none';
+      document.getElementById('prompt-add-unif').style.display = 'none';
+      document.getElementById('form-unif').style.display = 'none';
+      document.getElementById('lista-placas').style.display = 'block';
+      document.getElementById('step2-footer').style.display = 'flex';
+      document.getElementById('busca-placa').closest('.form-group').style.display = 'block';
+      document.querySelector('#step2-header h4').textContent = 'Selecione a Placa';
+      // Fix 1: restaura steps do wizard ao voltar para seleção normal
+      ['3','4'].forEach(function(n) {
+        var el = document.querySelector('.wizard-step[data-step="' + n + '"]');
+        if (el) el.style.display = '';
+      });
+      var s2label = document.querySelector('.wizard-step[data-step="2"]');
+      if (s2label) s2label.textContent = '2. Placa';
+      carneUnificadoAtivo = null;
+      placaValoresAtivos = {};
+
+      AL.apiGet('/api/clientes/' + state.cliente.id)
+        .then(function (c) {
+          // Salvar vendedor padrão do cliente para pré-preenchimento
+          clienteVendedorId   = c.vendedor ? c.vendedor.id   : null;
+          clienteVendedorNome = c.vendedor ? c.vendedor.nome : null;
+
+          todasPlacas = (c.placas || []).filter(function (p) { return p.ativo === true; });
+          var todasPlacasMap = {};
+          (c.placas || []).forEach(function (p) { todasPlacasMap[p.id] = p; });
+          var carnes = c.carnes || [];
+          var placasComCarne = {};
+          var placasComCarneUnificado = {};
+
+          carnes.forEach(function (cn) {
+            var temAtivo = cn.boletos && cn.boletos.some(function (b) {
+              return b.status === 'PENDENTE' || b.status === 'ATRASADO';
+            });
+            if (!temAtivo) return;
+            if (cn.tipo === 'INDIVIDUAL') {
+              var bAtivo = cn.boletos.find(function (b) { return b.status === 'PENDENTE' || b.status === 'ATRASADO'; });
+              cn.boletos.forEach(function (b) { if (b.placaId) placasComCarne[b.placaId] = true; });
+              if (bAtivo && bAtivo.placaId) placaValoresAtivos[bAtivo.placaId] = Number(bAtivo.valor);
+            }
+            if (cn.tipo === 'UNIFICADO') {
+              var unificTemp = [];
+              cn.boletos.forEach(function (b) {
+                (b.placasUnificadas || []).forEach(function (bp) {
+                  if (bp.placaId) {
+                    placasComCarneUnificado[bp.placaId] = true;
+                    placaValoresAtivos[bp.placaId] = Number(bp.valorPlaca);
+                    if (!unificTemp.find(function (x) { return x.placaId === bp.placaId; })) {
+                      var p = todasPlacasMap[bp.placaId];
+                      unificTemp.push({ placaId: bp.placaId, placa: p ? p.placa : '?', valor: Number(bp.valorPlaca) });
+                    }
+                  }
+                });
+              });
+              if (unificTemp.length) carneUnificadoAtivo = { id: cn.id, placas: unificTemp };
+            }
+          });
+
+          // Ajuste 1: para placas sem carnê ativo, usar valorPadrao salvo no banco
+          todasPlacas.forEach(function (p) {
+            if (!placaValoresAtivos[p.id] && p.valorPadrao) {
+              placaValoresAtivos[p.id] = Number(p.valorPadrao);
+            }
+          });
+
+          renderPlacasLista(todasPlacas, placasComCarne, placasComCarneUnificado);
+          document.getElementById('busca-placa').oninput = function () {
+            renderPlacasLista(todasPlacas, placasComCarne, placasComCarneUnificado);
+            state.placa = null;
+            document.getElementById('btn-step2-next').disabled = true;
+            document.getElementById('prompt-add-unif').style.display = 'none';
+          };
+
+          // Cenários 2 & 3: 2+ placas sem carnê unificado ativo
+          if (!carneUnificadoAtivo && todasPlacas.length >= 2) {
+            var qtdComCarne = todasPlacas.filter(function (p) { return placasComCarne[p.id]; }).length;
+            var qtdSemCarne = todasPlacas.length - qtdComCarne;
+            var texto = (qtdComCarne > 0 && qtdSemCarne > 0)
+              ? 'Este cliente tem ' + todasPlacas.length + ' placas (' + qtdComCarne + ' com carnê ativo e ' + qtdSemCarne + ' sem carnê). Deseja gerar um boleto unificado para todas?'
+              : 'Este cliente tem ' + todasPlacas.length + ' placas. Deseja gerar um boleto unificado para todas?';
+            document.getElementById('sugestao-unif-texto').textContent = texto;
+            document.getElementById('sugestao-unif').style.display = 'block';
+          }
+          // Novo: carnê unificado ativo + 2+ placas fora dele → sugestão de recriar unificado para todas
+          if (carneUnificadoAtivo) {
+            var placasForaDoUnif = todasPlacas.filter(function (p) {
+              return !carneUnificadoAtivo.placas.some(function (up) { return up.placaId === p.id; });
+            });
+            if (placasForaDoUnif.length >= 2) {
+              var nomesUnif = carneUnificadoAtivo.placas.map(function (p) { return p.placa; }).join(', ');
+              var foraComCarne = placasForaDoUnif.filter(function (p) { return placasComCarne[p.id]; });
+              var foraSemCarne = placasForaDoUnif.filter(function (p) { return !placasComCarne[p.id]; });
+              var parteExtra;
+              if (foraComCarne.length > 0 && foraSemCarne.length > 0) {
+                parteExtra = foraComCarne.length + ' placa(s) com carnê individual (' + foraComCarne.map(function (p) { return p.placa; }).join(', ') + ') e ' +
+                  foraSemCarne.length + ' placa(s) sem cobrança (' + foraSemCarne.map(function (p) { return p.placa; }).join(', ') + ')';
+              } else if (foraComCarne.length > 0) {
+                parteExtra = foraComCarne.length + ' placa(s) com carnê individual (' + foraComCarne.map(function (p) { return p.placa; }).join(', ') + ')';
+              } else {
+                parteExtra = foraSemCarne.length + ' placa(s) sem cobrança (' + foraSemCarne.map(function (p) { return p.placa; }).join(', ') + ')';
+              }
+              document.getElementById('sugestao-unif-texto').textContent =
+                'Este cliente possui um boleto unificado com ' + carneUnificadoAtivo.placas.length +
+                ' placa(s) (' + nomesUnif + ') e mais ' + parteExtra +
+                '. Deseja gerar um novo boleto unificado para todas as placas?';
+              document.getElementById('sugestao-unif').style.display = 'block';
+            }
+          }
+        })
+        .catch(function (err) {
+          document.getElementById('lista-placas').innerHTML = '<div class="text-danger">' + err.message + '</div>';
+        });
+    }
+
+    // ── Unificação: funções ───────────────────────────────────
+    function mostrarFormUnificado(placasParaUnif) {
+      unifPlacas = placasParaUnif;
+      // Fix 3: reduz indicador de passos para 2 no modo unificação
+      ['3','4'].forEach(function(n) {
+        var el = document.querySelector('.wizard-step[data-step="' + n + '"]');
+        if (el) el.style.display = 'none';
+      });
+      var s2label = document.querySelector('.wizard-step[data-step="2"]');
+      if (s2label) s2label.textContent = '2. Unificar';
+      document.getElementById('sugestao-unif').style.display = 'none';
+      document.getElementById('lista-placas').style.display = 'none';
+      document.getElementById('prompt-add-unif').style.display = 'none';
+      document.getElementById('nova-placa-wrap').style.display = 'none';
+      document.getElementById('btn-mostrar-np').style.display = 'none';
+      document.getElementById('step2-footer').style.display = 'none';
+      document.getElementById('alerta-carne-ativo').style.display = 'none';
+      document.getElementById('busca-placa').closest('.form-group').style.display = 'none';
+      document.querySelector('#step2-header h4').textContent = 'Boleto Unificado';
+      var d = new Date(); d.setDate(d.getDate() + 5);
+      document.getElementById('unif-vencimento').value = d.toISOString().split('T')[0];
+      document.getElementById('unif-parcelas').value = '';
+      document.getElementById('form-unif-alert').innerHTML = '';
+      // Pré-preencher vendedor com o do cliente
+      if (clienteVendedorId) {
+        unifVendedorId = clienteVendedorId;
+        document.getElementById('unif-vendedor-busca').value = clienteVendedorNome;
+        document.getElementById('unif-vendedor-limpar').style.display = 'block';
+      } else {
+        unifVendedorId = null;
+        document.getElementById('unif-vendedor-busca').value = '';
+        document.getElementById('unif-vendedor-limpar').style.display = 'none';
+      }
+      renderFormUnifPlacas();
+      document.getElementById('form-unif').style.display = 'block';
+    }
+
+    function renderFormUnifPlacas() {
+      document.getElementById('form-unif-placas').innerHTML = unifPlacas.map(function (p, i) {
+        return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+          '<span style="flex:1;font-weight:600;">' + p.placa +
+          (p.descricao ? ' <small class="text-muted">— ' + p.descricao + '</small>' : '') + '</span>' +
+          '<div style="width:160px;"><div class="input-group input-group-sm">' +
+          '<span class="input-group-addon">R$</span>' +
+          '<input type="number" class="form-control unif-placa-valor" data-index="' + i + '" value="' +
+          (p.valor || '') + '" step="0.01" min="0.01" placeholder="0,00" /></div></div></div>';
+      }).join('');
+      document.querySelectorAll('.unif-placa-valor').forEach(function (inp) {
+        inp.addEventListener('input', function () {
+          var idx = parseInt(this.dataset.index);
+          var val = parseFloat(this.value) || 0;
+          var pid = unifPlacas[idx].placaId;
+          unifPlacas[idx].valor = val;
+          placaValoresAtivos[pid] = val;
+          // Ajuste 1: salva valorPadrao no banco (debounce 800ms)
+          clearTimeout(unifVarTimer);
+          unifVarTimer = setTimeout(function () {
+            AL.apiPatch('/api/placas/' + pid + '/valor', { valor: val }).catch(function () {});
+          }, 800);
+          atualizarTotalUnif();
+        });
+      });
+      atualizarTotalUnif();
+    }
+
+    function atualizarTotalUnif() {
+      var total = unifPlacas.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
+      document.getElementById('unif-total').textContent = AL.fmtMoney(total);
+    }
+
+    function buscarVendedoresUnif(q) {
+      AL.apiGet('/api/vendedores?busca=' + encodeURIComponent(q))
+        .then(function (list) {
+          var div = document.getElementById('unif-vendedor-resultados');
+          if (!list || !list.length) {
+            div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum vendedor encontrado.</div>';
+            div.style.display = 'block'; return;
+          }
+          div.innerHTML = list.map(function (v) {
+            return '<div class="unif-vend-item" data-id="' + v.id + '" data-nome="' + v.nome + '" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;">' +
+              '<strong>' + v.nome + '</strong>' + (v.email ? ' <small class="text-muted">— ' + v.email + '</small>' : '') + '</div>';
+          }).join('');
+          div.style.display = 'block';
+          div.querySelectorAll('.unif-vend-item').forEach(function (item) {
+            item.addEventListener('click', function () {
+              unifVendedorId = this.dataset.id;
+              document.getElementById('unif-vendedor-busca').value = this.dataset.nome;
+              document.getElementById('unif-vendedor-limpar').style.display = 'block';
+              div.style.display = 'none';
+            });
+          });
+        }).catch(function () {});
+    }
+
+    // Nova placa inline
+    document.getElementById('btn-mostrar-np').addEventListener('click', function () {
+      document.getElementById('nova-placa-wrap').style.display = 'block';
+      this.style.display = 'none';
+    });
+    document.getElementById('btn-cancelar-np').addEventListener('click', function () {
+      document.getElementById('nova-placa-wrap').style.display = 'none';
+      document.getElementById('btn-mostrar-np').style.display = 'inline-block';
+    });
+    document.getElementById('btn-criar-placa-inline').addEventListener('click', function () {
+      var placa = document.getElementById('np-placa').value.trim().toUpperCase();
+      if (!placa) {
+        document.getElementById('np-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;margin:4px 0;">Placa é obrigatória.</div>';
+        return;
+      }
+      AL.apiPost('/api/clientes/' + state.cliente.id + '/placas', {
+        placa: placa,
+        descricao: document.getElementById('np-desc').value.trim(),
+      }).then(function () {
+        document.getElementById('nova-placa-wrap').style.display = 'none';
+        document.getElementById('btn-mostrar-np').style.display = 'inline-block';
+        document.getElementById('np-placa').value = '';
+        document.getElementById('np-desc').value = '';
+        document.getElementById('np-alert').innerHTML = '';
+        carregarPlacas();
+      }).catch(function (err) {
+        document.getElementById('np-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;margin:4px 0;">' + err.message + '</div>';
+      });
+    });
+
+    document.getElementById('btn-step2-back').addEventListener('click', function () { goStep(1); });
+    document.getElementById('btn-step2-next').addEventListener('click', function () {
+      // Pré-preencher vendedor com o do cliente (se nenhum foi selecionado manualmente)
+      if (!vendedorSelecionadoId && clienteVendedorId) {
+        vendedorSelecionadoId = clienteVendedorId;
+        document.getElementById('cb-vendedor-busca').value = clienteVendedorNome;
+        document.getElementById('cb-vendedor-limpar').style.display = 'block';
+      }
+      goStep(3);
+    });
+
+    // ── Unificação: event listeners ───────────────────────────
+    document.getElementById('btn-sim-unificar').addEventListener('click', function () {
+      mostrarFormUnificado(todasPlacas.map(function (p) {
+        return { placaId: p.id, placa: p.placa, valor: placaValoresAtivos[p.id] || 0, descricao: p.descricao || '' };
+      }));
+    });
+    document.getElementById('btn-nao-unificar').addEventListener('click', function () {
+      document.getElementById('sugestao-unif').style.display = 'none';
+    });
+    document.getElementById('btn-sim-add-unif').addEventListener('click', function () {
+      var lista = carneUnificadoAtivo.placas.map(function (p) {
+        return { placaId: p.placaId, placa: p.placa, valor: p.valor, descricao: '' };
+      });
+      lista.push({ placaId: state.placa.id, placa: state.placa.placa, valor: placaValoresAtivos[state.placa.id] || 0, descricao: '' });
+      mostrarFormUnificado(lista);
+    });
+    document.getElementById('btn-nao-add-unif').addEventListener('click', function () {
+      document.getElementById('prompt-add-unif').style.display = 'none';
+    });
+    document.getElementById('btn-unif-cancelar').addEventListener('click', function () {
+      document.getElementById('form-unif').style.display = 'none';
+      carregarPlacas();
+    });
+    document.getElementById('btn-unif-gerar').addEventListener('click', function () {
+      var vencimento = document.getElementById('unif-vencimento').value;
+      var parcelas   = document.getElementById('unif-parcelas').value;
+      if (!vencimento || !parcelas) {
+        document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;">Preencha a data de vencimento e o número de parcelas.</div>';
+        return;
+      }
+      if (unifPlacas.some(function (p) { return !p.valor || Number(p.valor) <= 0; })) {
+        document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;">Informe o valor de cada placa.</div>';
+        return;
+      }
+      document.getElementById('form-unif-alert').innerHTML = '';
+      document.getElementById('btn-unif-gerar-texto').style.display = 'none';
+      document.getElementById('btn-unif-gerar-spinner').style.display = 'inline';
+      document.getElementById('btn-unif-gerar').disabled = true;
+      document.getElementById('btn-unif-cancelar').disabled = true;
+
+      var unifDescricao = document.getElementById('unif-descricao').value.trim() || null;
+      AL.apiPost('/api/carnes/unificar-placas', {
+        clienteId:      state.cliente.id,
+        placas:         unifPlacas.map(function (p) { return { placaId: p.placaId, valor: p.valor }; }),
+        dataVencimento: vencimento,
+        numeroParcelas: parseInt(parcelas),
+        vendedorId:     unifVendedorId || null,
+        descricaoBoleto: unifDescricao || undefined,
+      }).then(function (carne) {
+        document.getElementById('btn-unif-gerar-texto').style.display = 'inline';
+        document.getElementById('btn-unif-gerar-spinner').style.display = 'none';
+        document.getElementById('btn-unif-gerar').disabled = false;
+        document.getElementById('btn-unif-cancelar').disabled = false;
+
+        var total = unifPlacas.reduce(function (s, p) { return s + Number(p.valor); }, 0);
+        document.getElementById('res-cliente').textContent  = state.cliente.nome;
+        document.getElementById('res-cpf').textContent      = AL.fmtCpfCnpj(state.cliente.cpfCnpj);
+        document.getElementById('res-placa').textContent    = 'Boleto Unificado (' + unifPlacas.map(function (p) { return p.placa; }).join(', ') + ')';
+        document.getElementById('res-valor').textContent    = AL.fmtMoney(total) + ' por parcela';
+        document.getElementById('res-parcelas').textContent = parcelas + 'x';
+        document.getElementById('res-vencimento').textContent = AL.fmtDate(vencimento);
+        document.getElementById('res-vendedor').textContent = unifVendedorId ? document.getElementById('unif-vendedor-busca').value : '—';
+
+        var linksDiv = document.getElementById('links-boletos');
+        linksDiv.innerHTML = '';
+        (carne.boletos || []).forEach(function (b, i) {
+          var a = document.createElement('a');
+          a.href = b.linkBoleto || '#'; a.target = '_blank';
+          a.className = 'btn btn-default btn-sm';
+          a.innerHTML = '<i class="fa fa-file-pdf-o"></i> Boleto ' + (i + 1);
+          if (!b.linkBoleto) a.style.opacity = '0.5';
+          linksDiv.appendChild(a);
+        });
+        document.getElementById('resultado-ok').style.display    = 'block';
+        document.getElementById('step4-actions').style.display   = 'none';
+        document.getElementById('resultado-erro').style.display  = 'none';
+        goStep(4);
+      }).catch(function (err) {
+        document.getElementById('btn-unif-gerar-texto').style.display = 'inline';
+        document.getElementById('btn-unif-gerar-spinner').style.display = 'none';
+        document.getElementById('btn-unif-gerar').disabled = false;
+        document.getElementById('btn-unif-cancelar').disabled = false;
+        document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger"><strong>Erro:</strong> ' + err.message + '</div>';
+      });
+    });
+
+    // Vendedor autocomplete no form-unif
+    document.getElementById('unif-vendedor-busca').addEventListener('input', function () {
+      var q = this.value.trim();
+      clearTimeout(unifVendedorTimer);
+      document.getElementById('unif-vendedor-limpar').style.display = 'none';
+      unifVendedorId = null;
+      if (q.length < 2) { document.getElementById('unif-vendedor-resultados').style.display = 'none'; return; }
+      unifVendedorTimer = setTimeout(function () { buscarVendedoresUnif(q); }, 300);
+    });
+    document.getElementById('unif-vendedor-limpar').addEventListener('click', function () {
+      unifVendedorId = null;
+      document.getElementById('unif-vendedor-busca').value = '';
+      this.style.display = 'none';
+      document.getElementById('unif-vendedor-busca').focus();
+    });
+
+    // ── Step 3: Cobrança ──────────────────────────────────────
+    // Data padrão = hoje + 5 dias
+    (function () {
+      var d = new Date();
+      d.setDate(d.getDate() + 5);
+      document.getElementById('cb-vencimento').value = d.toISOString().split('T')[0];
+    })();
+
+    document.getElementById('btn-step3-back').addEventListener('click', function () { goStep(2); });
+    document.getElementById('btn-step3-next').addEventListener('click', function () {
+      var valor     = parseFloat(document.getElementById('cb-valor').value);
+      var venc      = document.getElementById('cb-vencimento').value;
+      var parcelas  = document.getElementById('cb-parcelas').value;
+      if (!valor || !venc || !parcelas) {
+        AL.showAlert('Preencha valor, vencimento e número de parcelas.');
+        return;
+      }
+      state.valor      = valor;
+      state.vencimento = venc;
+      state.parcelas   = parseInt(parcelas);
+      state.vendedorId   = vendedorSelecionadoId || null;
+      state.vendedorNome = vendedorSelecionadoId ? document.getElementById('cb-vendedor-busca').value : '—';
+      state.descricao  = document.getElementById('cb-descricao').value.trim() || null;
+
+      // Preenche resumo
+      document.getElementById('res-cliente').textContent   = state.cliente.nome;
+      document.getElementById('res-cpf').textContent       = AL.fmtCpfCnpj(state.cliente.cpfCnpj);
+      document.getElementById('res-placa').textContent     = state.placa.placa;
+      document.getElementById('res-valor').textContent     = AL.fmtMoney(state.valor) + ' por parcela';
+      document.getElementById('res-parcelas').textContent  = state.parcelas + 'x';
+      document.getElementById('res-vencimento').textContent = AL.fmtDate(state.vencimento);
+      document.getElementById('res-vendedor').textContent  = state.vendedorNome;
+
+      // Reset resultado anterior
+      document.getElementById('resultado-ok').style.display = 'none';
+      document.getElementById('resultado-erro').style.display = 'none';
+      document.getElementById('step4-actions').style.display = 'flex';
+
+      goStep(4);
+    });
+
+    // ── Step 4: Gerar ─────────────────────────────────────────
+    document.getElementById('btn-step4-back').addEventListener('click', function () { goStep(3); });
+
+    document.getElementById('btn-gerar').addEventListener('click', function () {
+      document.getElementById('btn-gerar-texto').style.display = 'none';
+      document.getElementById('btn-gerar-spinner').style.display = 'inline';
+      document.getElementById('btn-gerar').disabled = true;
+      document.getElementById('btn-step4-back').disabled = true;
+
+      var payload = {
+        clienteId:      state.cliente.id,
+        placaId:        state.placa.id,
+        valor:          state.valor,
+        dataVencimento: state.vencimento,
+        numeroParcelas: state.parcelas,
+        vendedorId:     state.vendedorId,
+        descricaoBoleto: state.descricao || undefined,
+      };
+
+      AL.apiPost('/api/carnes', payload)
+        .then(function (carne) {
+          document.getElementById('btn-gerar-texto').style.display = 'inline';
+          document.getElementById('btn-gerar-spinner').style.display = 'none';
+          document.getElementById('btn-gerar').disabled = false;
+          document.getElementById('btn-step4-back').disabled = false;
+
+          // Mostra links dos boletos
+          var linksDiv = document.getElementById('links-boletos');
+          linksDiv.innerHTML = '';
+          var boletos = carne.boletos || [];
+          boletos.forEach(function (b, i) {
+            var a = document.createElement('a');
+            a.href = b.linkBoleto || '#';
+            a.target = '_blank';
+            a.className = 'btn btn-default btn-sm';
+            a.innerHTML = '<i class="fa fa-file-pdf-o"></i> Boleto ' + (i + 1);
+            if (!b.linkBoleto) a.style.opacity = '0.5';
+            linksDiv.appendChild(a);
+          });
+
+          document.getElementById('resultado-ok').style.display = 'block';
+          document.getElementById('step4-actions').style.display = 'none';
+          document.getElementById('resultado-erro').style.display = 'none';
+        })
+        .catch(function (err) {
+          document.getElementById('btn-gerar-texto').style.display = 'inline';
+          document.getElementById('btn-gerar-spinner').style.display = 'none';
+          document.getElementById('btn-gerar').disabled = false;
+          document.getElementById('btn-step4-back').disabled = false;
+
+          document.getElementById('resultado-erro').style.display = 'block';
+          document.getElementById('resultado-erro').innerHTML =
+            '<div class="alert alert-danger"><strong>Erro ao gerar carnê:</strong> ' + err.message + '</div>';
+        });
+    });
+
+    document.getElementById('btn-gerar-outro').addEventListener('click', function () {
+      state = { step: 1, cliente: null, placa: null, valor: null, vencimento: null, parcelas: null, vendedorId: null, vendedorNome: null, descricao: null };
+      vendedorSelecionadoId = null;
+      carneUnificadoAtivo = null; placaValoresAtivos = {}; unifPlacas = []; unifVendedorId = null;
+      clienteVendedorId = null; clienteVendedorNome = null;
+      document.getElementById('cb-vendedor-busca').value = '';
+      document.getElementById('cb-vendedor-limpar').style.display = 'none';
+      document.getElementById('cb-descricao').value = '';
+      document.getElementById('unif-descricao').value = '';
+      document.getElementById('busca-cliente').value = '';
+      document.getElementById('busca-cliente').style.display = 'block';
+      document.getElementById('cliente-selecionado-card').style.display = 'none';
+      document.getElementById('btn-mostrar-nc').style.display = 'inline-block';
+      document.getElementById('btn-step1-next').disabled = true;
+      document.getElementById('form-unif').style.display = 'none';
+      document.getElementById('lista-placas').style.display = 'block';
+      document.getElementById('btn-mostrar-np').style.display = 'inline-block';
+      document.getElementById('step2-footer').style.display = 'flex';
+      goStep(1);
+    });
+
+    // Fecha dropdowns ao clicar fora
+    document.addEventListener('click', function (e) {
+      if (!document.getElementById('busca-cliente').contains(e.target)) {
+        document.getElementById('busca-resultados').style.display = 'none';
+      }
+    });
+    document.addEventListener('click', function (e) {
+      var unifWrap = document.getElementById('unif-vendedor-busca').parentNode;
+      if (!unifWrap.contains(e.target)) document.getElementById('unif-vendedor-resultados').style.display = 'none';
+    });
+
+    // ── Contadores de caracteres ───────────────────────────────
+    [
+      { inp: 'np-desc',       ctr: 'ctr-np-desc',       max: 40  },
+      { inp: 'cb-descricao',  ctr: 'ctr-cb-descricao',  max: 100 },
+      { inp: 'unif-descricao',ctr: 'ctr-unif-descricao',max: 100 },
+    ].forEach(function (item) {
+      var inp = document.getElementById(item.inp);
+      var ctr = document.getElementById(item.ctr);
+      if (!inp || !ctr) return;
+      inp.addEventListener('input', function () {
+        var len = this.value.length;
+        ctr.textContent = len + '/' + item.max;
+        ctr.style.color = len >= item.max ? '#dc3545' : '#aaa';
+      });
+    });
+
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Dashboard — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+</head>
+
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;"
+        onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li class="active"><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout">
+        <i class="fa fa-sign-out"></i> Sair
+      </button>
+    </div>
+  </div>
+
+  <!-- Overlay para mobile -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+
+    <!-- Topbar -->
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle">
+          <i class="fa fa-bars"></i>
+        </button>
+        <h2 class="topbar-title">Dashboard</h2>
+      </div>
+    </div>
+
+    <!-- Alert container -->
+    <div id="al-alert-container"></div>
+
+    <!-- Cards de métricas -->
+    <div class="row" id="metrics-row">
+      <div class="col-sm-6 col-md-3">
+        <div class="metric-card blue">
+          <div class="value" id="m-clientes">—</div>
+          <div class="label">Clientes Ativos</div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="metric-card green">
+          <div class="value" id="m-placas">—</div>
+          <div class="label">Placas Ativas</div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="metric-card yellow">
+          <div class="value" id="m-recebimentos">—</div>
+          <div class="label">Recebimentos Hoje</div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <div class="metric-card red">
+          <div class="value" id="m-atrasados">—</div>
+          <div class="label">Boletos em Atraso</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="btn-migrar-efi" data-toggle="modal" data-target="#modal-migrar-efi">
+        <i class="fa fa-cloud-download"></i> Importar dados do EFI
+      </button>
+      <button class="btn btn-warning" id="btn-corrigir-links" title="Preenche linkBoleto nos boletos importados que estão sem PDF">
+        <i class="fa fa-link"></i> Corrigir links PDF
+      </button>
+      <button class="btn btn-default" id="btn-refresh">
+        <i class="fa fa-refresh"></i> Atualizar dados
+      </button>
+    </div>
+
+    <!-- Modal: Importar do EFI -->
+    <div class="modal fade" id="modal-migrar-efi" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Fechar"><span
+                aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title"><i class="fa fa-cloud-download"></i> Importar dados do EFI</h4>
+          </div>
+          <div class="modal-body" id="modal-efi-body">
+            <!-- conteúdo dinâmico via JS -->
+          </div>
+          <div class="modal-footer" id="modal-efi-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN']);
+      if (!user) return;
+
+      // Exibe usuário
+      document.getElementById('user-nome').textContent = user.nome || user.email || '—';
+      var badge = document.getElementById('user-badge');
+      badge.textContent = user.role;
+      badge.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+      // Sidebar toggle (mobile)
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+
+      // Logout
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      // Carrega métricas
+      function loadDashboard() {
+        document.getElementById('m-clientes').textContent = '…';
+        document.getElementById('m-placas').textContent = '…';
+        document.getElementById('m-recebimentos').textContent = '…';
+        document.getElementById('m-atrasados').textContent = '…';
+
+        AL.apiGet('/api/dashboard')
+          .then(function (data) {
+            document.getElementById('m-clientes').textContent = data.totalClientesAtivos !== undefined ? data.totalClientesAtivos : '—';
+            document.getElementById('m-placas').textContent = data.totalPlacasAtivas !== undefined ? data.totalPlacasAtivas : '—';
+            document.getElementById('m-recebimentos').textContent = data.recebimentosHoje !== undefined
+              ? AL.fmtMoney(data.recebimentosHoje) : '—';
+            document.getElementById('m-atrasados').textContent = data.totalAtrasados !== undefined ? data.totalAtrasados : '—';
+          })
+          .catch(function (err) {
+            AL.showAlert('Erro ao carregar dashboard: ' + err.message);
+          });
+      }
+
+      loadDashboard();
+      document.getElementById('btn-refresh').addEventListener('click', loadDashboard);
+
+      // ── Corrigir links PDF em boletos importados ───────────────────────────
+      document.getElementById('btn-corrigir-links').addEventListener('click', function () {
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Corrigindo...';
+        AL.apiPost('/api/admin/corrigir-links-efi', {})
+          .then(function (res) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-link"></i> Corrigir links PDF';
+            AL.showAlert('Links corrigidos: ' + res.atualizados + ' boleto(s) atualizados de ' + res.total_boletos_sem_link + ' sem link.', 'success');
+          })
+          .catch(function (err) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-link"></i> Corrigir links PDF';
+            AL.showAlert('Erro: ' + err.message);
+          });
+      });
+
+      // ── Importar do EFI ────────────────────────────────────────────────────
+      var efiPreviewData = null;
+
+      function efiSetBody(html) {
+        document.getElementById('modal-efi-body').innerHTML = html;
+      }
+      function efiSetFooter(html) {
+        document.getElementById('modal-efi-footer').innerHTML = html;
+      }
+
+      function efiEstadoCarregandoPreview() {
+        efiSetBody(
+          '<div style="text-align:center;padding:40px 20px;">' +
+          '<i class="fa fa-spinner fa-spin fa-3x" style="color:#337ab7;"></i>' +
+          '<p style="margin-top:16px;color:#666;">Consultando EFI Bank, aguarde...</p>' +
+          '</div>'
+        );
+        efiSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>');
+      }
+
+      function efiEstadoPreview(dados) {
+        efiPreviewData = dados;
+        var html = '';
+
+        // Resumo
+        html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">';
+        html += '<div style="flex:1;min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
+          '<div style="font-size:26px;font-weight:700;color:#337ab7;">' + dados.total_efi + '</div>' +
+          '<div style="font-size:12px;color:#666;margin-top:2px;">No EFI</div></div>';
+        html += '<div style="flex:1;min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
+          '<div style="font-size:26px;font-weight:700;color:#5cb85c;">' + dados.novos + '</div>' +
+          '<div style="font-size:12px;color:#666;margin-top:2px;">Novos para importar</div></div>';
+        html += '<div style="flex:1;min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
+          '<div style="font-size:26px;font-weight:700;color:#aaa;">' + dados.ja_importados + '</div>' +
+          '<div style="font-size:12px;color:#666;margin-top:2px;">Já importados</div></div>';
+        html += '</div>';
+
+        if (dados.carnets.length === 0) {
+          html += '<p class="text-muted text-center" style="padding:16px 0;">Nenhum carnê novo para importar.</p>';
+        } else {
+          html += '<p style="margin-bottom:8px;color:#555;font-size:13px;">Carnês que serão importados:</p>';
+          html += '<div style="max-height:320px;overflow-y:auto;">';
+          html += '<table class="table table-condensed table-bordered" style="font-size:13px;margin:0;">';
+          html += '<thead><tr><th>PDF</th><th>Cliente</th><th>Doc</th><th>Placas</th><th>Parcelas</th><th>R$/mês</th></tr></thead>';
+          html += '<tbody>';
+          dados.carnets.forEach(function (c) {
+            var docFmt = c.cliente_doc
+              ? (c.cliente_doc.length === 11
+                ? c.cliente_doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+                : c.cliente_doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))
+              : '—';
+            html += '<tr>';
+            var linkLabel = c.link ? '<a href="' + c.link + '" target="_blank" title="' + c.link + '">PDF</a>' : '—';
+            html += '<td style="text-align:center;">' + linkLabel + '</td>';
+            html += '<td>' + c.cliente_nome + '</td>';
+            html += '<td>' + docFmt + '</td>';
+            html += '<td>' + (c.placas.length ? c.placas.join(', ') : '—') + '</td>';
+            html += '<td style="text-align:center;">' + c.num_parcelas + '</td>';
+            html += '<td>' + AL.fmtMoney(c.valor_mensal) + '</td>';
+            html += '</tr>';
+          });
+          html += '</tbody></table></div>';
+        }
+
+        efiSetBody(html);
+
+        var btnImportar = dados.novos > 0
+          ? '<button type="button" class="btn btn-primary" id="btn-efi-confirmar">' +
+          '<i class="fa fa-check"></i> Importar ' + dados.novos + ' carnê(s)</button>'
+          : '';
+        efiSetFooter(
+          '<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>' +
+          btnImportar
+        );
+
+        if (dados.novos > 0) {
+          document.getElementById('btn-efi-confirmar').addEventListener('click', efiExecutarImportacao);
+        }
+      }
+
+      function efiEstadoCarregandoImport() {
+        efiSetBody(
+          '<div style="text-align:center;padding:40px 20px;">' +
+          '<i class="fa fa-spinner fa-spin fa-3x" style="color:#337ab7;"></i>' +
+          '<p style="margin-top:16px;color:#666;">Importando carnês, aguarde...<br>' +
+          '<small>Isso pode levar alguns segundos.</small></p>' +
+          '</div>'
+        );
+        efiSetFooter('<button type="button" class="btn btn-default" disabled>Aguarde...</button>');
+      }
+
+      function efiEstadoResultado(res) {
+        var temErros = res.erros && res.erros.length > 0;
+        var html = '';
+
+        html += '<div style="text-align:center;padding:20px 0 16px;">';
+        if (!temErros) {
+          html += '<i class="fa fa-check-circle fa-3x" style="color:#5cb85c;"></i>';
+          html += '<p style="margin-top:12px;font-size:16px;font-weight:600;color:#3d8b3d;">Importação concluída!</p>';
+        } else {
+          html += '<i class="fa fa-exclamation-circle fa-3x" style="color:#f0ad4e;"></i>';
+          html += '<p style="margin-top:12px;font-size:16px;font-weight:600;color:#8a6d3b;">Importação concluída com erros</p>';
+        }
+        html += '</div>';
+
+        html += '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:20px;">';
+        html += '<div style="min-width:120px;background:#dff0d8;border-radius:6px;padding:14px 16px;text-align:center;">' +
+          '<div style="font-size:26px;font-weight:700;color:#3c763d;">' + res.importados + '</div>' +
+          '<div style="font-size:12px;color:#3c763d;margin-top:2px;">Importados</div></div>';
+        html += '<div style="min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
+          '<div style="font-size:26px;font-weight:700;color:#aaa;">' + res.ignorados + '</div>' +
+          '<div style="font-size:12px;color:#888;margin-top:2px;">Já existiam</div></div>';
+        if (temErros) {
+          html += '<div style="min-width:120px;background:#fcf8e3;border-radius:6px;padding:14px 16px;text-align:center;">' +
+            '<div style="font-size:26px;font-weight:700;color:#8a6d3b;">' + res.erros.length + '</div>' +
+            '<div style="font-size:12px;color:#8a6d3b;margin-top:2px;">Erros</div></div>';
+        }
+        html += '</div>';
+
+        if (temErros) {
+          html += '<p style="font-size:13px;color:#8a6d3b;margin-bottom:6px;"><strong>Erros:</strong></p>';
+          html += '<ul style="font-size:12px;color:#a94442;max-height:120px;overflow-y:auto;background:#fdf2f2;padding:10px 10px 10px 28px;border-radius:4px;">';
+          res.erros.forEach(function (e) {
+            html += '<li>' + (e.chave || 'Carnê') + ': ' + e.erro + '</li>';
+          });
+          html += '</ul>';
+        }
+
+        efiSetBody(html);
+        efiSetFooter(
+          '<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>' +
+          '<button type="button" class="btn btn-primary" id="btn-efi-atualizar">' +
+          '<i class="fa fa-refresh"></i> Atualizar dashboard</button>'
+        );
+        document.getElementById('btn-efi-atualizar').addEventListener('click', function () {
+          $('#modal-migrar-efi').modal('hide');
+          loadDashboard();
+        });
+      }
+
+      function efiCarregarPreview() {
+        efiPreviewData = null;
+        efiEstadoCarregandoPreview();
+        AL.apiGet('/api/admin/migrar-efi/preview')
+          .then(function (dados) { efiEstadoPreview(dados); })
+          .catch(function (err) {
+            efiSetBody('<div class="alert alert-danger">' + err.message + '</div>');
+            efiSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
+          });
+      }
+
+      function efiExecutarImportacao() {
+        efiEstadoCarregandoImport();
+        AL.apiPost('/api/admin/migrar-efi', {})
+          .then(function (res) { efiEstadoResultado(res); })
+          .catch(function (err) {
+            efiSetBody('<div class="alert alert-danger">Erro durante importação: ' + err.message + '</div>');
+            efiSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
+          });
+      }
+
+      // Ao abrir o modal, carrega automaticamente o preview
+      $('#modal-migrar-efi').on('show.bs.modal', function () {
+        efiCarregarPreview();
+      });
+      // Ao fechar, limpa o estado
+      $('#modal-migrar-efi').on('hidden.bs.modal', function () {
+        efiPreviewData = null;
+        efiSetBody('');
+        efiSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
+      });
+    })();
+  </script>
+</body>
+
+</html>

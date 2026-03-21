@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Configurações — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+
+  <style>
+    /* ════════════════════════════════════════════════════════════════
+       EFEITO APP E DARK MODE: CONFIGURAÇÕES
+    ════════════════════════════════════════════════════════════════ */
+
+    /* 1. Efeito App: Desliga scroll geral e ajusta a área */
+    body { 
+        overflow: hidden !important; 
+        height: 100vh; 
+    }
+    .admin-content { 
+        height: 100vh; 
+        display: flex; 
+        flex-direction: column; 
+        padding-bottom: 0 !important; 
+        padding-right: 0 !important; /* <--- ISSO EMPURRA A BARRA PARA A EXTREMIDADE DIREITA */
+    }
+    
+    /* 2. O alerta não encolhe e ganha margem para não colar na borda */
+    #al-alert-container {
+        flex-shrink: 0;
+        margin-right: 24px; 
+    }
+    
+    /* 3. A MÁGICA: A linha passa a ser a área de scroll */
+    .admin-content > .row {
+        flex: 1;
+        overflow-y: auto;
+        margin: 0;
+        padding-top: 10px; 
+        padding-bottom: 24px;
+        padding-right: 24px; /* <--- DEVOLVE O RESPIRO PARA O CONTEÚDO NÃO COLAR NA BARRA */
+    }
+
+    /* ─── CORREÇÕES DO TEMA ESCURO (Sobrescrevendo os estilos inline) ─── */
+
+    /* 4. Fundo da caixa principal */
+    html.dark-theme div[style*="background:white"] {
+      background-color: #1e2530 !important;
+      border: 1px solid #2d3748 !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+      /* Sombra adaptada pro dark */
+    }
+
+    /* 5. Título "Parâmetros de Cobrança" */
+    html.dark-theme h4[style*="color:#1e2530"] {
+      color: #e0e6f0 !important;
+    }
+
+    /* 6. Subtítulo "Encargos por Atraso" */
+    html.dark-theme h5[style*="color:#555"] {
+      color: #c9d1d9 !important;
+    }
+
+    /* 7. Textinhos de ajuda (small) */
+    html.dark-theme .text-muted {
+      color: #8b949e !important;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;"
+        onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li class="active"><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Configurações</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="row">
+      <div class="col-md-6 col-md-offset-3">
+        <!-- Alterar Senha -->
+        <div style="background:white;border-radius:10px;padding:24px 32px;box-shadow:0 2px 12px rgba(0,0,0,.08);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <h4 style="margin:0 0 4px;color:#1e2530;">Segurança</h4>
+            <small class="text-muted">Altere a senha da sua conta de administrador.</small>
+          </div>
+          <button type="button" class="btn btn-default" data-toggle="modal" data-target="#modal-senha">
+            <i class="fa fa-lock"></i> Alterar Senha
+          </button>
+        </div>
+
+        <div
+          style="background:white;border-radius:10px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+          <h4 style="margin-top:0;margin-bottom:24px;color:#1e2530;">Parâmetros de Cobrança</h4>
+          <form id="form-config">
+            <div class="form-group">
+              <label>Percentual Menor (%)</label>
+              <input type="number" class="form-control" id="percentualMenor" step="0.01" min="0"
+                placeholder="Ex.: 12.50" />
+              <small class="text-muted">Comissão aplicada para cobranças menores que o valor de referência.</small>
+            </div>
+            <div class="form-group">
+              <label>Percentual Maior (%)</label>
+              <input type="number" class="form-control" id="percentualMaior" step="0.01" min="0"
+                placeholder="Ex.: 18.00" />
+              <small class="text-muted">Comissão aplicada para cobranças maiores ou iguais ao valor de
+                referência.</small>
+            </div>
+            <div class="form-group">
+              <label>Valor de Referência (R$)</label>
+              <input type="number" class="form-control" id="valorReferencia" step="0.01" min="0"
+                placeholder="Ex.: 50.00" />
+              <small class="text-muted">Acima deste valor, usa-se o Percentual Maior.</small>
+            </div>
+            <hr />
+            <h5 style="font-weight:700;color:#555;margin-bottom:16px;">Encargos por Atraso</h5>
+            <div class="form-group">
+              <label>Multa por Atraso (%) <small class="text-muted">— máx. 10%</small></label>
+              <input type="number" class="form-control" id="multaPercentual" step="0.01" min="0" max="10"
+                placeholder="Ex.: 2.00" />
+              <small class="text-muted">Aplicada uma vez quando o boleto vence.</small>
+            </div>
+            <div class="form-group">
+              <label>Juros Diários (% ao dia) <small class="text-muted">— máx. 1%</small></label>
+              <input type="number" class="form-control" id="jurosDiarios" step="0.001" min="0" max="1" placeholder="Ex.: 0.033" />
+              <small class="text-muted">Cobrado por dia de atraso após o vencimento.</small>
+            </div>
+            <button type="button" class="btn btn-primary-al btn-block" id="btn-salvar" style="margin-top:30px;">
+              <i class="fa fa-save"></i> Salvar Configurações
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Alterar Senha -->
+  <div class="modal fade" id="modal-senha" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title"><i class="fa fa-lock"></i> Alterar Senha</h4>
+        </div>
+        <div class="modal-body">
+          <div id="modal-senha-alert"></div>
+          <div class="form-group">
+            <label>Senha Atual</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="senha-atual" autocomplete="current-password" />
+              <span class="input-group-btn">
+                <button type="button" class="btn btn-default" tabindex="-1" onclick="toggleOlho('senha-atual',this)"><i class="fa fa-eye"></i></button>
+              </span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Nova Senha</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="senha-nova" autocomplete="new-password" />
+              <span class="input-group-btn">
+                <button type="button" class="btn btn-default" tabindex="-1" onclick="toggleOlho('senha-nova',this)"><i class="fa fa-eye"></i></button>
+              </span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Confirmar Nova Senha</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="senha-confirmar" autocomplete="new-password" />
+              <span class="input-group-btn">
+                <button type="button" class="btn btn-default" tabindex="-1" onclick="toggleOlho('senha-confirmar',this)"><i class="fa fa-eye"></i></button>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary-al" id="btn-salvar-senha">
+            <i class="fa fa-lock"></i> Alterar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    function toggleOlho(inputId, btn) {
+      var input = document.getElementById(inputId);
+      var icon = btn.querySelector('i');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fa fa-eye';
+      }
+    }
+
+    (function () {
+      var user = AL.requireAuth(['ADMIN']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = user.role; ub.className = 'al-badge badge-ativo';
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      // Carrega configurações
+      AL.apiGet('/api/configuracoes')
+        .then(function (data) {
+          if (data.percentualMenor !== undefined) document.getElementById('percentualMenor').value = data.percentualMenor;
+          if (data.percentualMaior !== undefined) document.getElementById('percentualMaior').value = data.percentualMaior;
+          if (data.valorReferencia !== undefined) document.getElementById('valorReferencia').value = data.valorReferencia;
+          if (data.multaPercentual !== undefined) document.getElementById('multaPercentual').value = data.multaPercentual;
+          if (data.jurosDiarios !== undefined) document.getElementById('jurosDiarios').value = data.jurosDiarios;
+        })
+        .catch(function (err) {
+          AL.showAlert('Erro ao carregar configurações: ' + err.message);
+        });
+
+      function parseNum(id) {
+        return parseFloat((document.getElementById(id).value || '0').replace(',', '.')) || 0;
+      }
+
+      // Modal alterar senha
+      $('#modal-senha').on('show.bs.modal', function () {
+        document.getElementById('senha-atual').value = '';
+        document.getElementById('senha-nova').value = '';
+        document.getElementById('senha-confirmar').value = '';
+        document.getElementById('modal-senha-alert').innerHTML = '';
+      });
+
+      document.getElementById('btn-salvar-senha').addEventListener('click', function () {
+        var atual = document.getElementById('senha-atual').value;
+        var nova  = document.getElementById('senha-nova').value;
+        var conf  = document.getElementById('senha-confirmar').value;
+        var alertEl = document.getElementById('modal-senha-alert');
+
+        alertEl.innerHTML = '';
+        if (!atual || !nova || !conf) {
+          alertEl.innerHTML = '<div class="alert alert-danger">Preencha todos os campos.</div>';
+          return;
+        }
+        if (nova !== conf) {
+          alertEl.innerHTML = '<div class="alert alert-danger">A nova senha e a confirmação não coincidem.</div>';
+          return;
+        }
+        if (nova.length < 6) {
+          alertEl.innerHTML = '<div class="alert alert-danger">A nova senha deve ter pelo menos 6 caracteres.</div>';
+          return;
+        }
+
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Alterando…';
+
+        AL.apiPatch('/api/auth/change-password', { senhaAtual: atual, senhaNova: nova })
+          .then(function () {
+            $('#modal-senha').modal('hide');
+            AL.showAlert('Senha alterada com sucesso.', 'success');
+          })
+          .catch(function (err) {
+            alertEl.innerHTML = '<div class="alert alert-danger">' + (err.message || 'Erro ao alterar senha.') + '</div>';
+          })
+          .finally(function () {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-lock"></i> Alterar';
+          });
+      });
+
+      document.getElementById('btn-salvar').addEventListener('click', function () {
+        var multa = parseNum('multaPercentual');
+        var juros = parseNum('jurosDiarios');
+
+        if (multa > 10) {
+          AL.showAlert('Multa por Atraso não pode ultrapassar 10% (limite do EFI Bank).', 'warning');
+          return;
+        }
+        if (juros > 1) {
+          AL.showAlert('Juros Diários não pode ultrapassar 1% ao dia (limite do EFI Bank).', 'warning');
+          return;
+        }
+
+        var payload = {
+          percentualMenor: parseNum('percentualMenor'),
+          percentualMaior: parseNum('percentualMaior'),
+          valorReferencia: parseNum('valorReferencia'),
+          multaPercentual: multa,
+          jurosDiarios: juros,
+        };
+        AL.apiPut('/api/configuracoes', payload)
+          .then(function () {
+            AL.showAlert('Configurações salvas com sucesso.', 'success');
+          })
+          .catch(function (err) {
+            AL.showAlert('Erro ao salvar: ' + err.message);
+          });
+      });
+    })();
+  </script>
+</body>
+
+</html>

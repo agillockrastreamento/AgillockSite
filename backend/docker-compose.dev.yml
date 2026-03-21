@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: agillock
+      POSTGRES_USER: agillock_user
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5433:5432"  # host:5433 → container:5432 (evita conflito com outros projetos)
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agillock_user -d agillock"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://agillock_user:dev_password@postgres:5432/agillock
+      JWT_SECRET: dev_jwt_secret_troque_em_producao
+      CORS_ORIGIN: http://localhost:5500,http://127.0.0.1:5500
+      PORT: 3000
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_SENHA: ${ADMIN_SENHA}
+      EFI_CLIENT_ID: ${EFI_CLIENT_ID:-}
+      EFI_CLIENT_SECRET: ${EFI_CLIENT_SECRET:-}
+      EFI_SANDBOX: "true"
+      EFI_CERT_PATH: ./cert/certificado.p12
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh scripts/docker-entrypoint-dev.sh
+
+volumes:
+  postgres_dev_data:

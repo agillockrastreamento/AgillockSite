@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Login — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { margin: 0; }
+  </style>
+</head>
+<body class="login-page">
+
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" onerror="this.style.display='none'" />
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <form id="login-form" autocomplete="off">
+      <div class="form-group">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" class="form-control" placeholder="seu@email.com" required autofocus />
+      </div>
+
+      <div class="form-group" style="position:relative;">
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" class="form-control" placeholder="••••••••" required />
+        <button type="button" id="toggle-senha"
+          style="position:absolute;right:10px;top:28px;background:none;border:none;color:#888;cursor:pointer;padding:4px;">
+          <i class="fa fa-eye" id="icon-olho"></i>
+        </button>
+      </div>
+
+      <button type="submit" class="btn btn-primary-al btn-block btn-login" id="btn-entrar">
+        <span id="btn-texto">Entrar</span>
+        <span id="btn-spinner" style="display:none;">
+          <i class="fa fa-spinner fa-spin"></i> Entrando…
+        </span>
+      </button>
+    </form>
+
+    <p class="login-footer-text" style="margin-top:16px;text-align:center;font-size:12px;color:#aaa;">
+      &copy; 2026 AgilLock &mdash; Gestão de Rastreamento
+    </p>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      // Se já autenticado, redireciona
+      if (AL.isAuthenticated()) {
+        var u = AL.getUser();
+        if (u && u.role === 'VENDEDOR') window.location.href = '../vendedor/carteira.html';
+        else if (u && u.role === 'COLABORADOR') window.location.href = '../colaborador/clientes.html';
+        else window.location.href = 'dashboard.html';
+      }
+
+      // Toggle visibilidade da senha
+      document.getElementById('toggle-senha').addEventListener('click', function () {
+        var input = document.getElementById('senha');
+        var icon  = document.getElementById('icon-olho');
+        if (input.type === 'password') {
+          input.type = 'text';
+          icon.className = 'fa fa-eye-slash';
+        } else {
+          input.type = 'password';
+          icon.className = 'fa fa-eye';
+        }
+      });
+
+      // Submit
+      document.getElementById('login-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        var email = document.getElementById('email').value.trim();
+        var senha = document.getElementById('senha').value;
+
+        if (!email || !senha) {
+          AL.showAlert('Preencha e-mail e senha.');
+          return;
+        }
+
+        // Loading state
+        document.getElementById('btn-texto').style.display  = 'none';
+        document.getElementById('btn-spinner').style.display = 'inline';
+        document.getElementById('btn-entrar').disabled = true;
+
+        fetch((window.API_URL || 'http://localhost:3000') + '/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, senha: senha }),
+        })
+          .then(function (res) {
+            return res.json().then(function (data) {
+              if (!res.ok) throw new Error(data.error || 'Credenciais inválidas.');
+              return data;
+            });
+          })
+          .then(function (data) {
+            AL.setToken(data.token);
+            var user = AL.getUser();
+            if (user && user.role === 'VENDEDOR') window.location.href = '../vendedor/carteira.html';
+            else if (user && user.role === 'COLABORADOR') window.location.href = '../colaborador/clientes.html';
+            else window.location.href = 'dashboard.html';
+          })
+          .catch(function (err) {
+            AL.showAlert(err.message || 'Erro ao conectar com o servidor.');
+            document.getElementById('btn-texto').style.display  = 'inline';
+            document.getElementById('btn-spinner').style.display = 'none';
+            document.getElementById('btn-entrar').disabled = false;
+          });
+      });
+    })();
+  </script>
+</body>
+</html>
