@@ -10,10 +10,11 @@ const router = Router();
 // ─── POST /api/efi/webhook — Receber notificação de pagamento EFI ─────────────
 // Não usa authMiddleware (chamado pelo EFI Bank, não pelo frontend)
 router.post('/efi/webhook', async (req: Request, res: Response): Promise<void> => {
-  const { notification_token } = req.body;
+  // EFI envia o token no campo "notification" (API v1)
+  const token = req.body?.notification || req.body?.notification_token;
 
-  if (!notification_token) {
-    res.status(400).json({ error: 'notification_token ausente.' });
+  if (!token) {
+    res.status(400).json({ error: 'notification token ausente.' });
     return;
   }
 
@@ -23,7 +24,7 @@ router.post('/efi/webhook', async (req: Request, res: Response): Promise<void> =
   // Processa em background (sem bloquear a resposta)
   setImmediate(async () => {
     try {
-      const notificacoes = await efiService.getNotification(notification_token);
+      const notificacoes = await efiService.getNotification(token);
 
       for (const notif of notificacoes) {
         if (notif.status?.current === 'paid' && notif.identifiers?.charge_id) {
