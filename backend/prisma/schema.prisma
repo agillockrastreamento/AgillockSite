@@ -62,6 +62,7 @@ model Cliente {
   id          String        @id @default(uuid())
   nome        String
   cpfCnpj     String?
+  rg          String?
   telefone    String?
   email       String?
   notas       String?

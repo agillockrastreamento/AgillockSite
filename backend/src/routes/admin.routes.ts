@@ -9,6 +9,10 @@ router.use(authMiddleware);
 interface ClienteImport {
   nome: string;
   placas: string[];
+  cpfCnpj?: string;
+  rg?: string;
+  email?: string;
+  telefone?: string;
   cep?: string;
   logradouro?: string;
   numero?: string;
@@ -66,6 +70,10 @@ router.post('/admin/importar-planilha', requireRoles('ADMIN'), async (req: AuthR
       const cliente = await prisma.cliente.create({
         data: {
           nome: row.nome.trim(),
+          cpfCnpj: row.cpfCnpj?.trim() || null,
+          rg: row.rg?.trim() || null,
+          email: row.email?.trim() || null,
+          telefone: row.telefone?.trim() || null,
           vendedorId,
           cep: row.cep?.trim() || null,
           logradouro,
