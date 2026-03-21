@@ -1,0 +1,4 @@
+# Certificados SSL — gerados pelo certbot no servidor, não versionados
+*.pem
+*.key
+*.crt
