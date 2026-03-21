@@ -115,12 +115,14 @@ export async function criarCarne(params: {
   };
 }): Promise<EfiCarneResult> {
   const client = getClient();
+  const webhookUrl = process.env.WEBHOOK_URL || 'https://api.agillock.com.br/api/efi/webhook';
   const body: Record<string, unknown> = {
     items: params.items,
     customer: params.customer,
     expire_at: params.expire_at,
     repeats: params.repeats,
     split_items: params.split_items ?? false,
+    metadata: { notification_url: webhookUrl },
   };
   if (params.configurations) {
     body.configurations = params.configurations;
