@@ -115,7 +115,8 @@ export async function criarCarne(params: {
   };
 }): Promise<EfiCarneResult> {
   const client = getClient();
-  const webhookUrl = process.env.WEBHOOK_URL || 'https://api.agillock.com.br/api/efi/webhook';
+  const webhookUrl = process.env.WEBHOOK_URL;
+  if (!webhookUrl) throw new Error('WEBHOOK_URL não configurado no ambiente.');
   const body: Record<string, unknown> = {
     items: params.items,
     customer: params.customer,
@@ -130,6 +131,15 @@ export async function criarCarne(params: {
   try {
     const response = await client.createCarnet({}, body);
     return response.data as EfiCarneResult;
+  } catch (err) {
+    throw normalizeEfiError(err);
+  }
+}
+
+export async function atualizarNotificacaoCharge(chargeId: number, webhookUrl: string): Promise<void> {
+  const client = getClient();
+  try {
+    await client.updateChargeMetadata({ id: chargeId }, { notification_url: webhookUrl });
   } catch (err) {
     throw normalizeEfiError(err);
   }

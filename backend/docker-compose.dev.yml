@@ -35,6 +35,7 @@ services:
       EFI_CLIENT_SECRET: ${EFI_CLIENT_SECRET:-}
       EFI_SANDBOX: "true"
       EFI_CERT_PATH: ./cert/certificado.p12
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "1000"
     depends_on:

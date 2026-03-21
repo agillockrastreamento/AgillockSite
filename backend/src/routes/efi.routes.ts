@@ -27,7 +27,8 @@ router.post('/efi/webhook', async (req: Request, res: Response): Promise<void> =
       const notificacoes = await efiService.getNotification(token);
 
       for (const notif of notificacoes) {
-        if (notif.status?.current === 'paid' && notif.identifiers?.charge_id) {
+        const statusPago = notif.status?.current === 'paid' || notif.status?.current === 'settled';
+        if (statusPago && notif.identifiers?.charge_id) {
           await processarPagamento(String(notif.identifiers.charge_id));
         }
       }
@@ -269,14 +270,14 @@ router.post('/admin/migrar-efi', authMiddleware, requireRoles('ADMIN'), async (r
     }
   }
 
-  res.json(resultado);
+  // Após importar: corrige links PDF e registra webhooks nos boletos ativos
+  const correcao = await corrigirLinksEWebhooks(allCharges);
+  console.log(`[migrar-efi] correção pós-importação: links=${correcao.links_atualizados} webhooks=${correcao.webhooks_atualizados}`);
+
+  res.json({ ...resultado, ...correcao });
 });
 
-// ─── POST /api/admin/corrigir-links-efi — Corrige linkBoleto em todos os boletos ───
-// Corrige dois casos:
-//   1. linkBoleto = null (boletos importados sem link)
-//   2. linkBoleto = efiCarneLink do carnê pai (link do carnê completo, não do boleto individual)
-// Em ambos os casos, substitui pelo link individual de cada parcela via listCharges.
+// ─── POST /api/admin/corrigir-links-efi — mantido para uso manual ────────────
 router.post('/admin/corrigir-links-efi', authMiddleware, requireRoles('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   const hoje = new Date();
   const endDate   = hoje.toISOString().split('T')[0];
@@ -290,7 +291,16 @@ router.post('/admin/corrigir-links-efi', authMiddleware, requireRoles('ADMIN'), 
     return;
   }
 
-  // Mapa efiChargeId → URL individual da parcela
+  const resultado = await corrigirLinksEWebhooks(allCharges);
+  res.json(resultado);
+});
+
+// ─── Helper: corrige links PDF e registra webhooks nos boletos ativos ────────
+async function corrigirLinksEWebhooks(allCharges: efiService.EfiChargeListItem[]): Promise<{
+  links_atualizados: number;
+  webhooks_atualizados: number;
+}> {
+  // Mapa efiChargeId → link individual da parcela
   const linkPorCharge = new Map<string, string>();
   for (const charge of allCharges) {
     if (charge.payment?.carnet?.link) {
@@ -298,30 +308,48 @@ router.post('/admin/corrigir-links-efi', authMiddleware, requireRoles('ADMIN'), 
     }
   }
 
-  // Busca todos os boletos com efiChargeId e inclui o efiCarneLink do carnê pai
+  // Corrige links PDF
   const boletos = await prisma.boleto.findMany({
     where: { efiChargeId: { not: null } },
     select: { id: true, efiChargeId: true, linkBoleto: true, carne: { select: { efiCarneLink: true } } },
   });
-
-  // Corrige: linkBoleto nulo OU igual ao link do carnê completo (não é individual)
   const aCorrigir = boletos.filter((b) => {
     if (!b.linkBoleto) return true;
     const carneLink = b.carne?.efiCarneLink;
     return carneLink ? b.linkBoleto === carneLink : false;
   });
-
-  let atualizados = 0;
+  let linksAtualizados = 0;
   for (const b of aCorrigir) {
     const link = linkPorCharge.get(b.efiChargeId!);
     if (link) {
       await prisma.boleto.update({ where: { id: b.id }, data: { linkBoleto: link } });
-      atualizados++;
+      linksAtualizados++;
     }
   }
 
-  res.json({ total_a_corrigir: aCorrigir.length, atualizados });
-});
+  // Registra notification_url nos boletos PENDENTE/ATRASADO
+  const webhookUrl = process.env.WEBHOOK_URL;
+  let webhooksAtualizados = 0;
+  if (webhookUrl) {
+    const boletosAtivos = await prisma.boleto.findMany({
+      where: { efiChargeId: { not: null }, status: { in: ['PENDENTE', 'ATRASADO'] } },
+      select: { efiChargeId: true },
+    });
+    for (const b of boletosAtivos) {
+      const chargeEfi = allCharges.find((c) => String(c.id) === b.efiChargeId);
+      if (chargeEfi && (chargeEfi.status === 'waiting' || chargeEfi.status === 'unpaid')) {
+        try {
+          await efiService.atualizarNotificacaoCharge(chargeEfi.id, webhookUrl);
+          webhooksAtualizados++;
+        } catch (err: any) {
+          console.warn(`[corrigir] Não foi possível atualizar webhook do charge ${chargeEfi.id}: ${err.message}`);
+        }
+      }
+    }
+  }
+
+  return { links_atualizados: linksAtualizados, webhooks_atualizados: webhooksAtualizados };
+}
 
 // ─── Helpers da migração ──────────────────────────────────────────────────────
 
@@ -552,6 +580,20 @@ async function importarGrupoCarnet(
       }))
     );
     await prisma.boletoPlaca.createMany({ data: boletoPlacaData });
+  }
+
+  // 5. Registrar notification_url em cada boleto PENDENTE/ATRASADO no EFI
+  const webhookUrl = process.env.WEBHOOK_URL;
+  if (webhookUrl) {
+    for (const charge of charges) {
+      if (charge.status === 'waiting' || charge.status === 'unpaid') {
+        try {
+          await efiService.atualizarNotificacaoCharge(charge.id, webhookUrl);
+        } catch (err: any) {
+          console.warn(`[migrar-efi] Não foi possível atualizar notification_url do charge ${charge.id}: ${err.message}`);
+        }
+      }
+    }
   }
 
   return true;

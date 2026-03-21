@@ -93,9 +93,6 @@
       <button class="btn btn-primary" id="btn-migrar-efi" data-toggle="modal" data-target="#modal-migrar-efi">
         <i class="fa fa-cloud-download"></i> Importar dados do EFI
       </button>
-      <button class="btn btn-warning" id="btn-corrigir-links" title="Preenche linkBoleto nos boletos importados que estão sem PDF">
-        <i class="fa fa-link"></i> Corrigir links PDF
-      </button>
       <button class="btn btn-default" id="btn-refresh">
         <i class="fa fa-refresh"></i> Atualizar dados
       </button>
@@ -173,24 +170,6 @@
 
       loadDashboard();
       document.getElementById('btn-refresh').addEventListener('click', loadDashboard);
-
-      // ── Corrigir links PDF em boletos importados ───────────────────────────
-      document.getElementById('btn-corrigir-links').addEventListener('click', function () {
-        var btn = this;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Corrigindo...';
-        AL.apiPost('/api/admin/corrigir-links-efi', {})
-          .then(function (res) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa fa-link"></i> Corrigir links PDF';
-            AL.showAlert('Links corrigidos: ' + res.atualizados + ' boleto(s) atualizados de ' + res.total_boletos_sem_link + ' sem link.', 'success');
-          })
-          .catch(function (err) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa fa-link"></i> Corrigir links PDF';
-            AL.showAlert('Erro: ' + err.message);
-          });
-      });
 
       // ── Importar do EFI ────────────────────────────────────────────────────
       var efiPreviewData = null;
@@ -304,6 +283,12 @@
         html += '<div style="min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
           '<div style="font-size:26px;font-weight:700;color:#aaa;">' + res.ignorados + '</div>' +
           '<div style="font-size:12px;color:#888;margin-top:2px;">Já existiam</div></div>';
+        html += '<div style="min-width:120px;background:#d9edf7;border-radius:6px;padding:14px 16px;text-align:center;">' +
+          '<div style="font-size:26px;font-weight:700;color:#31708f;">' + (res.links_atualizados || 0) + '</div>' +
+          '<div style="font-size:12px;color:#31708f;margin-top:2px;">Links PDF</div></div>';
+        html += '<div style="min-width:120px;background:#d9edf7;border-radius:6px;padding:14px 16px;text-align:center;">' +
+          '<div style="font-size:26px;font-weight:700;color:#31708f;">' + (res.webhooks_atualizados || 0) + '</div>' +
+          '<div style="font-size:12px;color:#31708f;margin-top:2px;">Webhooks</div></div>';
         if (temErros) {
           html += '<div style="min-width:120px;background:#fcf8e3;border-radius:6px;padding:14px 16px;text-align:center;">' +
             '<div style="font-size:26px;font-weight:700;color:#8a6d3b;">' + res.erros.length + '</div>' +
