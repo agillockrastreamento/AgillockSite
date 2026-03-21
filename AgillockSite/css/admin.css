@@ -793,7 +793,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
 
     /* Sidebar mais compacto — remove flex:1 do nav para footer ficar junto */
     .sidebar-brand       { padding: 11px 16px; }
-    .sidebar-nav         { flex: none; padding: 4px 0; margin-bottom: 80px; }
+    .sidebar-nav         { flex: none; padding: 4px 0; margin-bottom: 30px; }
     .sidebar-nav li a    { padding: 9px 16px; font-size: 13px; }
     .sidebar-footer      { padding: 10px 16px 14px; }
     .sidebar-user        { margin-bottom: 10px; }
