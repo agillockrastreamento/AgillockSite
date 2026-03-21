@@ -333,19 +333,24 @@ Ordem de implementação recomendada. Cada etapa entrega algo funcional e testá
 - [x] Criar registro DNS tipo `A` com nome `api` apontando para o IP do servidor
 
 ### 9.3 — Configurar o servidor
-- [ ] Gerar certificado SSL com Let's Encrypt para `api.agillock.com.br`
-- [ ] Configurar Nginx como reverse proxy (porta 443 → container backend porta 3000)
-- [ ] Criar `.env` de produção com chaves EFI de produção
-- [ ] Copiar certificado p12 de produção para o servidor (`backend/cert/certificado.p12`)
+- [x] Gerar certificado SSL com Let's Encrypt para `api.agillock.com.br`
+- [x] Configurar Nginx como reverse proxy (porta 443 → container backend porta 3000)
+- [x] Criar `.env` de produção com chaves EFI de produção
+- [x] Copiar certificado p12 de produção para o servidor (`backend/cert/certificado.p12`)
+
+> **Observações de deploy:**
+> - Dockerfile usa build em dois estágios: `builder` (com devDependencies para compilar TypeScript) + imagem final (só production)
+> - `docker compose restart` NÃO relê o `.env` — usar `docker compose up -d --force-recreate backend` ao alterar variáveis de ambiente
+> - CORS_ORIGIN deve incluir `https://agillock.com.br` (domínio via CNAME do GitHub Pages)
 
 ### 9.4 — Subir a aplicação
-- [ ] Subir containers: `docker compose up -d --build`
-- [ ] Migrations e seed rodam automaticamente no `CMD` do Dockerfile (sem comando manual)
+- [x] Subir containers: `docker compose up -d --build`
+- [x] Migrations e seed rodam automaticamente no `CMD` do Dockerfile (sem comando manual)
 
 ### 9.5 — Conectar os serviços externos
 - [ ] Configurar webhook no painel EFI apontando para `https://api.agillock.com.br/api/efi/webhook`
-- [ ] Atualizar `js/config.js` no frontend: `window.API_URL = 'https://api.agillock.com.br'`
-- [ ] Publicar frontend atualizado no GitHub Pages
+- [x] Atualizar `js/config.js` no frontend: `window.API_URL = 'https://api.agillock.com.br'`
+- [x] Publicar frontend atualizado no GitHub Pages
 
 ### 9.6 — Validação final
 - [ ] Testar fluxo completo: login → criar cliente → gerar carnê → pagamento → comissão
