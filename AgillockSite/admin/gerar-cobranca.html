@@ -138,7 +138,7 @@
           </div>
         </div>
 
-        <div id="cliente-selecionado-card" style="display:none;background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:16px;border-left:4px solid #fed136;">
+        <div id="cliente-selecionado-card" style="display:none;background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:16px;border-left:4px solid #fab32c;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;">
             <div>
               <strong id="cs-nome">—</strong><br />
@@ -150,7 +150,7 @@
         </div>
 
         <!-- Mini-form novo cliente -->
-        <div id="novo-cliente-wrap" style="display:none;background:#fffbf0;border:1px solid #fed136;border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div id="novo-cliente-wrap" style="display:none;background:#fffbf0;border:1px solid #fab32c;border-radius:8px;padding:16px;margin-bottom:16px;">
           <h5 style="margin-top:0;color:#333;">Novo Cliente</h5>
           <div class="row">
             <div class="col-sm-6"><div class="form-group"><label style="color:#555;">Nome *</label><input class="form-control" id="nc-nome" /></div></div>
@@ -220,7 +220,7 @@
             <button class="btn btn-default btn-sm" id="btn-nao-add-unif" style="margin-left:8px;">Não, gerar carnê individual</button>
           </div>
 
-          <div id="nova-placa-wrap" style="display:none;background:#fffbf0;border:1px solid #fed136;border-radius:8px;padding:16px;margin-bottom:16px;">
+          <div id="nova-placa-wrap" style="display:none;background:#fffbf0;border:1px solid #fab32c;border-radius:8px;padding:16px;margin-bottom:16px;">
             <h5 style="margin-top:0;">Nova Placa</h5>
             <div class="row">
               <div class="col-sm-6"><div class="form-group"><label>Placa *</label><input class="form-control" id="np-placa" style="text-transform:uppercase;" placeholder="ABC1234" maxlength="7" /></div></div>
@@ -667,7 +667,7 @@
           state.placa = { id: this.value, placa: this.dataset.placa };
           document.getElementById('btn-step2-next').disabled = false;
           document.querySelectorAll('input[name="placa"]').forEach(function (r) {
-            r.closest('label').style.borderColor = r.checked ? '#fed136' : '#eee';
+            r.closest('label').style.borderColor = r.checked ? '#fab32c' : '#eee';
           });
           // Ajuste 1: placa selecionada não está no carnê unificado ativo
           document.getElementById('prompt-add-unif').style.display = 'none';

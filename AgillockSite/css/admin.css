@@ -3,6 +3,13 @@
    Stack: Bootstrap 3 + Font Awesome 4.7 + Montserrat
 ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ─── Variáveis de cor — altere aqui para mudar em todo o sistema ───────── */
+:root {
+    --al-primary:       #fab32c;  /* Amarelo principal */
+    --al-primary-hover: #e09520;  /* Hover (levemente mais escuro) */
+    --al-primary-dark:  #c8870a;  /* Variante escura (tabs ativas, bordas) */
+}
+
 /* ─── Reset / base ─────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
 
@@ -40,7 +47,7 @@ body.admin-body {
 }
 .sidebar-brand img { height: 32px; }
 .sidebar-brand span {
-    color: #fed136;
+    color: #fab32c;
     font-size: 16px;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -67,9 +74,9 @@ body.admin-body {
 .sidebar-nav li a .fa { font-size: 15px; width: 18px; text-align: center; }
 .sidebar-nav li a:hover { background: #2d3748; color: #fff; }
 .sidebar-nav li.active > a {
-    color: #fed136;
+    color: #fab32c;
     background: rgba(254, 209, 54, 0.08);
-    border-left-color: #fed136;
+    border-left-color: #fab32c;
 }
 
 .sidebar-divider {
@@ -223,7 +230,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
 .metric-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.12); }
 .metric-card.blue   { border-top-color: #3498db; }
 .metric-card.green  { border-top-color: #27ae60; }
-.metric-card.yellow { border-top-color: #fed136; }
+.metric-card.yellow { border-top-color: #fab32c; }
 .metric-card.red    { border-top-color: #e74c3c; }
 
 .metric-card .value {
@@ -264,7 +271,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
     transition: border-color 0.2s;
 }
 .admin-filters input:focus,
-.admin-filters select:focus { border-color: #fed136; }
+.admin-filters select:focus { border-color: #fab32c; }
 .admin-filters input.search-input { flex: 1 1 200px; }
 .admin-filters select { min-width: 130px; }
 
@@ -329,7 +336,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
 
 /* ─── Botões ────────────────────────────────────────────────────────────── */
 .btn-primary-al {
-    background: #fed136;
+    background: #fab32c;
     color: #222;
     border: none;
     border-radius: 6px;
@@ -341,7 +348,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
     transition: background 0.2s, transform 0.15s;
     white-space: nowrap;
 }
-.btn-primary-al:hover { background: #fec503; transform: translateY(-1px); }
+.btn-primary-al:hover { background: #e09520; transform: translateY(-1px); }
 .btn-primary-al .fa   { margin-right: 6px; }
 
 .btn-icon {
@@ -433,7 +440,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
     transition: color 0.2s, border-color 0.2s;
 }
 .detail-tabs button:hover { color: #555; }
-.detail-tabs button.active { color: #fed136; border-bottom-color: #fed136; }
+.detail-tabs button.active { color: #fab32c; border-bottom-color: #fab32c; }
 
 .detail-body {
     flex: 1;
@@ -462,7 +469,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
 }
 .detail-field input:focus,
 .detail-field textarea:focus,
-.detail-field select:focus { border-color: #fed136; }
+.detail-field select:focus { border-color: #fab32c; }
 
 /* Lista de placas no painel */
 .placa-item {
@@ -528,7 +535,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
     transition: border-color 0.2s;
     display: block;
 }
-.form-control-al:focus { border-color: #fed136; box-shadow: 0 0 0 2px rgba(254,209,54,.25); }
+.form-control-al:focus { border-color: #fab32c; box-shadow: 0 0 0 2px rgba(250,179,44,.25); }
 
 /* ─── Wizard (gerar cobrança) ───────────────────────────────────────────── */
 .wizard-steps {
@@ -563,7 +570,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
     text-align: center;
     margin-bottom: 4px;
 }
-.wizard-step.active { background: #fed136; color: #222; }
+.wizard-step.active { background: #fab32c; color: #222; }
 .wizard-step.active .step-num { background: #222; }
 .wizard-step.done   { background: #27ae60; color: #fff; }
 .wizard-step.done .step-num   { background: rgba(255,255,255,.3); }
@@ -585,12 +592,12 @@ html.dark-theme .filter-bar { background: #1e2530; }
     align-items: center;
     gap: 12px;
     padding: 14px 16px;
-    border: 2px solid #fed136;
+    border: 2px solid #fab32c;
     border-radius: 8px;
     background: #fffdf0;
     margin-top: 14px;
 }
-.selected-card .fa { font-size: 20px; color: #fed136; }
+.selected-card .fa { font-size: 20px; color: #fab32c; }
 .selected-card .info strong { font-size: 15px; }
 .selected-card .info small  { color: #888; }
 
@@ -629,8 +636,8 @@ html.dark-theme .filter-bar { background: #1e2530; }
     cursor: pointer;
     transition: border-color 0.2s, background 0.2s;
 }
-.placa-radio-item:hover { border-color: #fed136; background: #fffdf0; }
-.placa-radio-item.selected { border-color: #fed136; background: #fffdf0; }
+.placa-radio-item:hover { border-color: #fab32c; background: #fffdf0; }
+.placa-radio-item.selected { border-color: #fab32c; background: #fffdf0; }
 .placa-radio-item input[type=radio] { margin: 0; }
 
 /* Navegação do wizard */
@@ -686,14 +693,14 @@ html.dark-theme .filter-bar { background: #1e2530; }
     font-size: 14px;
     font-family: inherit;
 }
-.login-card .form-control:focus { border-color: #fed136; box-shadow: 0 0 0 2px rgba(254,209,54,.25); outline: none; }
+.login-card .form-control:focus { border-color: #fab32c; box-shadow: 0 0 0 2px rgba(250,179,44,.25); outline: none; }
 .login-card .input-group { display: flex; }
 .login-card .input-group .form-control { flex: 1; border-radius: 0 5px 5px 0; }
 .login-card .input-group .input-group-addon:first-child { border-radius: 5px 0 0 5px; border-right: none; }
 
 .btn-login {
     width: 100%;
-    background: #fed136;
+    background: #fab32c;
     color: #222;
     border: none;
     border-radius: 6px;
@@ -705,7 +712,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
     transition: background 0.2s, transform 0.15s;
     margin-top: 6px;
 }
-.btn-login:hover { background: #fec503; transform: translateY(-1px); }
+.btn-login:hover { background: #e09520; transform: translateY(-1px); }
 .btn-login:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
 .login-error { color: #e74c3c; font-size: 13px; text-align: center; margin-top: 10px; min-height: 20px; }
 
@@ -820,12 +827,12 @@ html.dark-theme .filter-bar { background: #1e2530; }
 
 /* ─── Item 12: Bordas amarelas em todos os inputs ──────────────────────── */
 .form-control:focus {
-  border-color: #fed136 !important;
-  box-shadow: 0 0 0 2px rgba(254,209,54,.2) !important;
+  border-color: #fab32c !important;
+  box-shadow: 0 0 0 2px rgba(250,179,44,.2) !important;
   outline: none !important;
 }
 input:focus, select:focus, textarea:focus {
-  border-color: #fed136 !important;
+  border-color: #fab32c !important;
   outline: none !important;
 }
 
@@ -863,7 +870,7 @@ input:focus, select:focus, textarea:focus {
     width: 100%;
     text-align: left;
 }
-.btn-tema-sidebar:hover { color: #fed136; }
+.btn-tema-sidebar:hover { color: #fab32c; }
 
 .btn-tema-login {
     background: transparent;
@@ -879,9 +886,9 @@ input:focus, select:focus, textarea:focus {
     display: block;
     width: 100%;
 }
-.btn-tema-login:hover { border-color: #fed136; color: #b8860b; }
+.btn-tema-login:hover { border-color: #fab32c; color: #b8860b; }
 html.dark-theme .btn-tema-login { border-color: #3d4a5c; color: #adb5bd; }
-html.dark-theme .btn-tema-login:hover { border-color: #fed136; color: #fed136; }
+html.dark-theme .btn-tema-login:hover { border-color: #fab32c; color: #fab32c; }
 
 /* ─── Tema Escuro ───────────────────────────────────────────────────────── */
 html.dark-theme body,
@@ -929,7 +936,7 @@ html.dark-theme .boleto-item:hover  { background: #252d3d; }
 
 /* Formulários */
 html.dark-theme .form-control { background: #252d3d; color: #e0e6f0; border-color: #3d4a5c; }
-html.dark-theme .form-control:focus { border-color: #fed136; box-shadow: 0 0 0 2px rgba(254,209,54,.2); }
+html.dark-theme .form-control:focus { border-color: #fab32c; box-shadow: 0 0 0 2px rgba(250,179,44,.2); }
 html.dark-theme .form-group label { color: #adb5bd; }
 html.dark-theme select.form-control > option { background: #252d3d; }
 
@@ -949,7 +956,7 @@ html.dark-theme .btn-default:hover {
 /* Wizard */
 html.dark-theme #wizard-content { background: #1e2530 !important; color: #c9d1d9; }
 html.dark-theme .wizard-step { background: #252d3d; color: #888; border-right-color: #3d4a5c; }
-html.dark-theme .wizard-step.active { background: #fed136; color: #222; }
+html.dark-theme .wizard-step.active { background: #fab32c; color: #222; }
 html.dark-theme .wizard-step.done   { background: #27ae60; color: #fff; }
 
 /* Inline-style overrides (painéis internos) */
@@ -978,7 +985,7 @@ html.dark-theme .login-page { background: linear-gradient(135deg, #0a0d12 0%, #1
 html.dark-theme .login-card { background: #1e2530; color: #c9d1d9; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
 html.dark-theme .login-card label { color: #adb5bd; }
 html.dark-theme .login-card .form-control { background: #252d3d; color: #e0e6f0; border-color: #3d4a5c; }
-html.dark-theme .login-card .form-control:focus { border-color: #fed136; }
+html.dark-theme .login-card .form-control:focus { border-color: #fab32c; }
 html.dark-theme .login-card .form-control::placeholder { color: #5a6577; }
 html.dark-theme .login-subtitle { color: #adb5bd !important; }
 
@@ -1030,7 +1037,7 @@ html.dark-theme #resumo-card td {
 /* 5. Alerta de Carnê Ativo e Tela de Sucesso */
 html.dark-theme #alerta-carne-ativo {
     background: #3d2c00 !important;
-    color: #fed136 !important;
+    color: #fab32c !important;
     border-color: #7a6500 !important;
 }
 html.dark-theme #resultado-ok {
