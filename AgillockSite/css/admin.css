@@ -789,7 +789,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
     /* TESTE: table-responsive com altura fixa de 50% da tela */
     body            { height: var(--real-vh, 100dvh) !important; }
     .admin-content  { height: var(--real-vh, 100dvh) !important; }
-    .table-responsive { height: calc(var(--real-vh, 100dvh) * 0.5) !important; flex: none !important; }
+    .table-responsive { height: calc(var(--real-vh, 100dvh) * 0.6) !important; flex: none !important; }
 
     /* Sidebar mais compacto para caber na tela sem precisar rolar */
     .sidebar-brand       { padding: 11px 16px; }
