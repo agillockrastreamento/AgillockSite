@@ -62,6 +62,11 @@
     #fc-notas {
         resize: none;
     }
+    @media (max-width: 767px) {
+        body { overflow: auto !important; height: auto !important; }
+        .admin-content { height: auto !important; padding-bottom: 80px !important; }
+        .table-responsive { flex: none !important; overflow-y: visible !important; }
+    }
   </style>
 
 </head>
