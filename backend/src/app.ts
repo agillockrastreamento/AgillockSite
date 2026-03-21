@@ -28,6 +28,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // EFI webhook envia application/x-www-form-urlencoded
 
 // Health check — deve vir antes de qualquer router com prefixo genérico /api
 app.get('/api/health', (_req, res) => {
