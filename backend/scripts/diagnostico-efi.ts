@@ -1,6 +1,5 @@
 /**
- * Script diagnóstico — inspeciona métodos do SDK EFI e testa endpoints de carnê.
- * Uso: npx tsx scripts/diagnostico-efi.ts
+ * Script diagnóstico — inspeciona métodos da instância SDK EFI e testa carnês.
  */
 import 'dotenv/config';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -17,70 +16,61 @@ const client = new EfiPay({
 });
 
 async function main() {
-  console.log(`\nSandbox: ${process.env.EFI_SANDBOX !== 'false'}`);
+  console.log(`Sandbox: ${process.env.EFI_SANDBOX !== 'false'}`);
 
-  // 1. Listar todos os métodos disponíveis no SDK
-  console.log('\n=== MÉTODOS DISPONÍVEIS NO SDK ===');
-  const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(client))
-    .filter(m => m !== 'constructor' && typeof (client as any)[m] === 'function')
+  // 1. Inspecionar métodos da INSTÂNCIA (gerados dinamicamente)
+  console.log('\n=== MÉTODOS DA INSTÂNCIA (client) ===');
+  const instanceMethods = Object.keys(client)
+    .filter(k => typeof (client as any)[k] === 'function')
     .sort();
-  console.log(methods.join('\n'));
+  console.log(instanceMethods.join('\n') || '(nenhum em Object.keys)');
 
-  // 2. Testar métodos que contenham "carnet" no nome
-  console.log('\n=== MÉTODOS COM "carnet" NO NOME ===');
-  const carnetMethods = methods.filter(m => m.toLowerCase().includes('carnet'));
+  // 2. Tudo que existe no objeto (incluindo não-enumeráveis)
+  console.log('\n=== Object.getOwnPropertyNames(client) ===');
+  const ownNames = Object.getOwnPropertyNames(client)
+    .filter(k => typeof (client as any)[k] === 'function')
+    .sort();
+  console.log(ownNames.join('\n') || '(nenhum)');
+
+  // 3. Prototype chain completa
+  console.log('\n=== TODA A PROTOTYPE CHAIN ===');
+  const allMethods = new Set<string>();
+  let proto = client;
+  while (proto) {
+    Object.getOwnPropertyNames(proto)
+      .filter(k => k !== 'constructor' && typeof (client as any)[k] === 'function')
+      .forEach(k => allMethods.add(k));
+    proto = Object.getPrototypeOf(proto);
+  }
+  console.log([...allMethods].sort().join('\n'));
+
+  // 4. Métodos com "carnet" (case-insensitive) em toda a chain
+  const carnetMethods = [...allMethods].filter(m => m.toLowerCase().includes('carnet'));
+  console.log('\n=== MÉTODOS COM "carnet" ===');
   console.log(carnetMethods.join('\n') || '(nenhum)');
 
-  // 3. Testar detailCarnet para o carnê que sabemos existir (id extraído do link)
-  // link: .../A4CL-381777-29491-LUADO9/... → carnet id numérico?
-  // Tentar listar via método correto com período curto
-  console.log('\n=== TENTATIVA: getCarnet / detailCarnet / showCarnet ===');
-  for (const m of ['getCarnet', 'detailCarnet', 'showCarnet', 'retrieveCarnet']) {
-    if (typeof (client as any)[m] === 'function') {
-      console.log(`\n→ ${m} existe! Testando...`);
-      try {
-        const r = await (client as any)[m]({ id: 29491 });
-        console.log(JSON.stringify(r, null, 2));
-      } catch (e: any) {
-        console.log(`  Erro: ${e.message}`);
-      }
-    }
+  // 5. Testar detailCarnet com erro completo
+  console.log('\n=== detailCarnet com id=29491 (erro completo) ===');
+  try {
+    const r = await (client as any).detailCarnet({ id: 29491 });
+    console.log(JSON.stringify(r, null, 2));
+  } catch (e: any) {
+    console.log('Tipo:', typeof e);
+    console.log('JSON:', JSON.stringify(e));
+    console.log('message:', e?.message);
+    console.log('code:', e?.code);
+    console.log('body:', e?.body);
+    console.log('response:', JSON.stringify(e?.response));
   }
 
-  // 4. Tentar listCharges sem charge_type para ver TODOS os tipos
-  console.log('\n=== listCharges SEM charge_type (todos os tipos) — só 2026 ===');
+  // 6. Ver o conteúdo bruto do require para entender a estrutura
+  console.log('\n=== SDK package.json ===');
   try {
-    const r = await client.listCharges({
-      begin_date: '2026-01-01',
-      end_date:   '2026-03-21',
-      limit: 100,
-    });
-    const { data, ...meta } = r;
-    console.log('meta:', JSON.stringify(meta, null, 2));
-    console.log(`Total charges: ${(data ?? []).length}`);
-    if (data?.length > 0) {
-      console.log('Tipos encontrados:', [...new Set((data as any[]).map((c: any) => c.payment?.payment_method))]);
-      console.log('Primeiro:', JSON.stringify(data[0], null, 2));
-    }
-  } catch (e: any) {
-    console.log('Erro:', e.message);
-  }
-
-  // 5. Tentar listCharges com charge_type: 'billet' para ver boletos avulsos
-  console.log('\n=== listCharges charge_type:billet — só 2026 ===');
-  try {
-    const r = await client.listCharges({
-      begin_date:  '2026-01-01',
-      end_date:    '2026-03-21',
-      charge_type: 'billet',
-      limit: 100,
-    });
-    const { data, ...meta } = r;
-    console.log('meta:', JSON.stringify(meta, null, 2));
-    console.log(`Total: ${(data ?? []).length}`);
-  } catch (e: any) {
-    console.log('Erro:', e.message);
-  }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pkg = require('sdk-node-apis-efi/package.json');
+    console.log('version:', pkg.version);
+    console.log('main:', pkg.main);
+  } catch (e: any) { console.log(e.message); }
 }
 
 main()
