@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -90,27 +91,27 @@
     </div>
 
     <div style="margin-top:24px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-primary" id="btn-migrar-efi" data-toggle="modal" data-target="#modal-migrar-efi">
-        <i class="fa fa-cloud-download"></i> Importar dados do EFI
+      <button class="btn btn-success" id="btn-importar-planilha" data-toggle="modal" data-target="#modal-importar-planilha">
+        <i class="fa fa-upload"></i> Importar Planilha
       </button>
       <button class="btn btn-default" id="btn-refresh">
         <i class="fa fa-refresh"></i> Atualizar dados
       </button>
     </div>
 
-    <!-- Modal: Importar do EFI -->
-    <div class="modal fade" id="modal-migrar-efi" tabindex="-1" role="dialog">
+    <!-- Modal: Importar via Planilha -->
+    <div class="modal fade" id="modal-importar-planilha" tabindex="-1" role="dialog">
       <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
           <div class="modal-header">
             <button type="button" class="close" data-dismiss="modal" aria-label="Fechar"><span
                 aria-hidden="true">&times;</span></button>
-            <h4 class="modal-title"><i class="fa fa-cloud-download"></i> Importar dados do EFI</h4>
+            <h4 class="modal-title"><i class="fa fa-upload"></i> Importar Clientes via Planilha</h4>
           </div>
-          <div class="modal-body" id="modal-efi-body">
+          <div class="modal-body" id="modal-pl-body">
             <!-- conteúdo dinâmico via JS -->
           </div>
-          <div class="modal-footer" id="modal-efi-footer">
+          <div class="modal-footer" id="modal-pl-footer">
             <button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>
           </div>
         </div>
@@ -171,98 +172,321 @@
       loadDashboard();
       document.getElementById('btn-refresh').addEventListener('click', loadDashboard);
 
-      // ── Importar do EFI ────────────────────────────────────────────────────
-      var efiPreviewData = null;
+      // ── Importar via Planilha ───────────────────────────────────────────────
+      var planilhaArquivo = null;
+      var planilhaDados = null;
+      var planilhaColunas = [];
 
-      function efiSetBody(html) {
-        document.getElementById('modal-efi-body').innerHTML = html;
+      function plSetBody(html) {
+        document.getElementById('modal-pl-body').innerHTML = html;
       }
-      function efiSetFooter(html) {
-        document.getElementById('modal-efi-footer').innerHTML = html;
-      }
-
-      function efiEstadoCarregandoPreview() {
-        efiSetBody(
-          '<div style="text-align:center;padding:40px 20px;">' +
-          '<i class="fa fa-spinner fa-spin fa-3x" style="color:#337ab7;"></i>' +
-          '<p style="margin-top:16px;color:#666;">Consultando EFI Bank, aguarde...</p>' +
-          '</div>'
-        );
-        efiSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>');
+      function plSetFooter(html) {
+        document.getElementById('modal-pl-footer').innerHTML = html;
       }
 
-      function efiEstadoPreview(dados) {
-        efiPreviewData = dados;
+      // Step 1 — Upload
+      function plEstadoUpload() {
+        planilhaArquivo = null;
+        planilhaDados = null;
+        planilhaColunas = [];
+
         var html = '';
-
-        // Resumo
-        html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">';
-        html += '<div style="flex:1;min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
-          '<div style="font-size:26px;font-weight:700;color:#337ab7;">' + dados.total_efi + '</div>' +
-          '<div style="font-size:12px;color:#666;margin-top:2px;">No EFI</div></div>';
-        html += '<div style="flex:1;min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
-          '<div style="font-size:26px;font-weight:700;color:#5cb85c;">' + dados.novos + '</div>' +
-          '<div style="font-size:12px;color:#666;margin-top:2px;">Novos para importar</div></div>';
-        html += '<div style="flex:1;min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
-          '<div style="font-size:26px;font-weight:700;color:#aaa;">' + dados.ja_importados + '</div>' +
-          '<div style="font-size:12px;color:#666;margin-top:2px;">Já importados</div></div>';
+        html += '<div style="background:#f0f7ff;border:1px solid #c8e0f9;border-radius:6px;padding:16px;margin-bottom:20px;">';
+        html += '<p style="margin:0 0 8px;font-weight:600;color:#31708f;"><i class="fa fa-info-circle"></i> Como preparar sua planilha</p>';
+        html += '<ul style="margin:0;padding-left:20px;color:#555;font-size:13px;line-height:1.7;">';
+        html += '<li>A planilha deve ter uma <strong>linha de cabeçalho</strong> com os nomes das colunas</li>';
+        html += '<li>Colunas utilizadas: <strong>Nome</strong> <span style="color:#a94442">(obrigatório)</span>, <strong>Placa(s)</strong>, <strong>Endereço</strong>, <strong>Vendedor</strong></li>';
+        html += '<li>Múltiplas placas: separe com <strong>+</strong> &nbsp;&nbsp;exemplo: <code>ABC1D23 + XYZ4E56 + DEF5G78</code></li>';
+        html += '<li>Formatos aceitos: <strong>.xlsx</strong>, <strong>.xls</strong> ou <strong>.csv</strong></li>';
+        html += '</ul>';
         html += '</div>';
 
-        if (dados.carnets.length === 0) {
-          html += '<p class="text-muted text-center" style="padding:16px 0;">Nenhum carnê novo para importar.</p>';
-        } else {
-          html += '<p style="margin-bottom:8px;color:#555;font-size:13px;">Carnês que serão importados:</p>';
-          html += '<div style="max-height:320px;overflow-y:auto;">';
-          html += '<table class="table table-condensed table-bordered" style="font-size:13px;margin:0;">';
-          html += '<thead><tr><th>PDF</th><th>Cliente</th><th>Doc</th><th>Placas</th><th>Parcelas</th><th>R$/mês</th></tr></thead>';
-          html += '<tbody>';
-          dados.carnets.forEach(function (c) {
-            var docFmt = c.cliente_doc
-              ? (c.cliente_doc.length === 11
-                ? c.cliente_doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-                : c.cliente_doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))
-              : '—';
-            html += '<tr>';
-            var linkLabel = c.link ? '<a href="' + c.link + '" target="_blank" title="' + c.link + '">PDF</a>' : '—';
-            html += '<td style="text-align:center;">' + linkLabel + '</td>';
-            html += '<td>' + c.cliente_nome + '</td>';
-            html += '<td>' + docFmt + '</td>';
-            html += '<td>' + (c.placas.length ? c.placas.join(', ') : '—') + '</td>';
-            html += '<td style="text-align:center;">' + c.num_parcelas + '</td>';
-            html += '<td>' + AL.fmtMoney(c.valor_mensal) + '</td>';
-            html += '</tr>';
-          });
-          html += '</tbody></table></div>';
-        }
+        html += '<div id="pl-dropzone" style="border:2px dashed #ccc;border-radius:8px;padding:48px 24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;">';
+        html += '<i class="fa fa-cloud-upload fa-3x" style="color:#aaa;margin-bottom:14px;display:block;"></i>';
+        html += '<p style="font-size:15px;color:#666;margin:0 0 6px;">Arraste seu arquivo aqui</p>';
+        html += '<p style="font-size:13px;color:#aaa;margin:0 0 18px;">ou</p>';
+        html += '<label class="btn btn-primary" style="cursor:pointer;margin:0;">';
+        html += '<i class="fa fa-folder-open"></i> Selecionar arquivo';
+        html += '<input type="file" id="pl-file-input" accept=".xlsx,.xls,.csv" style="display:none;">';
+        html += '</label>';
+        html += '<p style="font-size:12px;color:#bbb;margin:12px 0 0;">XLSX, XLS ou CSV</p>';
+        html += '</div>';
 
-        efiSetBody(html);
+        plSetBody(html);
+        plSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
 
-        var btnImportar = dados.novos > 0
-          ? '<button type="button" class="btn btn-primary" id="btn-efi-confirmar">' +
-          '<i class="fa fa-check"></i> Importar ' + dados.novos + ' carnê(s)</button>'
-          : '';
-        efiSetFooter(
-          '<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>' +
-          btnImportar
-        );
+        // Drag-and-drop listeners
+        var dropzone = document.getElementById('pl-dropzone');
+        var fileInput = document.getElementById('pl-file-input');
 
-        if (dados.novos > 0) {
-          document.getElementById('btn-efi-confirmar').addEventListener('click', efiExecutarImportacao);
-        }
+        dropzone.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          dropzone.style.borderColor = '#337ab7';
+          dropzone.style.background = '#f0f7ff';
+        });
+        dropzone.addEventListener('dragleave', function () {
+          dropzone.style.borderColor = '#ccc';
+          dropzone.style.background = '';
+        });
+        dropzone.addEventListener('drop', function (e) {
+          e.preventDefault();
+          dropzone.style.borderColor = '#ccc';
+          dropzone.style.background = '';
+          if (e.dataTransfer.files.length > 0) plHandleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', function () {
+          if (this.files.length > 0) plHandleFile(this.files[0]);
+        });
       }
 
-      function efiEstadoCarregandoImport() {
-        efiSetBody(
+      // Lê e processa o arquivo selecionado
+      function plHandleFile(file) {
+        if (!file) return;
+        planilhaArquivo = file;
+
+        plSetBody(
           '<div style="text-align:center;padding:40px 20px;">' +
           '<i class="fa fa-spinner fa-spin fa-3x" style="color:#337ab7;"></i>' +
-          '<p style="margin-top:16px;color:#666;">Importando carnês, aguarde...<br>' +
-          '<small>Isso pode levar alguns segundos.</small></p>' +
+          '<p style="margin-top:16px;color:#666;">Lendo arquivo...</p>' +
           '</div>'
         );
-        efiSetFooter('<button type="button" class="btn btn-default" disabled>Aguarde...</button>');
+        plSetFooter('<button type="button" class="btn btn-default" disabled>Aguarde...</button>');
+
+        var ext = file.name.split('.').pop().toLowerCase();
+        var reader = new FileReader();
+
+        if (ext === 'csv') {
+          reader.onload = function (e) {
+            try {
+              var rows = plParseCSV(e.target.result);
+              plProcessarLinhas(rows);
+            } catch (err) {
+              plMostrarErroArquivo(err.message);
+            }
+          };
+          reader.readAsText(file, 'UTF-8');
+        } else {
+          // XLSX / XLS via SheetJS
+          reader.onload = function (e) {
+            try {
+              var data = new Uint8Array(e.target.result);
+              var workbook = XLSX.read(data, { type: 'array' });
+              var sheet = workbook.Sheets[workbook.SheetNames[0]];
+              var rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+              plProcessarLinhas(rows);
+            } catch (err) {
+              plMostrarErroArquivo(err.message);
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        }
       }
 
-      function efiEstadoResultado(res) {
+      function plMostrarErroArquivo(msg) {
+        plSetBody('<div class="alert alert-danger"><strong>Erro ao ler arquivo:</strong> ' + msg + '</div>');
+        plSetFooter(
+          '<button type="button" class="btn btn-default" id="btn-pl-voltar-upload">&#8592; Tentar novamente</button>' +
+          '<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>'
+        );
+        document.getElementById('btn-pl-voltar-upload').addEventListener('click', plEstadoUpload);
+      }
+
+      // Parser CSV simples (suporta campos com aspas e separadores , ou ;)
+      function plParseCSV(text) {
+        var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });
+        if (lines.length < 2) return [];
+
+        function parseLine(line) {
+          var result = [], cur = '', inQuote = false;
+          for (var i = 0; i < line.length; i++) {
+            var c = line[i];
+            if (c === '"' && !inQuote) { inQuote = true; }
+            else if (c === '"' && inQuote) { inQuote = false; }
+            else if ((c === ',' || c === ';') && !inQuote) { result.push(cur.trim()); cur = ''; }
+            else { cur += c; }
+          }
+          result.push(cur.trim());
+          return result;
+        }
+
+        var headers = parseLine(lines[0]);
+        return lines.slice(1).map(function (line) {
+          var vals = parseLine(line);
+          var obj = {};
+          headers.forEach(function (h, i) { obj[h] = vals[i] || ''; });
+          return obj;
+        });
+      }
+
+      function plProcessarLinhas(rows) {
+        if (!rows || rows.length === 0) {
+          plSetBody('<div class="alert alert-warning">Planilha vazia ou sem dados válidos.</div>');
+          plSetFooter(
+            '<button type="button" class="btn btn-default" id="btn-pl-voltar-upload">&#8592; Voltar</button>' +
+            '<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>'
+          );
+          document.getElementById('btn-pl-voltar-upload').addEventListener('click', plEstadoUpload);
+          return;
+        }
+        planilhaDados = rows;
+        planilhaColunas = Object.keys(rows[0]);
+        plEstadoMapeamento();
+      }
+
+      // Auto-detecta colunas por nomes comuns
+      function plDetectarColunas(headers) {
+        var result = { nome: '', placa: '', endereco: '', vendedor: '' };
+        var lh = headers.map(function (h) { return (h || '').toLowerCase().trim(); });
+        var maps = {
+          nome: ['nome', 'cliente', 'name', 'razão social', 'razao social'],
+          placa: ['placa', 'placas', 'placa(s)', 'veículo', 'veiculo', 'placa/veículo'],
+          endereco: ['endereço', 'endereco', 'address', 'end', 'logradouro', 'endereço completo', 'endereco completo'],
+          vendedor: ['vendedor', 'seller', 'agente', 'responsável', 'responsavel', 'vendedora'],
+        };
+        Object.keys(maps).forEach(function (campo) {
+          maps[campo].forEach(function (k) {
+            if (!result[campo]) {
+              var i = lh.indexOf(k);
+              if (i >= 0) result[campo] = headers[i];
+            }
+          });
+        });
+        return result;
+      }
+
+      // Step 2 — Mapeamento de colunas + preview
+      function plEstadoMapeamento() {
+        var mapa = plDetectarColunas(planilhaColunas);
+        var total = planilhaDados.length;
+
+        var html = '';
+
+        // Cabeçalho com nome do arquivo
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">';
+        html += '<i class="fa fa-file-excel-o" style="color:#217346;font-size:20px;"></i>';
+        html += '<span style="font-weight:600;">' + (planilhaArquivo ? planilhaArquivo.name : 'arquivo') + '</span>';
+        html += '&nbsp;<span class="label label-info">' + total + ' linha(s) encontrada(s)</span>';
+        html += '</div>';
+
+        // Tabela de mapeamento
+        html += '<p style="font-size:13px;color:#555;margin-bottom:8px;"><strong>Mapeamento de colunas</strong> — confira qual coluna da planilha corresponde a cada campo:</p>';
+        html += '<table class="table table-condensed" style="font-size:13px;margin-bottom:20px;">';
+        html += '<thead><tr><th style="width:180px;">Campo do sistema</th><th>Coluna da planilha</th><th style="width:90px;">Obrigatório</th></tr></thead><tbody>';
+
+        var campos = [
+          { id: 'pl-map-nome', label: 'Nome do cliente', val: mapa.nome, obrig: true },
+          { id: 'pl-map-placa', label: 'Placa(s)', val: mapa.placa, obrig: false },
+          { id: 'pl-map-endereco', label: 'Endereço', val: mapa.endereco, obrig: false },
+          { id: 'pl-map-vendedor', label: 'Vendedor', val: mapa.vendedor, obrig: false },
+        ];
+
+        campos.forEach(function (campo) {
+          html += '<tr><td><strong>' + campo.label + '</strong></td><td>';
+          html += '<select class="form-control input-sm" id="' + campo.id + '">';
+          html += '<option value="">(não importar)</option>';
+          planilhaColunas.forEach(function (col) {
+            html += '<option value="' + col + '"' + (campo.val === col ? ' selected' : '') + '>' + col + '</option>';
+          });
+          html += '</select></td><td>';
+          html += campo.obrig
+            ? '<span class="label label-danger">Sim</span>'
+            : '<span class="label label-default">Não</span>';
+          html += '</td></tr>';
+        });
+
+        html += '</tbody></table>';
+
+        // Prévia dos dados
+        var previewRows = planilhaDados.slice(0, 5);
+        html += '<p style="font-size:13px;color:#555;margin-bottom:6px;"><strong>Prévia</strong> (primeiras ' + previewRows.length + ' de ' + total + ' linhas):</p>';
+        html += '<div style="overflow-x:auto;max-height:180px;overflow-y:auto;">';
+        html += '<table class="table table-condensed table-bordered table-striped" style="font-size:12px;margin:0;">';
+        html += '<thead><tr>';
+        planilhaColunas.forEach(function (col) { html += '<th style="white-space:nowrap;">' + col + '</th>'; });
+        html += '</tr></thead><tbody>';
+        previewRows.forEach(function (row) {
+          html += '<tr>';
+          planilhaColunas.forEach(function (col) { html += '<td style="white-space:nowrap;">' + (row[col] || '') + '</td>'; });
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+
+        plSetBody(html);
+        plSetFooter(
+          '<button type="button" class="btn btn-default" id="btn-pl-voltar">&#8592; Voltar</button>' +
+          '<button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>' +
+          '<button type="button" class="btn btn-primary" id="btn-pl-confirmar">' +
+          '<i class="fa fa-upload"></i> Importar ' + total + ' cliente(s)</button>'
+        );
+
+        document.getElementById('btn-pl-voltar').addEventListener('click', plEstadoUpload);
+        document.getElementById('btn-pl-confirmar').addEventListener('click', plExecutarImportacao);
+      }
+
+      // Extrai placas de um texto usando regex + separador +
+      function plExtrairPlacas(texto) {
+        if (!texto) return [];
+        return texto.split('+').map(function (parte) {
+          var s = parte.trim().toUpperCase();
+          // Mercosul: ABC1D23
+          var m1 = s.match(/[A-Z]{3}[0-9][A-Z][0-9]{2}/);
+          // Antigo: ABC1234
+          var m2 = s.match(/[A-Z]{3}[0-9]{4}/);
+          if (m1) return m1[0];
+          if (m2) return m2[0];
+          // Fallback: remove tudo que não é alfanumérico
+          var limpa = s.replace(/[^A-Z0-9]/g, '');
+          return limpa.length >= 7 ? limpa : '';
+        }).filter(function (p) { return p; });
+      }
+
+      // Envia dados para o backend
+      function plExecutarImportacao() {
+        var colNome = document.getElementById('pl-map-nome').value;
+        var colPlaca = document.getElementById('pl-map-placa').value;
+        var colEndereco = document.getElementById('pl-map-endereco').value;
+        var colVendedor = document.getElementById('pl-map-vendedor').value;
+
+        if (!colNome) {
+          alert('Selecione a coluna para "Nome do cliente".');
+          return;
+        }
+
+        var clientes = planilhaDados
+          .map(function (row) {
+            return {
+              nome: (row[colNome] || '').trim(),
+              placas: plExtrairPlacas(colPlaca ? row[colPlaca] : ''),
+              enderecoRaw: colEndereco ? (row[colEndereco] || '').trim() : '',
+              vendedorNome: colVendedor ? (row[colVendedor] || '').trim() : '',
+            };
+          })
+          .filter(function (c) { return c.nome; });
+
+        if (clientes.length === 0) {
+          alert('Nenhum cliente válido encontrado (coluna Nome vazia em todas as linhas).');
+          return;
+        }
+
+        plSetBody(
+          '<div style="text-align:center;padding:40px 20px;">' +
+          '<i class="fa fa-spinner fa-spin fa-3x" style="color:#337ab7;"></i>' +
+          '<p style="margin-top:16px;color:#666;">Importando ' + clientes.length + ' cliente(s)...<br>' +
+          '<small>Aguarde, isso pode levar alguns segundos.</small></p>' +
+          '</div>'
+        );
+        plSetFooter('<button type="button" class="btn btn-default" disabled>Aguarde...</button>');
+
+        AL.apiPost('/api/admin/importar-planilha', { clientes: clientes })
+          .then(function (res) { plEstadoResultado(res); })
+          .catch(function (err) {
+            plSetBody('<div class="alert alert-danger">Erro na importação: ' + err.message + '</div>');
+            plSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
+          });
+      }
+
+      // Step 3 — Resultado
+      function plEstadoResultado(res) {
         var temErros = res.erros && res.erros.length > 0;
         var html = '';
 
@@ -272,23 +496,17 @@
           html += '<p style="margin-top:12px;font-size:16px;font-weight:600;color:#3d8b3d;">Importação concluída!</p>';
         } else {
           html += '<i class="fa fa-exclamation-circle fa-3x" style="color:#f0ad4e;"></i>';
-          html += '<p style="margin-top:12px;font-size:16px;font-weight:600;color:#8a6d3b;">Importação concluída com erros</p>';
+          html += '<p style="margin-top:12px;font-size:16px;font-weight:600;color:#8a6d3b;">Importação concluída com avisos</p>';
         }
         html += '</div>';
 
         html += '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:20px;">';
         html += '<div style="min-width:120px;background:#dff0d8;border-radius:6px;padding:14px 16px;text-align:center;">' +
           '<div style="font-size:26px;font-weight:700;color:#3c763d;">' + res.importados + '</div>' +
-          '<div style="font-size:12px;color:#3c763d;margin-top:2px;">Importados</div></div>';
-        html += '<div style="min-width:120px;background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center;">' +
-          '<div style="font-size:26px;font-weight:700;color:#aaa;">' + res.ignorados + '</div>' +
-          '<div style="font-size:12px;color:#888;margin-top:2px;">Já existiam</div></div>';
+          '<div style="font-size:12px;color:#3c763d;margin-top:2px;">Clientes criados</div></div>';
         html += '<div style="min-width:120px;background:#d9edf7;border-radius:6px;padding:14px 16px;text-align:center;">' +
-          '<div style="font-size:26px;font-weight:700;color:#31708f;">' + (res.links_atualizados || 0) + '</div>' +
-          '<div style="font-size:12px;color:#31708f;margin-top:2px;">Links PDF</div></div>';
-        html += '<div style="min-width:120px;background:#d9edf7;border-radius:6px;padding:14px 16px;text-align:center;">' +
-          '<div style="font-size:26px;font-weight:700;color:#31708f;">' + (res.webhooks_atualizados || 0) + '</div>' +
-          '<div style="font-size:12px;color:#31708f;margin-top:2px;">Webhooks</div></div>';
+          '<div style="font-size:26px;font-weight:700;color:#31708f;">' + (res.placasCriadas || 0) + '</div>' +
+          '<div style="font-size:12px;color:#31708f;margin-top:2px;">Placas criadas</div></div>';
         if (temErros) {
           html += '<div style="min-width:120px;background:#fcf8e3;border-radius:6px;padding:14px 16px;text-align:center;">' +
             '<div style="font-size:26px;font-weight:700;color:#8a6d3b;">' + res.erros.length + '</div>' +
@@ -297,56 +515,37 @@
         html += '</div>';
 
         if (temErros) {
-          html += '<p style="font-size:13px;color:#8a6d3b;margin-bottom:6px;"><strong>Erros:</strong></p>';
+          html += '<p style="font-size:13px;color:#8a6d3b;margin-bottom:6px;"><strong>Detalhes dos erros:</strong></p>';
           html += '<ul style="font-size:12px;color:#a94442;max-height:120px;overflow-y:auto;background:#fdf2f2;padding:10px 10px 10px 28px;border-radius:4px;">';
           res.erros.forEach(function (e) {
-            html += '<li>' + (e.chave || 'Carnê') + ': ' + e.erro + '</li>';
+            html += '<li>Linha ' + e.linha + ' (' + e.nome + '): ' + e.erro + '</li>';
           });
           html += '</ul>';
         }
 
-        efiSetBody(html);
-        efiSetFooter(
+        plSetBody(html);
+        plSetFooter(
           '<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>' +
-          '<button type="button" class="btn btn-primary" id="btn-efi-atualizar">' +
+          '<button type="button" class="btn btn-primary" id="btn-pl-atualizar">' +
           '<i class="fa fa-refresh"></i> Atualizar dashboard</button>'
         );
-        document.getElementById('btn-efi-atualizar').addEventListener('click', function () {
-          $('#modal-migrar-efi').modal('hide');
+        document.getElementById('btn-pl-atualizar').addEventListener('click', function () {
+          $('#modal-importar-planilha').modal('hide');
           loadDashboard();
         });
       }
 
-      function efiCarregarPreview() {
-        efiPreviewData = null;
-        efiEstadoCarregandoPreview();
-        AL.apiGet('/api/admin/migrar-efi/preview')
-          .then(function (dados) { efiEstadoPreview(dados); })
-          .catch(function (err) {
-            efiSetBody('<div class="alert alert-danger">' + err.message + '</div>');
-            efiSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
-          });
-      }
-
-      function efiExecutarImportacao() {
-        efiEstadoCarregandoImport();
-        AL.apiPost('/api/admin/migrar-efi', {})
-          .then(function (res) { efiEstadoResultado(res); })
-          .catch(function (err) {
-            efiSetBody('<div class="alert alert-danger">Erro durante importação: ' + err.message + '</div>');
-            efiSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
-          });
-      }
-
-      // Ao abrir o modal, carrega automaticamente o preview
-      $('#modal-migrar-efi').on('show.bs.modal', function () {
-        efiCarregarPreview();
+      // Inicializa o wizard ao abrir o modal
+      $('#modal-importar-planilha').on('show.bs.modal', function () {
+        plEstadoUpload();
       });
-      // Ao fechar, limpa o estado
-      $('#modal-migrar-efi').on('hidden.bs.modal', function () {
-        efiPreviewData = null;
-        efiSetBody('');
-        efiSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
+      // Limpa ao fechar
+      $('#modal-importar-planilha').on('hidden.bs.modal', function () {
+        planilhaArquivo = null;
+        planilhaDados = null;
+        planilhaColunas = [];
+        plSetBody('');
+        plSetFooter('<button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>');
       });
     })();
   </script>

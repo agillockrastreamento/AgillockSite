@@ -10,6 +10,7 @@ import usuariosRoutes from './routes/usuarios.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import vendedorRoutes from './routes/vendedor.routes';
 import configuracoesRoutes from './routes/configuracoes.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use('/api/vendedor', vendedorRoutes);   // deve vir antes de app.use('/api',
 app.use('/api/configuracoes', configuracoesRoutes);
 app.use('/api', placasRoutes);             // authMiddleware global no router
 app.use('/api', usuariosRoutes);           // colaboradores + vendedores (authMiddleware global ADMIN)
+app.use('/api', adminRoutes);              // rotas admin utilitárias
 
 // Rota não encontrada
 app.use((_req, res) => {
