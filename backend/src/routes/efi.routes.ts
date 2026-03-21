@@ -32,7 +32,7 @@ router.post('/efi/webhook', async (req: Request, res: Response): Promise<void> =
         if (!chargeId) continue;
         if (statusAtual === 'paid' || statusAtual === 'settled') {
           await processarPagamento(chargeId);
-        } else if (statusAtual === 'cancelled') {
+        } else if (statusAtual === 'canceled') {
           await processarCancelamento(chargeId);
         } else if (statusAtual === 'refunded') {
           await processarReembolso(chargeId);
@@ -186,7 +186,7 @@ router.get('/admin/migrar-efi/preview', authMiddleware, requireRoles('ADMIN'), a
   }
 
   // Agrupar parcelas pelo link do carnê (mesmo link = mesmo carnê)
-  const grupos = agruparChargesPorCarnet(allCharges);
+  const grupos = await agruparChargesPorCarnet(allCharges);
 
   const resultado = {
     begin_date:    beginDate,
@@ -281,7 +281,7 @@ router.post('/admin/migrar-efi', authMiddleware, requireRoles('ADMIN'), async (r
     return;
   }
 
-  const grupos = agruparChargesPorCarnet(allCharges);
+  const grupos = await agruparChargesPorCarnet(allCharges);
 
   const resultado = {
     begin_date:  beginDate,
@@ -402,15 +402,41 @@ async function corrigirLinksEWebhooks(allCharges: efiService.EfiChargeListItem[]
  * Ex: https://.../emissao/381777_62_MALSI8/A4CL-381777-220-RRADRA8/381777-220-RRADRA8
  *                                           ^^^^^^^^^^^^^^^^^^^^^^^^ ← chave compartilhada
  *
+ * Charges sem payment.carnet.link (ex: criados manualmente no painel EFI) são
+ * enriquecidos via detailCharge para obter o link. Delay de 100ms entre essas
+ * chamadas para evitar rate-limit.
+ *
  * Retorna Map<carnetFolder, charges[]>
  */
-function agruparChargesPorCarnet(
+async function agruparChargesPorCarnet(
   charges: efiService.EfiChargeListItem[],
-): Map<string, efiService.EfiChargeListItem[]> {
+): Promise<Map<string, efiService.EfiChargeListItem[]>> {
   const grupos = new Map<string, efiService.EfiChargeListItem[]>();
   let semLink = 0;
+  let enriquecidos = 0;
   for (const charge of charges) {
-    const link = charge.payment?.carnet?.link;
+    let link = charge.payment?.carnet?.link;
+
+    // Fallback: busca link via detailCharge para charges sem payment.carnet.link
+    if (!link) {
+      try {
+        await new Promise((r) => setTimeout(r, 100)); // evita rate-limit EFI
+        const detalhe = await efiService.obterDetalheCharge(charge.id);
+        link = detalhe?.payment?.banking_billet?.link
+          || detalhe?.link
+          || detalhe?.payment?.carnet?.link;
+        if (link) {
+          enriquecidos++;
+          console.log(`[agrupar] charge ${charge.id} enriquecido via detailCharge → link: ${link.slice(-40)}`);
+        } else {
+          // Log do detalhe para diagnóstico quando link ainda não encontrado
+          console.warn(`[agrupar] charge ${charge.id} sem link mesmo via detailCharge. payment:`, JSON.stringify(detalhe?.payment));
+        }
+      } catch (err: any) {
+        console.warn(`[agrupar] falha ao buscar detalhe do charge ${charge.id}: ${err.message}`);
+      }
+    }
+
     if (!link) {
       semLink++;
       continue;
@@ -422,9 +448,9 @@ function agruparChargesPorCarnet(
     grupos.get(chave)!.push(charge);
   }
   if (semLink > 0) {
-    console.warn(`[agrupar] ${semLink} charge(s) ignorados por não ter payment.carnet.link`);
+    console.warn(`[agrupar] ${semLink} charge(s) descartados (sem link mesmo via detailCharge)`);
   }
-  console.log(`[agrupar] total recebido do EFI: ${charges.length} charges → ${grupos.size} carnê(s) agrupados`);
+  console.log(`[agrupar] total: ${charges.length} charges | enriquecidos: ${enriquecidos} | agrupados: ${grupos.size} carnê(s) | descartados: ${semLink}`);
   return grupos;
 }
 
@@ -478,7 +504,7 @@ function mapEfiStatus(
   vencimento: Date,
 ): 'PENDENTE' | 'PAGO' | 'ATRASADO' | 'CANCELADO' | 'REEMBOLSADO' {
   if (chargeStatus === 'paid' || chargeStatus === 'settled') return 'PAGO';
-  if (chargeStatus === 'cancelled') return 'CANCELADO';
+  if (chargeStatus === 'canceled') return 'CANCELADO';
   if (chargeStatus === 'refunded') return 'REEMBOLSADO';
   if (chargeStatus === 'unpaid') return 'ATRASADO';
   // 'waiting' → verificar se já venceu

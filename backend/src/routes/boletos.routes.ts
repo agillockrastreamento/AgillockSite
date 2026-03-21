@@ -209,10 +209,30 @@ router.patch('/:id/baixa', requireRoles('ADMIN', 'COLABORADOR'), async (req: Aut
         Number(boleto.carne.efiCarneId),
         boleto.numeroParcela
       );
-    } catch (err: any) {
-      console.error('Erro EFI ao dar baixa:', err);
-      res.status(502).json({ error: `Erro ao dar baixa no EFI Bank: ${err.message || 'erro desconhecido'}` });
-      return;
+    } catch (sdkErr: any) {
+      console.error('Erro SDK ao dar baixa no EFI:', sdkErr);
+      // O SDK do EFI pode crashar com TypeError mesmo quando a chamada ao EFI
+      // foi bem-sucedida (bug na leitura da resposta HTTP). Verificamos o status
+      // real da parcela no EFI antes de decidir se é um erro real.
+      if (boleto.efiChargeId) {
+        try {
+          const detalhe = await efiService.obterDetalheCharge(Number(boleto.efiChargeId));
+          const statusEfi: string = detalhe?.status ?? '';
+          if (statusEfi === 'settled' || statusEfi === 'paid') {
+            // EFI confirmou — segue marcando como PAGO localmente
+            console.log(`[baixa] EFI confirmou status="${statusEfi}" para charge ${boleto.efiChargeId} após crash do SDK`);
+          } else {
+            res.status(502).json({ error: `Erro ao dar baixa no EFI Bank: ${sdkErr.message || 'erro desconhecido'}` });
+            return;
+          }
+        } catch {
+          res.status(502).json({ error: `Erro ao dar baixa no EFI Bank: ${sdkErr.message || 'erro desconhecido'}` });
+          return;
+        }
+      } else {
+        res.status(502).json({ error: `Erro ao dar baixa no EFI Bank: ${sdkErr.message || 'erro desconhecido'}` });
+        return;
+      }
     }
   }
 
