@@ -27,6 +27,7 @@ enum StatusBoleto {
   PAGO
   ATRASADO
   CANCELADO
+  REEMBOLSADO
 }
 
 model User {

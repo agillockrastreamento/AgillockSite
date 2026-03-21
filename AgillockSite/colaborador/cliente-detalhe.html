@@ -964,10 +964,11 @@
             (canCancelarCarne && cn.boletos.length > 0 && cn.boletos.every(function (b) { return b.status === 'CANCELADO'; }) ? '<button class="btn btn-xs btn-default btn-excluir-carne" data-carne-id="' + cn.id + '" title="Excluir Carnê"><i class="fa fa-trash"></i> Excluir Carnê</button>' : '') +
             '</div>';
 
-          var grupos = { aberto: [], pago: [], cancelado: [] };
+          var grupos = { aberto: [], pago: [], cancelado: [], reembolsado: [] };
           boletos.forEach(function (b) {
             if (b.status === 'PAGO') grupos.pago.push(b);
             else if (b.status === 'CANCELADO') grupos.cancelado.push(b);
+            else if (b.status === 'REEMBOLSADO') grupos.reembolsado.push(b);
             else grupos.aberto.push(b);
           });
 
@@ -984,8 +985,9 @@
               if (b.linkBoleto) {
                 acoes += '<a href="' + b.linkBoleto + '" target="_blank" class="btn btn-xs btn-info" title="Ver boleto PDF"><i class="fa fa-file-pdf-o"></i> PDF</a> ';
               }
-              if (b.status !== 'PAGO' && b.status !== 'CANCELADO') {
-                if (canBaixaManual) acoes += '<button class="btn btn-xs btn-success btn-baixa" data-bid="' + b.id + '" title="Confirmar pagamento"><i class="fa fa-check"></i> Baixa</button> ';
+              if (b.status !== 'PAGO' && b.status !== 'CANCELADO' && b.status !== 'REEMBOLSADO') {
+                if (canBaixaManual) acoes += '<button class="btn btn-xs btn-success btn-baixa" data-bid="' + b.id + '" title="Confirmar pagamento manual"><i class="fa fa-check"></i> Pago</button> ';
+                if (canCancelarCarne) acoes += '<button class="btn btn-xs btn-danger btn-cancelar-boleto" data-bid="' + b.id + '" title="Cancelar boleto"><i class="fa fa-ban"></i> Cancelar</button> ';
                 if (canAlterarVencto) acoes += '<button class="btn btn-xs btn-warning btn-editar-data" data-bid="' + b.id + '" data-venc="' + (b.vencimento || '').split('T')[0] + '" title="Alterar vencimento"><i class="fa fa-calendar"> Alterar Vencimento</i></button>';
               }
               var isHojeBoleto = AL.isHoje(b.vencimento) && (b.status === 'PENDENTE' || b.status === 'ATRASADO');
@@ -1010,6 +1012,7 @@
           html += renderGrupo('aberto', 'Em aberto', '#e67e22', grupos.aberto);
           html += renderGrupo('pago', 'Pagos', '#27ae60', grupos.pago);
           html += renderGrupo('cancelado', 'Cancelados', '#95a5a6', grupos.cancelado);
+          html += renderGrupo('reembolsado', 'Reembolsados', '#1565c0', grupos.reembolsado);
           html += '</div>';
         });
 
@@ -1064,16 +1067,16 @@
           });
         });
 
-        // Baixa manual (admin)
+        // Pago manual
         container.querySelectorAll('.btn-baixa').forEach(function (btn) {
           btn.addEventListener('click', function () {
             var bid = this.dataset.bid;
             var self = this;
             AL.confirmar({
-              titulo: 'Confirmar Baixa',
+              titulo: 'Confirmar Pagamento',
               mensagem: 'Confirmar pagamento manual deste boleto?',
               consequencias: 'O boleto será marcado como pago e a comissão do vendedor será calculada automaticamente.',
-              btnTexto: '<i class="fa fa-check"></i> Confirmar Baixa',
+              btnTexto: '<i class="fa fa-check"></i> Confirmar Pago',
               btnClasse: 'btn-success',
             }).then(function (ok) {
               if (!ok) return;
@@ -1081,12 +1084,40 @@
               self.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
               AL.apiPatch('/api/boletos/' + bid + '/baixa', {})
                 .then(function () {
-                  AL.showAlert('Baixa registrada.', 'success');
+                  AL.showAlert('Boleto marcado como pago.', 'success');
                   carregarCobrancas();
                 })
                 .catch(function (err) {
                   self.disabled = false;
-                  self.innerHTML = '<i class="fa fa-check"></i> Baixa';
+                  self.innerHTML = '<i class="fa fa-check"></i> Pago';
+                  AL.showAlert(err.message);
+                });
+            });
+          });
+        });
+
+        // Cancelar boleto individual
+        container.querySelectorAll('.btn-cancelar-boleto').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var bid = this.dataset.bid;
+            var self = this;
+            AL.confirmar({
+              titulo: 'Cancelar Boleto',
+              mensagem: 'Deseja cancelar este boleto individualmente?',
+              consequencias: 'O boleto será cancelado no EFI Bank e marcado como cancelado no sistema. Esta ação não pode ser desfeita.',
+              btnTexto: '<i class="fa fa-ban"></i> Cancelar Boleto',
+            }).then(function (ok) {
+              if (!ok) return;
+              self.disabled = true;
+              self.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+              AL.apiPatch('/api/boletos/' + bid + '/cancelar', {})
+                .then(function () {
+                  AL.showAlert('Boleto cancelado.', 'success');
+                  carregarCobrancas();
+                })
+                .catch(function (err) {
+                  self.disabled = false;
+                  self.innerHTML = '<i class="fa fa-ban"></i> Cancelar';
                   AL.showAlert(err.message);
                 });
             });

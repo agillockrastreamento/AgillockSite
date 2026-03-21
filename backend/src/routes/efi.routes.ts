@@ -27,9 +27,15 @@ router.post('/efi/webhook', async (req: Request, res: Response): Promise<void> =
       const notificacoes = await efiService.getNotification(token);
 
       for (const notif of notificacoes) {
-        const statusPago = notif.status?.current === 'paid' || notif.status?.current === 'settled';
-        if (statusPago && notif.identifiers?.charge_id) {
-          await processarPagamento(String(notif.identifiers.charge_id));
+        const chargeId = notif.identifiers?.charge_id ? String(notif.identifiers.charge_id) : null;
+        const statusAtual = notif.status?.current;
+        if (!chargeId) continue;
+        if (statusAtual === 'paid' || statusAtual === 'settled') {
+          await processarPagamento(chargeId);
+        } else if (statusAtual === 'cancelled') {
+          await processarCancelamento(chargeId);
+        } else if (statusAtual === 'refunded') {
+          await processarReembolso(chargeId);
         }
       }
     } catch (err) {
@@ -63,6 +69,38 @@ async function processarPagamento(efiChargeId: string): Promise<void> {
   await registrarComissoes(boleto.id);
 
   console.log(`Boleto ${boleto.id} (EFI charge ${efiChargeId}) marcado como PAGO.`);
+}
+
+async function processarCancelamento(efiChargeId: string): Promise<void> {
+  const boleto = await prisma.boleto.findUnique({
+    where: { efiChargeId },
+    select: { id: true, status: true },
+  });
+
+  if (!boleto || boleto.status === 'CANCELADO') return;
+
+  await prisma.boleto.update({
+    where: { id: boleto.id },
+    data: { status: 'CANCELADO' },
+  });
+
+  console.log(`Boleto ${boleto.id} (EFI charge ${efiChargeId}) marcado como CANCELADO via webhook.`);
+}
+
+async function processarReembolso(efiChargeId: string): Promise<void> {
+  const boleto = await prisma.boleto.findUnique({
+    where: { efiChargeId },
+    select: { id: true, status: true },
+  });
+
+  if (!boleto || boleto.status === 'REEMBOLSADO') return;
+
+  await prisma.boleto.update({
+    where: { id: boleto.id },
+    data: { status: 'REEMBOLSADO' },
+  });
+
+  console.log(`Boleto ${boleto.id} (EFI charge ${efiChargeId}) marcado como REEMBOLSADO via webhook.`);
 }
 
 // ─── GET /api/segunda-via — Busca pública de boletos por CPF ou placa ─────────
@@ -136,7 +174,8 @@ router.get('/segunda-via', async (req: Request, res: Response): Promise<void> =>
 router.get('/admin/migrar-efi/preview', authMiddleware, requireRoles('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   const hoje = new Date();
   const endDate   = hoje.toISOString().split('T')[0];
-  const beginDate = (req.query.begin_date as string) || '2020-01-01';
+  const vinte = new Date(hoje); vinte.setFullYear(vinte.getFullYear() - 20);
+  const beginDate = (req.query.begin_date as string) || vinte.toISOString().split('T')[0];
 
   let allCharges: efiService.EfiChargeListItem[];
   try {
@@ -231,7 +270,8 @@ router.post('/admin/migrar-efi', authMiddleware, requireRoles('ADMIN'), async (r
 
   const hoje = new Date();
   const endDate   = hoje.toISOString().split('T')[0];
-  const beginDate = (req.body?.begin_date as string) || '2020-01-01';
+  const vinte = new Date(hoje); vinte.setFullYear(vinte.getFullYear() - 20);
+  const beginDate = (req.body?.begin_date as string) || vinte.toISOString().split('T')[0];
 
   let allCharges: efiService.EfiChargeListItem[];
   try {
@@ -281,7 +321,8 @@ router.post('/admin/migrar-efi', authMiddleware, requireRoles('ADMIN'), async (r
 router.post('/admin/corrigir-links-efi', authMiddleware, requireRoles('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   const hoje = new Date();
   const endDate   = hoje.toISOString().split('T')[0];
-  const beginDate = (req.body?.begin_date as string) || '2020-01-01';
+  const vinte2 = new Date(hoje); vinte2.setFullYear(vinte2.getFullYear() - 20);
+  const beginDate = (req.body?.begin_date as string) || vinte2.toISOString().split('T')[0];
 
   let allCharges: efiService.EfiChargeListItem[];
   try {
@@ -367,15 +408,23 @@ function agruparChargesPorCarnet(
   charges: efiService.EfiChargeListItem[],
 ): Map<string, efiService.EfiChargeListItem[]> {
   const grupos = new Map<string, efiService.EfiChargeListItem[]>();
+  let semLink = 0;
   for (const charge of charges) {
     const link = charge.payment?.carnet?.link;
-    if (!link) continue;
+    if (!link) {
+      semLink++;
+      continue;
+    }
     // Extrai penúltimo segmento da URL como chave do carnê
     const parts = link.split('/');
     const chave = parts.length >= 2 ? parts[parts.length - 2] : link;
     if (!grupos.has(chave)) grupos.set(chave, []);
     grupos.get(chave)!.push(charge);
   }
+  if (semLink > 0) {
+    console.warn(`[agrupar] ${semLink} charge(s) ignorados por não ter payment.carnet.link`);
+  }
+  console.log(`[agrupar] total recebido do EFI: ${charges.length} charges → ${grupos.size} carnê(s) agrupados`);
   return grupos;
 }
 
@@ -427,9 +476,10 @@ function parsePlacaFromNome(nome: string): { placa: string; descricao: string | 
 function mapEfiStatus(
   chargeStatus: string,
   vencimento: Date,
-): 'PENDENTE' | 'PAGO' | 'ATRASADO' | 'CANCELADO' {
+): 'PENDENTE' | 'PAGO' | 'ATRASADO' | 'CANCELADO' | 'REEMBOLSADO' {
   if (chargeStatus === 'paid' || chargeStatus === 'settled') return 'PAGO';
   if (chargeStatus === 'cancelled') return 'CANCELADO';
+  if (chargeStatus === 'refunded') return 'REEMBOLSADO';
   if (chargeStatus === 'unpaid') return 'ATRASADO';
   // 'waiting' → verificar se já venceu
   const hoje = new Date();

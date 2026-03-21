@@ -157,7 +157,7 @@
     var map = {
       ATIVO: 'badge-ativo', INATIVO: 'badge-inativo',
       PENDENTE: 'badge-pendente', ATRASADO: 'badge-atrasado',
-      PAGO: 'badge-pago', CANCELADO: 'badge-cancelado',
+      PAGO: 'badge-pago', CANCELADO: 'badge-cancelado', REEMBOLSADO: 'badge-reembolsado',
     };
     return '<span class="al-badge ' + (map[status] || 'badge-default') + '">' + status + '</span>';
   }

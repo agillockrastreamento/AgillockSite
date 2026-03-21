@@ -197,6 +197,10 @@ router.patch('/:id/baixa', requireRoles('ADMIN', 'COLABORADOR'), async (req: Aut
     res.status(400).json({ error: 'Boleto cancelado não pode receber baixa.' });
     return;
   }
+  if (boleto.status === 'REEMBOLSADO') {
+    res.status(400).json({ error: 'Boleto reembolsado não pode receber baixa.' });
+    return;
+  }
 
   // Dar baixa no EFI
   if (boleto.carne.efiCarneId) {
@@ -224,6 +228,55 @@ router.patch('/:id/baixa', requireRoles('ADMIN', 'COLABORADOR'), async (req: Aut
 
   // Calcular comissão por placa (cada placa tem seu vendedor dono)
   await registrarComissoes(id);
+
+  res.json(atualizado);
+});
+
+// ─── PATCH /api/boletos/:id/cancelar — Cancelar boleto individual ────────────
+router.patch('/:id/cancelar', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  if (req.user!.role === 'COLABORADOR' && !req.user!.podeCancelarCarne) {
+    res.status(403).json({ error: 'Sem permissão para cancelar boletos.' });
+    return;
+  }
+  const id = param(req, 'id');
+
+  const boleto = await prisma.boleto.findUnique({
+    where: { id },
+    include: { carne: { select: { efiCarneId: true } } },
+  });
+
+  if (!boleto) {
+    res.status(404).json({ error: 'Boleto não encontrado.' });
+    return;
+  }
+  if (boleto.status === 'CANCELADO') {
+    res.status(400).json({ error: 'Boleto já está cancelado.' });
+    return;
+  }
+  if (boleto.status === 'PAGO') {
+    res.status(400).json({ error: 'Boleto já pago não pode ser cancelado.' });
+    return;
+  }
+  if (boleto.status === 'REEMBOLSADO') {
+    res.status(400).json({ error: 'Boleto reembolsado não pode ser cancelado.' });
+    return;
+  }
+
+  // Cancelar parcela no EFI
+  if (boleto.carne.efiCarneId) {
+    try {
+      await efiService.cancelarParcela(Number(boleto.carne.efiCarneId), boleto.numeroParcela);
+    } catch (err: any) {
+      console.error('Erro EFI ao cancelar parcela:', err);
+      res.status(502).json({ error: `Erro ao cancelar no EFI Bank: ${err.message || 'erro desconhecido'}` });
+      return;
+    }
+  }
+
+  const atualizado = await prisma.boleto.update({
+    where: { id },
+    data: { status: 'CANCELADO' },
+  });
 
   res.json(atualizado);
 });

@@ -154,6 +154,15 @@ export async function cancelarCarne(efiCarneId: number): Promise<void> {
   }
 }
 
+export async function cancelarParcela(efiCarneId: number, parcela: number): Promise<void> {
+  const client = getClient();
+  try {
+    await client.cancelCarnetParcel({ id: efiCarneId, parcel: String(parcela) });
+  } catch (err) {
+    throw normalizeEfiError(err);
+  }
+}
+
 export async function liquidarParcela(efiCarneId: number, parcela: number): Promise<void> {
   const client = getClient();
   try {
@@ -211,7 +220,8 @@ export interface EfiChargeListItem {
 }
 
 // A API limita a diferença entre begin_date e end_date a no máximo 1 ano.
-// Esta função divide automaticamente o intervalo em fatias anuais.
+// Esta função divide automaticamente o intervalo em fatias anuais e percorre
+// todas as páginas de cada fatia (listCharges é paginado).
 export async function listarCarnetCharges(params: {
   begin_date: string;
   end_date: string;
@@ -233,17 +243,27 @@ export async function listarCarnetCharges(params: {
     const sliceBeginStr = cursor.toISOString().split('T')[0];
     const sliceEndStr   = effectiveEnd.toISOString().split('T')[0];
 
-    try {
-      const response = await client.listCharges({
-        begin_date:  sliceBeginStr,
-        end_date:    sliceEndStr,
-        charge_type: 'carnet',
-      });
-      const data = (response.data ?? []) as EfiChargeListItem[];
-      all.push(...data);
-    } catch (err) {
-      throw normalizeEfiError(err);
-    }
+    // Percorre todas as páginas desta fatia
+    let page = 1;
+    let totalPaginas = 1;
+    do {
+      try {
+        const response = await client.listCharges({
+          begin_date:  sliceBeginStr,
+          end_date:    sliceEndStr,
+          charge_type: 'carnet',
+          page,
+          limit: 100,
+        });
+        const data = (response.data ?? []) as EfiChargeListItem[];
+        all.push(...data);
+        // A API retorna quantidadeDePaginas quando há paginação
+        totalPaginas = response.quantidadeDePaginas ?? 1;
+        page++;
+      } catch (err) {
+        throw normalizeEfiError(err);
+      }
+    } while (page <= totalPaginas);
 
     // Avança cursor para o dia seguinte ao fim desta fatia
     cursor = new Date(effectiveEnd);

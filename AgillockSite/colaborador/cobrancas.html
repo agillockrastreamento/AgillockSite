@@ -81,6 +81,7 @@
           <option value="ATRASADO">Atrasado</option>
           <option value="PAGO">Pago</option>
           <option value="CANCELADO">Cancelado</option>
+          <option value="REEMBOLSADO">Reembolsado</option>
         </select>
         <select id="filtro-tipo" class="form-control" style="width:auto;">
           <option value="">Todos os tipos</option>
@@ -154,6 +155,7 @@
     if (!currentUser) return;
 
     var podeBaixa = currentUser.podeBaixaManual;
+    var podeCancelar = currentUser.podeCancelarCarne;
     var podeEditarVenc = currentUser.podeAlterarVencimento;
 
     document.getElementById('user-nome').textContent = currentUser.nome || '—';
@@ -242,10 +244,13 @@
         if (b.linkBoleto) {
           acoes += '<a href="' + b.linkBoleto + '" target="_blank" class="btn btn-xs btn-info" title="Ver PDF"><i class="fa fa-file-pdf-o"></i></a> ';
         }
-        if (podeBaixa && b.status !== 'PAGO' && b.status !== 'CANCELADO') {
-          acoes += '<button class="btn btn-xs btn-success btn-baixa" data-bid="' + b.id + '" title="Confirmar pagamento"><i class="fa fa-check"></i></button> ';
+        if (podeBaixa && b.status !== 'PAGO' && b.status !== 'CANCELADO' && b.status !== 'REEMBOLSADO') {
+          acoes += '<button class="btn btn-xs btn-success btn-baixa" data-bid="' + b.id + '" title="Confirmar pagamento manual"><i class="fa fa-check"></i></button> ';
         }
-        if (podeEditarVenc && b.status !== 'PAGO' && b.status !== 'CANCELADO') {
+        if (podeCancelar && b.status !== 'PAGO' && b.status !== 'CANCELADO' && b.status !== 'REEMBOLSADO') {
+          acoes += '<button class="btn btn-xs btn-danger btn-cancelar-boleto" data-bid="' + b.id + '" title="Cancelar boleto"><i class="fa fa-ban"></i></button> ';
+        }
+        if (podeEditarVenc && b.status !== 'PAGO' && b.status !== 'CANCELADO' && b.status !== 'REEMBOLSADO') {
           acoes += '<button class="btn btn-xs btn-warning btn-editar-data" data-bid="' + b.id + '" data-venc="' + (b.vencimento || '').split('T')[0] + '" title="Alterar vencimento"><i class="fa fa-calendar"></i></button> ';
         }
         if (cliente && cliente.telefone) {
@@ -276,18 +281,38 @@
           var bid = this.dataset.bid;
           var self = this;
           AL.confirmar({
-            titulo: 'Confirmar Baixa',
+            titulo: 'Confirmar Pagamento',
             mensagem: 'Confirmar pagamento manual deste boleto?',
             consequencias: 'O boleto será marcado como pago e a comissão do vendedor será calculada automaticamente.',
-            btnTexto: '<i class="fa fa-check"></i> Confirmar Baixa',
+            btnTexto: '<i class="fa fa-check"></i> Confirmar Pago',
             btnClasse: 'btn-success',
           }).then(function (ok) {
             if (!ok) return;
             self.disabled = true;
             self.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
             AL.apiPatch('/api/boletos/' + bid + '/baixa', {})
-              .then(function () { AL.showAlert('Baixa registrada.', 'success'); carregarBoletos(); })
+              .then(function () { AL.showAlert('Boleto marcado como pago.', 'success'); carregarBoletos(); })
               .catch(function (err) { self.disabled = false; self.innerHTML = '<i class="fa fa-check"></i>'; AL.showAlert(err.message); });
+          });
+        });
+      });
+
+      tbody.querySelectorAll('.btn-cancelar-boleto').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var bid = this.dataset.bid;
+          var self = this;
+          AL.confirmar({
+            titulo: 'Cancelar Boleto',
+            mensagem: 'Deseja cancelar este boleto individualmente?',
+            consequencias: 'O boleto será cancelado no EFI Bank e marcado como cancelado no sistema. Esta ação não pode ser desfeita.',
+            btnTexto: '<i class="fa fa-ban"></i> Cancelar Boleto',
+          }).then(function (ok) {
+            if (!ok) return;
+            self.disabled = true;
+            self.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+            AL.apiPatch('/api/boletos/' + bid + '/cancelar', {})
+              .then(function () { AL.showAlert('Boleto cancelado.', 'success'); carregarBoletos(); })
+              .catch(function (err) { self.disabled = false; self.innerHTML = '<i class="fa fa-ban"></i>'; AL.showAlert(err.message); });
           });
         });
       });
