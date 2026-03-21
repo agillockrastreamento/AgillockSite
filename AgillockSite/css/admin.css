@@ -791,10 +791,12 @@ html.dark-theme .filter-bar { background: #1e2530; }
     .admin-content  { height: var(--real-vh, 100dvh) !important; }
     .table-responsive { height: calc(var(--real-vh, 100dvh) * 0.65) !important; flex: none !important; }
 
-    /* Sidebar mais compacto para caber na tela sem precisar rolar */
+    /* Sidebar mais compacto — remove flex:1 do nav para footer ficar junto */
     .sidebar-brand       { padding: 11px 16px; }
+    .sidebar-nav         { flex: none; padding: 4px 0; }
     .sidebar-nav li a    { padding: 9px 16px; font-size: 13px; }
-    .sidebar-footer      { padding: 8px 14px 12px; }
+    .sidebar-footer      { padding: 10px 16px 14px; }
+    .sidebar-user        { margin-bottom: 10px; }
 
     /* Scroll horizontal na tabela de boletos (detalhe do cliente) */
     .cobranca-group      { overflow-x: auto !important; }
