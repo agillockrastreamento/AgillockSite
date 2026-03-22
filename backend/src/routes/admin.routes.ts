@@ -19,8 +19,6 @@ interface ClienteImport {
   bairro?: string;
   cidade?: string;
   estado?: string;
-  enderecoRaw?: string;
-  vendedorNome?: string;
 }
 
 // POST /api/admin/importar-planilha
@@ -31,12 +29,6 @@ router.post('/admin/importar-planilha', requireRoles('ADMIN'), async (req: AuthR
     res.status(400).json({ error: 'Nenhum cliente enviado.' });
     return;
   }
-
-  // Carrega todos os vendedores para matching
-  const vendedores = await prisma.user.findMany({
-    where: { role: 'VENDEDOR', ativo: true },
-    select: { id: true, nome: true },
-  });
 
   const importados: string[] = [];
   const erros: { linha: number; nome: string; erro: string }[] = [];
@@ -51,30 +43,14 @@ router.post('/admin/importar-planilha', requireRoles('ADMIN'), async (req: AuthR
     }
 
     try {
-      // Busca vendedor por nome (insensível a maiúsculas, busca parcial)
-      let vendedorId: string | null = null;
-      if (row.vendedorNome?.trim()) {
-        const nomeBusca = row.vendedorNome.trim().toLowerCase();
-        const match = vendedores.find(
-          (v) =>
-            v.nome.toLowerCase().includes(nomeBusca) ||
-            nomeBusca.includes(v.nome.toLowerCase())
-        );
-        if (match) vendedorId = match.id;
-      }
-
-      // Endereço: usa campos estruturados ou o campo raw
-      const logradouro = row.logradouro?.trim() || row.enderecoRaw?.trim() || null;
-
       const cliente = await prisma.cliente.create({
         data: {
           nome: row.nome.trim(),
           cpfCnpj: row.cpfCnpj?.trim() || null,
           email: row.email?.trim() || null,
           telefone: row.telefone?.trim() || null,
-          vendedorId,
           cep: row.cep?.trim() || null,
-          logradouro,
+          logradouro: row.logradouro?.trim() || null,
           numero: row.numero?.trim() || null,
           complemento: row.complemento?.trim() || null,
           bairro: row.bairro?.trim() || null,
