@@ -10,7 +10,6 @@ interface ClienteImport {
   nome: string;
   placas: string[];
   cpfCnpj?: string;
-  rg?: string;
   email?: string;
   telefone?: string;
   cep?: string;
@@ -71,7 +70,6 @@ router.post('/admin/importar-planilha', requireRoles('ADMIN'), async (req: AuthR
         data: {
           nome: row.nome.trim(),
           cpfCnpj: row.cpfCnpj?.trim() || null,
-          rg: row.rg?.trim() || null,
           email: row.email?.trim() || null,
           telefone: row.telefone?.trim() || null,
           vendedorId,

@@ -195,7 +195,7 @@
         html += '<p style="margin:0 0 8px;font-weight:600;color:#31708f;"><i class="fa fa-info-circle"></i> Como preparar sua planilha</p>';
         html += '<ul style="margin:0;padding-left:20px;color:#555;font-size:13px;line-height:1.7;">';
         html += '<li>A planilha deve ter uma <strong>linha de cabeçalho</strong> com os nomes das colunas</li>';
-        html += '<li>Colunas utilizadas: <strong>Nome</strong> <span style="color:#a94442">(obrigatório)</span>, <strong>Placa(s)</strong>, <strong>CPF/CNPJ</strong>, <strong>RG</strong>, <strong>E-mail</strong>, <strong>Telefone</strong>, <strong>Endereço</strong>, <strong>Vendedor</strong></li>';
+        html += '<li>Colunas utilizadas: <strong>Nome</strong> <span style="color:#a94442">(obrigatório)</span>, <strong>Placa(s)</strong>, <strong>CPF/CNPJ</strong>, <strong>E-mail</strong>, <strong>Telefone</strong>, <strong>Endereço</strong>, <strong>Vendedor</strong></li>';
         html += '<li>Múltiplas placas: separe com <strong>+</strong> &nbsp;&nbsp;exemplo: <code>ABC1D23 + XYZ4E56 + DEF5G78</code></li>';
         html += '<li>Formatos aceitos: <strong>.xlsx</strong>, <strong>.xls</strong> ou <strong>.csv</strong></li>';
         html += '</ul>';
@@ -335,13 +335,12 @@
 
       // Auto-detecta colunas por nomes comuns
       function plDetectarColunas(headers) {
-        var result = { nome: '', placa: '', cpfCnpj: '', rg: '', email: '', telefone: '', endereco: '', vendedor: '' };
+        var result = { nome: '', placa: '', cpfCnpj: '', email: '', telefone: '', endereco: '', vendedor: '' };
         var lh = headers.map(function (h) { return (h || '').toLowerCase().trim(); });
         var maps = {
           nome: ['nome', 'cliente', 'name', 'razão social', 'razao social'],
           placa: ['placa', 'placas', 'placa(s)', 'veículo', 'veiculo', 'placa/veículo'],
           cpfCnpj: ['cpf/cnpj', 'cpf', 'cnpj', 'documento', 'doc', 'cpf_cnpj'],
-          rg: ['rg', 'identidade', 'rg/identidade'],
           email: ['email', 'e-mail', 'e_mail', 'correio'],
           telefone: ['telefone', 'fone', 'celular', 'phone', 'tel', 'whatsapp'],
           endereco: ['endereço', 'endereco', 'address', 'end', 'logradouro', 'endereço completo', 'endereco completo'],
@@ -381,7 +380,6 @@
           { id: 'pl-map-nome',     label: 'Nome do cliente', val: mapa.nome,     obrig: true },
           { id: 'pl-map-placa',    label: 'Placa(s)',        val: mapa.placa,    obrig: false },
           { id: 'pl-map-cpfcnpj',  label: 'CPF / CNPJ',     val: mapa.cpfCnpj,  obrig: false },
-          { id: 'pl-map-rg',       label: 'RG',              val: mapa.rg,       obrig: false },
           { id: 'pl-map-email',    label: 'E-mail',          val: mapa.email,    obrig: false },
           { id: 'pl-map-telefone', label: 'Telefone',        val: mapa.telefone, obrig: false },
           { id: 'pl-map-endereco', label: 'Endereço',        val: mapa.endereco, obrig: false },
@@ -453,7 +451,7 @@
         var colNome     = document.getElementById('pl-map-nome').value;
         var colPlaca    = document.getElementById('pl-map-placa').value;
         var colCpfCnpj  = document.getElementById('pl-map-cpfcnpj').value;
-        var colRg       = document.getElementById('pl-map-rg').value;
+
         var colEmail    = document.getElementById('pl-map-email').value;
         var colTelefone = document.getElementById('pl-map-telefone').value;
         var colEndereco = document.getElementById('pl-map-endereco').value;
@@ -470,7 +468,7 @@
               nome:         (row[colNome]     || '').trim(),
               placas:       plExtrairPlacas(colPlaca ? row[colPlaca] : ''),
               cpfCnpj:      colCpfCnpj  ? (row[colCpfCnpj]  || '').trim() : '',
-              rg:           colRg       ? (row[colRg]       || '').trim() : '',
+
               email:        colEmail    ? (row[colEmail]    || '').trim() : '',
               telefone:     colTelefone ? (row[colTelefone] || '').trim() : '',
               enderecoRaw:  colEndereco ? (row[colEndereco] || '').trim() : '',
