@@ -93,6 +93,8 @@ Todas as rotas protegidas exigem header: `Authorization: Bearer <token>`
 }
 ```
 
+> **Validações do POST**: `nome` é obrigatório. `cep`, `logradouro`, `numero`, `bairro`, `cidade` e `estado` são obrigatórios na criação — o backend retorna 400 se qualquer um estiver ausente. `email` é opcional (mas se informado, o EFI envia o boleto por e-mail ao cliente).
+
 ---
 
 ## Placas
@@ -246,7 +248,7 @@ Busca automaticamente todos os carnês individuais ativos do cliente e os unific
 | GET | `/vendedor/carteira` | Carteira do vendedor logado | VENDEDOR |
 
 ### GET /vendedor/carteira
-**Query params:** `?mes=2026-03`
+**Query params:** `?mes=2026-03&vendedorId=uuid` (ADMIN pode passar `vendedorId` para ver carteira de outro vendedor)
 
 Retorna os **três totais simultaneamente** (sem toggle): `garantido`, `atrasado` e `futuro`.
 
@@ -272,6 +274,60 @@ Retorna os **três totais simultaneamente** (sem toggle): `garantido`, `atrasado
 - `toggle=futuro`: detalha boletos `PENDENTE` com vencimento no mês
 
 **Response:** `{ mes, toggle, total, itens: [{ boletoId, cliente, telefone, placa, vencimento, dataPagamento, valorBoleto, comissao, percentual, linkBoleto }] }`
+
+---
+
+## Pagamento de Comissão ao Vendedor
+
+| Método | Rota | Descrição | Roles |
+|---|---|---|---|
+| GET | `/vendedor/pagamentos` | Consultar registro de pagamento (vendedor+mês) | VENDEDOR, ADMIN |
+| POST | `/vendedor/pagamentos` | Registrar pagamento de comissão | ADMIN |
+| POST | `/vendedor/pagamentos/:id/comprovante` | Upload do comprovante (PDF/JPG/PNG) | ADMIN |
+| GET | `/vendedor/comprovante/:id` | Download/visualização do comprovante | VENDEDOR, ADMIN |
+
+### GET /vendedor/pagamentos
+**Query params:** `?vendedorId=uuid&mes=2026-03`
+
+- ADMIN pode informar qualquer `vendedorId`; VENDEDOR só acessa o próprio
+- Retorna o registro `PagamentoComissao` ou `null` se ainda não houver pagamento no mês
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "vendedorId": "uuid",
+  "mes": "2026-03",
+  "valor": 350.00,
+  "pago": true,
+  "comprovante": "uploads/comprovantes/1711123456-abc.pdf",
+  "comprovanteMime": "application/pdf",
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
+
+### POST /vendedor/pagamentos
+Cria ou atualiza (upsert) o registro de pagamento para o par `vendedorId + mes`.
+
+**Body:**
+```json
+{ "vendedorId": "uuid", "mes": "2026-03", "valor": 350.00 }
+```
+
+### POST /vendedor/pagamentos/:id/comprovante
+Upload via `multipart/form-data`. Campo: `comprovante`.
+- Formatos aceitos: PDF, JPG, PNG, WebP
+- Tamanho máximo: 10 MB
+- Arquivo anterior é removido automaticamente se já existia
+
+### GET /vendedor/comprovante/:id
+Serve o arquivo do comprovante com o `Content-Type` correto.
+
+**Autenticação especial**: aceita JWT via header `Authorization: Bearer <token>` **ou** via query param `?token=<jwt>`. O query param é necessário para abrir o arquivo em nova aba no browser (onde não é possível definir headers HTTP).
+
+- VENDEDOR só pode acessar o comprovante do seu próprio registro
+- ADMIN pode acessar qualquer comprovante
 
 ---
 

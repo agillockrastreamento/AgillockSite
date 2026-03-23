@@ -33,9 +33,9 @@ router.get('/', requireRoles('ADMIN'), async (_req: AuthRequest, res: Response):
   const inicioDia = inicioDiaHoje;
   const fimDia    = fimDiaHoje;
 
-  const [totalClientesAtivos, totalPlacasAtivas, recebimentosHoje, totalAtrasados] = await Promise.all([
+  const [totalClientesAtivos, totalDispositivosAtivos, recebimentosHoje, totalAtrasados] = await Promise.all([
     prisma.cliente.count({ where: { status: 'ATIVO' } }),
-    prisma.placa.count({ where: { ativo: true } }),
+    prisma.dispositivo.count({ where: { ativo: true } }),
     prisma.boleto.aggregate({
       where: { status: 'PAGO', dataPagamento: { gte: inicioDia, lt: fimDia } },
       _sum: { valorPago: true },
@@ -45,7 +45,7 @@ router.get('/', requireRoles('ADMIN'), async (_req: AuthRequest, res: Response):
 
   res.json({
     totalClientesAtivos,
-    totalPlacasAtivas,
+    totalDispositivosAtivos,
     recebimentosHoje: Number(recebimentosHoje._sum.valorPago ?? 0),
     totalAtrasados,
   });

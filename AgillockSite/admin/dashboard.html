@@ -25,6 +25,7 @@
     <ul class="sidebar-nav">
       <li class="active"><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
       <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
@@ -73,7 +74,7 @@
       <div class="col-sm-6 col-md-3">
         <div class="metric-card green">
           <div class="value" id="m-placas">—</div>
-          <div class="label">Placas Ativas</div>
+          <div class="label">Dispositivos Ativos</div>
         </div>
       </div>
       <div class="col-sm-6 col-md-3">
@@ -159,7 +160,7 @@
         AL.apiGet('/api/dashboard')
           .then(function (data) {
             document.getElementById('m-clientes').textContent = data.totalClientesAtivos !== undefined ? data.totalClientesAtivos : '—';
-            document.getElementById('m-placas').textContent = data.totalPlacasAtivas !== undefined ? data.totalPlacasAtivas : '—';
+            document.getElementById('m-placas').textContent = data.totalDispositivosAtivos !== undefined ? data.totalDispositivosAtivos : '—';
             document.getElementById('m-recebimentos').textContent = data.recebimentosHoje !== undefined
               ? AL.fmtMoney(data.recebimentosHoje) : '—';
             document.getElementById('m-atrasados').textContent = data.totalAtrasados !== undefined ? data.totalAtrasados : '—';

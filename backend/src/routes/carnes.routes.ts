@@ -8,12 +8,12 @@ import * as efiService from '../services/efi.service';
 const router = Router();
 router.use(authMiddleware);
 
-// ─── POST /api/carnes — Gerar carnê individual (1 placa) ──────────────────────
+// ─── POST /api/carnes — Gerar carnê individual (1 dispositivo ou placa) ───────
 router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
-  const { clienteId, placaId, valor, dataVencimento, numeroParcelas, vendedorId, descricaoBoleto } = req.body;
+  const { clienteId, placaId, dispositivoId, valor, dataVencimento, numeroParcelas, vendedorId, descricaoBoleto } = req.body;
 
-  if (!clienteId || !placaId || !valor || !dataVencimento || !numeroParcelas) {
-    res.status(400).json({ error: 'clienteId, placaId, valor, dataVencimento e numeroParcelas são obrigatórios.' });
+  if (!clienteId || (!placaId && !dispositivoId) || !valor || !dataVencimento || !numeroParcelas) {
+    res.status(400).json({ error: 'clienteId, placaId ou dispositivoId, valor, dataVencimento e numeroParcelas são obrigatórios.' });
     return;
   }
   if (Number(valor) <= 0 || Number(numeroParcelas) < 1) {
@@ -23,7 +23,10 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
-    select: { id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true },
+    select: {
+      id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true,
+      cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
+    },
   });
   if (!cliente) {
     res.status(404).json({ error: 'Cliente não encontrado.' });
@@ -38,13 +41,48 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
   // Determinar vendedor efetivo da cobrança: prioriza o informado na cobrança, depois o do cliente
   const vendedorEfetivo = vendedorId || cliente.vendedorId || null;
 
-  const placa = await prisma.placa.findFirst({
-    where: { id: placaId, clienteId, ativo: true },
-    select: { id: true, placa: true, descricao: true, vendedorId: true },
-  });
-  if (!placa) {
-    res.status(404).json({ error: 'Placa não encontrada ou inativa.' });
-    return;
+  // Resolução do item de cobrança: dispositivo (novo) ou placa (legado)
+  let itemNome: string;
+  let itemVendedorId: string | null = null;
+  let boletoExtra: Record<string, string | null> = {};
+
+  if (dispositivoId) {
+    const dispositivo = await prisma.dispositivo.findFirst({
+      where: { id: dispositivoId, clienteId, ativo: true },
+      select: { id: true, nome: true, identificador: true, placa: true, vendedorId: true },
+    });
+    if (!dispositivo) {
+      res.status(404).json({ error: 'Dispositivo não encontrado ou inativo.' });
+      return;
+    }
+    const base = dispositivo.placa
+      ? `Rastreamento ${dispositivo.placa}`
+      : `Rastreamento ${dispositivo.identificador}`;
+    itemNome = (descricaoBoleto ? `${base} - ${descricaoBoleto}` : base).slice(0, 255);
+    itemVendedorId = dispositivo.vendedorId;
+    boletoExtra = { dispositivoId };
+
+    // Definir vendedor dono do dispositivo (somente se ainda não tiver um)
+    if (vendedorEfetivo && !dispositivo.vendedorId) {
+      await prisma.dispositivo.update({ where: { id: dispositivoId }, data: { vendedorId: vendedorEfetivo } });
+    }
+  } else {
+    const placa = await prisma.placa.findFirst({
+      where: { id: placaId, clienteId, ativo: true },
+      select: { id: true, placa: true, descricao: true, vendedorId: true },
+    });
+    if (!placa) {
+      res.status(404).json({ error: 'Placa não encontrada ou inativa.' });
+      return;
+    }
+    const base = placa.descricao ? `${placa.placa} - ${placa.descricao}` : `Rastreamento ${placa.placa}`;
+    itemNome = (descricaoBoleto ? `${base} - ${descricaoBoleto}` : base).slice(0, 255);
+    itemVendedorId = placa.vendedorId;
+    boletoExtra = { placaId };
+
+    if (vendedorEfetivo && !placa.vendedorId) {
+      await prisma.placa.update({ where: { id: placaId }, data: { vendedorId: vendedorEfetivo } });
+    }
   }
 
   // Aviso se cliente já tem carnê unificado ativo
@@ -76,18 +114,19 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
         ...(cliente.cpfCnpj ? { cpf: cliente.cpfCnpj.replace(/\D/g, '') } : {}),
         ...(cliente.telefone ? { phone_number: cliente.telefone.replace(/\D/g, '') } : {}),
         ...(cliente.email ? { email: cliente.email } : {}),
+        ...(cliente.logradouro && cliente.cidade && cliente.estado ? {
+          address: {
+            street: cliente.logradouro,
+            number: cliente.numero || 'S/N',
+            neighborhood: cliente.bairro || '',
+            zipcode: (cliente.cep || '').replace(/\D/g, ''),
+            city: cliente.cidade,
+            state: cliente.estado.toUpperCase(),
+            ...(cliente.complemento ? { complement: cliente.complemento } : {}),
+          },
+        } : {}),
       },
-      items: [
-        {
-          name: (() => {
-            const base = placa.descricao ? `${placa.placa} - ${placa.descricao}` : `Rastreamento ${placa.placa}`;
-            const full = descricaoBoleto ? `${base} - ${descricaoBoleto}` : base;
-            return full.slice(0, 255);
-          })(),
-          value: valorCentavos,
-          amount: 1,
-        },
-      ],
+      items: [{ name: itemNome, value: valorCentavos, amount: 1 }],
       expire_at: dataVencimento,
       repeats: Number(numeroParcelas),
       configurations: configurations?.fine || configurations?.interest ? configurations : undefined,
@@ -119,7 +158,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
             status: 'PENDENTE' as const,
             efiChargeId: String(charge.charge_id),
             linkBoleto: charge.url,
-            placaId,
+            ...boletoExtra,
           };
         }),
       },
@@ -128,15 +167,6 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
       boletos: { orderBy: { numeroParcela: 'asc' } },
     },
   });
-
-  // Definir vendedor dono da placa (somente se ainda não tiver um)
-  console.log(`[carnes] placa=${placaId} vendedorEfetivo=${vendedorEfetivo ?? 'null'} placaVendedorAtual=${placa!.vendedorId ?? 'null'}`);
-  if (vendedorEfetivo && !placa!.vendedorId) {
-    await prisma.placa.update({ where: { id: placaId }, data: { vendedorId: vendedorEfetivo } });
-    console.log(`[carnes] placa=${placaId} → vendedorId definido como ${vendedorEfetivo}`);
-  } else {
-    console.log(`[carnes] placa=${placaId} → vendedorId mantido (${placa!.vendedorId ?? 'null'})`);
-  }
 
   res.status(201).json({
     ...carne,
@@ -269,7 +299,10 @@ router.post('/unificar', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthR
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
-    select: { id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true },
+    select: {
+      id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true,
+      cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
+    },
   });
   if (!cliente) {
     res.status(404).json({ error: 'Cliente não encontrado.' });
@@ -369,6 +402,17 @@ router.post('/unificar', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthR
         ...(cliente.cpfCnpj ? { cpf: cliente.cpfCnpj.replace(/\D/g, '') } : {}),
         ...(cliente.telefone ? { phone_number: cliente.telefone.replace(/\D/g, '') } : {}),
         ...(cliente.email ? { email: cliente.email } : {}),
+        ...(cliente.logradouro && cliente.cidade && cliente.estado ? {
+          address: {
+            street: cliente.logradouro,
+            number: cliente.numero || 'S/N',
+            neighborhood: cliente.bairro || '',
+            zipcode: (cliente.cep || '').replace(/\D/g, ''),
+            city: cliente.cidade,
+            state: cliente.estado.toUpperCase(),
+            ...(cliente.complemento ? { complement: cliente.complemento } : {}),
+          },
+        } : {}),
       },
       items: itens.map((i) => ({
         name: i.nome,
@@ -463,7 +507,10 @@ router.post('/unificar-placas', requireRoles('ADMIN', 'COLABORADOR'), async (req
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
-    select: { id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true },
+    select: {
+      id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true,
+      cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
+    },
   });
   if (!cliente) {
     res.status(404).json({ error: 'Cliente não encontrado.' });
@@ -550,6 +597,17 @@ router.post('/unificar-placas', requireRoles('ADMIN', 'COLABORADOR'), async (req
         ...(cliente.cpfCnpj ? { cpf: cliente.cpfCnpj.replace(/\D/g, '') } : {}),
         ...(cliente.telefone ? { phone_number: cliente.telefone.replace(/\D/g, '') } : {}),
         ...(cliente.email ? { email: cliente.email } : {}),
+        ...(cliente.logradouro && cliente.cidade && cliente.estado ? {
+          address: {
+            street: cliente.logradouro,
+            number: cliente.numero || 'S/N',
+            neighborhood: cliente.bairro || '',
+            zipcode: (cliente.cep || '').replace(/\D/g, ''),
+            city: cliente.cidade,
+            state: cliente.estado.toUpperCase(),
+            ...(cliente.complemento ? { complement: cliente.complemento } : {}),
+          },
+        } : {}),
       },
       items: itens.map((i) => ({ name: i.nome, value: Math.round(i.valor * 100), amount: 1 })),
       expire_at: dataVencimento,
@@ -610,6 +668,186 @@ router.post('/unificar-placas', requireRoles('ADMIN', 'COLABORADOR'), async (req
   const urlsPlacasIguais = efiResult.charges.every((c) => c.url === efiResult.link);
   if (urlsPlacasIguais) {
     setImmediate(() => corrigirLinksBoletos(carneUnificado.id, efiResult.charges, dataVencimento));
+  }
+});
+
+// ─── POST /api/carnes/unificar-dispositivos — Criar boleto unificado com dispositivos explícitos ──
+router.post('/unificar-dispositivos', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { clienteId, dispositivos, dataVencimento, numeroParcelas, vendedorId, descricaoBoleto } = req.body;
+  // dispositivos: Array<{ dispositivoId: string; valor: number }>
+
+  if (!clienteId || !Array.isArray(dispositivos) || dispositivos.length < 2 || !dataVencimento || !numeroParcelas) {
+    res.status(400).json({ error: 'clienteId, dispositivos (mín. 2), dataVencimento e numeroParcelas são obrigatórios.' });
+    return;
+  }
+  if (dispositivos.some((d: any) => !d.dispositivoId || Number(d.valor) <= 0)) {
+    res.status(400).json({ error: 'Cada dispositivo deve ter dispositivoId e valor positivo.' });
+    return;
+  }
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    select: {
+      id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true,
+      cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
+    },
+  });
+  if (!cliente) {
+    res.status(404).json({ error: 'Cliente não encontrado.' });
+    return;
+  }
+
+  if (vendedorId && !cliente.vendedorId) {
+    await prisma.cliente.update({ where: { id: clienteId }, data: { vendedorId } });
+  }
+
+  const vendedorEfetivoUnif = vendedorId || cliente.vendedorId || null;
+
+  const dispositivoIds = dispositivos.map((d: any) => d.dispositivoId as string);
+  const dispositivosDb = await prisma.dispositivo.findMany({
+    where: { id: { in: dispositivoIds }, clienteId, ativo: true },
+    select: { id: true, nome: true, identificador: true, placa: true, vendedorId: true },
+  });
+  if (dispositivosDb.length !== dispositivoIds.length) {
+    res.status(400).json({ error: 'Um ou mais dispositivos não encontrados ou inativos.' });
+    return;
+  }
+
+  // Cancelar carnê UNIFICADO ativo (se existir)
+  const carneUnifExistente = await prisma.carne.findFirst({
+    where: { clienteId, tipo: 'UNIFICADO', boletos: { some: { status: { in: ['PENDENTE', 'ATRASADO'] } } } },
+    select: { id: true, efiCarneId: true },
+  });
+  if (carneUnifExistente) {
+    if (carneUnifExistente.efiCarneId) {
+      try { await efiService.cancelarCarne(Number(carneUnifExistente.efiCarneId)); } catch (e) { console.error('EFI cancel unif:', e); }
+    }
+    await prisma.boleto.updateMany({
+      where: { carneId: carneUnifExistente.id, status: { in: ['PENDENTE', 'ATRASADO'] } },
+      data: { status: 'CANCELADO' },
+    });
+  }
+
+  // Cancelar carnês INDIVIDUAIS ativos para os dispositivos informados
+  const carnesIndivDisp = await prisma.carne.findMany({
+    where: {
+      clienteId,
+      tipo: 'INDIVIDUAL',
+      boletos: { some: { dispositivoId: { in: dispositivoIds }, status: { in: ['PENDENTE', 'ATRASADO'] } } },
+    },
+    select: { id: true, efiCarneId: true },
+  });
+  for (const cn of carnesIndivDisp) {
+    if (cn.efiCarneId) {
+      try { await efiService.cancelarCarne(Number(cn.efiCarneId)); } catch (e) { console.error('EFI cancel indiv:', e); }
+    }
+    await prisma.boleto.updateMany({
+      where: { carneId: cn.id, status: { in: ['PENDENTE', 'ATRASADO'] } },
+      data: { status: 'CANCELADO' },
+    });
+  }
+
+  // Montar itens EFI
+  const itensDisp = dispositivos.map((d: any) => {
+    const db = dispositivosDb.find((x) => x.id === d.dispositivoId)!;
+    const base = db.placa
+      ? `Rastreamento ${db.placa}`
+      : `Rastreamento ${db.identificador}`;
+    const nomeCompleto = descricaoBoleto ? `${base} - ${descricaoBoleto}` : base;
+    return {
+      dispositivoId: d.dispositivoId as string,
+      nome: nomeCompleto.slice(0, 255),
+      valor: Number(d.valor),
+    };
+  });
+  const valorMensalTotalDisp = itensDisp.reduce((s, i) => s + i.valor, 0);
+
+  const configDisp = await prisma.configuracoes.findUnique({ where: { id: '1' } });
+  const configurationsDisp = configDisp ? {
+    fine: Number(configDisp.multaPercentual) > 0 ? Math.round(Number(configDisp.multaPercentual) * 100) : undefined,
+    interest: Number(configDisp.jurosDiarios) > 0
+      ? { type: 'daily', value: Math.round(Number(configDisp.jurosDiarios) * 100) }
+      : undefined,
+  } : undefined;
+
+  let efiResultDisp: efiService.EfiCarneResult;
+  try {
+    efiResultDisp = await efiService.criarCarne({
+      customer: {
+        name: cliente.nome,
+        ...(cliente.cpfCnpj ? { cpf: cliente.cpfCnpj.replace(/\D/g, '') } : {}),
+        ...(cliente.telefone ? { phone_number: cliente.telefone.replace(/\D/g, '') } : {}),
+        ...(cliente.email ? { email: cliente.email } : {}),
+        ...(cliente.logradouro && cliente.cidade && cliente.estado ? {
+          address: {
+            street: cliente.logradouro,
+            number: cliente.numero || 'S/N',
+            neighborhood: cliente.bairro || '',
+            zipcode: (cliente.cep || '').replace(/\D/g, ''),
+            city: cliente.cidade,
+            state: cliente.estado.toUpperCase(),
+            ...(cliente.complemento ? { complement: cliente.complemento } : {}),
+          },
+        } : {}),
+      },
+      items: itensDisp.map((i) => ({ name: i.nome, value: Math.round(i.valor * 100), amount: 1 })),
+      expire_at: dataVencimento,
+      repeats: Number(numeroParcelas),
+      split_items: false,
+      configurations: configurationsDisp?.fine || configurationsDisp?.interest ? configurationsDisp : undefined,
+    });
+  } catch (err: any) {
+    console.error('Erro EFI ao criar carnê unificado (dispositivos):', err);
+    res.status(502).json({ error: `Erro ao criar carnê unificado no EFI Bank: ${err.message || 'erro desconhecido'}` });
+    return;
+  }
+
+  const carneUnifDisp = await prisma.carne.create({
+    data: {
+      tipo: 'UNIFICADO',
+      efiCarneId: String(efiResultDisp.carnet_id),
+      efiCarneLink: efiResultDisp.link,
+      valorTotal: valorMensalTotalDisp * Number(numeroParcelas),
+      numeroParcelas: Number(numeroParcelas),
+      clienteId,
+      geradoPorId: req.user!.userId,
+      vendedorId: vendedorEfetivoUnif,
+      boletos: {
+        create: efiResultDisp.charges.map((charge) => {
+          const [ey, em, ed] = charge.expire_at.split('-').map(Number);
+          return {
+            numeroParcela: Number(charge.parcel),
+            valor: valorMensalTotalDisp,
+            vencimento: new Date(ey, em - 1, ed, 12, 0, 0),
+            status: 'PENDENTE' as const,
+            efiChargeId: String(charge.charge_id),
+            linkBoleto: charge.url,
+          };
+        }),
+      },
+    },
+    include: { boletos: { orderBy: { numeroParcela: 'asc' } } },
+  });
+
+  const boletoDispData = carneUnifDisp.boletos.flatMap((boleto) =>
+    itensDisp.map((item) => ({ boletoId: boleto.id, dispositivoId: item.dispositivoId, valorDispositivo: item.valor }))
+  );
+  await prisma.boletoDispositivo.createMany({ data: boletoDispData });
+
+  // Definir vendedor dono dos dispositivos que ainda não têm um
+  if (vendedorEfetivoUnif) {
+    for (const d of dispositivosDb) {
+      if (!d.vendedorId) {
+        await prisma.dispositivo.update({ where: { id: d.id }, data: { vendedorId: vendedorEfetivoUnif } });
+      }
+    }
+  }
+
+  res.status(201).json(carneUnifDisp);
+
+  const urlsDispIguais = efiResultDisp.charges.every((c) => c.url === efiResultDisp.link);
+  if (urlsDispIguais) {
+    setImmediate(() => corrigirLinksBoletos(carneUnifDisp.id, efiResultDisp.charges, dataVencimento));
   }
 });
 

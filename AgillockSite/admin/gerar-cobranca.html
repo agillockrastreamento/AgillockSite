@@ -90,6 +90,7 @@
     <ul class="sidebar-nav">
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li class="active"><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
       <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
@@ -120,7 +121,7 @@
     <!-- Wizard steps indicator -->
     <div class="wizard-steps" id="wizard-steps">
       <div class="wizard-step active" data-step="1">1. Cliente</div>
-      <div class="wizard-step" data-step="2">2. Placa</div>
+      <div class="wizard-step" data-step="2">2. Dispositivo</div>
       <div class="wizard-step" data-step="3">3. Cobrança</div>
       <div class="wizard-step" data-step="4">4. Confirmar</div>
     </div>
@@ -187,20 +188,20 @@
         </div>
       </div>
 
-      <!-- ── Step 2: Placa ── -->
+      <!-- ── Step 2: Dispositivo ── -->
       <div id="step-2" style="display:none;">
         <div id="step2-header">
-          <h4 style="margin-top:0;">Selecione a Placa</h4>
+          <h4 style="margin-top:0;">Selecione o Dispositivo</h4>
           <div id="alerta-carne-ativo" class="alert alert-warning" style="display:none;">
             <i class="fa fa-exclamation-triangle"></i> Este cliente já possui um carnê ativo. Gerar novo substituirá o existente.
           </div>
           <div class="form-group" style="margin-bottom:12px;">
-            <input type="text" class="form-control" id="busca-placa" placeholder="Buscar placa…" autocomplete="off" />
+            <input type="text" class="form-control" id="busca-placa" placeholder="Buscar dispositivo…" autocomplete="off" />
           </div>
         </div>
 
         <div id="step2-body">
-          <!-- ─ Sugestão de unificação (cenários 2 e 3) ─ -->
+          <!-- ─ Sugestão de unificação ─ -->
           <div id="sugestao-unif" style="display:none;margin-bottom:14px;">
             <div class="alert alert-info" style="margin-bottom:8px;">
               <i class="fa fa-info-circle"></i> <span id="sugestao-unif-texto"></span>
@@ -211,7 +212,7 @@
 
           <div id="lista-placas" style="margin-bottom:16px;"></div>
 
-          <!-- ─ Prompt Ajuste 1: placa nova + carnê unificado existente ─ -->
+          <!-- ─ Prompt: dispositivo não está no carnê unificado ─ -->
           <div id="prompt-add-unif" style="display:none;margin-bottom:12px;">
             <div class="alert alert-warning" style="margin-bottom:8px;">
               <i class="fa fa-exclamation-triangle"></i> <span id="prompt-add-unif-texto"></span>
@@ -220,20 +221,11 @@
             <button class="btn btn-default btn-sm" id="btn-nao-add-unif" style="margin-left:8px;">Não, gerar carnê individual</button>
           </div>
 
-          <div id="nova-placa-wrap" style="display:none;background:#fffbf0;border:1px solid #fab32c;border-radius:8px;padding:16px;margin-bottom:16px;">
-            <h5 style="margin-top:0;">Nova Placa</h5>
-            <div class="row">
-              <div class="col-sm-6"><div class="form-group"><label>Placa *</label><input class="form-control" id="np-placa" style="text-transform:uppercase;" placeholder="ABC1234" maxlength="7" /></div></div>
-              <div class="col-sm-6"><div class="form-group"><label>Descrição</label><input class="form-control" id="np-desc" maxlength="40" /><small id="ctr-np-desc" style="display:block;text-align:right;color:#aaa;font-size:11px;margin-top:2px;">0/40</small></div></div>
-            </div>
-            <div id="np-alert"></div>
-            <button class="btn btn-primary-al" id="btn-criar-placa-inline"><i class="fa fa-check"></i> Adicionar Placa</button>
-            <button class="btn btn-default" id="btn-cancelar-np" style="margin-left:8px;">Cancelar</button>
+          <div style="margin-bottom:16px;">
+            <a id="btn-mostrar-np" class="btn btn-default" id="btn-mostrar-np">
+              <i class="fa fa-plus"></i> Novo Dispositivo
+            </a>
           </div>
-
-          <button class="btn btn-default" id="btn-mostrar-np" style="margin-bottom:16px;">
-            <i class="fa fa-plus"></i> Nova Placa
-          </button>
 
           <!-- ─ Formulário de unificação ─ -->
           <div id="form-unif" style="display:none;padding-top:4px;">
@@ -347,7 +339,7 @@
             <tbody>
               <tr><td style="width:40%;color:#666;">Cliente</td><td id="res-cliente" style="font-weight:600;">—</td></tr>
               <tr><td style="color:#666;">CPF/CNPJ</td><td id="res-cpf">—</td></tr>
-              <tr><td style="color:#666;">Placa</td><td id="res-placa" style="font-weight:600;">—</td></tr>
+              <tr><td style="color:#666;">Dispositivo</td><td id="res-placa" style="font-weight:600;">—</td></tr>
               <tr><td style="color:#666;">Valor</td><td id="res-valor" style="font-weight:600;color:#28a745;">—</td></tr>
               <tr><td style="color:#666;">Parcelas</td><td id="res-parcelas">—</td></tr>
               <tr><td style="color:#666;">1° Vencimento</td><td id="res-vencimento">—</td></tr>
@@ -635,31 +627,35 @@
       carregarPlacas();
     });
 
-    // ── Step 2: Placas ────────────────────────────────────────
-    var todasPlacas = [];
+    // ── Step 2: Dispositivos ──────────────────────────────────
+    var todasPlacas = []; // dispositivos ativos do cliente
 
-    function renderPlacasLista(placas, placasComCarne, placasComCarneUnificado) {
-      if (!placas.length) {
-        document.getElementById('lista-placas').innerHTML = '<p class="text-muted">Nenhuma placa ativa. Adicione uma abaixo.</p>';
+    function renderPlacasLista(dispositivos, dispComCarne, dispComCarneUnificado) {
+      if (!dispositivos.length) {
+        document.getElementById('lista-placas').innerHTML = '<p class="text-muted">Nenhum dispositivo ativo. <a href="dispositivo.html?clienteId=' + (state.cliente ? state.cliente.id : '') + '">Adicione um dispositivo</a>.</p>';
         return;
       }
-      var busca = (document.getElementById('busca-placa') ? document.getElementById('busca-placa').value.trim().toUpperCase() : '');
-      var filtradas = busca ? placas.filter(function (p) { return p.placa.indexOf(busca) !== -1 || (p.descricao || '').toUpperCase().indexOf(busca) !== -1; }) : placas;
+      var busca = document.getElementById('busca-placa').value.trim().toLowerCase();
+      var filtradas = busca ? dispositivos.filter(function (d) {
+        return d.nome.toLowerCase().indexOf(busca) !== -1 ||
+          d.identificador.toLowerCase().indexOf(busca) !== -1 ||
+          (d.placa || '').toLowerCase().indexOf(busca) !== -1;
+      }) : dispositivos;
       if (!filtradas.length) {
-        document.getElementById('lista-placas').innerHTML = '<p class="text-muted">Nenhuma placa encontrada.</p>';
+        document.getElementById('lista-placas').innerHTML = '<p class="text-muted">Nenhum dispositivo encontrado.</p>';
         return;
       }
-      document.getElementById('lista-placas').innerHTML = filtradas.map(function (p) {
-        var temCarne = placasComCarne[p.id];
-        var temCarneUnificado = placasComCarneUnificado[p.id];
+      document.getElementById('lista-placas').innerHTML = filtradas.map(function (d) {
+        var temCarne = dispComCarne[d.id];
+        var temCarneUnif = dispComCarneUnificado[d.id];
         var badges = '';
-        if (temCarneUnificado) badges += ' <span class="al-badge badge-pendente" style="font-size:10px;vertical-align:middle;">Carnê Unificado</span>';
+        if (temCarneUnif) badges += ' <span class="al-badge badge-pendente" style="font-size:10px;vertical-align:middle;">Carnê Unificado</span>';
         else if (temCarne) badges += ' <span class="al-badge badge-atrasado" style="font-size:10px;vertical-align:middle;">Possui Carnê</span>';
         return '<label style="display:flex;align-items:center;gap:10px;padding:10px;border:2px solid #eee;border-radius:8px;margin-bottom:8px;cursor:pointer;">' +
-          '<input type="radio" name="placa" value="' + p.id + '" data-placa="' + p.placa + '" style="margin:0;" />' +
-          '<div style="flex:1;"><strong>' + p.placa + '</strong>' + badges +
-          (p.descricao ? '<br><small class="text-muted">' + p.descricao + '</small>' : '') + '</div>' +
-          '</label>';
+          '<input type="radio" name="placa" value="' + d.id + '" data-placa="' + d.nome + (d.placa ? ' (' + d.placa + ')' : '') + '" style="margin:0;" />' +
+          '<div style="flex:1;"><strong>' + d.nome + '</strong>' + badges +
+          '<br><small class="text-muted">' + d.identificador + (d.placa ? ' &mdash; Placa: <strong>' + d.placa + '</strong>' : '') + '</small>' +
+          '</div></label>';
       }).join('');
 
       document.querySelectorAll('input[name="placa"]').forEach(function (radio) {
@@ -669,15 +665,14 @@
           document.querySelectorAll('input[name="placa"]').forEach(function (r) {
             r.closest('label').style.borderColor = r.checked ? '#fab32c' : '#eee';
           });
-          // Ajuste 1: placa selecionada não está no carnê unificado ativo
           document.getElementById('prompt-add-unif').style.display = 'none';
           if (carneUnificadoAtivo && document.getElementById('sugestao-unif').style.display === 'none') {
             var estaNoUnif = carneUnificadoAtivo.placas.some(function (p) { return p.placaId === state.placa.id; });
             if (!estaNoUnif) {
               var nomesUnif = carneUnificadoAtivo.placas.map(function (p) { return p.placa; }).join(', ');
               document.getElementById('prompt-add-unif-texto').textContent =
-                'Esta placa não faz parte do boleto unificado atual (' + nomesUnif + '). ' +
-                'Deseja adicioná-la? O carnê unificado atual será cancelado e um novo será gerado.';
+                'Este dispositivo não faz parte do boleto unificado atual (' + nomesUnif + '). ' +
+                'Deseja adicioná-lo? O carnê unificado atual será cancelado e um novo será gerado.';
               document.getElementById('prompt-add-unif').style.display = 'block';
             }
           }
@@ -695,50 +690,51 @@
       document.getElementById('lista-placas').style.display = 'block';
       document.getElementById('step2-footer').style.display = 'flex';
       document.getElementById('busca-placa').closest('.form-group').style.display = 'block';
-      document.querySelector('#step2-header h4').textContent = 'Selecione a Placa';
-      // Fix 1: restaura steps do wizard ao voltar para seleção normal
+      document.querySelector('#step2-header h4').textContent = 'Selecione o Dispositivo';
       ['3','4'].forEach(function(n) {
         var el = document.querySelector('.wizard-step[data-step="' + n + '"]');
         if (el) el.style.display = '';
       });
       var s2label = document.querySelector('.wizard-step[data-step="2"]');
-      if (s2label) s2label.textContent = '2. Placa';
+      if (s2label) s2label.textContent = '2. Dispositivo';
       carneUnificadoAtivo = null;
       placaValoresAtivos = {};
 
+      // Atualizar link do botão Novo Dispositivo
+      var btnNp = document.getElementById('btn-mostrar-np');
+      if (btnNp) btnNp.href = 'dispositivo.html?clienteId=' + state.cliente.id + '&back=' + encodeURIComponent(window.location.pathname + window.location.search);
+
       AL.apiGet('/api/clientes/' + state.cliente.id)
         .then(function (c) {
-          // Salvar vendedor padrão do cliente para pré-preenchimento
           clienteVendedorId   = c.vendedor ? c.vendedor.id   : null;
           clienteVendedorNome = c.vendedor ? c.vendedor.nome : null;
 
-          todasPlacas = (c.placas || []).filter(function (p) { return p.ativo === true; });
-          var todasPlacasMap = {};
-          (c.placas || []).forEach(function (p) { todasPlacasMap[p.id] = p; });
+          // Usar dispositivos no lugar de placas
+          todasPlacas = (c.dispositivos || []).filter(function (d) { return d.ativo === true; });
+          var dispMap = {};
+          (c.dispositivos || []).forEach(function (d) { dispMap[d.id] = d; });
           var carnes = c.carnes || [];
-          var placasComCarne = {};
-          var placasComCarneUnificado = {};
+          var dispComCarne = {};
+          var dispComCarneUnificado = {};
 
           carnes.forEach(function (cn) {
-            var temAtivo = cn.boletos && cn.boletos.some(function (b) {
-              return b.status === 'PENDENTE' || b.status === 'ATRASADO';
-            });
+            var temAtivo = cn.boletos && cn.boletos.some(function (b) { return b.status === 'PENDENTE' || b.status === 'ATRASADO'; });
             if (!temAtivo) return;
             if (cn.tipo === 'INDIVIDUAL') {
               var bAtivo = cn.boletos.find(function (b) { return b.status === 'PENDENTE' || b.status === 'ATRASADO'; });
-              cn.boletos.forEach(function (b) { if (b.placaId) placasComCarne[b.placaId] = true; });
-              if (bAtivo && bAtivo.placaId) placaValoresAtivos[bAtivo.placaId] = Number(bAtivo.valor);
+              cn.boletos.forEach(function (b) { if (b.dispositivoId) dispComCarne[b.dispositivoId] = true; });
+              if (bAtivo && bAtivo.dispositivoId) placaValoresAtivos[bAtivo.dispositivoId] = Number(bAtivo.valor);
             }
             if (cn.tipo === 'UNIFICADO') {
               var unificTemp = [];
               cn.boletos.forEach(function (b) {
-                (b.placasUnificadas || []).forEach(function (bp) {
-                  if (bp.placaId) {
-                    placasComCarneUnificado[bp.placaId] = true;
-                    placaValoresAtivos[bp.placaId] = Number(bp.valorPlaca);
-                    if (!unificTemp.find(function (x) { return x.placaId === bp.placaId; })) {
-                      var p = todasPlacasMap[bp.placaId];
-                      unificTemp.push({ placaId: bp.placaId, placa: p ? p.placa : '?', valor: Number(bp.valorPlaca) });
+                (b.dispositivosUnificados || []).forEach(function (bd) {
+                  if (bd.dispositivoId) {
+                    dispComCarneUnificado[bd.dispositivoId] = true;
+                    placaValoresAtivos[bd.dispositivoId] = Number(bd.valorDispositivo);
+                    if (!unificTemp.find(function (x) { return x.placaId === bd.dispositivoId; })) {
+                      var d = dispMap[bd.dispositivoId];
+                      unificTemp.push({ placaId: bd.dispositivoId, placa: d ? (d.nome + (d.placa ? ' ('+d.placa+')' : '')) : '?', valor: Number(bd.valorDispositivo) });
                     }
                   }
                 });
@@ -747,53 +743,40 @@
             }
           });
 
-          // Ajuste 1: para placas sem carnê ativo, usar valorPadrao salvo no banco
-          todasPlacas.forEach(function (p) {
-            if (!placaValoresAtivos[p.id] && p.valorPadrao) {
-              placaValoresAtivos[p.id] = Number(p.valorPadrao);
+          // Usar valorPadrao do dispositivo como fallback
+          todasPlacas.forEach(function (d) {
+            if (!placaValoresAtivos[d.id] && d.valorPadrao) {
+              placaValoresAtivos[d.id] = Number(d.valorPadrao);
             }
           });
 
-          renderPlacasLista(todasPlacas, placasComCarne, placasComCarneUnificado);
+          renderPlacasLista(todasPlacas, dispComCarne, dispComCarneUnificado);
           document.getElementById('busca-placa').oninput = function () {
-            renderPlacasLista(todasPlacas, placasComCarne, placasComCarneUnificado);
+            renderPlacasLista(todasPlacas, dispComCarne, dispComCarneUnificado);
             state.placa = null;
             document.getElementById('btn-step2-next').disabled = true;
             document.getElementById('prompt-add-unif').style.display = 'none';
           };
 
-          // Cenários 2 & 3: 2+ placas sem carnê unificado ativo
           if (!carneUnificadoAtivo && todasPlacas.length >= 2) {
-            var qtdComCarne = todasPlacas.filter(function (p) { return placasComCarne[p.id]; }).length;
+            var qtdComCarne = todasPlacas.filter(function (d) { return dispComCarne[d.id]; }).length;
             var qtdSemCarne = todasPlacas.length - qtdComCarne;
             var texto = (qtdComCarne > 0 && qtdSemCarne > 0)
-              ? 'Este cliente tem ' + todasPlacas.length + ' placas (' + qtdComCarne + ' com carnê ativo e ' + qtdSemCarne + ' sem carnê). Deseja gerar um boleto unificado para todas?'
-              : 'Este cliente tem ' + todasPlacas.length + ' placas. Deseja gerar um boleto unificado para todas?';
+              ? 'Este cliente tem ' + todasPlacas.length + ' dispositivos (' + qtdComCarne + ' com carnê ativo e ' + qtdSemCarne + ' sem carnê). Deseja gerar um boleto unificado para todos?'
+              : 'Este cliente tem ' + todasPlacas.length + ' dispositivos. Deseja gerar um boleto unificado para todos?';
             document.getElementById('sugestao-unif-texto').textContent = texto;
             document.getElementById('sugestao-unif').style.display = 'block';
           }
-          // Novo: carnê unificado ativo + 2+ placas fora dele → sugestão de recriar unificado para todas
           if (carneUnificadoAtivo) {
-            var placasForaDoUnif = todasPlacas.filter(function (p) {
-              return !carneUnificadoAtivo.placas.some(function (up) { return up.placaId === p.id; });
+            var dispForaDoUnif = todasPlacas.filter(function (d) {
+              return !carneUnificadoAtivo.placas.some(function (up) { return up.placaId === d.id; });
             });
-            if (placasForaDoUnif.length >= 2) {
+            if (dispForaDoUnif.length >= 2) {
               var nomesUnif = carneUnificadoAtivo.placas.map(function (p) { return p.placa; }).join(', ');
-              var foraComCarne = placasForaDoUnif.filter(function (p) { return placasComCarne[p.id]; });
-              var foraSemCarne = placasForaDoUnif.filter(function (p) { return !placasComCarne[p.id]; });
-              var parteExtra;
-              if (foraComCarne.length > 0 && foraSemCarne.length > 0) {
-                parteExtra = foraComCarne.length + ' placa(s) com carnê individual (' + foraComCarne.map(function (p) { return p.placa; }).join(', ') + ') e ' +
-                  foraSemCarne.length + ' placa(s) sem cobrança (' + foraSemCarne.map(function (p) { return p.placa; }).join(', ') + ')';
-              } else if (foraComCarne.length > 0) {
-                parteExtra = foraComCarne.length + ' placa(s) com carnê individual (' + foraComCarne.map(function (p) { return p.placa; }).join(', ') + ')';
-              } else {
-                parteExtra = foraSemCarne.length + ' placa(s) sem cobrança (' + foraSemCarne.map(function (p) { return p.placa; }).join(', ') + ')';
-              }
               document.getElementById('sugestao-unif-texto').textContent =
                 'Este cliente possui um boleto unificado com ' + carneUnificadoAtivo.placas.length +
-                ' placa(s) (' + nomesUnif + ') e mais ' + parteExtra +
-                '. Deseja gerar um novo boleto unificado para todas as placas?';
+                ' dispositivo(s) (' + nomesUnif + ') e mais ' + dispForaDoUnif.length +
+                ' dispositivo(s) fora dele. Deseja gerar um novo boleto unificado para todos?';
               document.getElementById('sugestao-unif').style.display = 'block';
             }
           }
@@ -816,7 +799,6 @@
       document.getElementById('sugestao-unif').style.display = 'none';
       document.getElementById('lista-placas').style.display = 'none';
       document.getElementById('prompt-add-unif').style.display = 'none';
-      document.getElementById('nova-placa-wrap').style.display = 'none';
       document.getElementById('btn-mostrar-np').style.display = 'none';
       document.getElementById('step2-footer').style.display = 'none';
       document.getElementById('alerta-carne-ativo').style.display = 'none';
@@ -843,8 +825,7 @@
     function renderFormUnifPlacas() {
       document.getElementById('form-unif-placas').innerHTML = unifPlacas.map(function (p, i) {
         return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
-          '<span style="flex:1;font-weight:600;">' + p.placa +
-          (p.descricao ? ' <small class="text-muted">— ' + p.descricao + '</small>' : '') + '</span>' +
+          '<span style="flex:1;font-weight:600;">' + p.placa + '</span>' +
           '<div style="width:160px;"><div class="input-group input-group-sm">' +
           '<span class="input-group-addon">R$</span>' +
           '<input type="number" class="form-control unif-placa-valor" data-index="' + i + '" value="' +
@@ -857,10 +838,9 @@
           var pid = unifPlacas[idx].placaId;
           unifPlacas[idx].valor = val;
           placaValoresAtivos[pid] = val;
-          // Ajuste 1: salva valorPadrao no banco (debounce 800ms)
           clearTimeout(unifVarTimer);
           unifVarTimer = setTimeout(function () {
-            AL.apiPatch('/api/placas/' + pid + '/valor', { valor: val }).catch(function () {});
+            AL.apiPatch('/api/dispositivos/' + pid + '/valor', { valor: val }).catch(function () {});
           }, 800);
           atualizarTotalUnif();
         });
@@ -897,35 +877,7 @@
         }).catch(function () {});
     }
 
-    // Nova placa inline
-    document.getElementById('btn-mostrar-np').addEventListener('click', function () {
-      document.getElementById('nova-placa-wrap').style.display = 'block';
-      this.style.display = 'none';
-    });
-    document.getElementById('btn-cancelar-np').addEventListener('click', function () {
-      document.getElementById('nova-placa-wrap').style.display = 'none';
-      document.getElementById('btn-mostrar-np').style.display = 'inline-block';
-    });
-    document.getElementById('btn-criar-placa-inline').addEventListener('click', function () {
-      var placa = document.getElementById('np-placa').value.trim().toUpperCase();
-      if (!placa) {
-        document.getElementById('np-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;margin:4px 0;">Placa é obrigatória.</div>';
-        return;
-      }
-      AL.apiPost('/api/clientes/' + state.cliente.id + '/placas', {
-        placa: placa,
-        descricao: document.getElementById('np-desc').value.trim(),
-      }).then(function () {
-        document.getElementById('nova-placa-wrap').style.display = 'none';
-        document.getElementById('btn-mostrar-np').style.display = 'inline-block';
-        document.getElementById('np-placa').value = '';
-        document.getElementById('np-desc').value = '';
-        document.getElementById('np-alert').innerHTML = '';
-        carregarPlacas();
-      }).catch(function (err) {
-        document.getElementById('np-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;margin:4px 0;">' + err.message + '</div>';
-      });
-    });
+    // btn-mostrar-np é um link <a> com href setado dinamicamente em carregarPlacas()
 
     document.getElementById('btn-step2-back').addEventListener('click', function () { goStep(1); });
     document.getElementById('btn-step2-next').addEventListener('click', function () {
@@ -941,7 +893,7 @@
     // ── Unificação: event listeners ───────────────────────────
     document.getElementById('btn-sim-unificar').addEventListener('click', function () {
       mostrarFormUnificado(todasPlacas.map(function (p) {
-        return { placaId: p.id, placa: p.placa, valor: placaValoresAtivos[p.id] || 0, descricao: p.descricao || '' };
+        return { placaId: p.id, placa: p.nome + (p.placa ? ' (' + p.placa + ')' : ''), valor: placaValoresAtivos[p.id] || 0 };
       }));
     });
     document.getElementById('btn-nao-unificar').addEventListener('click', function () {
@@ -949,9 +901,9 @@
     });
     document.getElementById('btn-sim-add-unif').addEventListener('click', function () {
       var lista = carneUnificadoAtivo.placas.map(function (p) {
-        return { placaId: p.placaId, placa: p.placa, valor: p.valor, descricao: '' };
+        return { placaId: p.placaId, placa: p.placa, valor: p.valor };
       });
-      lista.push({ placaId: state.placa.id, placa: state.placa.placa, valor: placaValoresAtivos[state.placa.id] || 0, descricao: '' });
+      lista.push({ placaId: state.placa.id, placa: state.placa.placa, valor: placaValoresAtivos[state.placa.id] || 0 });
       mostrarFormUnificado(lista);
     });
     document.getElementById('btn-nao-add-unif').addEventListener('click', function () {
@@ -969,7 +921,7 @@
         return;
       }
       if (unifPlacas.some(function (p) { return !p.valor || Number(p.valor) <= 0; })) {
-        document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;">Informe o valor de cada placa.</div>';
+        document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;">Informe o valor de cada dispositivo.</div>';
         return;
       }
       document.getElementById('form-unif-alert').innerHTML = '';
@@ -979,9 +931,9 @@
       document.getElementById('btn-unif-cancelar').disabled = true;
 
       var unifDescricao = document.getElementById('unif-descricao').value.trim() || null;
-      AL.apiPost('/api/carnes/unificar-placas', {
+      AL.apiPost('/api/carnes/unificar-dispositivos', {
         clienteId:      state.cliente.id,
-        placas:         unifPlacas.map(function (p) { return { placaId: p.placaId, valor: p.valor }; }),
+        dispositivos:   unifPlacas.map(function (p) { return { dispositivoId: p.placaId, valor: p.valor }; }),
         dataVencimento: vencimento,
         numeroParcelas: parseInt(parcelas),
         vendedorId:     unifVendedorId || null,
@@ -1092,7 +1044,7 @@
 
       var payload = {
         clienteId:      state.cliente.id,
-        placaId:        state.placa.id,
+        dispositivoId:  state.placa.id,
         valor:          state.valor,
         dataVencimento: state.vencimento,
         numeroParcelas: state.parcelas,
@@ -1153,7 +1105,6 @@
       document.getElementById('btn-step1-next').disabled = true;
       document.getElementById('form-unif').style.display = 'none';
       document.getElementById('lista-placas').style.display = 'block';
-      document.getElementById('btn-mostrar-np').style.display = 'inline-block';
       document.getElementById('step2-footer').style.display = 'flex';
       goStep(1);
     });
@@ -1171,7 +1122,6 @@
 
     // ── Contadores de caracteres ───────────────────────────────
     [
-      { inp: 'np-desc',       ctr: 'ctr-np-desc',       max: 40  },
       { inp: 'cb-descricao',  ctr: 'ctr-cb-descricao',  max: 100 },
       { inp: 'unif-descricao',ctr: 'ctr-unif-descricao',max: 100 },
     ].forEach(function (item) {

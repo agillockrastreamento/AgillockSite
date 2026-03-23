@@ -68,8 +68,12 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
         },
       },
       placa: { select: { id: true, placa: true } },
+      dispositivo: { select: { id: true, nome: true, placa: true } },
       placasUnificadas: {
         include: { placa: { select: { id: true, placa: true } } },
+      },
+      dispositivosUnificados: {
+        include: { dispositivo: { select: { id: true, nome: true, placa: true } } },
       },
     },
   });

@@ -97,13 +97,22 @@ const response = await client.createCarnet({}, {
   ],
   customer: {
     name: "João Silva",
-    cpf: "94271564656",        // opcional
+    cpf: "94271564656",          // opcional
     phone_number: "31912345678", // opcional
-    email: "joao@email.com",   // opcional
+    email: "joao@email.com",     // opcional — se informado, EFI envia o boleto por e-mail
+    address: {                   // opcional — se informado, aparece impresso no boleto
+      street: "Rua das Flores",
+      number: "123",
+      neighborhood: "Centro",
+      zipcode: "60000000",       // somente dígitos
+      city: "Fortaleza",
+      state: "CE",               // sigla em maiúsculo
+      complement: "Apt 4",       // opcional
+    },
   },
-  expire_at: "2025-05-10",     // data do 1º vencimento (YYYY-MM-DD)
-  repeats: 12,                  // número de parcelas
-  split_items: false,           // false = um boleto por mês com total dos itens
+  expire_at: "2025-05-10",       // data do 1º vencimento (YYYY-MM-DD)
+  repeats: 12,                   // número de parcelas
+  split_items: false,            // false = um boleto por mês com total dos itens
 });
 
 // response.data.carnet_id  → ID do carnê no EFI (número)

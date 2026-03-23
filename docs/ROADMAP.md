@@ -353,23 +353,51 @@ Ordem de implementação recomendada. Cada etapa entrega algo funcional e testá
 - [x] Publicar frontend atualizado no GitHub Pages
 
 ### 9.6 — Validação final
-- [ ] Testar fluxo completo: login → criar cliente → gerar carnê → pagamento → comissão
+- [x] Testar fluxo completo: login → criar cliente → gerar carnê → pagamento → comissão
 
 **Resultado**: Sistema 100% em produção.
 
 ---
 
-## Etapa 10 — Migração de Dados EFI
-**Objetivo**: Importar histórico de clientes e boletos já existentes no EFI.
+---
 
-> **Botões já implementados no frontend** (`admin/dashboard.html`):
-> - **Importar dados do EFI** — abre modal com preview dos carnês novos e confirmação de importação (`POST /api/admin/migrar-efi`)
-> - **Corrigir links PDF** — atualiza boletos importados sem link de PDF (`POST /api/admin/corrigir-links-efi`)
+## Ajustes Pós-Etapa 8 ✅ CONCLUÍDOS (2026-03-22)
 
-- [ ] Executar **Importar dados do EFI** pelo Dashboard para trazer o histórico de carnês do EFI Bank
-- [ ] Revisar dados importados (clientes criados automaticamente, associar placas manualmente se necessário)
-- [ ] Associar clientes aos vendedores responsáveis
-- [ ] Usar **Corrigir links PDF** se necessário para boletos sem link de PDF
+Melhorias incrementais aplicadas após a conclusão das etapas principais.
+
+### Ajuste 1 — E-mail não obrigatório no cadastro de clientes
+- [x] Campo e-mail removido de `required` em `admin/clientes.html` e `colaborador/clientes.html`
+- [x] Label alterado de "E-mail *" para "E-mail"
+- [x] Comportamento EFI mantido: se o cliente tiver e-mail cadastrado, a EFI envia o boleto por e-mail; se não tiver, não envia (campo `email` já era condicional no `criarCarne`)
+
+### Ajuste 2 — Data correta no step de confirmação do gerar-cobrança
+- [x] Corrigido bug visual em `fmtDate()` (`auth-guard.js`): strings `YYYY-MM-DD` vindas de `<input type="date">` eram interpretadas como UTC midnight, causando exibição do dia anterior em fusos negativos (ex: UTC-3 Brasil)
+- [x] Fix: parse manual das partes da string (`split('-')`) sem criação de objeto `Date`, eliminando a conversão de fuso
+- [x] Afeta gerar-cobrança admin e colaborador (step 4 — resumo antes de gerar)
+
+### Ajuste 3 — Endereço obrigatório na criação de clientes
+- [x] Campos CEP, Logradouro, Número, Bairro, Cidade e UF marcados como `required` (com `*` no label) em `admin/clientes.html` e `colaborador/clientes.html`
+- [x] Backend: `POST /api/clientes` agora retorna 400 se qualquer campo de endereço obrigatório estiver ausente
+- [x] **Motivação**: os boletos EFI saíam sem endereço do cliente; tornar o endereço obrigatório na criação garante disponibilidade para todos os carnês futuros
+
+### Ajuste 4 — Endereço do cliente no boleto EFI
+- [x] Corrigido: o `SELECT` do cliente em `carnes.routes.ts` não incluía os campos de endereço; agora inclui `cep, logradouro, numero, complemento, bairro, cidade, estado`
+- [x] O objeto `customer` enviado ao EFI agora inclui o campo `address` (quando endereço está preenchido) nos 3 endpoints de geração: `POST /carnes`, `POST /carnes/unificar`, `POST /carnes/unificar-placas`
+- [x] Adicionado tipo `EfiCustomerAddress` em `efi.service.ts`
+
+### Ajuste 5 — Pagamento de comissão e comprovante na carteira do vendedor
+- [x] Novo modelo `PagamentoComissao` no Prisma (migration aplicada): `vendedorId + mes` (unique), `valor`, `pago`, `comprovante` (caminho do arquivo), `comprovanteMime`
+- [x] Instalado `multer` para upload de arquivos (PDF/JPG/PNG até 10 MB); arquivos salvos em `/app/uploads/comprovantes/` (persiste via volume Docker)
+- [x] Novos endpoints em `GET|POST /api/vendedor/pagamentos` e `POST /api/vendedor/pagamentos/:id/comprovante`
+- [x] `GET /api/vendedor/comprovante/:id` — serve o arquivo; aceita JWT via header `Authorization` **ou** query param `?token=` (necessário para abrir em nova aba no browser)
+- [x] Frontend `vendedor/carteira.html` — barra de ações aparece na aba **Ganhos Garantidos**:
+  - **Visão admin** (quando `vendedorId` está na URL): botão "Efetuar Pagamento" (esquerda) → modal de confirmação → após confirmar exibe badge "Pago ✓"; botão "Anexar Comprovante" (direita, desabilitado antes do pagamento) → ao ser anexado, vira "Ver / Baixar Comprovante"
+  - **Visão vendedor**: badge "Saque Realizado ✓" (se pago) ou "Saldo Acumulado" (se não); botão "Ver Comprovante" (apenas se admin já anexou arquivo) que abre em nova aba
+
+> **Observações de implementação:**
+> - A rota `GET /api/vendedor/comprovante/:id` é registrada **antes** do `router.use(authMiddleware)` para poder aceitar o JWT via query param sem ser bloqueada pelo middleware global
+> - Upload via `fetch` com `FormData` (não via `AL.apiPost`), pois precisa enviar `multipart/form-data`
+> - `pagVendId = adminVendId || currentUser.userId` — funciona tanto para admin visualizando um vendedor quanto para o próprio vendedor
 
 ---
 
@@ -384,6 +412,6 @@ Etapa 5  → Landing Page modernizada
 Etapa 6  → Painel Admin (frontend)
 Etapa 7  → Painel Colaborador (frontend)
 Etapa 8  → Painel Vendedor/Carteira (frontend)
-Etapa 9  → Deploy em Produção (inclui atualização de credenciais admin)
-Etapa 10 → Migração histórico EFI (botões já prontos no Dashboard)
+Etapa 9  → Deploy em Produção
+Ajustes  → E-mail opcional, endereço obrigatório/no boleto, data correta, pagamento comissão
 ```

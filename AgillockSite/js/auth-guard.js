@@ -136,6 +136,14 @@
 
   function fmtDate(isoStr) {
     if (!isoStr) return '—';
+    // Strings YYYY-MM-DD (ex: input type=date) são tratadas como UTC midnight pelo JS,
+    // o que causa exibição do dia anterior em fusos negativos (ex: UTC-3 Brasil).
+    // Parseamos manualmente para evitar conversão de fuso.
+    var s = String(isoStr).split('T')[0];
+    var parts = s.split('-');
+    if (parts.length === 3) {
+      return parts[2] + '/' + parts[1] + '/' + parts[0];
+    }
     var d = new Date(isoStr);
     return d.toLocaleDateString('pt-BR');
   }

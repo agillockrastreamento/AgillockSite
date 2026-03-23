@@ -43,6 +43,7 @@
     <ul class="sidebar-nav">
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li class="active"><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
       <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
@@ -110,7 +111,7 @@
           <tr>
             <th>Cliente</th>
             <th>Parcela</th>
-            <th>Placas</th>
+            <th>Dispositivo</th>
             <th>Vencimento</th>
             <th>Pagamento</th>
             <th>Valor</th>
@@ -157,6 +158,23 @@
   (function () {
     var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
     if (!currentUser) return;
+
+    function esc(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function fmtDispositivo(val) {
+      if (!val || val === '—' || val === 'Boleto Unificado') return val;
+      var sep = ' \u2014 ';
+      var idx = val.indexOf(sep);
+      if (idx !== -1) {
+        var nome = val.slice(0, idx);
+        var placa = val.slice(idx + sep.length);
+        if (nome.length > 20) nome = nome.slice(0, 20) + '...';
+        return nome + sep + placa;
+      }
+      if (val.length > 20) return val.slice(0, 20) + '...';
+      return val;
+    }
 
     var isAdmin = currentUser.role === 'ADMIN';
     var podeBaixa = isAdmin || currentUser.podeBaixaManual;
@@ -232,10 +250,15 @@
         if (b.carne && b.carne.tipo === 'UNIFICADO') {
           var pList = (b.placasUnificadas || []).map(function (bp) {
             return bp.placa ? esc(bp.placa.placa) : '';
-          }).filter(Boolean);
+          }).concat((b.dispositivosUnificados || []).map(function (bd) {
+            return bd.dispositivo ? esc(bd.dispositivo.nome + (bd.dispositivo.placa ? ' (' + bd.dispositivo.placa + ')' : '')) : '';
+          })).filter(Boolean);
           placasCell = pList.length
-            ? '<span title="' + pList.join(', ') + '"><i class="fa fa-compress"></i> Unificado <small class="text-muted">(' + pList.length + ' placas)</small></span>'
+            ? '<span title="' + pList.join(', ') + '"><i class="fa fa-compress"></i> Unificado <small class="text-muted">(' + pList.length + ' itens)</small></span>'
             : '<i class="fa fa-compress"></i> Unificado';
+        } else if (b.dispositivo) {
+          var dispRaw = b.dispositivo.nome + (b.dispositivo.placa ? ' \u2014 ' + b.dispositivo.placa : '');
+          placasCell = '<span class="al-badge badge-ativo" title="' + esc(dispRaw) + '">' + esc(fmtDispositivo(dispRaw)) + '</span>';
         } else {
           placasCell = b.placa ? '<span class="al-badge badge-ativo">' + esc(b.placa.placa) + '</span>' : '—';
         }

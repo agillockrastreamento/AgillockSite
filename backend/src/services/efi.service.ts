@@ -31,11 +31,22 @@ function getClient() {
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
+export interface EfiCustomerAddress {
+  street: string;
+  number: string;
+  neighborhood: string;
+  zipcode: string;
+  city: string;
+  state: string;
+  complement?: string;
+}
+
 export interface EfiCustomer {
   name: string;
   cpf?: string;
   phone_number?: string;
   email?: string;
+  address?: EfiCustomerAddress;
 }
 
 export interface EfiItem {

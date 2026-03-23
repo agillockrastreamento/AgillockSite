@@ -121,7 +121,7 @@
           <tr>
             <th>Cliente</th>
             <th>Telefone</th>
-            <th>Placa</th>
+            <th>Dispositivo</th>
             <th>Vencimento</th>
             <th id="th-pgto">Data Pgto</th>
             <th>Boleto (R$)</th>
@@ -194,6 +194,7 @@
         document.querySelector('.sidebar-nav').innerHTML =
           '<li><a href="../admin/dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>' +
           '<li><a href="../admin/clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>' +
+          '<li><a href="../admin/dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>' +
           '<li><a href="../admin/gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>' +
           '<li><a href="../admin/cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>' +
           '<li><a href="../admin/colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>' +
@@ -219,6 +220,20 @@
       // ── Dados ─────────────────────────────────────────────────
       var todosItens = [];
       var configs    = null;
+
+      function fmtDispositivo(val) {
+        if (!val || val === '—' || val === 'Boleto Unificado') return val;
+        var sep = ' \u2014 '; // ' — '
+        var idx = val.indexOf(sep);
+        if (idx !== -1) {
+          var nome = val.slice(0, idx);
+          var placa = val.slice(idx + sep.length);
+          if (nome.length > 20) nome = nome.slice(0, 20) + '...';
+          return nome + sep + placa;
+        }
+        if (val.length > 20) return val.slice(0, 20) + '...';
+        return val;
+      }
 
       function buildTitle(pMenor, pMaior) {
         var pctLabel = percentual === '12'
@@ -299,7 +314,7 @@
           return '<tr>' +
             '<td><strong>' + item.cliente + '</strong></td>' +
             '<td>' + (item.telefone || '—') + '</td>' +
-            '<td><span class="al-badge badge-ativo">' + item.placa + '</span></td>' +
+            '<td><span class="al-badge badge-ativo" title="' + item.placa + '">' + fmtDispositivo(item.placa) + '</span></td>' +
             '<td>' + AL.fmtDate(item.vencimento) + '</td>' +
             pgtoTd +
             '<td>' + AL.fmtMoney(item.valorBoleto) + '</td>' +

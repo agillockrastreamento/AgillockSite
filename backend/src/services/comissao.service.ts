@@ -14,8 +14,12 @@ export async function registrarComissoes(boletoId: string): Promise<void> {
       where: { id: boletoId },
       include: {
         placa: { select: { vendedorId: true } },
+        dispositivo: { select: { vendedorId: true } },
         placasUnificadas: {
           include: { placa: { select: { vendedorId: true } } },
+        },
+        dispositivosUnificados: {
+          include: { dispositivo: { select: { vendedorId: true } } },
         },
       },
     }),
@@ -40,13 +44,15 @@ export async function registrarComissoes(boletoId: string): Promise<void> {
 
   const comissoes: ComissaoData[] = [];
 
-  if (boleto.placasUnificadas.length > 0) {
-    // Boleto unificado: comissão por placa, para o vendedor dono de cada placa
-    console.log(`[comissao] boletoId=${boletoId} tipo=UNIFICADO placas=${boleto.placasUnificadas.length}`);
+  const totalUnificados = boleto.placasUnificadas.length + boleto.dispositivosUnificados.length;
+
+  if (totalUnificados > 0) {
+    // Boleto unificado: comissão por placa/dispositivo, para o vendedor dono de cada um
+    console.log(`[comissao] boletoId=${boletoId} tipo=UNIFICADO placas=${boleto.placasUnificadas.length} dispositivos=${boleto.dispositivosUnificados.length}`);
     for (const bp of boleto.placasUnificadas) {
       const vendedorIdPlaca = bp.placa?.vendedorId;
       console.log(`[comissao]   placaId=${bp.placaId} vendedorId=${vendedorIdPlaca ?? 'null'}`);
-      if (!vendedorIdPlaca) continue; // placa sem vendedor: sem comissão
+      if (!vendedorIdPlaca) continue;
       const valorRef = Number(bp.valorPlaca);
       const percentual = valorRef >= refNum ? Number(percentualMaior) : Number(percentualMenor);
       comissoes.push({
@@ -57,18 +63,34 @@ export async function registrarComissoes(boletoId: string): Promise<void> {
         valorComissao: Math.round(valorRef * percentual) / 100,
       });
     }
+    for (const bd of boleto.dispositivosUnificados) {
+      const vendedorIdDisp = bd.dispositivo?.vendedorId;
+      console.log(`[comissao]   dispositivoId=${bd.dispositivoId} vendedorId=${vendedorIdDisp ?? 'null'}`);
+      if (!vendedorIdDisp) continue;
+      const valorRef = Number(bd.valorDispositivo);
+      const percentual = valorRef >= refNum ? Number(percentualMaior) : Number(percentualMenor);
+      comissoes.push({
+        vendedorId: vendedorIdDisp,
+        boletoId,
+        valorReferencia: valorRef,
+        percentualAplicado: percentual,
+        valorComissao: Math.round(valorRef * percentual) / 100,
+      });
+    }
   } else {
-    // Boleto individual: comissão para o vendedor dono da placa
+    // Boleto individual: comissão para o vendedor dono da placa ou do dispositivo
     const vendedorIdPlaca = boleto.placa?.vendedorId;
-    console.log(`[comissao] boletoId=${boletoId} tipo=INDIVIDUAL placaId=${boleto.placaId ?? 'null'} vendedorId=${vendedorIdPlaca ?? 'null'}`);
-    if (!vendedorIdPlaca) {
-      console.log(`[comissao] placa sem vendedorId — sem comissão`);
+    const vendedorIdDisp  = boleto.dispositivo?.vendedorId;
+    const vendedorEfetivo = vendedorIdPlaca || vendedorIdDisp;
+    console.log(`[comissao] boletoId=${boletoId} tipo=INDIVIDUAL placaId=${boleto.placaId ?? 'null'} dispositivoId=${boleto.dispositivoId ?? 'null'} vendedorId=${vendedorEfetivo ?? 'null'}`);
+    if (!vendedorEfetivo) {
+      console.log(`[comissao] sem vendedorId — sem comissão`);
       return;
     }
     const valorRef = Number(boleto.valor);
     const percentual = valorRef >= refNum ? Number(percentualMaior) : Number(percentualMenor);
     comissoes.push({
-      vendedorId: vendedorIdPlaca,
+      vendedorId: vendedorEfetivo,
       boletoId,
       valorReferencia: valorRef,
       percentualAplicado: percentual,

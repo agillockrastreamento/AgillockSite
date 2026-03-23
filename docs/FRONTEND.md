@@ -94,6 +94,11 @@ Substituir o link do Banco do Brasil por um campo de busca simples:
 
 ### admin/clientes.html (e colaborador/clientes.html)
 
+**Formulário de novo cliente — campos obrigatórios (`*`):**
+- Nome, CPF/CNPJ, Telefone
+- Endereço: CEP, Logradouro, Número, Bairro, Cidade, UF (todos obrigatórios para garantir exibição no boleto EFI)
+- E-mail: **opcional** — se preenchido, EFI envia o boleto por e-mail ao cliente
+
 **Tabela de clientes:**
 - Nome, CPF/CNPJ, Telefone, Cidade, Status (Ativo/Inativo), Ações
 
@@ -202,15 +207,22 @@ Substituir o link do Banco do Brasil por um campo de busca simples:
 **Header:**
 - Seletor de mês (anterior / mês atual / próximo)
 
-**Toggle:** `Valores em Atraso | Valores Garantidos`
+**Toggle:** `Deixando de Ganhar | Ganhos Garantidos | Ganhos Futuros`
 
 **Card Principal (destaque):**
-- Fundo VERMELHO se "em atraso", VERDE se "garantidos"
+- Fundo VERMELHO se "atrasado", VERDE se "garantidos", AZUL se "futuros"
 - Valor total de comissão no mês (somado)
+- **Barra de pagamento** (visível apenas na aba "Ganhos Garantidos"):
+  - **Visão admin** (quando `?vendedorId=` está na URL):
+    - Esquerda: botão **"Efetuar Pagamento"** → modal de confirmação (avisa que aparecerá para o vendedor como "Saque Realizado" e que é necessário anexar comprovante) → após confirmar: badge **"Pago ✓"**
+    - Direita: botão **"Anexar Comprovante"** (desabilitado antes do pagamento) → abre seletor de arquivo (PDF/JPG/PNG) → após upload: **"Ver / Baixar Comprovante"**
+  - **Visão vendedor**:
+    - Esquerda: badge **"Saque Realizado ✓"** (se admin já pagou) ou **"Saldo Acumulado"** (se não)
+    - Direita: botão **"Ver Comprovante"** (apenas se admin anexou arquivo) → abre em nova aba
 
 **Cards secundários:**
-- Card: `12,5% — Atraso/Garantido` → valor somado desta faixa
-- Card: `18% — Atraso/Garantido` → valor somado desta faixa
+- Card: `Comissão X%` → valor somado desta faixa (clicável → vai para carteira-detalhes.html)
+- Card: `Comissão Y%` → valor somado desta faixa (clicável)
 
 ---
 
@@ -261,7 +273,7 @@ AL.confirmar({ titulo, mensagem, btnTexto, btnClasse })  // modal de confirmaç�
 AL.initThemeToggle(btnId)  // toggle dark/light mode
 AL.badgeStatus(status)     // badge colorida para status do boleto
 AL.fmtMoney(valor)         // formata R$ 1.234,56
-AL.fmtDate(date)           // formata DD/MM/AAAA
+AL.fmtDate(date)           // formata DD/MM/AAAA — strings YYYY-MM-DD são parseadas sem conversão de fuso (evita bug de "dia anterior" em UTC-3)
 AL.fmtCpfCnpj(str)         // formata CPF ou CNPJ
 AL.isHoje(date)            // true se a data for hoje
 AL.logout()                // remove token e redireciona para login

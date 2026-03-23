@@ -18,7 +18,8 @@ User (ADMIN | COLABORADOR | VENDEDOR)
   │                                         │
   │                                         └── gera → ComissaoVendedor
   │
-  └── responsável vendas → Cliente (vendedor_id)
+  ├── responsável vendas → Cliente (vendedor_id)
+  └── recebe → PagamentoComissao (por mês)
 
 Configuracoes (singleton — percentuais de comissão)
 ```
@@ -60,6 +61,7 @@ enum StatusBoleto {
   PAGO
   ATRASADO
   CANCELADO
+  REEMBOLSADO
 }
 
 model User {
@@ -83,12 +85,13 @@ model User {
   podeAlterarVencimento Boolean @default(true)
 
   // Relacionamentos
-  clientesCriados  Cliente[]          @relation("ClienteCriador")
-  clientesVendidos Cliente[]          @relation("ClienteVendedor")
-  carnesGerados    Carne[]            @relation("CarneGeradoPor")
-  carnesVendidos   Carne[]            @relation("CarneVendedor")
-  placasVendidas   Placa[]            @relation("PlacaVendedor")
+  clientesCriados  Cliente[]           @relation("ClienteCriador")
+  clientesVendidos Cliente[]           @relation("ClienteVendedor")
+  carnesGerados    Carne[]             @relation("CarneGeradoPor")
+  carnesVendidos   Carne[]             @relation("CarneVendedor")
+  placasVendidas   Placa[]             @relation("PlacaVendedor")
   comissoes        ComissaoVendedor[]
+  pagamentos       PagamentoComissao[]
 }
 
 model Cliente {
@@ -213,6 +216,23 @@ model ComissaoVendedor {
   createdAt          DateTime @default(now())
 }
 
+// Registro de pagamento de comissão ao vendedor (por mês)
+// Criado pelo admin na tela de carteira do vendedor
+model PagamentoComissao {
+  id              String   @id @default(uuid())
+  vendedorId      String
+  vendedor        User     @relation(fields: [vendedorId], references: [id])
+  mes             String   // formato YYYY-MM
+  valor           Decimal  @db.Decimal(10, 2)
+  pago            Boolean  @default(false)
+  comprovante     String?  // caminho relativo do arquivo (ex: "uploads/comprovantes/uuid.pdf")
+  comprovanteMime String?  // MIME type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([vendedorId, mes])
+}
+
 // Singleton de configurações (sempre ID = "1")
 model Configuracoes {
   id                String  @id @default("1")
@@ -235,6 +255,12 @@ model Configuracoes {
 
 3. **Dono da Placa (`Placa.vendedorId`)**: definido na **primeira cobrança** gerada para aquela placa. Uma vez definido, não muda — todas as cobranças futuras da mesma placa continuam comissionando o mesmo vendedor, mesmo que a cobrança posterior indique outro.
 
-3. **Recuperação de Clientes EFI**: o EFI não possui endpoint direto de clientes. Os clientes existentes serão importados consultando as cobranças (`GET /v1/charges`) e extraindo os dados do pagador (`customer`). Isso será uma migração única.
+4. **Endereço do Cliente (obrigatório na criação)**: campos `cep`, `logradouro`, `numero`, `bairro`, `cidade` e `estado` são obrigatórios no `POST /api/clientes`. O backend retorna 400 se qualquer um estiver ausente. O endereço é enviado ao EFI no campo `address` do `customer` ao gerar carnês, garantindo que apareça impresso no boleto.
 
-4. **Migrações**: rodar `npx prisma migrate dev` no desenvolvimento e `npx prisma migrate deploy` na produção via Docker entrypoint.
+5. **PagamentoComissao**: registra o pagamento físico de comissão ao vendedor por mês. A constraint `@@unique([vendedorId, mes])` garante um único registro por vendedor/mês. O campo `comprovante` armazena o caminho relativo do arquivo no filesystem (`uploads/comprovantes/`); `comprovanteMime` guarda o tipo para servir o arquivo com o `Content-Type` correto.
+
+6. **Recuperação de Clientes EFI**: o EFI não possui endpoint direto de clientes. Os clientes existentes serão importados consultando as cobranças (`GET /v1/charges`) e extraindo os dados do pagador (`customer`). Isso será uma migração única.
+
+7. **Migrações**: rodar `npx prisma migrate dev` no desenvolvimento e `npx prisma migrate deploy` na produção via Docker entrypoint. Migrations devem ser executadas **dentro do container** (`docker exec backend-backend-1 npx prisma migrate dev`), pois o schema Prisma usa a URL interna (`postgres:5432`).
+
+8. **Arquivos de comprovante**: salvos em `/app/uploads/comprovantes/` dentro do container. O volume `.:/app` no `docker-compose.dev.yml` garante persistência no host em `backend/uploads/comprovantes/`.
