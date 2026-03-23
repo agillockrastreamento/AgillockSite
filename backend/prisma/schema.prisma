@@ -41,21 +41,29 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Permissões granulares para COLABORADOR (ignoradas para outros roles)
-  podeExcluirCliente    Boolean @default(true)
-  podeEditarCliente     Boolean @default(true)
-  podeInativarCliente   Boolean @default(true)
-  podeExcluirPlaca      Boolean @default(true)
-  podeInativarPlaca     Boolean @default(true)
-  podeBaixaManual       Boolean @default(true)
-  podeCancelarCarne     Boolean @default(true)
-  podeAlterarVencimento Boolean @default(true)
+  podeExcluirCliente      Boolean @default(true)
+  podeEditarCliente       Boolean @default(true)
+  podeInativarCliente     Boolean @default(true)
+  podeExcluirPlaca        Boolean @default(true)
+  podeInativarPlaca       Boolean @default(true)
+  podeExcluirDispositivo      Boolean @default(true)
+  podeInativarDispositivo     Boolean @default(true)
+  podeCriarDispositivo        Boolean @default(true)
+  podeEditarDispositivo       Boolean @default(true)
+  podeDesvincularDispositivo  Boolean @default(true)
+  podeBaixaManual         Boolean @default(true)
+  podeCancelarCarne       Boolean @default(true)
+  podeAlterarVencimento   Boolean @default(true)
 
-  clientesCriados  Cliente[]          @relation("ClienteCriador")
-  clientesVendidos Cliente[]          @relation("ClienteVendedor")
-  carnesGerados    Carne[]            @relation("CarneGeradoPor")
-  carnesVendidos   Carne[]            @relation("CarneVendedor")
-  placasVendidas   Placa[]            @relation("PlacaVendedor")
-  comissoes        ComissaoVendedor[]
+  clientesCriados      Cliente[]          @relation("ClienteCriador")
+  clientesVendidos     Cliente[]          @relation("ClienteVendedor")
+  carnesGerados        Carne[]            @relation("CarneGeradoPor")
+  carnesVendidos       Carne[]            @relation("CarneVendedor")
+  placasVendidas       Placa[]            @relation("PlacaVendedor")
+  dispositivosCriados  Dispositivo[]      @relation("DispositivoCriador")
+  dispositivosVendidos Dispositivo[]      @relation("DispositivoVendedor")
+  comissoes            ComissaoVendedor[]
+  pagamentos           PagamentoComissao[]
 }
 
 model Cliente {
@@ -64,7 +72,11 @@ model Cliente {
   cpfCnpj     String?
   telefone    String?
   email       String?
-  notas       String?
+  notas          String?
+  dataNascimento String?
+  rg             String?
+  profissao      String?
+  estadoCivil    String?
   status      StatusCliente @default(ATIVO)
   cep         String?
   logradouro  String?
@@ -81,8 +93,9 @@ model Cliente {
   vendedorId  String?
   vendedor    User?  @relation("ClienteVendedor", fields: [vendedorId], references: [id])
 
-  placas Placa[]
-  carnes Carne[]
+  placas       Placa[]
+  dispositivos Dispositivo[]
+  carnes       Carne[]
 }
 
 model Placa {
@@ -140,9 +153,12 @@ model Boleto {
   carne   Carne  @relation(fields: [carneId], references: [id])
   placaId String?
   placa   Placa? @relation(fields: [placaId], references: [id])
+  dispositivoId String?
+  dispositivo   Dispositivo? @relation(fields: [dispositivoId], references: [id])
 
-  placasUnificadas BoletoPlaca[]
-  comissoes        ComissaoVendedor[]
+  placasUnificadas       BoletoPlaca[]
+  dispositivosUnificados BoletoDispositivo[]
+  comissoes              ComissaoVendedor[]
 }
 
 model BoletoPlaca {
@@ -156,18 +172,98 @@ model BoletoPlaca {
   @@id([boletoId, placaId])
 }
 
+model BoletoDispositivo {
+  valorDispositivo Decimal @db.Decimal(10, 2)
+
+  boletoId      String
+  boleto        Boleto      @relation(fields: [boletoId], references: [id])
+  dispositivoId String
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id])
+
+  @@id([boletoId, dispositivoId])
+}
+
+model Dispositivo {
+  id               String   @id @default(uuid())
+  nome             String
+  identificador    String   @unique
+  categoria        String?
+  grupo            String?
+  contato          String?
+  ativo            Boolean  @default(true)
+
+  // Rastreador
+  modeloRastreador    String?
+  telefoneRastreador  String?
+  iccid               String?
+  operadora           String?
+
+  // Veículo
+  placa           String?
+  marca           String?
+  modeloVeiculo   String?
+  cor             String?
+  ano             String?
+  renavam         String?
+  chassi          String?
+  combustivel     String?
+  localInstalacao String?
+  instalador      String?
+
+  // Configurações
+  consumo          String?
+  limiteVelocidade Float?
+  senha            String?
+  ignorarOdometro  Boolean  @default(false)
+
+  // Imagem
+  imagemUrl   String?
+
+  // Billing (equivalente a Placa)
+  valorPadrao Decimal? @db.Decimal(10, 2)
+
+  clienteId   String?
+  cliente     Cliente? @relation(fields: [clienteId], references: [id])
+  vendedorId  String?
+  vendedor    User?    @relation("DispositivoVendedor", fields: [vendedorId], references: [id])
+  criadoPorId String
+  criadoPor   User     @relation("DispositivoCriador", fields: [criadoPorId], references: [id])
+
+  boletos           Boleto[]
+  boletosUnificados BoletoDispositivo[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model ComissaoVendedor {
-  id                 String   @id @default(uuid())
-  valorReferencia    Decimal  @db.Decimal(10, 2)
-  percentualAplicado Decimal  @db.Decimal(5, 2)
-  valorComissao      Decimal  @db.Decimal(10, 2)
-  pago               Boolean  @default(false)
-  createdAt          DateTime @default(now())
+  id                 String    @id @default(uuid())
+  valorReferencia    Decimal   @db.Decimal(10, 2)
+  percentualAplicado Decimal   @db.Decimal(5, 2)
+  valorComissao      Decimal   @db.Decimal(10, 2)
+  pago               Boolean   @default(false)
+  dataPagamento      DateTime? // snapshot quando o boleto/cliente é excluído
+  createdAt          DateTime  @default(now())
 
   vendedorId String
-  vendedor   User   @relation(fields: [vendedorId], references: [id])
-  boletoId   String
-  boleto     Boleto @relation(fields: [boletoId], references: [id])
+  vendedor   User    @relation(fields: [vendedorId], references: [id])
+  boletoId   String?
+  boleto     Boleto? @relation(fields: [boletoId], references: [id])
+}
+
+model PagamentoComissao {
+  id               String   @id @default(uuid())
+  vendedorId       String
+  vendedor         User     @relation(fields: [vendedorId], references: [id])
+  mes              String   // formato YYYY-MM
+  valor            Decimal  @db.Decimal(10, 2)
+  pago             Boolean  @default(false)
+  comprovante      String?  // caminho relativo do arquivo (ex: "uploads/comprovantes/uuid.pdf")
+  comprovanteMime  String?  // MIME type do arquivo
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([vendedorId, mes])
 }
 
 model Configuracoes {

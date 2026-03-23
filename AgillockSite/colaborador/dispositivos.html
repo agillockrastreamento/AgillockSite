@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Dispositivos — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
+    #al-alert-container, .filter-bar { flex-shrink: 0; }
+    .table-responsive { flex: 1; overflow-y: auto; border-radius: 8px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 0; }
+    html.dark-theme .table-responsive { background: #141820; }
+    .admin-table thead th { position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li class="active"><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Dispositivos</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <a href="dispositivo.html" class="btn btn-primary-al">
+          <i class="fa fa-plus"></i> Novo Dispositivo
+        </a>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-5">
+          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por nome, identificador ou placa…" />
+        </div>
+        <div class="col-sm-3">
+          <select id="filtro-status" class="form-control">
+            <option value="">Todos os status</option>
+            <option value="true">Ativo</option>
+            <option value="false">Inativo</option>
+          </select>
+        </div>
+        <div class="col-sm-4">
+          <input type="text" id="filtro-cliente" class="form-control" placeholder="Filtrar por cliente…" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Identificador</th>
+            <th>Nome</th>
+            <th>Placa</th>
+            <th>Categoria</th>
+            <th>Cliente</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tabela-body">
+          <tr><td colspan="7" class="text-center text-muted" style="padding:40px;">
+            <i class="fa fa-spinner fa-spin fa-2x"></i>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+      if (!currentUser) return;
+      var isAdmin = currentUser.role === 'ADMIN';
+      var canCriarDispositivo    = isAdmin || (currentUser.podeCriarDispositivo    !== false);
+      var canEditarDispositivo   = isAdmin || (currentUser.podeEditarDispositivo   !== false);
+      var canInativarDispositivo = isAdmin || (currentUser.podeInativarDispositivo !== false);
+      var canExcluirDispositivo  = isAdmin || (currentUser.podeExcluirDispositivo  !== false);
+
+      if (!canCriarDispositivo) {
+        var btnNovo = document.querySelector('.admin-topbar a.btn-primary-al');
+        if (btnNovo) btnNovo.style.display = 'none';
+      }
+
+      document.getElementById('user-nome').textContent = currentUser.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = currentUser.role;
+      ub.className = 'al-badge ' + (isAdmin ? 'badge-ativo' : 'badge-pendente');
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      var todosDispositivos = [];
+      var filtroBusca = '';
+      var filtroStatus = '';
+      var filtroCliente = '';
+      var filtroTimer = null;
+
+      function esc(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function renderTabela() {
+        var busca = filtroBusca.toLowerCase();
+        var lista = todosDispositivos.filter(function (d) {
+          if (filtroStatus !== '' && String(d.ativo) !== filtroStatus) return false;
+          if (busca && !(
+            d.nome.toLowerCase().indexOf(busca) !== -1 ||
+            d.identificador.toLowerCase().indexOf(busca) !== -1 ||
+            (d.placa || '').toLowerCase().indexOf(busca) !== -1
+          )) return false;
+          if (filtroCliente && !(d.cliente && d.cliente.nome.toLowerCase().indexOf(filtroCliente.toLowerCase()) !== -1)) return false;
+          return true;
+        });
+
+        var tbody = document.getElementById('tabela-body');
+        if (!lista.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:40px;">Nenhum dispositivo encontrado.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = lista.map(function (d) {
+          var editUrl = 'dispositivo.html?id=' + d.id;
+          var clienteNome = d.cliente ? '<a href="cliente-detalhe.html?id=' + d.cliente.id + '">' + esc(d.cliente.nome) + '</a>' : '<span class="text-muted">—</span>';
+          var rowClick = canEditarDispositivo ? ' style="cursor:pointer;" onclick="window.location=\'' + editUrl + '\'"' : '';
+          return '<tr' + rowClick + '>' +
+            '<td><strong>' + esc(d.identificador) + '</strong></td>' +
+            '<td>' + esc(d.nome) + '</td>' +
+            '<td>' + (d.placa ? esc(d.placa) : '<span class="text-muted">—</span>') + '</td>' +
+            '<td>' + (d.categoria ? esc(d.categoria) : '<span class="text-muted">—</span>') + '</td>' +
+            '<td onclick="event.stopPropagation();">' + clienteNome + '</td>' +
+            '<td>' + AL.badgeStatus(d.ativo ? 'ATIVO' : 'INATIVO') + '</td>' +
+            '<td onclick="event.stopPropagation();" style="text-align:right;white-space:nowrap;">' +
+            (canEditarDispositivo ? '<a href="' + editUrl + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a>' : '') +
+            (canInativarDispositivo ? ' <button class="btn btn-xs ' + (d.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + d.id + '" title="' + (d.ativo ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button>' : '') +
+            (canExcluirDispositivo ? ' <button class="btn btn-xs btn-danger btn-excluir-disp" data-id="' + d.id + '" data-nome="' + esc(d.nome) + '" title="Excluir"><i class="fa fa-trash"></i></button>' : '') +
+            '</td></tr>';
+        }).join('');
+
+        document.querySelectorAll('.btn-toggle').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var id = this.dataset.id;
+            var self = this;
+            self.disabled = true;
+            AL.apiPatch('/api/dispositivos/' + id + '/status', {})
+              .then(function () { carregarDispositivos(); })
+              .catch(function (err) { self.disabled = false; AL.showAlert(err.message); });
+          });
+        });
+
+        document.querySelectorAll('.btn-excluir-disp').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var id = this.dataset.id;
+            var nome = this.dataset.nome;
+            AL.confirmar({
+              titulo: 'Excluir Dispositivo',
+              mensagem: 'Excluir o dispositivo <strong>' + nome + '</strong>?',
+              consequencias: 'O dispositivo será removido permanentemente. Esta ação é irreversível.',
+              btnTexto: '<i class="fa fa-trash"></i> Excluir',
+            }).then(function (ok) {
+              if (!ok) return;
+              AL.apiDelete('/api/dispositivos/' + id)
+                .then(function () { carregarDispositivos(); AL.showAlert('Dispositivo excluído.', 'success'); })
+                .catch(function (err) { AL.showAlert(err.message, 'danger'); });
+            });
+          });
+        });
+      }
+
+      function carregarDispositivos() {
+        AL.apiGet('/api/dispositivos')
+          .then(function (lista) {
+            todosDispositivos = lista || [];
+            renderTabela();
+          })
+          .catch(function (err) {
+            document.getElementById('tabela-body').innerHTML =
+              '<tr><td colspan="7" class="text-danger" style="padding:20px;">' + err.message + '</td></tr>';
+          });
+      }
+
+      document.getElementById('filtro-busca').addEventListener('input', function () {
+        filtroBusca = this.value;
+        clearTimeout(filtroTimer);
+        filtroTimer = setTimeout(renderTabela, 200);
+      });
+      document.getElementById('filtro-status').addEventListener('change', function () {
+        filtroStatus = this.value;
+        renderTabela();
+      });
+      document.getElementById('filtro-cliente').addEventListener('input', function () {
+        filtroCliente = this.value;
+        clearTimeout(filtroTimer);
+        filtroTimer = setTimeout(renderTabela, 200);
+      });
+
+      carregarDispositivos();
+    })();
+  </script>
+</body>
+</html>

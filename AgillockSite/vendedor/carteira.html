@@ -111,6 +111,55 @@
       font-size: 14px;
     }
     html.dark-theme .sem-dados-box { color: #6c757d; }
+
+    /* ── Pagamento comissão ───────────────────────────────────── */
+    .pagamento-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 18px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn-pagar {
+      background: rgba(255,255,255,.22);
+      border: 2px solid rgba(255,255,255,.7);
+      color: #fff;
+      border-radius: 8px;
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-pagar:hover { background: rgba(255,255,255,.35); }
+    .btn-pagar:disabled { opacity: .6; cursor: default; }
+    .pago-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(255,255,255,.18);
+      border-radius: 8px;
+      padding: 7px 16px;
+    }
+    .saldo-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255,255,255,.9);
+      background: rgba(0,0,0,.15);
+      border-radius: 8px;
+      padding: 7px 14px;
+    }
   </style>
 </head>
 
@@ -185,6 +234,13 @@
           <div class="cmc-valor" id="cmc-valor">R$ 0,00</div>
           <div class="cmc-label" id="cmc-label">—</div>
           <div class="cmc-sub"   id="cmc-sub"></div>
+          <!-- Barra de pagamento (visível apenas na aba "Ganhos Garantidos") -->
+          <div class="pagamento-bar" id="pagamento-bar" style="display:none;">
+            <!-- Esquerda: botão efetuar pagamento (admin) / status saque (vendedor) -->
+            <div id="pag-status-area"></div>
+            <!-- Direita: comprovante -->
+            <div id="pag-comprovante-area"></div>
+          </div>
         </div>
 
         <!-- Cards de percentual -->
@@ -215,6 +271,36 @@
 
     </div>
   </div><!-- /admin-content -->
+
+  <!-- Modal: confirmar pagamento -->
+  <div class="modal fade" id="modal-confirmar-pag" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title"><i class="fa fa-money" style="margin-right:6px;"></i> Confirmar Pagamento</h4>
+        </div>
+        <div class="modal-body">
+          <p>Você está prestes a registrar o pagamento da comissão de <strong id="modal-pag-nome">—</strong> referente ao mês <strong id="modal-pag-mes">—</strong>.</p>
+          <div class="alert alert-info" style="font-size:13px;margin-bottom:0;">
+            <i class="fa fa-info-circle"></i>
+            Ao confirmar, isso aparecerá na tela do vendedor como <strong>Saque Realizado</strong>.
+            É necessário anexar o comprovante para que o vendedor possa baixá-lo.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary-al" id="btn-confirmar-pag">
+            <span id="btn-pag-texto"><i class="fa fa-check"></i> Confirmar Pagamento</span>
+            <span id="btn-pag-spinner" style="display:none;"><i class="fa fa-spinner fa-spin"></i> Processando…</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input file para upload de comprovante (visualmente oculto, ativado via label) -->
+  <input type="file" id="input-comprovante" accept=".pdf,.jpg,.jpeg,.png,.webp" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;" />
 
   <script src="../js/jquery.js"></script>
   <script src="../js/bootstrap.min.js"></script>
@@ -253,6 +339,7 @@
         document.querySelector('.sidebar-nav').innerHTML =
           '<li><a href="../admin/dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>' +
           '<li><a href="../admin/clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>' +
+          '<li><a href="../admin/dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>' +
           '<li><a href="../admin/gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>' +
           '<li><a href="../admin/cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>' +
           '<li><a href="../admin/colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>' +
@@ -261,6 +348,168 @@
       }
       if (adminVendId && nomeVendedor) {
         document.getElementById('carteira-titulo').textContent = 'Carteira de ' + nomeVendedor;
+      }
+
+      // ── Estado de pagamento ───────────────────────────────────
+      var pagamentoData = null;   // registro PagamentoComissao do mês atual
+      var pagVendId = adminVendId || currentUser.userId;  // ID do vendedor sendo visualizado
+
+      function loadPagamento() {
+        AL.apiGet('/api/vendedor/pagamentos?vendedorId=' + pagVendId + '&mes=' + currentMes)
+          .then(function (data) {
+            pagamentoData = data;
+            renderPagamentoBar();
+          })
+          .catch(function () { pagamentoData = null; renderPagamentoBar(); });
+      }
+
+      function renderPagamentoBar() {
+        var bar = document.getElementById('pagamento-bar');
+        if (activeToggle !== 'garantido') { bar.style.display = 'none'; return; }
+        bar.style.display = 'flex';
+
+        var statusArea = document.getElementById('pag-status-area');
+        var compArea   = document.getElementById('pag-comprovante-area');
+        statusArea.innerHTML = '';
+        compArea.innerHTML   = '';
+
+        var pago = pagamentoData && pagamentoData.pago;
+        var temComprovante = pagamentoData && pagamentoData.comprovante;
+
+        if (adminVendId) {
+          // ── Visão ADMIN ───────────────────────────────────────
+          if (pago) {
+            statusArea.innerHTML =
+              '<div class="pago-badge"><i class="fa fa-check-circle"></i> Pago</div>';
+          } else {
+            var btnPagar = document.createElement('button');
+            btnPagar.type = 'button';
+            btnPagar.className = 'btn-pagar';
+            btnPagar.innerHTML = '<i class="fa fa-money"></i> Efetuar Pagamento';
+            btnPagar.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); abrirModalPagamento(); });
+            statusArea.appendChild(btnPagar);
+          }
+
+          // Botão comprovante (direita)
+          if (temComprovante) {
+            var btnVerAnexo = document.createElement('button');
+            btnVerAnexo.type = 'button';
+            btnVerAnexo.className = 'btn-pagar';
+            btnVerAnexo.innerHTML = '<i class="fa fa-file-text-o"></i> Ver / Baixar Comprovante';
+            btnVerAnexo.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); abrirComprovante(); });
+            compArea.appendChild(btnVerAnexo);
+          } else {
+            // Usar <label> associado ao input file para evitar click() programático
+            var lblAnexar = document.createElement('label');
+            lblAnexar.htmlFor = 'input-comprovante';
+            lblAnexar.className = 'btn-pagar';
+            lblAnexar.style.cursor = pagamentoData ? 'pointer' : 'not-allowed';
+            lblAnexar.style.opacity = pagamentoData ? '1' : '0.6';
+            lblAnexar.innerHTML = '<i class="fa fa-paperclip"></i> Anexar Comprovante';
+            if (!pagamentoData) lblAnexar.style.pointerEvents = 'none';
+            compArea.appendChild(lblAnexar);
+          }
+        } else {
+          // ── Visão VENDEDOR ────────────────────────────────────
+          if (pago) {
+            statusArea.innerHTML =
+              '<div class="pago-badge"><i class="fa fa-check-circle"></i> Saque Realizado</div>';
+          } else {
+            statusArea.innerHTML =
+              '<div class="saldo-badge"><i class="fa fa-hourglass-half"></i> Saldo Acumulado</div>';
+          }
+
+          if (temComprovante) {
+            var btnVer = document.createElement('button');
+            btnVer.type = 'button';
+            btnVer.className = 'btn-pagar';
+            btnVer.innerHTML = '<i class="fa fa-eye"></i> Ver Comprovante';
+            btnVer.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); abrirComprovante(); });
+            compArea.appendChild(btnVer);
+          }
+        }
+      }
+
+      function abrirModalPagamento() {
+        var valorTotal = cartData ? (cartData.garantido ? cartData.garantido.total : 0) : 0;
+        document.getElementById('modal-pag-nome').textContent = nomeVendedor || 'o vendedor';
+        document.getElementById('modal-pag-mes').textContent  = fmtMesPT(currentMes);
+        document.getElementById('btn-pag-texto').style.display   = 'inline';
+        document.getElementById('btn-pag-spinner').style.display = 'none';
+        document.getElementById('btn-confirmar-pag').disabled = false;
+        // Armazena valor para usar no confirm
+        document.getElementById('btn-confirmar-pag').dataset.valor = String(valorTotal);
+        $('#modal-confirmar-pag').modal('show');
+      }
+
+      document.getElementById('btn-confirmar-pag').addEventListener('click', function () {
+        var self = this;
+        var valor = parseFloat(self.dataset.valor || '0');
+        document.getElementById('btn-pag-texto').style.display   = 'none';
+        document.getElementById('btn-pag-spinner').style.display = 'inline';
+        self.disabled = true;
+
+        AL.apiPost('/api/vendedor/pagamentos', { vendedorId: pagVendId, mes: currentMes, valor: valor })
+          .then(function (data) {
+            pagamentoData = data;
+            $('#modal-confirmar-pag').modal('hide');
+            renderPagamentoBar();
+            AL.showAlert('Pagamento registrado com sucesso!', 'success');
+          })
+          .catch(function (err) {
+            document.getElementById('btn-pag-texto').style.display   = 'inline';
+            document.getElementById('btn-pag-spinner').style.display = 'none';
+            self.disabled = false;
+            AL.showAlert(err.message || 'Erro ao registrar pagamento.', 'danger');
+          });
+      });
+
+      document.getElementById('input-comprovante').addEventListener('change', function () {
+        var file = this.files[0];
+        if (!file || !pagamentoData) return;
+
+        // Captura o arquivo e reseta o input imediatamente para permitir reenvio
+        var fileCapturado = file;
+        this.value = '';
+
+        // Feedback: desabilitar o label durante o upload
+        var lbl = document.querySelector('#pag-comprovante-area label');
+        if (lbl) { lbl.style.pointerEvents = 'none'; lbl.style.opacity = '0.6'; lbl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando…'; }
+
+        var formData = new FormData();
+        formData.append('comprovante', fileCapturado);
+
+        var token = localStorage.getItem('al_token') || '';
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', (window.API_URL || '') + '/api/vendedor/pagamentos/' + pagamentoData.id + '/comprovante');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+
+        xhr.onload = function () {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { pagamentoData = JSON.parse(xhr.responseText); } catch (e) {}
+            renderPagamentoBar();
+            AL.showAlert('Comprovante anexado com sucesso!', 'success');
+          } else {
+            var msg = 'Erro ao enviar comprovante.';
+            try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+            if (lbl) { lbl.style.pointerEvents = ''; lbl.style.opacity = '1'; lbl.innerHTML = '<i class="fa fa-paperclip"></i> Anexar Comprovante'; }
+            AL.showAlert(msg, 'danger');
+          }
+        };
+
+        xhr.onerror = function () {
+          if (lbl) { lbl.style.pointerEvents = ''; lbl.style.opacity = '1'; lbl.innerHTML = '<i class="fa fa-paperclip"></i> Anexar Comprovante'; }
+          AL.showAlert('Erro de conexão ao enviar comprovante.', 'danger');
+        };
+
+        xhr.send(formData);
+      });
+
+      function abrirComprovante() {
+        if (!pagamentoData || !pagamentoData.comprovante) return;
+        var token = localStorage.getItem('al_token') || '';
+        var url = (window.API_URL || '') + '/api/vendedor/comprovante/' + pagamentoData.id + '?token=' + encodeURIComponent(token);
+        window.open(url, '_blank');
       }
 
       // ── Estado ────────────────────────────────────────────────
@@ -316,7 +565,7 @@
       function setToggle(t) {
         activeToggle = t;
         updateToggles();
-        if (cartData) renderCards();
+        if (cartData) { renderCards(); renderPagamentoBar(); }
       }
 
       ['atrasado', 'garantido', 'futuro'].forEach(function (t) {
@@ -397,19 +646,24 @@
 
       function loadCarteira() {
         setLoading(true);
+        pagamentoData = null;
         var configsPromise = configs
           ? Promise.resolve(configs)
           : AL.apiGet('/api/configuracoes');
 
         var carteiraUrl = '/api/vendedor/carteira?mes=' + currentMes + (adminVendId ? '&vendedorId=' + adminVendId : '');
+        var pagUrl = '/api/vendedor/pagamentos?vendedorId=' + pagVendId + '&mes=' + currentMes;
         Promise.all([
           AL.apiGet(carteiraUrl),
           configsPromise,
+          AL.apiGet(pagUrl).catch(function () { return null; }),
         ]).then(function (results) {
-          cartData = results[0];
-          configs  = results[1];
+          cartData      = results[0];
+          configs       = results[1];
+          pagamentoData = results[2];
           setLoading(false);
           renderCards();
+          renderPagamentoBar();
         }).catch(function (err) {
           setLoading(false);
           AL.showAlert(err.message || 'Erro ao carregar carteira.', 'danger');

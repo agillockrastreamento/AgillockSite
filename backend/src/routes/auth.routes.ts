@@ -33,9 +33,14 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     payload.podeExcluirCliente    = user.podeExcluirCliente;
     payload.podeEditarCliente     = user.podeEditarCliente;
     payload.podeInativarCliente   = user.podeInativarCliente;
-    payload.podeExcluirPlaca      = user.podeExcluirPlaca;
-    payload.podeInativarPlaca     = user.podeInativarPlaca;
-    payload.podeBaixaManual       = user.podeBaixaManual;
+    payload.podeExcluirPlaca        = user.podeExcluirPlaca;
+    payload.podeInativarPlaca       = user.podeInativarPlaca;
+    payload.podeExcluirDispositivo      = user.podeExcluirDispositivo;
+    payload.podeInativarDispositivo     = user.podeInativarDispositivo;
+    payload.podeCriarDispositivo        = user.podeCriarDispositivo;
+    payload.podeEditarDispositivo       = user.podeEditarDispositivo;
+    payload.podeDesvincularDispositivo  = user.podeDesvincularDispositivo;
+    payload.podeBaixaManual         = user.podeBaixaManual;
     payload.podeCancelarCarne     = user.podeCancelarCarne;
     payload.podeAlterarVencimento = user.podeAlterarVencimento;
   }

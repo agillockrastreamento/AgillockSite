@@ -30,6 +30,7 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
       vendedor: { select: { id: true, nome: true } },
       criadoPor: { select: { id: true, nome: true } },
       placas: { where: { ativo: true }, select: { id: true, placa: true, descricao: true } },
+      dispositivos: { select: { id: true, nome: true, identificador: true, placa: true, categoria: true, ativo: true } },
     },
     orderBy: { nome: 'asc' },
   });
@@ -47,12 +48,14 @@ router.get('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
       vendedor: { select: { id: true, nome: true } },
       criadoPor: { select: { id: true, nome: true } },
       placas: { orderBy: { placa: 'asc' } },
+      dispositivos: { orderBy: { nome: 'asc' } },
       carnes: {
         include: {
           boletos: {
             orderBy: { numeroParcela: 'asc' },
             include: {
               placasUnificadas: { select: { placaId: true, valorPlaca: true } },
+              dispositivosUnificados: { select: { dispositivoId: true, valorDispositivo: true } },
             },
           },
           geradoPor: { select: { id: true, nome: true } },
@@ -87,8 +90,12 @@ router.get('/:id/carnes', requireRoles('ADMIN', 'COLABORADOR'), async (req: Auth
         orderBy: { numeroParcela: 'asc' },
         include: {
           placa: { select: { id: true, placa: true } },
+          dispositivo: { select: { id: true, nome: true, identificador: true, placa: true } },
           placasUnificadas: {
             include: { placa: { select: { id: true, placa: true } } },
+          },
+          dispositivosUnificados: {
+            include: { dispositivo: { select: { id: true, nome: true, identificador: true, placa: true } } },
           },
         },
       },
@@ -105,16 +112,25 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
   const {
     nome, cpfCnpj, telefone, email, notas, vendedorId,
     cep, logradouro, numero, complemento, bairro, cidade, estado,
+    dataNascimento, rg, profissao, estadoCivil,
   } = req.body;
 
   if (!nome) {
     res.status(400).json({ error: 'O nome do cliente é obrigatório.' });
     return;
   }
+  if (!cep || !logradouro || !numero || !bairro || !cidade || !estado) {
+    res.status(400).json({ error: 'Endereço completo é obrigatório (CEP, logradouro, número, bairro, cidade e UF).' });
+    return;
+  }
 
   const cliente = await prisma.cliente.create({
     data: {
       nome, cpfCnpj, telefone, email, notas,
+      dataNascimento: dataNascimento || null,
+      rg: rg || null,
+      profissao: profissao || null,
+      estadoCivil: estadoCivil || null,
       vendedorId: vendedorId || null,
       cep, logradouro, numero, complemento, bairro, cidade, estado,
       criadoPorId: req.user!.userId,
@@ -139,6 +155,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
   const {
     nome, cpfCnpj, telefone, email, notas, vendedorId,
     cep, logradouro, numero, complemento, bairro, cidade, estado,
+    dataNascimento, rg, profissao, estadoCivil,
   } = req.body;
 
   const existe = await prisma.cliente.findUnique({ where: { id }, select: { id: true } });
@@ -151,6 +168,10 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
     where: { id },
     data: {
       nome, cpfCnpj, telefone, email, notas,
+      dataNascimento: dataNascimento || null,
+      rg: rg || null,
+      profissao: profissao || null,
+      estadoCivil: estadoCivil || null,
       vendedorId: vendedorId || null,
       cep, logradouro, numero, complemento, bairro, cidade, estado,
     },
@@ -210,14 +231,43 @@ router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequ
     return;
   }
 
+  // Desvincular dispositivos (não excluir — podem ser reutilizados)
+  await prisma.dispositivo.updateMany({ where: { clienteId: id }, data: { clienteId: null } });
+
+  // Comissões pagas: salvar snapshot de dataPagamento e desvinvular do boleto
+  const comissoesPagas = await prisma.comissaoVendedor.findMany({
+    where: { boleto: { carne: { clienteId: id }, dataPagamento: { not: null } } },
+    select: { id: true, boleto: { select: { dataPagamento: true } } },
+  });
+  for (const c of comissoesPagas) {
+    await prisma.comissaoVendedor.update({
+      where: { id: c.id },
+      data: { boletoId: null, dataPagamento: c.boleto!.dataPagamento },
+    });
+  }
+  // Comissões não pagas: excluir
+  await prisma.comissaoVendedor.deleteMany({ where: { boleto: { carne: { clienteId: id } } } });
+
   // Excluir registros em cascata
   await prisma.boletoPlaca.deleteMany({ where: { boleto: { carne: { clienteId: id } } } });
-  await prisma.comissaoVendedor.deleteMany({ where: { boleto: { carne: { clienteId: id } } } });
+  await prisma.boletoDispositivo.deleteMany({ where: { boleto: { carne: { clienteId: id } } } });
   await prisma.boleto.deleteMany({ where: { carne: { clienteId: id } } });
   await prisma.carne.deleteMany({ where: { clienteId: id } });
   await prisma.placa.deleteMany({ where: { clienteId: id } });
   await prisma.cliente.delete({ where: { id } });
   res.status(204).send();
+});
+
+// GET /api/clientes/:id/dispositivos
+router.get('/:id/dispositivos', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const clienteId = param(req, 'id');
+  const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { id: true } });
+  if (!cliente) { res.status(404).json({ error: 'Cliente não encontrado.' }); return; }
+  const dispositivos = await prisma.dispositivo.findMany({
+    where: { clienteId },
+    orderBy: { nome: 'asc' },
+  });
+  res.json(dispositivos);
 });
 
 export default router;

@@ -15,6 +15,8 @@ const COLAB_SELECT = {
   id: true, nome: true, email: true, role: true, ativo: true, createdAt: true,
   podeExcluirCliente: true, podeEditarCliente: true, podeInativarCliente: true,
   podeExcluirPlaca: true, podeInativarPlaca: true,
+  podeExcluirDispositivo: true, podeInativarDispositivo: true,
+  podeCriarDispositivo: true, podeEditarDispositivo: true, podeDesvincularDispositivo: true,
   podeBaixaManual: true, podeCancelarCarne: true, podeAlterarVencimento: true,
 } as const;
 
@@ -24,6 +26,8 @@ async function criarUsuario(
     nome: string; email: string; senha: string; role: 'COLABORADOR' | 'VENDEDOR';
     podeExcluirCliente?: boolean; podeEditarCliente?: boolean; podeInativarCliente?: boolean;
     podeExcluirPlaca?: boolean; podeInativarPlaca?: boolean;
+    podeExcluirDispositivo?: boolean; podeInativarDispositivo?: boolean;
+    podeCriarDispositivo?: boolean; podeEditarDispositivo?: boolean; podeDesvincularDispositivo?: boolean;
     podeBaixaManual?: boolean; podeCancelarCarne?: boolean; podeAlterarVencimento?: boolean;
   }
 ) {
@@ -43,9 +47,14 @@ async function criarUsuario(
     data.podeExcluirCliente    = dados.podeExcluirCliente    ?? true;
     data.podeEditarCliente     = dados.podeEditarCliente     ?? true;
     data.podeInativarCliente   = dados.podeInativarCliente   ?? true;
-    data.podeExcluirPlaca      = dados.podeExcluirPlaca      ?? true;
-    data.podeInativarPlaca     = dados.podeInativarPlaca     ?? true;
-    data.podeBaixaManual       = dados.podeBaixaManual       ?? true;
+    data.podeExcluirPlaca         = dados.podeExcluirPlaca         ?? true;
+    data.podeInativarPlaca        = dados.podeInativarPlaca        ?? true;
+    data.podeExcluirDispositivo      = dados.podeExcluirDispositivo      ?? true;
+    data.podeInativarDispositivo     = dados.podeInativarDispositivo     ?? true;
+    data.podeCriarDispositivo        = dados.podeCriarDispositivo        ?? true;
+    data.podeEditarDispositivo       = dados.podeEditarDispositivo       ?? true;
+    data.podeDesvincularDispositivo  = dados.podeDesvincularDispositivo  ?? true;
+    data.podeBaixaManual          = dados.podeBaixaManual          ?? true;
     data.podeCancelarCarne     = dados.podeCancelarCarne     ?? true;
     data.podeAlterarVencimento = dados.podeAlterarVencimento ?? true;
   }
@@ -59,7 +68,7 @@ async function editarUsuario(
   role: 'COLABORADOR' | 'VENDEDOR'
 ) {
   const id = param(req, 'id');
-  const { nome, email, senha, podeExcluirCliente, podeEditarCliente, podeInativarCliente, podeExcluirPlaca, podeInativarPlaca, podeBaixaManual, podeCancelarCarne, podeAlterarVencimento } = req.body;
+  const { nome, email, senha, podeExcluirCliente, podeEditarCliente, podeInativarCliente, podeExcluirPlaca, podeInativarPlaca, podeExcluirDispositivo, podeInativarDispositivo, podeCriarDispositivo, podeEditarDispositivo, podeDesvincularDispositivo, podeBaixaManual, podeCancelarCarne, podeAlterarVencimento } = req.body;
 
   const existe = await prisma.user.findFirst({ where: { id, role }, select: { id: true } });
   if (!existe) {
@@ -81,9 +90,14 @@ async function editarUsuario(
     if (podeExcluirCliente    !== undefined) data.podeExcluirCliente    = podeExcluirCliente;
     if (podeEditarCliente     !== undefined) data.podeEditarCliente     = podeEditarCliente;
     if (podeInativarCliente   !== undefined) data.podeInativarCliente   = podeInativarCliente;
-    if (podeExcluirPlaca      !== undefined) data.podeExcluirPlaca      = podeExcluirPlaca;
-    if (podeInativarPlaca     !== undefined) data.podeInativarPlaca     = podeInativarPlaca;
-    if (podeBaixaManual       !== undefined) data.podeBaixaManual       = podeBaixaManual;
+    if (podeExcluirPlaca        !== undefined) data.podeExcluirPlaca        = podeExcluirPlaca;
+    if (podeInativarPlaca       !== undefined) data.podeInativarPlaca       = podeInativarPlaca;
+    if (podeExcluirDispositivo      !== undefined) data.podeExcluirDispositivo      = podeExcluirDispositivo;
+    if (podeInativarDispositivo     !== undefined) data.podeInativarDispositivo     = podeInativarDispositivo;
+    if (podeCriarDispositivo        !== undefined) data.podeCriarDispositivo        = podeCriarDispositivo;
+    if (podeEditarDispositivo       !== undefined) data.podeEditarDispositivo       = podeEditarDispositivo;
+    if (podeDesvincularDispositivo  !== undefined) data.podeDesvincularDispositivo  = podeDesvincularDispositivo;
+    if (podeBaixaManual         !== undefined) data.podeBaixaManual         = podeBaixaManual;
     if (podeCancelarCarne     !== undefined) data.podeCancelarCarne     = podeCancelarCarne;
     if (podeAlterarVencimento !== undefined) data.podeAlterarVencimento = podeAlterarVencimento;
   }
@@ -114,17 +128,28 @@ async function excluirUsuario(req: AuthRequest, res: Response, role: 'COLABORADO
     res.status(404).json({ error: `${role === 'COLABORADOR' ? 'Colaborador' : 'Vendedor'} não encontrado.` });
     return;
   }
-  const [totalCriados, totalCarnes, totalVendidos, totalComissoes] = await Promise.all([
-    prisma.cliente.count({ where: { criadoPorId: id } }),
-    prisma.carne.count({ where: { geradoPorId: id } }),
-    role === 'VENDEDOR' ? prisma.cliente.count({ where: { vendedorId: id } }) : Promise.resolve(0),
-    role === 'VENDEDOR' ? prisma.comissaoVendedor.count({ where: { vendedorId: id } }) : Promise.resolve(0),
-  ]);
-  if (totalCriados > 0 || totalCarnes > 0 || totalVendidos > 0 || totalComissoes > 0) {
-    res.status(400).json({ error: 'Usuário possui registros vinculados. Inative-o em vez de excluir.' });
-    return;
+
+  if (role === 'COLABORADOR') {
+    const [totalCriados, totalCarnes] = await Promise.all([
+      prisma.cliente.count({ where: { criadoPorId: id } }),
+      prisma.carne.count({ where: { geradoPorId: id } }),
+    ]);
+    if (totalCriados > 0 || totalCarnes > 0) {
+      res.status(400).json({ error: 'Colaborador possui registros vinculados. Inative-o em vez de excluir.' });
+      return;
+    }
+    await prisma.user.delete({ where: { id } });
+  } else {
+    // VENDEDOR: cascata completa — desvincula clientes/carnes/placas/dispositivos, apaga comissões e pagamentos
+    await prisma.cliente.updateMany({ where: { vendedorId: id }, data: { vendedorId: null } });
+    await prisma.carne.updateMany({ where: { vendedorId: id }, data: { vendedorId: null } });
+    await prisma.placa.updateMany({ where: { vendedorId: id }, data: { vendedorId: null } });
+    await prisma.dispositivo.updateMany({ where: { vendedorId: id }, data: { vendedorId: null } });
+    await prisma.comissaoVendedor.deleteMany({ where: { vendedorId: id } });
+    await prisma.pagamentoComissao.deleteMany({ where: { vendedorId: id } });
+    await prisma.user.delete({ where: { id } });
   }
-  await prisma.user.delete({ where: { id } });
+
   res.status(204).send();
 }
 

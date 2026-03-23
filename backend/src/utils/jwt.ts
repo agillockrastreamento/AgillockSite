@@ -13,6 +13,11 @@ export interface JwtPayload {
   podeInativarCliente?: boolean;
   podeExcluirPlaca?: boolean;
   podeInativarPlaca?: boolean;
+  podeExcluirDispositivo?: boolean;
+  podeInativarDispositivo?: boolean;
+  podeCriarDispositivo?: boolean;
+  podeEditarDispositivo?: boolean;
+  podeDesvincularDispositivo?: boolean;
   podeBaixaManual?: boolean;
   podeCancelarCarne?: boolean;
   podeAlterarVencimento?: boolean;

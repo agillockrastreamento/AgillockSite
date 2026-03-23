@@ -86,16 +86,16 @@
 
     /* ─── REGRAS ESPECÍFICAS POR ABA ─── */
 
-    /* ABA DADOS E PLACAS: O card rola internamente */
+    /* ABA DADOS E DISPOSITIVOS: O card rola internamente */
     #tab-dados .card-section,
-    #tab-placas .card-section {
+    #tab-dispositivos .card-section {
         flex: 1;
         overflow-y: auto;
         margin-bottom: 0;
     }
 
-    /* PLACAS: Gruda o título e o botão "Adicionar Placa" no topo do card */
-    #tab-placas .card-section > div:first-child {
+    /* DISPOSITIVOS: Gruda o título e o botão "Adicionar Dispositivo" no topo do card */
+    #tab-dispositivos .card-section > div:first-child {
         position: sticky;
         top: -24px; /* Compensa o padding do card para colar no teto */
         margin: -24px -24px 16px -24px;
@@ -103,8 +103,8 @@
         background: #fff;
         z-index: 10;
     }
-    /* PLACAS (Tema Escuro): Fundo do cabeçalho fixo */
-    html.dark-theme #tab-placas .card-section > div:first-child {
+    /* DISPOSITIVOS (Tema Escuro): Fundo do cabeçalho fixo */
+    html.dark-theme #tab-dispositivos .card-section > div:first-child {
         background: #1e2530;
         border-bottom-color: #2d3748;
     }
@@ -228,6 +228,7 @@
     <ul class="sidebar-nav">
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li class="active"><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
       <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
@@ -264,34 +265,13 @@
     <div id="content-area" style="display:none;">
       <div class="detail-page-tabs" id="page-tabs">
         <button class="active" data-tab="dados"><i class="fa fa-id-card-o"></i> Dados</button>
-        <button data-tab="placas"><i class="fa fa-car"></i> Placas</button>
+        <button data-tab="dispositivos"><i class="fa fa-microchip"></i> Dispositivos</button>
         <button data-tab="cobrancas"><i class="fa fa-money"></i> Cobranças</button>
       </div>
 
       <div id="tab-dados" class="tab-pane active"></div>
-      <div id="tab-placas" class="tab-pane"></div>
+      <div id="tab-dispositivos" class="tab-pane"></div>
       <div id="tab-cobrancas" class="tab-pane"></div>
-    </div>
-  </div>
-
-  <!-- Modal Placa -->
-  <div class="modal fade" id="modal-placa" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-      <div class="modal-content">
-        <div class="modal-header" style="background:#1e2530;">
-          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
-          <h4 class="modal-title" style="color:#fff;">Adicionar Placa</h4>
-        </div>
-        <div class="modal-body">
-          <div id="modal-placa-alert"></div>
-          <div class="form-group"><label>Placa *</label><input class="form-control" id="mp-placa" placeholder="ABC1234" style="text-transform:uppercase;" maxlength="7" /></div>
-          <div class="form-group"><label>Descrição</label><input class="form-control" id="mp-desc" maxlength="40" /><small id="ctr-mp-desc" style="display:block;text-align:right;color:#aaa;font-size:11px;margin-top:2px;">0/40</small></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-default" data-dismiss="modal">Cancelar</button>
-          <button class="btn btn-primary-al" id="btn-salvar-placa">Salvar</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -402,6 +382,7 @@
         document.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
         document.getElementById('tab-' + tab).classList.add('active');
         if (tab === 'cobrancas') carregarCobrancas();
+        if (tab === 'dispositivos') renderDispositivos(clienteData);
       });
     });
 
@@ -415,7 +396,7 @@
           document.getElementById('loading-state').style.display = 'none';
           document.getElementById('content-area').style.display = 'block';
           renderDados(c);
-          renderPlacas(c);
+          renderDispositivos(c);
         })
         .catch(function (err) {
           document.getElementById('loading-state').innerHTML =
@@ -439,6 +420,15 @@
         '<div class="col-sm-5"><div class="form-group"><label>Bairro</label><input class="form-control" id="d-bairro" value="' + esc(c.bairro||'') + '" /></div></div></div>' +
         '<div class="row"><div class="col-sm-8"><div class="form-group"><label>Cidade</label><input class="form-control" id="d-cidade" value="' + esc(c.cidade||'') + '" /></div></div>' +
         '<div class="col-sm-4"><div class="form-group"><label>UF</label><input class="form-control" id="d-estado" value="' + esc(c.estado||'') + '" maxlength="2" style="text-transform:uppercase;" /></div></div></div>' +
+        '<div class="row"><div class="col-sm-6"><div class="form-group"><label>Data de Nascimento</label><input type="date" class="form-control" id="d-data-nascimento" value="' + esc(c.dataNascimento||'') + '" /></div></div>' +
+        '<div class="col-sm-6"><div class="form-group"><label>RG</label><input class="form-control" id="d-rg" value="' + esc(c.rg||'') + '" maxlength="20" /></div></div></div>' +
+        '<div class="row"><div class="col-sm-6"><div class="form-group"><label>Profissão</label><input class="form-control" id="d-profissao" value="' + esc(c.profissao||'') + '" maxlength="100" /></div></div>' +
+        '<div class="col-sm-6"><div class="form-group"><label>Estado Civil</label>' +
+        '<select class="form-control" id="d-estado-civil"><option value="">— Selecione —</option>' +
+        '<option value="Solteiro(a)">Solteiro(a)</option><option value="Casado(a)">Casado(a)</option>' +
+        '<option value="Divorciado(a)">Divorciado(a)</option><option value="Viúvo(a)">Viúvo(a)</option>' +
+        '<option value="União Estável">União Estável</option></select>' +
+        '</div></div></div>' +
         '<div class="form-group"><label>Notas</label><textarea class="form-control" id="d-notas" rows="2">' + esc(c.notas||'') + '</textarea></div>' +
         '<div class="form-group"><label>Vendedor</label>' +
         '<div style="position:relative;">' +
@@ -452,6 +442,7 @@
       // Máscaras
       AL.maskCpfCnpj(document.getElementById('d-cpfcnpj'));
       AL.maskPhone(document.getElementById('d-telefone'));
+      document.getElementById('d-estado-civil').value = c.estadoCivil || '';
 
       // ViaCEP
       document.getElementById('d-cep').addEventListener('blur', function () {
@@ -528,7 +519,11 @@
           bairro:      document.getElementById('d-bairro').value.trim(),
           cidade:      document.getElementById('d-cidade').value.trim(),
           estado:      document.getElementById('d-estado').value.trim().toUpperCase(),
-          notas:       document.getElementById('d-notas').value.trim(),
+          notas:          document.getElementById('d-notas').value.trim(),
+          dataNascimento: document.getElementById('d-data-nascimento').value || null,
+          rg:             document.getElementById('d-rg').value.trim() || null,
+          profissao:      document.getElementById('d-profissao').value.trim() || null,
+          estadoCivil:    document.getElementById('d-estado-civil').value || null,
           vendedorId:  dVendedorId || null,
         };
         AL.apiPut('/api/clientes/' + clienteId, payload)
@@ -537,60 +532,72 @@
       });
     }
 
-    // ── Aba Placas ────────────────────────────────────────────────────────
-    function renderPlacas(c) {
-      var div = document.getElementById('tab-placas');
-      var placas = c.placas || [];
+    // ── Aba Dispositivos ──────────────────────────────────────────────────
+    function renderDispositivos(c) {
+      var div = document.getElementById('tab-dispositivos');
+      var dispositivos = c.dispositivos || [];
+      var addUrl = 'dispositivo.html?clienteId=' + clienteId + '&back=cliente-detalhe.html%3Fid%3D' + clienteId;
       var html = '<div class="card-section">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
-        '<h5 style="margin:0;font-weight:700;">Placas Cadastradas</h5>' +
-        '<button class="btn btn-sm btn-primary-al" id="btn-nova-placa"><i class="fa fa-plus"></i> Adicionar Placa</button></div>';
-      if (!placas.length) {
-        html += '<p class="text-muted text-center" style="padding:20px 0;">Nenhuma placa cadastrada.</p>';
+        '<h5 style="margin:0;font-weight:700;">Dispositivo(s) Associados</h5>' +
+        '<a href="' + addUrl + '" class="btn btn-sm btn-primary-al"><i class="fa fa-plus"></i> Adicionar Dispositivo</a></div>';
+      if (!dispositivos.length) {
+        html += '<p class="text-muted text-center" style="padding:20px 0;">Nenhum dispositivo associado.</p>';
       } else {
-        html += placas.map(function (p) {
+        html += dispositivos.map(function (d) {
+          var statusBadge = d.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO');
           return '<div class="placa-item"><div>' +
-            '<strong>' + p.placa + '</strong>' +
-            (p.descricao ? '<br><small class="text-muted">' + esc(p.descricao) + '</small>' : '') +
+            '<strong>' + esc(d.identificador) + '</strong>' +
+            '<br><small class="text-muted">' + esc(d.nome) + (d.placa ? ' &mdash; <strong>' + esc(d.placa) + '</strong>' : '') + '</small>' +
             '</div><div style="display:flex;gap:6px;align-items:center;">' +
-            (p.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO')) +
-            '<button class="btn btn-xs ' + (p.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle-placa" data-pid="' + p.id + '" title="' + (p.ativo?'Inativar':'Ativar') + '"><i class="fa fa-power-off"></i></button>' +
-            (isAdmin ? '<button class="btn btn-xs btn-danger btn-del-placa" data-pid="' + p.id + '" title="Excluir"><i class="fa fa-trash"></i></button>' : '') +
+            statusBadge +
+            '<a href="dispositivo.html?id=' + d.id + '&back=cliente-detalhe.html%3Fid%3D' + clienteId + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a>' +
+            '<button class="btn btn-xs ' + (d.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle-disp" data-did="' + d.id + '" title="' + (d.ativo?'Inativar':'Ativar') + '"><i class="fa fa-power-off"></i></button>' +
+            '<button class="btn btn-xs btn-danger btn-desv-disp" data-did="' + d.id + '" title="Desvincular"><i class="fa fa-unlink"></i></button>' +
+            (isAdmin ? '<button class="btn btn-xs btn-danger btn-del-disp" data-did="' + d.id + '" title="Excluir"><i class="fa fa-trash"></i></button>' : '') +
             '</div></div>';
         }).join('');
       }
       html += '</div>';
       div.innerHTML = html;
 
-      document.getElementById('btn-nova-placa').addEventListener('click', function () {
-        document.getElementById('mp-placa').value = '';
-        document.getElementById('mp-desc').value = '';
-        document.getElementById('modal-placa-alert').innerHTML = '';
-        document.getElementById('ctr-mp-desc').textContent = '0/40';
-        document.getElementById('ctr-mp-desc').style.color = '#aaa';
-        $('#modal-placa').modal('show');
-      });
-
-      div.querySelectorAll('.btn-toggle-placa').forEach(function (btn) {
+      div.querySelectorAll('.btn-toggle-disp').forEach(function (btn) {
         btn.addEventListener('click', function () {
-          AL.apiPatch('/api/placas/' + this.dataset.pid + '/status', {})
+          AL.apiPatch('/api/dispositivos/' + this.dataset.did + '/status', {})
             .then(function () { carregarCliente(); })
             .catch(function (err) { AL.showAlert(err.message); });
         });
       });
 
+      div.querySelectorAll('.btn-desv-disp').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var did = this.dataset.did;
+          AL.confirmar({
+            titulo: 'Desvincular Dispositivo',
+            mensagem: 'Deseja desvincular este dispositivo do cliente?',
+            consequencias: 'O dispositivo ficará sem cliente associado mas não será excluído.',
+            btnTexto: '<i class="fa fa-unlink"></i> Desvincular',
+          }).then(function (ok) {
+            if (!ok) return;
+            AL.apiPatch('/api/dispositivos/' + did + '/vincular', { clienteId: null })
+              .then(function () { carregarCliente(); })
+              .catch(function (err) { AL.showAlert(err.message); });
+          });
+        });
+      });
+
       if (isAdmin) {
-        div.querySelectorAll('.btn-del-placa').forEach(function (btn) {
+        div.querySelectorAll('.btn-del-disp').forEach(function (btn) {
           btn.addEventListener('click', function () {
-            var pid = this.dataset.pid;
+            var did = this.dataset.did;
             AL.confirmar({
-              titulo: 'Excluir Placa',
-              mensagem: 'Deseja excluir esta placa?',
-              consequencias: 'A placa será removida permanentemente do sistema.',
+              titulo: 'Excluir Dispositivo',
+              mensagem: 'Deseja excluir este dispositivo?',
+              consequencias: 'O dispositivo será removido permanentemente.',
               btnTexto: '<i class="fa fa-trash"></i> Excluir',
             }).then(function (ok) {
               if (!ok) return;
-              AL.apiDelete('/api/placas/' + pid)
+              AL.apiDelete('/api/dispositivos/' + did)
                 .then(function () { carregarCliente(); })
                 .catch(function (err) { AL.showAlert(err.message); });
             });
@@ -598,30 +605,6 @@
         });
       }
     }
-
-    document.getElementById('mp-desc').addEventListener('input', function () {
-      var len = this.value.length;
-      var ctr = document.getElementById('ctr-mp-desc');
-      ctr.textContent = len + '/40';
-      ctr.style.color = len >= 40 ? '#dc3545' : '#aaa';
-    });
-
-    document.getElementById('btn-salvar-placa').addEventListener('click', function () {
-      var placa = document.getElementById('mp-placa').value.trim().toUpperCase();
-      if (!placa) {
-        document.getElementById('modal-placa-alert').innerHTML = '<div class="alert alert-danger">Placa é obrigatória.</div>';
-        return;
-      }
-      AL.apiPost('/api/clientes/' + clienteId + '/placas', {
-        placa: placa, descricao: document.getElementById('mp-desc').value.trim()
-      }).then(function () {
-        $('#modal-placa').modal('hide');
-        carregarCliente();
-        AL.showAlert('Placa adicionada.', 'success');
-      }).catch(function (err) {
-        document.getElementById('modal-placa-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
-      });
-    });
 
     // ── Aba Cobranças ─────────────────────────────────────────────────────
     var carnesData = null;
@@ -663,12 +646,14 @@
         });
       });
 
-      // Placas únicas dos carnês individuais com boletos ativos + valor do último boleto ativo
+      // Dispositivos/Placas únicos dos carnês individuais com boletos ativos
       var placasMap = {};
       carnesData.forEach(function (cn) {
         if (cn.tipo === 'INDIVIDUAL') {
           cn.boletos.forEach(function (b) {
-            if (b.placa && (b.status === 'PENDENTE' || b.status === 'ATRASADO')) {
+            if (b.dispositivo && (b.status === 'PENDENTE' || b.status === 'ATRASADO')) {
+              placasMap[b.dispositivo.id] = { id: b.dispositivo.id, placa: b.dispositivo.identificador + (b.dispositivo.placa ? ' (' + b.dispositivo.placa + ')' : ''), label: b.dispositivo.nome, valor: Number(b.valor) };
+            } else if (b.placa && (b.status === 'PENDENTE' || b.status === 'ATRASADO')) {
               placasMap[b.placa.id] = { id: b.placa.id, placa: b.placa.placa, valor: Number(b.valor) };
             }
           });
@@ -797,10 +782,10 @@
         // Mostrar todos os carnês (individuais e unificado)
         carnesFiltrados = carnesData;
       } else if (placaTabAtiva) {
-        // Mostrar carnês cujos boletos pertencem à placa selecionada
+        // Mostrar carnês cujos boletos pertencem ao dispositivo/placa selecionado
         carnesFiltrados = carnesData.filter(function (cn) {
           return cn.tipo === 'INDIVIDUAL' && cn.boletos.some(function (b) {
-            return b.placa && b.placa.id === placaTabAtiva;
+            return (b.dispositivo && b.dispositivo.id === placaTabAtiva) || (b.placa && b.placa.id === placaTabAtiva);
           });
         });
       } else {
@@ -808,7 +793,7 @@
       }
 
       if (!carnesFiltrados.length) {
-        container.innerHTML = '<p class="text-muted text-center" style="padding:20px 0;">Nenhuma cobrança para esta placa.</p>';
+        container.innerHTML = '<p class="text-muted text-center" style="padding:20px 0;">Nenhuma cobrança para este item.</p>';
         return;
       }
 
@@ -817,7 +802,8 @@
         // Filtrar boletos por placa (para individuais), por data e por status
         var boletos = cn.boletos.filter(function (b) {
           if (!filtroTipo && !temUnificado && placaTabAtiva && cn.tipo === 'INDIVIDUAL') {
-            if (!b.placa || b.placa.id !== placaTabAtiva) return false;
+            var bId = (b.dispositivo && b.dispositivo.id) || (b.placa && b.placa.id);
+            if (bId !== placaTabAtiva) return false;
           }
           if (filtroDataDe && b.vencimento < filtroDataDe) return false;
           if (filtroDataAte && b.vencimento > filtroDataAte + 'T23:59:59') return false;
@@ -859,8 +845,17 @@
           if (!items.length) return '';
           var rows = items.map(function (b) {
             var placaInfo = '';
-            if (cn.tipo === 'UNIFICADO' && b.placasUnificadas && b.placasUnificadas.length) {
-              placaInfo = '<br><small class="text-muted">' + b.placasUnificadas.map(function (bp) { return bp.placa ? bp.placa.placa : ''; }).join(', ') + '</small>';
+            if (cn.tipo === 'UNIFICADO') {
+              var labels = [];
+              if (b.dispositivosUnificados && b.dispositivosUnificados.length) {
+                b.dispositivosUnificados.forEach(function(bd){ if(bd.dispositivo) labels.push(bd.dispositivo.nome + (bd.dispositivo.placa ? ' ('+bd.dispositivo.placa+')' : '')); });
+              }
+              if (b.placasUnificadas && b.placasUnificadas.length) {
+                b.placasUnificadas.forEach(function(bp){ if(bp.placa) labels.push(bp.placa.placa); });
+              }
+              if (labels.length) placaInfo = '<br><small class="text-muted">' + labels.join(', ') + '</small>';
+            } else if (b.dispositivo) {
+              placaInfo = '<br><small class="text-muted">' + b.dispositivo.nome + (b.dispositivo.placa ? ' (' + b.dispositivo.placa + ')' : '') + '</small>';
             } else if (b.placa) {
               placaInfo = '<br><small class="text-muted">' + b.placa.placa + '</small>';
             }

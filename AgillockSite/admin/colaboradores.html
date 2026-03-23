@@ -72,6 +72,7 @@
     <ul class="sidebar-nav">
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
       <li class="active"><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
@@ -184,6 +185,21 @@
                   <input type="checkbox" id="f-pode-inativar-placa" checked /> Pode inativar/ativar placas
                 </label>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-criar-dispositivo" checked /> Pode criar novos dispositivos
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-editar-dispositivo" checked /> Pode editar dispositivos
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-excluir-dispositivo" checked /> Pode excluir dispositivos
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-inativar-dispositivo" checked /> Pode inativar/ativar dispositivos
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-desvincular-dispositivo" checked /> Pode desvincular dispositivos de clientes
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-baixa" checked /> Pode dar baixa manual em boletos
                 </label>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -280,8 +296,13 @@
       if (c.podeExcluirCliente)    icons.push('<span title="Excluir clientes" style="color:#e74c3c;"><i class="fa fa-user-times"></i></span>');
       if (c.podeEditarCliente)     icons.push('<span title="Editar clientes" style="color:#8e44ad;"><i class="fa fa-pencil"></i></span>');
       if (c.podeInativarCliente)   icons.push('<span title="Inativar/ativar clientes" style="color:#d35400;"><i class="fa fa-power-off"></i></span>');
-      if (c.podeExcluirPlaca)      icons.push('<span title="Excluir placas" style="color:#c0392b;"><i class="fa fa-car"></i></span>');
-      if (c.podeInativarPlaca)     icons.push('<span title="Inativar/ativar placas" style="color:#16a085;"><i class="fa fa-toggle-on"></i></span>');
+      if (c.podeExcluirPlaca)          icons.push('<span title="Excluir placas" style="color:#c0392b;"><i class="fa fa-car"></i></span>');
+      if (c.podeInativarPlaca)         icons.push('<span title="Inativar/ativar placas" style="color:#16a085;"><i class="fa fa-toggle-on"></i></span>');
+      if (c.podeCriarDispositivo)          icons.push('<span title="Criar dispositivos" style="color:#16a085;"><i class="fa fa-plus-circle"></i></span>');
+      if (c.podeEditarDispositivo)         icons.push('<span title="Editar dispositivos" style="color:#8e44ad;"><i class="fa fa-pencil-square-o"></i></span>');
+      if (c.podeExcluirDispositivo)        icons.push('<span title="Excluir dispositivos" style="color:#c0392b;"><i class="fa fa-microchip"></i></span>');
+      if (c.podeInativarDispositivo)       icons.push('<span title="Inativar/ativar dispositivos" style="color:#2980b9;"><i class="fa fa-toggle-on"></i></span>');
+      if (c.podeDesvincularDispositivo)    icons.push('<span title="Desvincular dispositivos" style="color:#e67e22;"><i class="fa fa-unlink"></i></span>');
       if (c.podeBaixaManual)       icons.push('<span title="Baixa manual" style="color:#27ae60;"><i class="fa fa-check-circle"></i></span>');
       if (c.podeCancelarCarne)     icons.push('<span title="Cancelar carnê" style="color:#e67e22;"><i class="fa fa-ban"></i></span>');
       if (c.podeAlterarVencimento) icons.push('<span title="Alterar vencimento" style="color:#3498db;"><i class="fa fa-calendar"></i></span>');
@@ -349,9 +370,12 @@
       document.getElementById('f-pode-excluir').checked           = true;
       document.getElementById('f-pode-editar').checked            = true;
       document.getElementById('f-pode-inativar-cliente').checked  = true;
-      document.getElementById('f-pode-excluir-placa').checked     = true;
-      document.getElementById('f-pode-inativar-placa').checked    = true;
-      document.getElementById('f-pode-baixa').checked             = true;
+      document.getElementById('f-pode-excluir-placa').checked          = true;
+      document.getElementById('f-pode-inativar-placa').checked         = true;
+      document.getElementById('f-pode-criar-dispositivo').checked      = true;
+      document.getElementById('f-pode-editar-dispositivo').checked     = true;
+      document.getElementById('f-pode-desvincular-dispositivo').checked = true;
+      document.getElementById('f-pode-baixa').checked                  = true;
       document.getElementById('f-pode-cancelar').checked          = true;
       document.getElementById('f-pode-vencimento').checked        = true;
 
@@ -367,8 +391,13 @@
           document.getElementById('f-pode-excluir').checked           = c.podeExcluirCliente    !== false;
           document.getElementById('f-pode-editar').checked            = c.podeEditarCliente     !== false;
           document.getElementById('f-pode-inativar-cliente').checked  = c.podeInativarCliente   !== false;
-          document.getElementById('f-pode-excluir-placa').checked     = c.podeExcluirPlaca      !== false;
-          document.getElementById('f-pode-inativar-placa').checked    = c.podeInativarPlaca     !== false;
+          document.getElementById('f-pode-excluir-placa').checked          = c.podeExcluirPlaca          !== false;
+          document.getElementById('f-pode-inativar-placa').checked         = c.podeInativarPlaca         !== false;
+          document.getElementById('f-pode-criar-dispositivo').checked       = c.podeCriarDispositivo       !== false;
+          document.getElementById('f-pode-editar-dispositivo').checked     = c.podeEditarDispositivo      !== false;
+          document.getElementById('f-pode-excluir-dispositivo').checked    = c.podeExcluirDispositivo     !== false;
+          document.getElementById('f-pode-inativar-dispositivo').checked   = c.podeInativarDispositivo    !== false;
+          document.getElementById('f-pode-desvincular-dispositivo').checked = c.podeDesvincularDispositivo !== false;
           document.getElementById('f-pode-baixa').checked             = c.podeBaixaManual       !== false;
           document.getElementById('f-pode-cancelar').checked          = c.podeCancelarCarne     !== false;
           document.getElementById('f-pode-vencimento').checked        = c.podeAlterarVencimento !== false;
@@ -408,8 +437,13 @@
         podeExcluirCliente:    document.getElementById('f-pode-excluir').checked,
         podeEditarCliente:     document.getElementById('f-pode-editar').checked,
         podeInativarCliente:   document.getElementById('f-pode-inativar-cliente').checked,
-        podeExcluirPlaca:      document.getElementById('f-pode-excluir-placa').checked,
-        podeInativarPlaca:     document.getElementById('f-pode-inativar-placa').checked,
+        podeExcluirPlaca:          document.getElementById('f-pode-excluir-placa').checked,
+        podeInativarPlaca:         document.getElementById('f-pode-inativar-placa').checked,
+        podeCriarDispositivo:       document.getElementById('f-pode-criar-dispositivo').checked,
+        podeEditarDispositivo:      document.getElementById('f-pode-editar-dispositivo').checked,
+        podeExcluirDispositivo:     document.getElementById('f-pode-excluir-dispositivo').checked,
+        podeInativarDispositivo:    document.getElementById('f-pode-inativar-dispositivo').checked,
+        podeDesvincularDispositivo: document.getElementById('f-pode-desvincular-dispositivo').checked,
         podeBaixaManual:       document.getElementById('f-pode-baixa').checked,
         podeCancelarCarne:     document.getElementById('f-pode-cancelar').checked,
         podeAlterarVencimento: document.getElementById('f-pode-vencimento').checked,

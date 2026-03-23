@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Dispositivo — AgilLock Colaborador</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; padding-right: 0 !important; overflow: hidden; }
+    .disp-page-scroll { flex: 1; overflow-y: auto; padding-right: 24px; padding-bottom: 40px; }
+    #page-body { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+    .card-section { background:#fff; border-radius:10px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.07); margin-bottom:20px; }
+    html.dark-theme .card-section { background:#1e2530; color:#c9d1d9; }
+    .card-section h5 { font-weight:700; font-size:15px; margin:0 0 18px; color:#c8870a; border-bottom:2px solid #c8870a22; padding-bottom:8px; }
+
+    /* Categoria picker */
+    .categoria-wrap { position:relative; }
+    .categoria-dropdown { position:absolute; z-index:300; width:100%; background:#fff; border:1px solid #ddd; border-radius:6px; max-height:260px; overflow-y:auto; display:none; box-shadow:0 4px 16px rgba(0,0,0,.12); }
+    html.dark-theme .categoria-dropdown { background:#1e2530; border-color:#3d4a5c; }
+    .cat-item { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f2f5; }
+    html.dark-theme .cat-item { border-bottom-color:#2d3748; color:#c9d1d9; }
+    .cat-item:hover, .cat-item.selected { background:#fff8e6; color:#c8870a; }
+    html.dark-theme .cat-item:hover, html.dark-theme .cat-item.selected { background:#2a2010; color:#c8870a; }
+    .cat-item i { width:18px; text-align:center; color:#c8870a; }
+
+    /* Toggle switch */
+    .toggle-row { display:flex; align-items:center; gap:12px; }
+    .toggle-switch { position:relative; width:46px; height:24px; flex-shrink:0; }
+    .toggle-switch input { opacity:0; width:0; height:0; }
+    .toggle-slider { position:absolute; cursor:pointer; top:0;left:0;right:0;bottom:0; background:#ccc; border-radius:24px; transition:.3s; }
+    .toggle-slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; }
+    input:checked + .toggle-slider { background:#c8870a; }
+    input:checked + .toggle-slider:before { transform:translateX(22px); }
+
+    /* Image drop */
+    .img-drop { border:2px dashed #ddd; border-radius:8px; padding:24px; text-align:center; cursor:pointer; color:#aaa; font-size:13px; transition:border-color .2s; }
+    html.dark-theme .img-drop { border-color:#3d4a5c; color:#6b7280; }
+    .img-drop:hover, .img-drop.dragover { border-color:#c8870a; color:#c8870a; }
+    .img-drop img { max-height:120px; border-radius:6px; margin-bottom:8px; }
+    .img-drop .img-name { font-size:12px; color:#666; margin-top:4px; }
+    html.dark-theme .img-drop .img-name { color:#adb5bd; }
+
+    /* Page scroll — handled above via flex layout */
+  </style>
+</head>
+<body>
+
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li class="active"><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <button class="btn btn-default btn-sm" id="btn-voltar"><i class="fa fa-arrow-left"></i></button>
+        <h2 class="topbar-title" id="page-title">Novo Dispositivo</h2>
+      </div>
+    </div>
+
+    <div class="disp-page-scroll">
+    <div id="al-alert-container"></div>
+
+    <div id="page-body">
+
+      <!-- Card Identificação -->
+      <div class="card-section">
+        <h5><i class="fa fa-tag"></i> Identificação</h5>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Nome *</label>
+              <input class="form-control" id="d-nome" placeholder="Ex.: Caminhão Frota 01" />
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Identificador *</label>
+              <input class="form-control" id="d-identificador" placeholder="Ex.: DISP-001" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Categoria</label>
+              <div class="categoria-wrap">
+                <input class="form-control" id="d-categoria-input" placeholder="Digite para filtrar..." autocomplete="off" />
+                <input type="hidden" id="d-categoria-value" />
+                <div class="categoria-dropdown" id="categoria-dropdown"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Grupo</label>
+              <input class="form-control" id="d-grupo" placeholder="Ex.: Frota SP" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Cliente</label>
+              <div style="position:relative;">
+                <input class="form-control" id="d-cliente-busca" placeholder="Digite para buscar cliente..." autocomplete="off" />
+                <input type="hidden" id="d-cliente-id" />
+                <button type="button" id="d-cliente-limpar" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;line-height:1;padding:0;">&times;</button>
+                <div id="d-cliente-resultados" style="position:absolute;z-index:200;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;display:none;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Contato</label>
+              <input class="form-control" id="d-contato" placeholder="Ex.: (11) 9 9999-9999" maxlength="15" />
+            </div>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="d-ativo" checked />
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="d-ativo-label" style="font-size:13px;font-weight:600;">Ativo</span>
+        </div>
+      </div>
+
+      <!-- Card Rastreador -->
+      <div class="card-section">
+        <h5><i class="fa fa-map-marker"></i> Rastreador</h5>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Modelo</label>
+              <input class="form-control" id="d-modelo-rastreador" placeholder="Ex.: Suntech ST4310" />
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Telefone</label>
+              <input class="form-control" id="d-telefone-rastreador" placeholder="Ex.: (11) 9 9999-9999" maxlength="15" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>ICCID</label>
+              <input class="form-control" id="d-iccid" placeholder="Número do chip" />
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Operadora do Chip</label>
+              <input class="form-control" id="d-operadora" placeholder="Ex.: Claro, Vivo, TIM..." />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Veículo -->
+      <div class="card-section">
+        <h5><i class="fa fa-car"></i> Veículo</h5>
+        <div class="row">
+          <div class="col-sm-3">
+            <div class="form-group">
+              <label>Placa</label>
+              <input class="form-control" id="d-placa" placeholder="ABC1234" style="text-transform:uppercase;" maxlength="8" />
+            </div>
+          </div>
+          <div class="col-sm-5">
+            <div class="form-group">
+              <label>Marca</label>
+              <input class="form-control" id="d-marca" placeholder="Ex.: Volkswagen" />
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Modelo do Veículo</label>
+              <input class="form-control" id="d-modelo-veiculo" placeholder="Ex.: Constellation" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-3">
+            <div class="form-group">
+              <label>Cor</label>
+              <input class="form-control" id="d-cor" placeholder="Ex.: Branco" />
+            </div>
+          </div>
+          <div class="col-sm-2">
+            <div class="form-group">
+              <label>Ano</label>
+              <input class="form-control" id="d-ano" placeholder="2024" maxlength="4" />
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>RENAVAM</label>
+              <input class="form-control" id="d-renavam" placeholder="00000000000" maxlength="11" />
+            </div>
+          </div>
+          <div class="col-sm-3">
+            <div class="form-group">
+              <label>Combustível</label>
+              <input class="form-control" id="d-combustivel" placeholder="Ex.: Diesel" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-12">
+            <div class="form-group">
+              <label>Chassi</label>
+              <input class="form-control" id="d-chassi" placeholder="9BWZZZ377VT004251" maxlength="17" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Local de Instalação</label>
+              <input class="form-control" id="d-local-instalacao" placeholder="Ex.: Painel dianteiro" />
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Instalador</label>
+              <input class="form-control" id="d-instalador" placeholder="Nome do instalador" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Configurações -->
+      <div class="card-section">
+        <h5><i class="fa fa-cog"></i> Configurações</h5>
+        <div class="row">
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Consumo</label>
+              <input class="form-control" id="d-consumo" placeholder="Ex.: 12 km/l" />
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Limite de Velocidade (km/h)</label>
+              <input type="number" class="form-control" id="d-velocidade" placeholder="Ex.: 90" min="0" />
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Senha</label>
+              <input class="form-control" id="d-senha" placeholder="Senha do rastreador" />
+            </div>
+          </div>
+        </div>
+        <div class="toggle-row" style="margin-top:4px;">
+          <label class="toggle-switch">
+            <input type="checkbox" id="d-ignorar-odometro" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span style="font-size:13px;font-weight:600;">Ignorar odômetro no relatório</span>
+        </div>
+      </div>
+
+      <!-- Card Imagem -->
+      <div class="card-section">
+        <h5><i class="fa fa-image"></i> Imagem</h5>
+        <div class="img-drop" id="img-drop">
+          <div id="img-preview-wrap">
+            <i class="fa fa-cloud-upload fa-2x" style="margin-bottom:8px;"></i>
+            <p style="margin:0;">Arraste uma imagem ou <strong>clique para selecionar</strong></p>
+            <small>Máximo 5 MB</small>
+          </div>
+          <input type="file" id="img-input" accept="image/*" style="display:none;" />
+        </div>
+      </div>
+
+      <!-- Botão Salvar -->
+      <div style="text-align:right; margin-top:8px;">
+        <button type="button" class="btn btn-primary-al btn-lg" id="btn-salvar">
+          <span id="btn-salvar-txt"><i class="fa fa-save"></i> Salvar Dispositivo</span>
+          <span id="btn-salvar-spin" style="display:none;"><i class="fa fa-spinner fa-spin"></i> Salvando…</span>
+        </button>
+      </div>
+
+    </div><!-- /page-body -->
+    </div><!-- /disp-page-scroll -->
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+    if (!currentUser) return;
+    var isAdmin = currentUser.role === 'ADMIN';
+    var canCriarDispositivo       = isAdmin || (currentUser.podeCriarDispositivo       !== false);
+    var canEditarDispositivo      = isAdmin || (currentUser.podeEditarDispositivo      !== false);
+    var canInativarDispositivo    = isAdmin || (currentUser.podeInativarDispositivo    !== false);
+    var canDesvincularDispositivo = isAdmin || (currentUser.podeDesvincularDispositivo !== false);
+    var canExcluirDispositivo     = isAdmin || (currentUser.podeExcluirDispositivo     !== false);
+
+    function esc(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge ' + (isAdmin ? 'badge-ativo' : 'badge-pendente');
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    // Máscaras de telefone
+    AL.maskPhone(document.getElementById('d-contato'));
+    AL.maskPhone(document.getElementById('d-telefone-rastreador'));
+
+    // URL params
+    var params = new URLSearchParams(window.location.search);
+    var dispositivoId = params.get('id');
+    var preClienteId  = params.get('clienteId');
+    var backUrl       = params.get('back') || 'dispositivos.html';
+
+    document.getElementById('btn-voltar').addEventListener('click', function () {
+      window.location.href = backUrl;
+    });
+
+    // ── Modo sucesso (após criação bem-sucedida) ───────────────────────────
+    if (params.get('success') === '1' && dispositivoId) {
+      var sd = null;
+      try { sd = JSON.parse(sessionStorage.getItem('disp-success') || 'null'); } catch(e) {}
+      sessionStorage.removeItem('disp-success');
+      document.getElementById('page-title').textContent = 'Dispositivo Cadastrado';
+      var cnOk = (sd && sd.clienteNome) ? esc(sd.clienteNome) : '—';
+      document.getElementById('page-body').innerHTML =
+        '<div style="text-align:center;padding:48px 24px;">' +
+        '<div style="font-size:64px;color:#27ae60;margin-bottom:16px;"><i class="fa fa-check-circle"></i></div>' +
+        '<h3 style="margin:0 0 8px;font-weight:700;">Dispositivo cadastrado com sucesso!</h3>' +
+        '<p style="color:#888;margin-bottom:24px;">O dispositivo foi salvo e está disponível no sistema.</p>' +
+        (sd ? '<div class="card-section" style="max-width:420px;margin:0 auto 32px;text-align:left;">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:14px;">' +
+        '<tr><td style="padding:6px 0;color:#888;width:40%;">Nome</td><td style="padding:6px 0;font-weight:600;">' + esc(sd.nome) + '</td></tr>' +
+        '<tr><td style="padding:6px 0;color:#888;">Identificador</td><td style="padding:6px 0;font-weight:600;">' + esc(sd.identificador) + '</td></tr>' +
+        (sd.placa ? '<tr><td style="padding:6px 0;color:#888;">Placa</td><td style="padding:6px 0;font-weight:600;">' + esc(sd.placa) + '</td></tr>' : '') +
+        '<tr><td style="padding:6px 0;color:#888;">Cliente</td><td style="padding:6px 0;font-weight:600;">' + cnOk + '</td></tr>' +
+        '<tr><td style="padding:6px 0;color:#888;">Status</td><td style="padding:6px 0;">' + (sd.ativo ? '<span class="al-badge badge-ativo">Ativo</span>' : '<span class="al-badge badge-inativo">Inativo</span>') + '</td></tr>' +
+        '</table></div>' : '') +
+        '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">' +
+        '<a href="dispositivo.html" class="btn btn-primary-al btn-lg" style="font-size:16px;display:inline-flex;align-items:center;"><i class="fa fa-plus" style="margin-right:6px;"></i> Cadastrar outro dispositivo</a>' +
+        '<a href="dispositivos.html" class="btn btn-default btn-lg" style="font-size:16px;display:inline-flex;align-items:center;"><i class="fa fa-list" style="margin-right:6px;"></i> Ver todos os dispositivos</a>' +
+        '</div></div>';
+      return;
+    }
+
+    // Verificar permissões de acesso à página
+    if (dispositivoId && !canEditarDispositivo) {
+      AL.showAlert('Você não tem permissão para editar dispositivos.', 'danger');
+      setTimeout(function() { window.location.href = backUrl; }, 1500);
+      return;
+    }
+    if (!dispositivoId && !canCriarDispositivo) {
+      AL.showAlert('Você não tem permissão para criar dispositivos.', 'danger');
+      setTimeout(function() { window.location.href = backUrl; }, 1500);
+      return;
+    }
+
+    if (dispositivoId) {
+      document.getElementById('page-title').textContent = 'Editar Dispositivo';
+      // Desabilitar toggle ativo se sem permissão de inativar
+      if (!canInativarDispositivo) {
+        var toggleInput = document.getElementById('d-ativo');
+        toggleInput.disabled = true;
+        toggleInput.parentElement.style.opacity = '0.5';
+        toggleInput.parentElement.style.cursor = 'not-allowed';
+        document.getElementById('d-ativo-label').textContent += ' (sem permissão para alterar)';
+      }
+    }
+
+    // ── Categorias ────────────────────────────────────────────────────────
+    var CATEGORIAS = [
+      { value: 'ambulancia', label: 'Ambulância', icon: 'fa-ambulance' },
+      { value: 'aviao_passageiros', label: 'Avião de passageiros', icon: 'fa-plane' },
+      { value: 'bicicleta', label: 'Bicicleta', icon: 'fa-bicycle' },
+      { value: 'caixa_estacionaria', label: 'Caixa estacionária', icon: 'fa-cube' },
+      { value: 'caminhao', label: 'Caminhão', icon: 'fa-truck' },
+      { value: 'caminhao_trator', label: 'Caminhão (unidade trator)', icon: 'fa-truck' },
+      { value: 'caminhao_bau', label: 'Caminhão baú', icon: 'fa-truck' },
+      { value: 'caminhao_bomba_concreto', label: 'Caminhão bomba de concreto', icon: 'fa-truck' },
+      { value: 'caminhao_betoneira', label: 'Caminhão misturador (betoneira)', icon: 'fa-truck' },
+      { value: 'caminhao_reboque', label: 'Caminhão reboque', icon: 'fa-truck' },
+      { value: 'caminhao_reboque_estrado', label: 'Caminhão reboque estrado', icon: 'fa-truck' },
+      { value: 'caminhao_tanque_combustivel', label: 'Caminhão tanque de combustível', icon: 'fa-truck' },
+      { value: 'caminhao_pipa', label: 'Caminhão tanque de água (pipa)', icon: 'fa-truck' },
+      { value: 'caminhao_vacuo', label: 'Caminhão vácuo', icon: 'fa-truck' },
+      { value: 'caminhao_bombeiros', label: 'Caminhão de bombeiros', icon: 'fa-truck' },
+      { value: 'caminhao_esgoto', label: 'Caminhão de limpeza de esgoto', icon: 'fa-truck' },
+      { value: 'caminhao_recuperacao', label: 'Caminhão de recuperação', icon: 'fa-truck' },
+      { value: 'caminhao_transporte', label: 'Caminhão de transporte', icon: 'fa-truck' },
+      { value: 'caravana', label: 'Caravana', icon: 'fa-bus' },
+      { value: 'carro', label: 'Carro', icon: 'fa-car' },
+      { value: 'carro_executivo', label: 'Carro executivo', icon: 'fa-car' },
+      { value: 'carro_hatchback', label: 'Carro hatchback', icon: 'fa-car' },
+      { value: 'carro_assistencia', label: 'Carro de assistência na estrada', icon: 'fa-car' },
+      { value: 'carro_luxo', label: 'Carro de luxo', icon: 'fa-car' },
+      { value: 'container_20', label: 'Container de 20 pés', icon: 'fa-cube' },
+      { value: 'container_40', label: 'Container de 40 pés', icon: 'fa-cube' },
+      { value: 'container_tanque', label: 'Container de tanque de troca', icon: 'fa-cube' },
+      { value: 'drone', label: 'Drone', icon: 'fa-rocket' },
+      { value: 'empilhadeira', label: 'Empilhadeira', icon: 'fa-truck' },
+      { value: 'escavadeira', label: 'Escavadeira', icon: 'fa-truck' },
+      { value: 'escavadora', label: 'Escavadora', icon: 'fa-truck' },
+      { value: 'helicoptero', label: 'Helicóptero', icon: 'fa-plane' },
+      { value: 'motocicleta', label: 'Motocicleta', icon: 'fa-motorcycle' },
+      { value: 'motocicleta_cruzada', label: 'Motocicleta cruzada', icon: 'fa-motorcycle' },
+      { value: 'padrao', label: 'Padrão', icon: 'fa-arrow-right' },
+      { value: 'pedicalo', label: 'Pedicalo', icon: 'fa-bicycle' },
+      { value: 'pickup', label: 'Pick-up', icon: 'fa-truck' },
+      { value: 'pickup_reboque', label: 'Pick-up reboque', icon: 'fa-truck' },
+      { value: 'plataforma_reboque', label: 'Plataforma de reboque de mesa', icon: 'fa-truck' },
+      { value: 'reboque_gerador', label: 'Reboque gerador ultra silencioso', icon: 'fa-truck' },
+      { value: 'reboque_reefer', label: 'Reboque reefer', icon: 'fa-truck' },
+      { value: 'reboque_tanque', label: 'Reboque tanque', icon: 'fa-truck' },
+      { value: 'reboque_residuos', label: 'Reboque de tanque de resíduos', icon: 'fa-truck' },
+      { value: 'reboque_caixa', label: 'Reboque de caixa', icon: 'fa-truck' },
+      { value: 'reboque_carro', label: 'Reboque de carro', icon: 'fa-truck' },
+      { value: 'reboque_container_gerador', label: 'Reboque de gerador container', icon: 'fa-truck' },
+      { value: 'retroescavadeira', label: 'Retroescavadeira', icon: 'fa-truck' },
+      { value: 'aclo_compressor', label: 'Aclo compressor', icon: 'fa-compress' },
+      { value: 'trator', label: 'Trator agrícola', icon: 'fa-truck' },
+      { value: 'taxi', label: 'Taxi', icon: 'fa-taxi' },
+      { value: 'van', label: 'Van', icon: 'fa-bus' },
+      { value: 'van_campista', label: 'Van de campista', icon: 'fa-bus' },
+      { value: 'viatura', label: 'Viatura', icon: 'fa-car' },
+      { value: 'onibus', label: 'Ônibus', icon: 'fa-bus' },
+    ];
+
+    var selectedCategoria = null;
+
+    function renderCategorias(filtro) {
+      var dropdown = document.getElementById('categoria-dropdown');
+      var filtradas = filtro
+        ? CATEGORIAS.filter(function(c){ return c.label.toLowerCase().indexOf(filtro.toLowerCase()) !== -1; })
+        : CATEGORIAS;
+      if (!filtradas.length) {
+        dropdown.innerHTML = '<div style="padding:10px;color:#999;font-size:13px;">Nenhuma categoria encontrada.</div>';
+      } else {
+        dropdown.innerHTML = filtradas.map(function(c) {
+          return '<div class="cat-item' + (selectedCategoria === c.value ? ' selected' : '') + '" data-value="' + c.value + '" data-label="' + c.label + '">' +
+            '<i class="fa ' + c.icon + '"></i> ' + c.label + '</div>';
+        }).join('');
+        dropdown.querySelectorAll('.cat-item').forEach(function(item) {
+          item.addEventListener('click', function() {
+            selectedCategoria = this.dataset.value;
+            document.getElementById('d-categoria-input').value = this.dataset.label;
+            document.getElementById('d-categoria-value').value = this.dataset.value;
+            document.getElementById('categoria-dropdown').style.display = 'none';
+          });
+        });
+      }
+      dropdown.style.display = 'block';
+    }
+
+    document.getElementById('d-categoria-input').addEventListener('focus', function() {
+      renderCategorias(this.value);
+    });
+    document.getElementById('d-categoria-input').addEventListener('input', function() {
+      selectedCategoria = null;
+      document.getElementById('d-categoria-value').value = '';
+      renderCategorias(this.value);
+    });
+    document.addEventListener('click', function(e) {
+      var wrap = document.querySelector('.categoria-wrap');
+      if (!wrap.contains(e.target)) document.getElementById('categoria-dropdown').style.display = 'none';
+    });
+
+    // ── Toggle ativo ──────────────────────────────────────────────────────
+    document.getElementById('d-ativo').addEventListener('change', function() {
+      document.getElementById('d-ativo-label').textContent = this.checked ? 'Ativo' : 'Inativo';
+    });
+
+    // ── Busca de clientes ─────────────────────────────────────────────────
+    var clienteTimer = null;
+    document.getElementById('d-cliente-busca').addEventListener('input', function() {
+      var q = this.value.trim();
+      clearTimeout(clienteTimer);
+      document.getElementById('d-cliente-id').value = '';
+      document.getElementById('d-cliente-limpar').style.display = 'none';
+      if (q.length < 2) { document.getElementById('d-cliente-resultados').style.display = 'none'; return; }
+      clienteTimer = setTimeout(function() {
+        AL.apiGet('/api/clientes?busca=' + encodeURIComponent(q))
+          .then(function(list) {
+            var div = document.getElementById('d-cliente-resultados');
+            if (!list || !list.length) {
+              div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum cliente encontrado.</div>';
+              div.style.display = 'block'; return;
+            }
+            div.innerHTML = list.map(function(c) {
+              return '<div class="cli-item" data-id="' + c.id + '" data-nome="' + c.nome.replace(/"/g,'&quot;') + '" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;">' +
+                '<strong>' + c.nome + '</strong>' + (c.cpfCnpj ? ' <small class="text-muted">— ' + AL.fmtCpfCnpj(c.cpfCnpj) + '</small>' : '') + '</div>';
+            }).join('');
+            div.style.display = 'block';
+            div.querySelectorAll('.cli-item').forEach(function(item) {
+              item.addEventListener('click', function() {
+                document.getElementById('d-cliente-id').value = this.dataset.id;
+                document.getElementById('d-cliente-busca').value = this.dataset.nome;
+                document.getElementById('d-cliente-limpar').style.display = 'block';
+                document.getElementById('d-cliente-resultados').style.display = 'none';
+              });
+            });
+          }).catch(function(){});
+      }, 300);
+    });
+    document.getElementById('d-cliente-limpar').addEventListener('click', function() {
+      document.getElementById('d-cliente-id').value = '';
+      document.getElementById('d-cliente-busca').value = '';
+      this.style.display = 'none';
+    });
+    document.addEventListener('click', function(e) {
+      var wrap = document.getElementById('d-cliente-busca').parentNode;
+      if (!wrap.contains(e.target)) document.getElementById('d-cliente-resultados').style.display = 'none';
+    });
+
+    // ── Imagem ────────────────────────────────────────────────────────────
+    var selectedFile = null;
+    var imgDrop = document.getElementById('img-drop');
+    var imgInput = document.getElementById('img-input');
+
+    imgDrop.addEventListener('click', function() { imgInput.click(); });
+    imgDrop.addEventListener('dragover', function(e) { e.preventDefault(); imgDrop.classList.add('dragover'); });
+    imgDrop.addEventListener('dragleave', function() { imgDrop.classList.remove('dragover'); });
+    imgDrop.addEventListener('drop', function(e) {
+      e.preventDefault(); imgDrop.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) setImagem(e.dataTransfer.files[0]);
+    });
+    imgInput.addEventListener('change', function() {
+      if (this.files[0]) setImagem(this.files[0]);
+    });
+
+    function setImagem(file) {
+      selectedFile = file;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('img-preview-wrap').innerHTML =
+          '<img src="' + e.target.result + '" style="max-height:120px;border-radius:6px;margin-bottom:8px;" />' +
+          '<div class="img-name">' + file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)</div>' +
+          '<small style="color:#c8870a;">Clique para trocar</small>';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ── Carregar dados se editando ────────────────────────────────────────
+    function preencherForm(d) {
+      document.getElementById('d-nome').value = d.nome || '';
+      document.getElementById('d-identificador').value = d.identificador || '';
+      document.getElementById('d-grupo').value = d.grupo || '';
+      document.getElementById('d-contato').value = d.contato || '';
+      document.getElementById('d-ativo').checked = d.ativo !== false;
+      document.getElementById('d-ativo-label').textContent = d.ativo !== false ? 'Ativo' : 'Inativo';
+      if (d.categoria) {
+        var cat = CATEGORIAS.find(function(c){ return c.value === d.categoria; });
+        document.getElementById('d-categoria-input').value = cat ? cat.label : d.categoria;
+        document.getElementById('d-categoria-value').value = d.categoria;
+        selectedCategoria = d.categoria;
+      }
+      if (d.clienteId && d.cliente) {
+        document.getElementById('d-cliente-id').value = d.clienteId;
+        document.getElementById('d-cliente-busca').value = d.cliente.nome || '';
+        if (canDesvincularDispositivo) {
+          document.getElementById('d-cliente-limpar').style.display = 'block';
+        }
+      }
+      // Rastreador
+      document.getElementById('d-modelo-rastreador').value = d.modeloRastreador || '';
+      document.getElementById('d-telefone-rastreador').value = d.telefoneRastreador || '';
+      document.getElementById('d-iccid').value = d.iccid || '';
+      document.getElementById('d-operadora').value = d.operadora || '';
+      // Veículo
+      document.getElementById('d-placa').value = d.placa || '';
+      document.getElementById('d-marca').value = d.marca || '';
+      document.getElementById('d-modelo-veiculo').value = d.modeloVeiculo || '';
+      document.getElementById('d-cor').value = d.cor || '';
+      document.getElementById('d-ano').value = d.ano || '';
+      document.getElementById('d-renavam').value = d.renavam || '';
+      document.getElementById('d-chassi').value = d.chassi || '';
+      document.getElementById('d-combustivel').value = d.combustivel || '';
+      document.getElementById('d-local-instalacao').value = d.localInstalacao || '';
+      document.getElementById('d-instalador').value = d.instalador || '';
+      // Config
+      document.getElementById('d-consumo').value = d.consumo || '';
+      document.getElementById('d-velocidade').value = d.limiteVelocidade || '';
+      document.getElementById('d-senha').value = d.senha || '';
+      document.getElementById('d-ignorar-odometro').checked = !!d.ignorarOdometro;
+      // Imagem existente
+      if (d.imagemUrl) {
+        document.getElementById('img-preview-wrap').innerHTML =
+          '<img src="' + window.API_URL + d.imagemUrl + '" style="max-height:120px;border-radius:6px;margin-bottom:8px;" />' +
+          '<div class="img-name">Imagem atual</div>' +
+          '<small style="color:#c8870a;">Clique para trocar</small>';
+      }
+    }
+
+    if (dispositivoId) {
+      AL.apiGet('/api/dispositivos/' + dispositivoId)
+        .then(function(d) {
+          preencherForm(d);
+          // Se tem cliente vinculado e sem permissão de desvincular, bloquear campo
+          if (d.clienteId && !canDesvincularDispositivo) {
+            document.getElementById('d-cliente-busca').disabled = true;
+            document.getElementById('d-cliente-busca').title = 'Sem permissão para desvincular';
+          }
+        })
+        .catch(function(err) { AL.showAlert(err.message); });
+    } else if (preClienteId) {
+      AL.apiGet('/api/clientes/' + preClienteId)
+        .then(function(c) {
+          document.getElementById('d-cliente-id').value = c.id;
+          document.getElementById('d-cliente-busca').value = c.nome;
+          document.getElementById('d-cliente-limpar').style.display = 'block';
+        }).catch(function(){});
+    }
+
+    // ── Salvar ────────────────────────────────────────────────────────────
+    document.getElementById('btn-salvar').addEventListener('click', function() {
+      var nome = document.getElementById('d-nome').value.trim();
+      var identificador = document.getElementById('d-identificador').value.trim();
+      if (!nome || !identificador) {
+        AL.showAlert('Nome e identificador são obrigatórios.');
+        return;
+      }
+
+      var formData = new FormData();
+      formData.append('nome', nome);
+      formData.append('identificador', identificador);
+      formData.append('categoria', document.getElementById('d-categoria-value').value || '');
+      formData.append('grupo', document.getElementById('d-grupo').value.trim());
+      formData.append('contato', document.getElementById('d-contato').value.trim());
+      formData.append('ativo', document.getElementById('d-ativo').checked ? 'true' : 'false');
+      formData.append('modeloRastreador', document.getElementById('d-modelo-rastreador').value.trim());
+      formData.append('telefoneRastreador', document.getElementById('d-telefone-rastreador').value.trim());
+      formData.append('iccid', document.getElementById('d-iccid').value.trim());
+      formData.append('operadora', document.getElementById('d-operadora').value.trim());
+      formData.append('placa', document.getElementById('d-placa').value.trim().toUpperCase());
+      formData.append('marca', document.getElementById('d-marca').value.trim());
+      formData.append('modeloVeiculo', document.getElementById('d-modelo-veiculo').value.trim());
+      formData.append('cor', document.getElementById('d-cor').value.trim());
+      formData.append('ano', document.getElementById('d-ano').value.trim());
+      formData.append('renavam', document.getElementById('d-renavam').value.trim());
+      formData.append('chassi', document.getElementById('d-chassi').value.trim());
+      formData.append('combustivel', document.getElementById('d-combustivel').value.trim());
+      formData.append('localInstalacao', document.getElementById('d-local-instalacao').value.trim());
+      formData.append('instalador', document.getElementById('d-instalador').value.trim());
+      formData.append('consumo', document.getElementById('d-consumo').value.trim());
+      formData.append('limiteVelocidade', document.getElementById('d-velocidade').value.trim());
+      formData.append('senha', document.getElementById('d-senha').value.trim());
+      formData.append('ignorarOdometro', document.getElementById('d-ignorar-odometro').checked ? 'true' : 'false');
+      formData.append('clienteId', document.getElementById('d-cliente-id').value);
+      if (selectedFile) formData.append('imagem', selectedFile);
+
+      var btn = document.getElementById('btn-salvar');
+      btn.disabled = true;
+      document.getElementById('btn-salvar-txt').style.display = 'none';
+      document.getElementById('btn-salvar-spin').style.display = 'inline';
+
+      var token = AL.getToken ? AL.getToken() : localStorage.getItem('al_token');
+      var url = dispositivoId ? (window.API_URL + '/api/dispositivos/' + dispositivoId) : (window.API_URL + '/api/dispositivos');
+      var method = dispositivoId ? 'PUT' : 'POST';
+
+      fetch(url, {
+        method: method,
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: formData,
+      })
+        .then(function(r) {
+          if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || 'Erro ao salvar'); });
+          return r.json();
+        })
+        .then(function(d) {
+          if (dispositivoId) {
+            AL.showAlert('Dispositivo atualizado com sucesso!', 'success');
+            btn.disabled = false;
+            document.getElementById('btn-salvar-txt').style.display = 'inline';
+            document.getElementById('btn-salvar-spin').style.display = 'none';
+            return;
+          }
+          // Criação: salvar dados no sessionStorage e navegar para tela de sucesso limpa
+          try {
+            sessionStorage.setItem('disp-success', JSON.stringify({
+              nome: d.nome,
+              identificador: d.identificador,
+              placa: d.placa || null,
+              clienteNome: d.cliente ? d.cliente.nome : null,
+              ativo: d.ativo,
+            }));
+          } catch(e) {}
+          window.location.href = 'dispositivo.html?id=' + encodeURIComponent(d.id) + '&success=1&back=' + encodeURIComponent(backUrl);
+        })
+        .catch(function(err) {
+          AL.showAlert(err.message);
+          btn.disabled = false;
+          document.getElementById('btn-salvar-txt').style.display = 'inline';
+          document.getElementById('btn-salvar-spin').style.display = 'none';
+        });
+    });
+
+  })();
+  </script>
+</body>
+</html>

@@ -59,6 +59,7 @@
     <ul class="sidebar-nav">
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
       <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
@@ -283,8 +284,8 @@
             AL.confirmar({
               titulo: 'Excluir Vendedor',
               mensagem: 'Excluir o vendedor <strong>' + nome + '</strong>?',
-              consequencias: 'O vendedor será removido permanentemente do sistema e não poderá mais acessar o painel.',
-              btnTexto: '<i class="fa fa-trash"></i> Excluir',
+              consequencias: 'Esta ação é irreversível. O vendedor perderá o acesso imediatamente. Todos os clientes vinculados a ele ficarão sem vendedor. Todas as comissões e comprovantes de pagamento serão apagados permanentemente.',
+              btnTexto: '<i class="fa fa-trash"></i> Excluir permanentemente',
             }).then(function (ok) {
               if (!ok) return;
               AL.apiDelete('/api/vendedores/' + id)

@@ -75,6 +75,7 @@
     <ul class="sidebar-nav">
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li class="active"><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
       <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
@@ -183,30 +184,30 @@
               </div>
               <div class="col-sm-6">
                 <div class="form-group">
-                  <label>E-mail *</label>
-                  <input type="email" class="form-control" id="fc-email" required />
+                  <label>E-mail</label>
+                  <input type="email" class="form-control" id="fc-email" />
                 </div>
               </div>
             </div>
             <div class="row">
               <div class="col-sm-4">
                 <div class="form-group">
-                  <label>CEP</label>
-                  <input type="text" class="form-control" id="fc-cep" placeholder="00000-000" maxlength="9" />
+                  <label>CEP *</label>
+                  <input type="text" class="form-control" id="fc-cep" placeholder="00000-000" maxlength="9" required />
                 </div>
               </div>
               <div class="col-sm-8">
                 <div class="form-group">
-                  <label>Logradouro</label>
-                  <input type="text" class="form-control" id="fc-logradouro" />
+                  <label>Logradouro *</label>
+                  <input type="text" class="form-control" id="fc-logradouro" required />
                 </div>
               </div>
             </div>
             <div class="row">
               <div class="col-sm-3">
                 <div class="form-group">
-                  <label>Número</label>
-                  <input type="text" class="form-control" id="fc-numero" />
+                  <label>Número *</label>
+                  <input type="text" class="form-control" id="fc-numero" required />
                 </div>
               </div>
               <div class="col-sm-4">
@@ -217,22 +218,57 @@
               </div>
               <div class="col-sm-5">
                 <div class="form-group">
-                  <label>Bairro</label>
-                  <input type="text" class="form-control" id="fc-bairro" />
+                  <label>Bairro *</label>
+                  <input type="text" class="form-control" id="fc-bairro" required />
                 </div>
               </div>
             </div>
             <div class="row">
               <div class="col-sm-8">
                 <div class="form-group">
-                  <label>Cidade</label>
-                  <input type="text" class="form-control" id="fc-cidade" />
+                  <label>Cidade *</label>
+                  <input type="text" class="form-control" id="fc-cidade" required />
                 </div>
               </div>
               <div class="col-sm-4">
                 <div class="form-group">
-                  <label>UF</label>
-                  <input type="text" class="form-control" id="fc-estado" maxlength="2" style="text-transform:uppercase;" />
+                  <label>UF *</label>
+                  <input type="text" class="form-control" id="fc-estado" maxlength="2" style="text-transform:uppercase;" required />
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-6">
+                <div class="form-group">
+                  <label>Data de Nascimento</label>
+                  <input type="date" class="form-control" id="fc-data-nascimento" />
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="form-group">
+                  <label>RG</label>
+                  <input type="text" class="form-control" id="fc-rg" maxlength="20" />
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-6">
+                <div class="form-group">
+                  <label>Profissão</label>
+                  <input type="text" class="form-control" id="fc-profissao" maxlength="100" />
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div class="form-group">
+                  <label>Estado Civil</label>
+                  <select class="form-control" id="fc-estado-civil">
+                    <option value="">— Selecione —</option>
+                    <option value="Solteiro(a)">Solteiro(a)</option>
+                    <option value="Casado(a)">Casado(a)</option>
+                    <option value="Divorciado(a)">Divorciado(a)</option>
+                    <option value="Viúvo(a)">Viúvo(a)</option>
+                    <option value="União Estável">União Estável</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -491,6 +527,10 @@
       document.getElementById('fc-cidade').value = '';
       document.getElementById('fc-estado').value = '';
       document.getElementById('fc-notas').value = '';
+      document.getElementById('fc-data-nascimento').value = '';
+      document.getElementById('fc-rg').value = '';
+      document.getElementById('fc-profissao').value = '';
+      document.getElementById('fc-estado-civil').value = '';
       // Reset autocomplete vendedor
       fcVendedorId = null;
       document.getElementById('fc-vendedor-busca').value = '';
@@ -513,6 +553,10 @@
           document.getElementById('fc-cidade').value = c.cidade || '';
           document.getElementById('fc-estado').value = c.estado || '';
           document.getElementById('fc-notas').value = c.notas || '';
+          document.getElementById('fc-data-nascimento').value = c.dataNascimento || '';
+          document.getElementById('fc-rg').value = c.rg || '';
+          document.getElementById('fc-profissao').value = c.profissao || '';
+          document.getElementById('fc-estado-civil').value = c.estadoCivil || '';
           if (c.vendedor) {
             fcVendedorId = c.vendedorId;
             document.getElementById('fc-vendedor-busca').value = c.vendedor.nome;
@@ -546,7 +590,11 @@
         bairro:      document.getElementById('fc-bairro').value.trim(),
         cidade:      document.getElementById('fc-cidade').value.trim(),
         estado:      document.getElementById('fc-estado').value.trim().toUpperCase(),
-        notas:       document.getElementById('fc-notas').value.trim(),
+        notas:          document.getElementById('fc-notas').value.trim(),
+        dataNascimento: document.getElementById('fc-data-nascimento').value || null,
+        rg:             document.getElementById('fc-rg').value.trim() || null,
+        profissao:      document.getElementById('fc-profissao').value.trim() || null,
+        estadoCivil:    document.getElementById('fc-estado-civil').value || null,
         vendedorId:  fcVendedorId || null,
       };
       if (!payload.nome || !payload.cpfCnpj || !payload.telefone || !payload.email) {
