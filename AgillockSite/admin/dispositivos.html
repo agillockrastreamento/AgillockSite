@@ -161,9 +161,17 @@
         }
         tbody.innerHTML = lista.map(function (d) {
           var editUrl = 'dispositivo.html?id=' + d.id;
-          var clienteNome = d.cliente ? '<a href="cliente-detalhe.html?id=' + d.cliente.id + '">' + esc(d.cliente.nome) + '</a>' : '<span class="text-muted">—</span>';
-          if (d._count && d._count.clientesVinculados > 0) {
-            clienteNome += ' <span class="al-badge badge-pendente" style="font-size:10px;padding:2px 6px;">+' + d._count.clientesVinculados + '</span>';
+          var extras = d._count ? d._count.clientesVinculados : 0;
+          var clienteNome;
+          if (d.cliente) {
+            clienteNome = '<a href="cliente-detalhe.html?id=' + d.cliente.id + '">' + esc(d.cliente.nome) + '</a>';
+            if (extras > 0) clienteNome += ' <span class="al-badge badge-pendente" style="font-size:10px;padding:2px 6px;">+' + extras + '</span>';
+          } else if (extras > 0 && d.clientesVinculados && d.clientesVinculados[0]) {
+            var primeiro = d.clientesVinculados[0].cliente;
+            clienteNome = '<a href="cliente-detalhe.html?id=' + primeiro.id + '">' + esc(primeiro.nome) + '</a>';
+            if (extras > 1) clienteNome += ' <span class="al-badge badge-pendente" style="font-size:10px;padding:2px 6px;">+' + (extras - 1) + '</span>';
+          } else {
+            clienteNome = '<span class="text-muted">—</span>';
           }
           return '<tr style="cursor:pointer;" onclick="window.location=\'' + editUrl + '\'">' +
             '<td><strong>' + esc(d.identificador) + '</strong></td>' +

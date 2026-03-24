@@ -63,6 +63,10 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
       cliente: { select: { id: true, nome: true } },
       vendedor: { select: { id: true, nome: true } },
       _count: { select: { clientesVinculados: true } },
+      clientesVinculados: {
+        take: 1,
+        include: { cliente: { select: { id: true, nome: true } } },
+      },
     },
     orderBy: { nome: 'asc' },
   });
