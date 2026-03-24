@@ -529,7 +529,7 @@
           document.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
           document.getElementById('tab-' + tab).classList.add('active');
           if (tab === 'cobrancas') carregarCobrancas();
-          if (tab === 'dispositivos') renderDispositivos(clienteData);
+          if (tab === 'dispositivos') renderDispositivos();
         });
       });
 
@@ -543,7 +543,7 @@
             document.getElementById('loading-state').style.display = 'none';
             document.getElementById('content-area').style.display = 'block';
             renderDados(c);
-            renderDispositivos(c);
+            renderDispositivos();
           })
           .catch(function (err) {
             document.getElementById('loading-state').innerHTML =
@@ -554,201 +554,154 @@
       // ── Aba Dados ─────────────────────────────────────────────────────────
       function renderDados(c) {
         var div = document.getElementById('tab-dados');
-        div.innerHTML = '<div class="card-section">' +
-          '<form id="form-dados">' +
-          '<div class="row"><div class="col-sm-8"><div class="form-group"><label>Nome</label><input class="form-control" id="d-nome" value="' + esc(c.nome) + '" /></div></div>' +
-          '<div class="col-sm-4"><div class="form-group"><label>CPF/CNPJ</label><input class="form-control" id="d-cpfcnpj" value="' + esc(c.cpfCnpj || '') + '" /></div></div></div>' +
-          '<div class="row"><div class="col-sm-6"><div class="form-group"><label>Telefone</label><input class="form-control" id="d-telefone" value="' + esc(c.telefone || '') + '" /></div></div>' +
-          '<div class="col-sm-6"><div class="form-group"><label>E-mail</label><input type="email" class="form-control" id="d-email" value="' + esc(c.email || '') + '" /></div></div></div>' +
-          '<div class="row"><div class="col-sm-4"><div class="form-group"><label>CEP</label><input class="form-control" id="d-cep" value="' + esc(c.cep || '') + '" placeholder="00000-000" maxlength="9" /></div></div>' +
-          '<div class="col-sm-8"><div class="form-group"><label>Logradouro</label><input class="form-control" id="d-logradouro" value="' + esc(c.logradouro || '') + '" /></div></div></div>' +
-          '<div class="row"><div class="col-sm-3"><div class="form-group"><label>Número</label><input class="form-control" id="d-numero" value="' + esc(c.numero || '') + '" /></div></div>' +
-          '<div class="col-sm-4"><div class="form-group"><label>Complemento</label><input class="form-control" id="d-complemento" value="' + esc(c.complemento || '') + '" /></div></div>' +
-          '<div class="col-sm-5"><div class="form-group"><label>Bairro</label><input class="form-control" id="d-bairro" value="' + esc(c.bairro || '') + '" /></div></div></div>' +
-          '<div class="row"><div class="col-sm-8"><div class="form-group"><label>Cidade</label><input class="form-control" id="d-cidade" value="' + esc(c.cidade || '') + '" /></div></div>' +
-          '<div class="col-sm-4"><div class="form-group"><label>UF</label><input class="form-control" id="d-estado" value="' + esc(c.estado || '') + '" maxlength="2" style="text-transform:uppercase;" /></div></div></div>' +
-          '<div class="row"><div class="col-sm-6"><div class="form-group"><label>Data de Nascimento</label><input type="date" class="form-control" id="d-data-nascimento" value="' + esc(c.dataNascimento || '') + '" /></div></div>' +
-          '<div class="col-sm-6"><div class="form-group"><label>RG</label><input class="form-control" id="d-rg" value="' + esc(c.rg || '') + '" maxlength="20" /></div></div></div>' +
-          '<div class="row"><div class="col-sm-6"><div class="form-group"><label>Profissão</label><input class="form-control" id="d-profissao" value="' + esc(c.profissao || '') + '" maxlength="100" /></div></div>' +
-          '<div class="col-sm-6"><div class="form-group"><label>Estado Civil</label>' +
-          '<select class="form-control" id="d-estado-civil"><option value="">— Selecione —</option>' +
-          '<option value="Solteiro(a)">Solteiro(a)</option><option value="Casado(a)">Casado(a)</option>' +
-          '<option value="Divorciado(a)">Divorciado(a)</option><option value="Viúvo(a)">Viúvo(a)</option>' +
-          '<option value="União Estável">União Estável</option></select>' +
-          '</div></div></div>' +
-          '<div class="form-group"><label>Notas</label><textarea class="form-control" id="d-notas" rows="2">' + esc(c.notas || '') + '</textarea></div>' +
-          '<div class="form-group"><label>Vendedor</label>' +
-          '<div style="position:relative;">' +
-          '<input type="text" class="form-control" id="d-vendedor-busca" placeholder="Digite nome ou e-mail do vendedor…" autocomplete="off" style="padding-right:32px;" />' +
-          '<button type="button" id="d-vendedor-limpar" title="Limpar vendedor" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;line-height:1;padding:0;">&times;</button>' +
-          '<div id="d-vendedor-resultados" style="position:absolute;z-index:200;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;display:none;"></div>' +
-          '</div></div>' +
-          (canEditarCliente ? '<button type="button" style="margin-top:30px;" class="btn btn-primary-al" id="btn-salvar-dados"><i class="fa fa-save"></i> Salvar alterações</button>' : '') +
-          '</form></div>';
+        var isPJ = c.tipoPessoa === 'PJ';
+        var end = [c.logradouro, c.numero, c.complemento, c.bairro, c.cidade + (c.estado ? '/' + c.estado : ''), c.cep]
+          .filter(Boolean).join(', ');
 
-        AL.maskCpfCnpj(document.getElementById('d-cpfcnpj'));
-        AL.maskPhone(document.getElementById('d-telefone'));
-        document.getElementById('d-estado-civil').value = c.estadoCivil || '';
-
-        document.getElementById('d-cep').addEventListener('blur', function () {
-          var cep = this.value.replace(/\D/g, '');
-          if (cep.length !== 8) return;
-          fetch('https://viacep.com.br/ws/' + cep + '/json/')
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-              if (d.erro) return;
-              document.getElementById('d-logradouro').value = d.logradouro || '';
-              document.getElementById('d-bairro').value = d.bairro || '';
-              document.getElementById('d-cidade').value = d.localidade || '';
-              document.getElementById('d-estado').value = d.uf || '';
-            }).catch(function () { });
-        });
-
-        // Autocomplete vendedor
-        var dVendedorId = c.vendedorId || null;
-        if (c.vendedor) {
-          document.getElementById('d-vendedor-busca').value = c.vendedor.nome;
-          document.getElementById('d-vendedor-limpar').style.display = '';
+        function row(label, val) {
+          if (!val) return '';
+          return '<div class="col-sm-6" style="margin-bottom:12px;">' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:3px;">' + label + '</div>' +
+            '<div>' + esc(val) + '</div></div>';
         }
-        var dVendTimer = null;
-        document.getElementById('d-vendedor-busca').addEventListener('input', function () {
-          var q = this.value.trim();
-          clearTimeout(dVendTimer);
-          dVendedorId = null;
-          document.getElementById('d-vendedor-limpar').style.display = 'none';
-          if (q.length < 2) { document.getElementById('d-vendedor-resultados').style.display = 'none'; return; }
-          dVendTimer = setTimeout(function () {
-            AL.apiGet('/api/vendedores?busca=' + encodeURIComponent(q)).then(function (list) {
-              var div = document.getElementById('d-vendedor-resultados');
-              if (!list || !list.length) {
-                div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum vendedor encontrado.</div>';
-                div.style.display = 'block'; return;
-              }
-              div.innerHTML = list.map(function (v) {
-                return '<div class="d-vend-item" data-id="' + v.id + '" data-nome="' + v.nome + '" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;">' +
-                  '<strong>' + v.nome + '</strong>' + (v.email ? ' <small class="text-muted">— ' + v.email + '</small>' : '') + '</div>';
-              }).join('');
-              div.style.display = 'block';
-              div.querySelectorAll('.d-vend-item').forEach(function (item) {
-                item.addEventListener('click', function () {
-                  dVendedorId = this.dataset.id;
-                  document.getElementById('d-vendedor-busca').value = this.dataset.nome;
-                  document.getElementById('d-vendedor-limpar').style.display = '';
-                  document.getElementById('d-vendedor-resultados').style.display = 'none';
-                });
-              });
-            }).catch(function () { });
-          }, 300);
-        });
-        document.getElementById('d-vendedor-limpar').addEventListener('click', function () {
-          dVendedorId = null;
-          document.getElementById('d-vendedor-busca').value = '';
-          this.style.display = 'none';
-          document.getElementById('d-vendedor-busca').focus();
-        });
-        document.addEventListener('click', function dVendClose(e) {
-          var wrap = document.getElementById('d-vendedor-busca') && document.getElementById('d-vendedor-busca').parentNode;
-          if (wrap && !wrap.contains(e.target)) document.getElementById('d-vendedor-resultados').style.display = 'none';
-        });
 
-        if (canEditarCliente) document.getElementById('btn-salvar-dados').addEventListener('click', function () {
-          var payload = {
-            nome: document.getElementById('d-nome').value.trim(),
-            cpfCnpj: document.getElementById('d-cpfcnpj').value.replace(/\D/g, ''),
-            telefone: document.getElementById('d-telefone').value.trim(),
-            email: document.getElementById('d-email').value.trim(),
-            cep: document.getElementById('d-cep').value.replace(/\D/g, ''),
-            logradouro: document.getElementById('d-logradouro').value.trim(),
-            numero: document.getElementById('d-numero').value.trim(),
-            complemento: document.getElementById('d-complemento').value.trim(),
-            bairro: document.getElementById('d-bairro').value.trim(),
-            cidade: document.getElementById('d-cidade').value.trim(),
-            estado: document.getElementById('d-estado').value.trim().toUpperCase(),
-            notas: document.getElementById('d-notas').value.trim(),
-            dataNascimento: document.getElementById('d-data-nascimento').value || null,
-            rg: document.getElementById('d-rg').value.trim() || null,
-            profissao: document.getElementById('d-profissao').value.trim() || null,
-            estadoCivil: document.getElementById('d-estado-civil').value || null,
-            vendedorId: dVendedorId || null,
-          };
-          AL.apiPut('/api/clientes/' + clienteId, payload)
-            .then(function () { AL.showAlert('Dados salvos.', 'success'); carregarCliente(); })
-            .catch(function (err) { AL.showAlert(err.message); });
-        });
+        var socios = Array.isArray(c.socios) ? c.socios : [];
+        var sociosHtml = '';
+        if (socios.length) {
+          sociosHtml = '<div style="margin-top:16px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:10px;">Sócios</div>';
+          socios.forEach(function(s, i) {
+            var sendSocio = [s.logradouro, s.numero, s.complemento, s.bairro, s.cidade + (s.estado ? '/' + s.estado : ''), s.cep].filter(Boolean).join(', ');
+            sociosHtml += '<div style="border:1px solid #dde3ee;border-radius:8px;padding:14px 16px;margin-bottom:10px;">' +
+              '<div style="font-weight:700;margin-bottom:10px;font-size:13px;"><i class="fa fa-user-o"></i> Sócio ' + (i+1) + ' — ' + esc(s.nome||'') + '</div>' +
+              '<div class="row">' +
+              row('CPF', s.cpf) + row('RG', s.rg) + row('Nacionalidade', s.nacionalidade) +
+              row('Estado Civil', s.estadoCivil) + row('Profissão', s.profissao) + row('Nascimento', s.dataNascimento) +
+              row('E-mail', s.email) + (sendSocio ? row('Endereço', sendSocio) : '') +
+              '</div></div>';
+          });
+          sociosHtml += '</div>';
+        }
+
+        div.innerHTML = '<div class="card-section">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">' +
+            '<span class="al-badge ' + (isPJ ? 'badge-pendente' : 'badge-ativo') + '" style="font-size:12px;padding:4px 10px;">' +
+              (isPJ ? '<i class="fa fa-building"></i> Pessoa Jurídica' : '<i class="fa fa-user"></i> Pessoa Física') + '</span>' +
+            (canEditarCliente ? '<a href="cliente-form.html?id=' + clienteId + '" class="btn btn-sm btn-default"><i class="fa fa-pencil"></i> Editar</a>' : '') +
+          '</div>' +
+          '<div class="row">' +
+            row(isPJ ? 'Nome da Empresa' : 'Nome', c.nome) +
+            row(isPJ ? 'CNPJ' : 'CPF', AL.fmtCpfCnpj(c.cpfCnpj)) +
+            row('Telefone', c.telefone) +
+            row(isPJ ? 'E-mail de Cobrança' : 'E-mail', isPJ ? c.emailCobranca : c.email) +
+            (!isPJ ? row('Data de Nascimento', c.dataNascimento) : '') +
+            (!isPJ ? row('RG', c.rg) : '') +
+            (!isPJ ? row('Profissão', c.profissao) : '') +
+            (!isPJ ? row('Estado Civil', c.estadoCivil) : '') +
+            (isPJ ? row('NIRC', c.nirc) : '') +
+            row('Origem do Cliente', c.origemCliente) +
+            row('Endereço', end) +
+            row('Notas', c.notas) +
+          '</div>' +
+          sociosHtml +
+          '</div>';
       }
 
       // ── Aba Dispositivos ──────────────────────────────────────────────────
-      function renderDispositivos(c) {
+      function renderDispositivos() {
         var div = document.getElementById('tab-dispositivos');
-        var dispositivos = c.dispositivos || [];
-        var addUrl = 'dispositivo.html?clienteId=' + clienteId + '&back=cliente-detalhe.html%3Fid%3D' + clienteId;
-        var html = '<div class="card-section">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
-          '<h5 style="margin:0;font-weight:700;">Dispositivos Associados</h5>' +
-          (canCriarDispositivo ? '<a href="' + addUrl + '" class="btn btn-sm btn-primary-al"><i class="fa fa-plus"></i> Adicionar Dispositivo</a>' : '') +
-          '</div>';
-        if (!dispositivos.length) {
-          html += '<p class="text-muted text-center" style="padding:20px 0;">Nenhum dispositivo associado.</p>';
-        } else {
-          html += dispositivos.map(function (d) {
-            return '<div class="placa-item"><div>' +
-              '<strong>' + esc(d.identificador) + '</strong>' +
-              '<br><small class="text-muted">' + esc(d.nome) + (d.placa ? ' &mdash; Placa: <strong>' + esc(d.placa) + '</strong>' : '') + '</small>' +
-              '</div><div style="display:flex;gap:6px;align-items:center;">' +
-              (d.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO')) +
-              (canEditarDispositivo ? '<a href="dispositivo.html?id=' + d.id + '&back=cliente-detalhe.html%3Fid%3D' + clienteId + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a>' : '') +
-              (canInativarDispositivo ? '<button class="btn btn-xs ' + (d.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle-disp" data-did="' + d.id + '" title="' + (d.ativo ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button>' : '') +
-              (canDesvincularDispositivo ? '<button class="btn btn-xs btn-default btn-desvincular-disp" data-did="' + d.id + '" title="Desvincular"><i class="fa fa-unlink"></i></button>' : '') +
-              (canDeleteDispositivo ? '<button class="btn btn-xs btn-danger btn-del-disp" data-did="' + d.id + '" title="Excluir"><i class="fa fa-trash"></i></button>' : '') +
-              '</div></div>';
-          }).join('');
-        }
-        html += '</div>';
-        div.innerHTML = html;
+        div.innerHTML = '<div class="text-center" style="padding:40px;color:#999;"><i class="fa fa-spinner fa-spin fa-2x"></i></div>';
+        AL.apiGet('/api/clientes/' + clienteId + '/dispositivos')
+          .then(function (dispositivos) {
+            var addUrl = 'dispositivo.html?clienteId=' + clienteId + '&back=cliente-detalhe.html%3Fid%3D' + clienteId;
+            var html = '<div class="card-section">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+              '<h5 style="margin:0;font-weight:700;">Dispositivos</h5>' +
+              (canCriarDispositivo ? '<a href="' + addUrl + '" class="btn btn-sm btn-primary-al"><i class="fa fa-plus"></i> Adicionar Dispositivo</a>' : '') +
+              '</div>';
+            if (!dispositivos.length) {
+              html += '<p class="text-muted text-center" style="padding:20px 0;">Nenhum dispositivo cadastrado.</p>';
+            } else {
+              html += dispositivos.map(function (d) {
+                var vinculadoBadge = d.vinculado
+                  ? '<span class="al-badge badge-ativo" style="font-size:11px;"><i class="fa fa-link"></i> Vinculado</span>'
+                  : '<span class="al-badge badge-inativo" style="font-size:11px;"><i class="fa fa-chain-broken"></i> Desvinculado</span>';
+                var statusBadge = d.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO');
+                var btnVinc = d.vinculado
+                  ? (canDesvincularDispositivo ? '<button class="btn btn-xs btn-warning btn-desv-disp" data-did="' + d.id + '" title="Desvincular"><i class="fa fa-chain-broken"></i> Desvincular</button>' : '')
+                  : '<button class="btn btn-xs btn-success btn-vinc-disp" data-did="' + d.id + '" title="Vincular"><i class="fa fa-link"></i> Vincular</button>';
+                return '<div class="placa-item"><div>' +
+                  '<strong>' + esc(d.identificador) + '</strong>' +
+                  (d.cliente ? '<small class="text-muted" style="margin-left:8px;">Resp.: ' + esc(d.cliente.nome) + '</small>' : '') +
+                  '<br><small class="text-muted">' + esc(d.nome) + (d.placa ? ' &mdash; Placa: <strong>' + esc(d.placa) + '</strong>' : '') + '</small>' +
+                  '</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+                  vinculadoBadge + statusBadge +
+                  (canEditarDispositivo ? '<a href="dispositivo.html?id=' + d.id + '&back=cliente-detalhe.html%3Fid%3D' + clienteId + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a>' : '') +
+                  (canInativarDispositivo ? '<button class="btn btn-xs ' + (d.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle-disp" data-did="' + d.id + '" title="' + (d.ativo ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button>' : '') +
+                  btnVinc +
+                  (canDeleteDispositivo ? '<button class="btn btn-xs btn-danger btn-del-disp" data-did="' + d.id + '" title="Excluir"><i class="fa fa-trash"></i></button>' : '') +
+                  '</div></div>';
+              }).join('');
+            }
+            html += '</div>';
+            div.innerHTML = html;
 
-        div.querySelectorAll('.btn-toggle-disp').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            AL.apiPatch('/api/dispositivos/' + this.dataset.did + '/status', {})
-              .then(function () { carregarCliente(); })
-              .catch(function (err) { AL.showAlert(err.message); });
-          });
-        });
-
-        div.querySelectorAll('.btn-desvincular-disp').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            var did = this.dataset.did;
-            AL.confirmar({
-              titulo: 'Desvincular Dispositivo',
-              mensagem: 'Deseja desvincular este dispositivo do cliente?',
-              consequencias: 'O dispositivo ficará sem cliente associado mas não será excluído.',
-              btnTexto: '<i class="fa fa-unlink"></i> Desvincular',
-            }).then(function (ok) {
-              if (!ok) return;
-              AL.apiPatch('/api/dispositivos/' + did + '/vincular', { clienteId: null })
-                .then(function () { carregarCliente(); })
-                .catch(function (err) { AL.showAlert(err.message); });
-            });
-          });
-        });
-
-        if (canDeleteDispositivo) {
-          div.querySelectorAll('.btn-del-disp').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-              var did = this.dataset.did;
-              AL.confirmar({
-                titulo: 'Excluir Dispositivo',
-                mensagem: 'Deseja excluir este dispositivo?',
-                consequencias: 'O dispositivo será removido permanentemente.',
-                btnTexto: '<i class="fa fa-trash"></i> Excluir',
-              }).then(function (ok) {
-                if (!ok) return;
-                AL.apiDelete('/api/dispositivos/' + did)
-                  .then(function () { carregarCliente(); })
+            div.querySelectorAll('.btn-toggle-disp').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                AL.apiPatch('/api/dispositivos/' + this.dataset.did + '/status', {})
+                  .then(function () { renderDispositivos(); })
                   .catch(function (err) { AL.showAlert(err.message); });
               });
             });
+
+            div.querySelectorAll('.btn-vinc-disp').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                var did = this.dataset.did;
+                AL.apiPost('/api/dispositivos/' + did + '/clientes', { clienteId: clienteId })
+                  .then(function () { renderDispositivos(); })
+                  .catch(function (err) { AL.showAlert(err.message); });
+              });
+            });
+
+            div.querySelectorAll('.btn-desv-disp').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                var did = this.dataset.did;
+                AL.confirmar({
+                  titulo: 'Desvincular Dispositivo',
+                  mensagem: 'Deseja desvincular este dispositivo deste cliente?',
+                  consequencias: 'O dispositivo ficará sem vínculo com este cliente mas não será excluído.',
+                  btnTexto: '<i class="fa fa-chain-broken"></i> Desvincular',
+                }).then(function (ok) {
+                  if (!ok) return;
+                  AL.apiDelete('/api/dispositivos/' + did + '/clientes/' + clienteId)
+                    .then(function () { renderDispositivos(); })
+                    .catch(function (err) { AL.showAlert(err.message); });
+                });
+              });
+            });
+
+            if (canDeleteDispositivo) {
+              div.querySelectorAll('.btn-del-disp').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                  var did = this.dataset.did;
+                  AL.confirmar({
+                    titulo: 'Excluir Dispositivo',
+                    mensagem: 'Deseja excluir este dispositivo?',
+                    consequencias: 'O dispositivo será removido permanentemente.',
+                    btnTexto: '<i class="fa fa-trash"></i> Excluir',
+                  }).then(function (ok) {
+                    if (!ok) return;
+                    AL.apiDelete('/api/dispositivos/' + did)
+                      .then(function () { renderDispositivos(); })
+                      .catch(function (err) { AL.showAlert(err.message); });
+                  });
+                });
+              });
+            }
+          })
+          .catch(function (err) {
+            document.getElementById('tab-dispositivos').innerHTML =
+              '<div class="text-danger" style="padding:24px;">' + err.message + '</div>';
           });
-        }
       }
 
       // ── Aba Cobranças ─────────────────────────────────────────────────────
