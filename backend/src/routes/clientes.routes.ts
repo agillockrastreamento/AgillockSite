@@ -113,6 +113,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
     nome, cpfCnpj, telefone, email, notas, vendedorId,
     cep, logradouro, numero, complemento, bairro, cidade, estado,
     dataNascimento, rg, profissao, estadoCivil,
+    tipoPessoa, nirc, emailCobranca, origemCliente, socios,
   } = req.body;
 
   if (!nome) {
@@ -131,6 +132,11 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
       rg: rg || null,
       profissao: profissao || null,
       estadoCivil: estadoCivil || null,
+      tipoPessoa: tipoPessoa || 'PF',
+      nirc: nirc || null,
+      emailCobranca: emailCobranca || null,
+      origemCliente: origemCliente || null,
+      socios: socios ?? null,
       vendedorId: vendedorId || null,
       cep, logradouro, numero, complemento, bairro, cidade, estado,
       criadoPorId: req.user!.userId,
@@ -156,6 +162,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
     nome, cpfCnpj, telefone, email, notas, vendedorId,
     cep, logradouro, numero, complemento, bairro, cidade, estado,
     dataNascimento, rg, profissao, estadoCivil,
+    tipoPessoa, nirc, emailCobranca, origemCliente, socios,
   } = req.body;
 
   const existe = await prisma.cliente.findUnique({ where: { id }, select: { id: true } });
@@ -172,6 +179,11 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
       rg: rg || null,
       profissao: profissao || null,
       estadoCivil: estadoCivil || null,
+      tipoPessoa: tipoPessoa || 'PF',
+      nirc: nirc || null,
+      emailCobranca: emailCobranca || null,
+      origemCliente: origemCliente || null,
+      socios: socios ?? null,
       vendedorId: vendedorId || null,
       cep, logradouro, numero, complemento, bairro, cidade, estado,
     },
@@ -258,16 +270,26 @@ router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequ
   res.status(204).send();
 });
 
-// GET /api/clientes/:id/dispositivos
+// GET /api/clientes/:id/dispositivos — retorna TODOS os dispositivos com flag vinculado
 router.get('/:id/dispositivos', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const clienteId = param(req, 'id');
   const cliente = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { id: true } });
   if (!cliente) { res.status(404).json({ error: 'Cliente não encontrado.' }); return; }
-  const dispositivos = await prisma.dispositivo.findMany({
-    where: { clienteId },
-    orderBy: { nome: 'asc' },
-  });
-  res.json(dispositivos);
+
+  const [vinculados, dispositivos] = await Promise.all([
+    prisma.dispositivoCliente.findMany({ where: { clienteId }, select: { dispositivoId: true } }),
+    prisma.dispositivo.findMany({
+      orderBy: { nome: 'asc' },
+      select: {
+        id: true, nome: true, identificador: true, placa: true,
+        categoria: true, ativo: true, clienteId: true,
+        cliente: { select: { id: true, nome: true } },
+      },
+    }),
+  ]);
+
+  const vinculadosSet = new Set(vinculados.map((v) => v.dispositivoId));
+  res.json(dispositivos.map((d) => ({ ...d, vinculado: vinculadosSet.has(d.id) })));
 });
 
 export default router;
