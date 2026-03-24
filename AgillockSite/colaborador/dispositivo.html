@@ -124,7 +124,7 @@
         <div class="row">
           <div class="col-sm-6">
             <div class="form-group">
-              <label>Cliente</label>
+              <label>Cliente Responsável (Faturamento)</label>
               <div style="position:relative;">
                 <input class="form-control" id="d-cliente-busca" placeholder="Digite para buscar cliente..." autocomplete="off" />
                 <input type="hidden" id="d-cliente-id" />
@@ -140,7 +140,20 @@
             </div>
           </div>
         </div>
-        <div class="toggle-row">
+        <!-- Clientes Vinculados -->
+        <div id="clientes-vinculados-section" style="margin-top:18px;">
+          <label style="font-weight:600;font-size:13px;">Clientes Vinculados</label>
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div style="flex:1;position:relative;">
+              <input class="form-control" id="cv-busca" placeholder="Digite para buscar cliente..." autocomplete="off" />
+              <div id="cv-resultados" style="position:absolute;z-index:200;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;display:none;"></div>
+            </div>
+            <button type="button" class="btn btn-default btn-sm" id="cv-adicionar" style="white-space:nowrap;"><i class="fa fa-plus"></i> Adicionar</button>
+          </div>
+          <div id="cv-lista" style="margin-top:10px;display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+
+        <div class="toggle-row" style="margin-top:18px;">
           <label class="toggle-switch">
             <input type="checkbox" id="d-ativo" checked />
             <span class="toggle-slider"></span>
@@ -556,6 +569,76 @@
       if (!wrap.contains(e.target)) document.getElementById('d-cliente-resultados').style.display = 'none';
     });
 
+    // ── Clientes Vinculados ───────────────────────────────────────────────
+    var clientesExtras = []; // [{id, nome}]
+    var cvTimer = null;
+    var cvSelecionado = null;
+
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function renderClientesExtras() {
+      var lista = document.getElementById('cv-lista');
+      if (!clientesExtras.length) {
+        lista.innerHTML = '<small class="text-muted">Nenhum cliente vinculado.</small>';
+        return;
+      }
+      lista.innerHTML = clientesExtras.map(function(c, i) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f8f9fa;border-radius:6px;border:1px solid #e9ecef;">' +
+          '<span style="font-size:13px;">' + esc(c.nome) + '</span>' +
+          '<button type="button" class="btn btn-xs btn-danger cv-remover" data-idx="' + i + '" title="Remover"><i class="fa fa-times"></i></button>' +
+          '</div>';
+      }).join('');
+      lista.querySelectorAll('.cv-remover').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          clientesExtras.splice(parseInt(this.dataset.idx), 1);
+          renderClientesExtras();
+        });
+      });
+    }
+
+    document.getElementById('cv-busca').addEventListener('input', function() {
+      var q = this.value.trim();
+      cvSelecionado = null;
+      if (q.length < 2) { document.getElementById('cv-resultados').style.display = 'none'; return; }
+      clearTimeout(cvTimer);
+      cvTimer = setTimeout(function() {
+        AL.apiGet('/api/clientes?busca=' + encodeURIComponent(q))
+          .then(function(list) {
+            var div = document.getElementById('cv-resultados');
+            if (!list || !list.length) { div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum cliente encontrado.</div>'; div.style.display = 'block'; return; }
+            div.innerHTML = list.map(function(c) {
+              return '<div class="cv-item" data-id="' + c.id + '" data-nome="' + c.nome.replace(/"/g,'&quot;') + '" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;">' +
+                '<strong>' + esc(c.nome) + '</strong>' + (c.cpfCnpj ? ' <small class="text-muted">— ' + AL.fmtCpfCnpj(c.cpfCnpj) + '</small>' : '') + '</div>';
+            }).join('');
+            div.style.display = 'block';
+            div.querySelectorAll('.cv-item').forEach(function(item) {
+              item.addEventListener('click', function() {
+                cvSelecionado = { id: this.dataset.id, nome: this.dataset.nome };
+                document.getElementById('cv-busca').value = this.dataset.nome;
+                div.style.display = 'none';
+              });
+            });
+          }).catch(function(){});
+      }, 300);
+    });
+
+    document.addEventListener('click', function(e) {
+      var cvWrap = document.getElementById('cv-busca') && document.getElementById('cv-busca').parentNode;
+      if (cvWrap && !cvWrap.contains(e.target)) document.getElementById('cv-resultados').style.display = 'none';
+    });
+
+    document.getElementById('cv-adicionar').addEventListener('click', function() {
+      if (!cvSelecionado) { AL.showAlert('Selecione um cliente na lista.'); return; }
+      var jaExiste = clientesExtras.some(function(c) { return c.id === cvSelecionado.id; });
+      if (jaExiste) { AL.showAlert('Este cliente já está na lista.'); return; }
+      clientesExtras.push(cvSelecionado);
+      cvSelecionado = null;
+      document.getElementById('cv-busca').value = '';
+      renderClientesExtras();
+    });
+
+    renderClientesExtras();
+
     // ── Imagem ────────────────────────────────────────────────────────────
     var selectedFile = null;
     var imgDrop = document.getElementById('img-drop');
@@ -605,6 +688,11 @@
           document.getElementById('d-cliente-limpar').style.display = 'block';
         }
       }
+      // Clientes vinculados extras
+      clientesExtras = (d.clientesVinculados || []).map(function(v) {
+        return { id: v.clienteId, nome: v.cliente ? v.cliente.nome : v.clienteId };
+      });
+      renderClientesExtras();
       // Rastreador
       document.getElementById('d-modelo-rastreador').value = d.modeloRastreador || '';
       document.getElementById('d-telefone-rastreador').value = d.telefoneRastreador || '';
@@ -690,6 +778,7 @@
       formData.append('senha', document.getElementById('d-senha').value.trim());
       formData.append('ignorarOdometro', document.getElementById('d-ignorar-odometro').checked ? 'true' : 'false');
       formData.append('clienteId', document.getElementById('d-cliente-id').value);
+      formData.append('clientesExtras', JSON.stringify(clientesExtras.map(function(c){ return c.id; })));
       if (selectedFile) formData.append('imagem', selectedFile);
 
       var btn = document.getElementById('btn-salvar');
