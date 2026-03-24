@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const TEMPLATES_DIR = path.resolve(__dirname, '../templates/contratos');
+const TEMPLATES_DIR = path.resolve(process.cwd(), 'src/templates/contratos');
 
 export interface DadosContrato {
   tipo: string;
@@ -54,7 +54,12 @@ function tipoParaArquivo(tipo: string): string {
 
 export function preencherTemplate(tipo: string, dados: DadosContrato): string {
   const arquivo = path.join(TEMPLATES_DIR, tipoParaArquivo(tipo));
-  let html = fs.readFileSync(arquivo, 'utf-8');
+  let html: string;
+  try {
+    html = fs.readFileSync(arquivo, 'utf-8');
+  } catch {
+    throw new Error(`Template de contrato não encontrado: ${arquivo}. Verifique se os arquivos de template existem.`);
+  }
 
   const { longa, curta } = dataHoje();
   const c = dados.cliente;

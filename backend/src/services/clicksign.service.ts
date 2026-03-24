@@ -2,13 +2,14 @@
 // Uses native fetch (Node 18+)
 
 const BASE_URL = process.env.CLICKSIGN_BASE_URL || 'https://sandbox.clicksign.com';
-const TOKEN    = process.env.CLICKSIGN_ACCESS_TOKEN || '';
 
 function getHeaders() {
+  const token = process.env.CLICKSIGN_ACCESS_TOKEN;
+  if (!token) throw new Error('CLICKSIGN_ACCESS_TOKEN não configurado. Configure em .env');
   return {
     'Content-Type': 'application/vnd.api+json',
     'Accept':       'application/vnd.api+json',
-    'Authorization': `Bearer ${TOKEN}`,
+    'Authorization': `Bearer ${token}`,
   };
 }
 
