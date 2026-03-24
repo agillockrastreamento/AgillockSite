@@ -460,100 +460,155 @@
     }
 
     // ── Aba Dispositivos ──────────────────────────────────────────────────
+    var todosDispositivosTab = [];
+    var dispFiltroBusca = '';
+    var dispFiltroStatus = '';
+    var dispFiltroVinculo = '';
+    var dispFiltroTimer = null;
+
+    function renderListaDispositivos() {
+      var busca = dispFiltroBusca.toLowerCase();
+      var lista = todosDispositivosTab.filter(function (d) {
+        if (dispFiltroStatus !== '' && String(d.ativo) !== dispFiltroStatus) return false;
+        if (dispFiltroVinculo === 'vinculado' && !d.vinculado) return false;
+        if (dispFiltroVinculo === 'desvinculado' && d.vinculado) return false;
+        if (busca && !(
+          d.nome.toLowerCase().indexOf(busca) !== -1 ||
+          d.identificador.toLowerCase().indexOf(busca) !== -1 ||
+          (d.placa || '').toLowerCase().indexOf(busca) !== -1
+        )) return false;
+        return true;
+      });
+
+      var addUrl = 'dispositivo.html?clienteId=' + clienteId + '&back=cliente-detalhe.html%3Fid%3D' + clienteId;
+      var listDiv = document.getElementById('disp-lista');
+      if (!lista.length) {
+        listDiv.innerHTML = '<p class="text-muted text-center" style="padding:20px 0;">Nenhum dispositivo encontrado.</p>';
+        return;
+      }
+      listDiv.innerHTML = lista.map(function (d) {
+        var vinculadoBadge = d.vinculado
+          ? '<span class="al-badge badge-ativo" style="font-size:11px;"><i class="fa fa-link"></i> Vinculado</span>'
+          : '<span class="al-badge badge-inativo" style="font-size:11px;"><i class="fa fa-chain-broken"></i> Desvinculado</span>';
+        var statusBadge = d.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO');
+        var btnVinc = d.vinculado
+          ? '<button class="btn btn-xs btn-warning btn-desv-disp" data-did="' + d.id + '" title="Desvincular"><i class="fa fa-chain-broken"></i> Desvincular</button>'
+          : '<button class="btn btn-xs btn-success btn-vinc-disp" data-did="' + d.id + '" title="Vincular"><i class="fa fa-link"></i> Vincular</button>';
+        return '<div class="placa-item"><div>' +
+          '<strong>' + esc(d.identificador) + '</strong>' +
+          (d.cliente ? '<small class="text-muted" style="margin-left:8px;">Resp.: ' + esc(d.cliente.nome) + '</small>' : '') +
+          '<br><small class="text-muted">' + esc(d.nome) + (d.placa ? ' &mdash; <strong>' + esc(d.placa) + '</strong>' : '') + '</small>' +
+          '</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+          vinculadoBadge + statusBadge +
+          '<a href="dispositivo.html?id=' + d.id + '&back=cliente-detalhe.html%3Fid%3D' + clienteId + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a>' +
+          '<button class="btn btn-xs ' + (d.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle-disp" data-did="' + d.id + '" title="' + (d.ativo?'Inativar':'Ativar') + '"><i class="fa fa-power-off"></i></button>' +
+          btnVinc +
+          (isAdmin ? '<button class="btn btn-xs btn-danger btn-del-disp" data-did="' + d.id + '" title="Excluir"><i class="fa fa-trash"></i></button>' : '') +
+          '</div></div>';
+      }).join('');
+
+      bindDispositivosBtns();
+    }
+
     function renderDispositivos() {
       var div = document.getElementById('tab-dispositivos');
       div.innerHTML = '<div class="text-center" style="padding:40px;color:#999;"><i class="fa fa-spinner fa-spin fa-2x"></i></div>';
       AL.apiGet('/api/clientes/' + clienteId + '/dispositivos')
         .then(function (dispositivos) {
+          todosDispositivosTab = dispositivos || [];
           var addUrl = 'dispositivo.html?clienteId=' + clienteId + '&back=cliente-detalhe.html%3Fid%3D' + clienteId;
-          var html = '<div class="card-section">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
-            '<h5 style="margin:0;font-weight:700;">Dispositivos</h5>' +
-            '<a href="' + addUrl + '" class="btn btn-sm btn-primary-al"><i class="fa fa-plus"></i> Adicionar Dispositivo</a></div>';
-          if (!dispositivos.length) {
-            html += '<p class="text-muted text-center" style="padding:20px 0;">Nenhum dispositivo cadastrado.</p>';
-          } else {
-            html += dispositivos.map(function (d) {
-              var vinculadoBadge = d.vinculado
-                ? '<span class="al-badge badge-ativo" style="font-size:11px;"><i class="fa fa-link"></i> Vinculado</span>'
-                : '<span class="al-badge badge-inativo" style="font-size:11px;"><i class="fa fa-chain-broken"></i> Desvinculado</span>';
-              var statusBadge = d.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO');
-              var btnVinc = d.vinculado
-                ? '<button class="btn btn-xs btn-warning btn-desv-disp" data-did="' + d.id + '" title="Desvincular"><i class="fa fa-chain-broken"></i> Desvincular</button>'
-                : '<button class="btn btn-xs btn-success btn-vinc-disp" data-did="' + d.id + '" title="Vincular"><i class="fa fa-link"></i> Vincular</button>';
-              return '<div class="placa-item"><div>' +
-                '<strong>' + esc(d.identificador) + '</strong>' +
-                (d.cliente ? '<small class="text-muted" style="margin-left:8px;">Resp.: ' + esc(d.cliente.nome) + '</small>' : '') +
-                '<br><small class="text-muted">' + esc(d.nome) + (d.placa ? ' &mdash; <strong>' + esc(d.placa) + '</strong>' : '') + '</small>' +
-                '</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
-                vinculadoBadge + statusBadge +
-                '<a href="dispositivo.html?id=' + d.id + '&back=cliente-detalhe.html%3Fid%3D' + clienteId + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a>' +
-                '<button class="btn btn-xs ' + (d.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle-disp" data-did="' + d.id + '" title="' + (d.ativo?'Inativar':'Ativar') + '"><i class="fa fa-power-off"></i></button>' +
-                btnVinc +
-                (isAdmin ? '<button class="btn btn-xs btn-danger btn-del-disp" data-did="' + d.id + '" title="Excluir"><i class="fa fa-trash"></i></button>' : '') +
-                '</div></div>';
-            }).join('');
-          }
-          html += '</div>';
-          div.innerHTML = html;
+          div.innerHTML =
+            '<div class="card-section">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+                '<h5 style="margin:0;font-weight:700;">Dispositivos</h5>' +
+                '<a href="' + addUrl + '" class="btn btn-sm btn-primary-al"><i class="fa fa-plus"></i> Adicionar Dispositivo</a>' +
+              '</div>' +
+              '<div class="row" style="margin-bottom:12px;">' +
+                '<div class="col-sm-5"><input type="text" id="disp-busca" class="form-control input-sm" placeholder="Buscar por nome, identificador ou placa…" value="' + esc(dispFiltroBusca) + '" /></div>' +
+                '<div class="col-sm-3"><select id="disp-status" class="form-control input-sm"><option value="">Todos os status</option><option value="true"' + (dispFiltroStatus==='true'?' selected':'') + '>Ativo</option><option value="false"' + (dispFiltroStatus==='false'?' selected':'') + '>Inativo</option></select></div>' +
+                '<div class="col-sm-4"><select id="disp-vinculo" class="form-control input-sm"><option value="">Todos os vínculos</option><option value="vinculado"' + (dispFiltroVinculo==='vinculado'?' selected':'') + '>Vinculado</option><option value="desvinculado"' + (dispFiltroVinculo==='desvinculado'?' selected':'') + '>Desvinculado</option></select></div>' +
+              '</div>' +
+              '<div id="disp-lista"></div>' +
+            '</div>';
 
-          div.querySelectorAll('.btn-toggle-disp').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-              AL.apiPatch('/api/dispositivos/' + this.dataset.did + '/status', {})
-                .then(function () { renderDispositivos(); })
-                .catch(function (err) { AL.showAlert(err.message); });
-            });
+          document.getElementById('disp-busca').addEventListener('input', function () {
+            dispFiltroBusca = this.value;
+            clearTimeout(dispFiltroTimer);
+            dispFiltroTimer = setTimeout(renderListaDispositivos, 200);
+          });
+          document.getElementById('disp-status').addEventListener('change', function () {
+            dispFiltroStatus = this.value;
+            renderListaDispositivos();
+          });
+          document.getElementById('disp-vinculo').addEventListener('change', function () {
+            dispFiltroVinculo = this.value;
+            renderListaDispositivos();
           });
 
-          div.querySelectorAll('.btn-vinc-disp').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-              var did = this.dataset.did;
-              AL.apiPost('/api/dispositivos/' + did + '/clientes', { clienteId: clienteId })
-                .then(function () { renderDispositivos(); })
-                .catch(function (err) { AL.showAlert(err.message); });
-            });
-          });
-
-          div.querySelectorAll('.btn-desv-disp').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-              var did = this.dataset.did;
-              AL.confirmar({
-                titulo: 'Desvincular Dispositivo',
-                mensagem: 'Deseja desvincular este dispositivo deste cliente?',
-                consequencias: 'O dispositivo ficará sem vínculo com este cliente mas não será excluído.',
-                btnTexto: '<i class="fa fa-chain-broken"></i> Desvincular',
-              }).then(function (ok) {
-                if (!ok) return;
-                AL.apiDelete('/api/dispositivos/' + did + '/clientes/' + clienteId)
-                  .then(function () { renderDispositivos(); })
-                  .catch(function (err) { AL.showAlert(err.message); });
-              });
-            });
-          });
-
-          if (isAdmin) {
-            div.querySelectorAll('.btn-del-disp').forEach(function (btn) {
-              btn.addEventListener('click', function () {
-                var did = this.dataset.did;
-                AL.confirmar({
-                  titulo: 'Excluir Dispositivo',
-                  mensagem: 'Deseja excluir este dispositivo?',
-                  consequencias: 'O dispositivo será removido permanentemente.',
-                  btnTexto: '<i class="fa fa-trash"></i> Excluir',
-                }).then(function (ok) {
-                  if (!ok) return;
-                  AL.apiDelete('/api/dispositivos/' + did)
-                    .then(function () { renderDispositivos(); })
-                    .catch(function (err) { AL.showAlert(err.message); });
-                });
-              });
-            });
-          }
+          renderListaDispositivos();
         })
         .catch(function (err) {
-          document.getElementById('tab-dispositivos').innerHTML =
-            '<div class="text-danger" style="padding:24px;">' + err.message + '</div>';
+          div.innerHTML = '<div class="text-danger" style="padding:24px;">' + err.message + '</div>';
+          return;
         });
+    }
+
+    function bindDispositivosBtns() {
+      var listDiv = document.getElementById('disp-lista');
+      if (!listDiv) return;
+
+      listDiv.querySelectorAll('.btn-toggle-disp').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          AL.apiPatch('/api/dispositivos/' + this.dataset.did + '/status', {})
+            .then(function () { renderDispositivos(); })
+            .catch(function (err) { AL.showAlert(err.message); });
+        });
+      });
+
+      listDiv.querySelectorAll('.btn-vinc-disp').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var did = this.dataset.did;
+          AL.apiPost('/api/dispositivos/' + did + '/clientes', { clienteId: clienteId })
+            .then(function () { renderDispositivos(); })
+            .catch(function (err) { AL.showAlert(err.message); });
+        });
+      });
+
+      listDiv.querySelectorAll('.btn-desv-disp').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var did = this.dataset.did;
+          AL.confirmar({
+            titulo: 'Desvincular Dispositivo',
+            mensagem: 'Deseja desvincular este dispositivo deste cliente?',
+            consequencias: 'O dispositivo ficará sem vínculo com este cliente mas não será excluído.',
+            btnTexto: '<i class="fa fa-chain-broken"></i> Desvincular',
+          }).then(function (ok) {
+            if (!ok) return;
+            AL.apiDelete('/api/dispositivos/' + did + '/clientes/' + clienteId)
+              .then(function () { renderDispositivos(); })
+              .catch(function (err) { AL.showAlert(err.message); });
+          });
+        });
+      });
+
+      if (isAdmin) {
+        listDiv.querySelectorAll('.btn-del-disp').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var did = this.dataset.did;
+            AL.confirmar({
+              titulo: 'Excluir Dispositivo',
+              mensagem: 'Deseja excluir este dispositivo?',
+              consequencias: 'O dispositivo será removido permanentemente.',
+              btnTexto: '<i class="fa fa-trash"></i> Excluir',
+            }).then(function (ok) {
+              if (!ok) return;
+              AL.apiDelete('/api/dispositivos/' + did)
+                .then(function () { renderDispositivos(); })
+                .catch(function (err) { AL.showAlert(err.message); });
+            });
+          });
+        });
+      }
     }
 
     // ── Aba Cobranças ─────────────────────────────────────────────────────
