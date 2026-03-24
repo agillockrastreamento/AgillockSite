@@ -1,0 +1,129 @@
+// backend/src/services/contrato-template.service.ts
+import fs from 'fs';
+import path from 'path';
+
+const TEMPLATES_DIR = path.resolve(__dirname, '../templates/contratos');
+
+export interface DadosContrato {
+  tipo: string;
+  cliente: {
+    nome: string; cpfCnpj?: string; tipoPessoa?: string;
+    rg?: string; profissao?: string; estadoCivil?: string; dataNascimento?: string;
+    telefone?: string; email?: string;
+    logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string;
+    socios?: Array<{ nome: string; cpf?: string; rg?: string; profissao?: string; estadoCivil?: string; nacionalidade?: string; dataNascimento?: string }>;
+  };
+  fiadores?: Array<{
+    nome: string; cpf?: string; rg?: string; profissao?: string; estadoCivil?: string; nacionalidade?: string; dataNascimento?: string;
+    email?: string; telefone?: string; logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string;
+  }>;
+  testemunhas: Array<{ nome: string; cpf?: string }>;
+  representante: { nome?: string; cpf?: string };
+}
+
+function fmtData(iso?: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('T')[0].split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function fmtEndereco(obj: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string }): string {
+  const parts = [obj.logradouro, obj.numero, obj.complemento, obj.bairro, obj.cidade && obj.estado ? `${obj.cidade}/${obj.estado}` : (obj.cidade || obj.estado), obj.cep ? `CEP ${obj.cep}` : ''];
+  return parts.filter(Boolean).join(', ');
+}
+
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+function dataHoje(): { longa: string; curta: string } {
+  const d = new Date();
+  return {
+    longa: `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`,
+    curta: `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`,
+  };
+}
+
+function tipoParaArquivo(tipo: string): string {
+  const map: Record<string, string> = {
+    PF_COM_ASSISTENCIA: 'pf-com-assistencia.html',
+    PF_SEM_ASSISTENCIA: 'pf-sem-assistencia.html',
+    PJ_COM_ASSISTENCIA: 'pj-com-assistencia.html',
+    PJ_SEM_ASSISTENCIA: 'pj-sem-assistencia.html',
+  };
+  return map[tipo] || 'pf-com-assistencia.html';
+}
+
+export function preencherTemplate(tipo: string, dados: DadosContrato): string {
+  const arquivo = path.join(TEMPLATES_DIR, tipoParaArquivo(tipo));
+  let html = fs.readFileSync(arquivo, 'utf-8');
+
+  const { longa, curta } = dataHoje();
+  const c = dados.cliente;
+  const rep = dados.representante;
+  const socios = c.socios || [];
+  const fiadores = dados.fiadores || [];
+  const testemunhas = dados.testemunhas;
+
+  const vars: Record<string, string> = {
+    DATA_HOJE: longa,
+    DATA_HOJE_CURTA: curta,
+    // PF
+    NOME_CLIENTE: c.nome || '',
+    CPF_CLIENTE: c.cpfCnpj || '',
+    RG_CLIENTE: c.rg || '',
+    PROFISSAO_CLIENTE: c.profissao || '',
+    ESTADO_CIVIL_CLIENTE: c.estadoCivil || '',
+    DATA_NASCIMENTO_CLIENTE: fmtData(c.dataNascimento),
+    TELEFONE_CLIENTE: c.telefone || '',
+    EMAIL_CLIENTE: c.email || '',
+    ENDERECO_CLIENTE: fmtEndereco(c),
+    // PJ
+    RAZAO_SOCIAL: c.nome || '',
+    CNPJ: c.cpfCnpj || '',
+    TELEFONE_PJ: c.telefone || '',
+    EMAIL_PJ: c.email || '',
+    ENDERECO_PJ: fmtEndereco(c),
+    // Representante
+    REPRESENTANTE_NOME: rep.nome || '',
+    REPRESENTANTE_CPF: rep.cpf || '',
+  };
+
+  // Sócios
+  socios.forEach((s, i) => {
+    const n = i + 1;
+    vars[`SOCIO_${n}_NOME`] = s.nome || '';
+    vars[`SOCIO_${n}_CPF`] = s.cpf || '';
+    vars[`SOCIO_${n}_RG`] = s.rg || '';
+    vars[`SOCIO_${n}_PROFISSAO`] = s.profissao || '';
+    vars[`SOCIO_${n}_ESTADO_CIVIL`] = s.estadoCivil || '';
+    vars[`SOCIO_${n}_NACIONALIDADE`] = s.nacionalidade || '';
+    vars[`SOCIO_${n}_DATA_NASCIMENTO`] = fmtData(s.dataNascimento);
+  });
+
+  // Fiadores
+  fiadores.forEach((f, i) => {
+    const n = i + 1;
+    vars[`FIADOR_${n}_NOME`] = f.nome || '';
+    vars[`FIADOR_${n}_CPF`] = f.cpf || '';
+    vars[`FIADOR_${n}_RG`] = f.rg || '';
+    vars[`FIADOR_${n}_PROFISSAO`] = f.profissao || '';
+    vars[`FIADOR_${n}_ESTADO_CIVIL`] = f.estadoCivil || '';
+    vars[`FIADOR_${n}_NACIONALIDADE`] = f.nacionalidade || '';
+    vars[`FIADOR_${n}_DATA_NASCIMENTO`] = fmtData(f.dataNascimento);
+    vars[`FIADOR_${n}_ENDERECO`] = fmtEndereco(f);
+  });
+
+  // Testemunhas
+  [0, 1].forEach(i => {
+    const n = i + 1;
+    const t = testemunhas[i];
+    vars[`TESTEMUNHA_${n}_NOME`] = t?.nome || '';
+    vars[`TESTEMUNHA_${n}_CPF`] = t?.cpf || '';
+  });
+
+  // Substituir todos os placeholders
+  for (const [key, val] of Object.entries(vars)) {
+    html = html.split(`{{${key}}}`).join(val);
+  }
+
+  return html;
+}
