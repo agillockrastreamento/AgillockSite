@@ -167,6 +167,9 @@
         tbody.innerHTML = lista.map(function (d) {
           var editUrl = 'dispositivo.html?id=' + d.id;
           var clienteNome = d.cliente ? '<a href="cliente-detalhe.html?id=' + d.cliente.id + '">' + esc(d.cliente.nome) + '</a>' : '<span class="text-muted">—</span>';
+          if (d._count && d._count.clientesVinculados > 0) {
+            clienteNome += ' <span class="al-badge badge-pendente" style="font-size:10px;padding:2px 6px;">+' + d._count.clientesVinculados + '</span>';
+          }
           var rowClick = canEditarDispositivo ? ' style="cursor:pointer;" onclick="window.location=\'' + editUrl + '\'"' : '';
           return '<tr' + rowClick + '>' +
             '<td><strong>' + esc(d.identificador) + '</strong></td>' +
