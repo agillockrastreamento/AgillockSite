@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #000;
+      margin: 0;
+      padding: 40px 60px;
+    }
+    h1, h2, h3 {
+      text-align: center;
+      text-transform: uppercase;
+    }
+    h1 { font-size: 14pt; margin-bottom: 24px; }
+    h2 { font-size: 12pt; margin-top: 24px; margin-bottom: 8px; }
+    h3 { font-size: 11pt; margin-top: 16px; margin-bottom: 4px; }
+    p {
+      text-align: justify;
+      margin-bottom: 0.8em;
+    }
+    .data-local {
+      text-align: right;
+      margin-bottom: 24px;
+    }
+    .parte {
+      margin: 16px 0;
+      padding: 12px 0;
+      border-bottom: 1px solid #ccc;
+    }
+    .parte:last-of-type {
+      border-bottom: none;
+    }
+    .socio-bloco, .fiador-bloco {
+      margin: 8px 0 12px 16px;
+      padding: 8px 12px;
+      background: #f9f9f9;
+      border-left: 3px solid #ccc;
+    }
+    .clausulas {
+      margin-top: 24px;
+    }
+    .assinaturas {
+      margin-top: 64px;
+      page-break-inside: avoid;
+    }
+    .assinaturas h2 {
+      margin-bottom: 32px;
+    }
+    .assinatura-bloco {
+      margin-bottom: 40px;
+    }
+    .assinatura-linha {
+      border-top: 1px solid #000;
+      padding-top: 6px;
+      width: 65%;
+      margin-bottom: 4px;
+    }
+    .assinatura-label {
+      font-size: 10pt;
+      color: #333;
+    }
+    .assinaturas-row {
+      display: flex;
+      gap: 60px;
+      flex-wrap: wrap;
+    }
+    .assinaturas-row .assinatura-bloco {
+      flex: 1;
+      min-width: 240px;
+    }
+    .testemunhas-row {
+      display: flex;
+      gap: 80px;
+      margin-top: 40px;
+    }
+    .testemunha-bloco {
+      flex: 1;
+    }
+    @media print {
+      body { padding: 20mm 25mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Contrato de Prestação de Serviços de Rastreamento Veicular<br>com Assistência Veicular — Pessoa Jurídica</h1>
+
+  <p class="data-local">São Paulo, {{DATA_HOJE}}.</p>
+
+  <!-- ================================================
+       PARTES DO CONTRATO
+  ================================================ -->
+  <h2>Partes</h2>
+
+  <div class="parte">
+    <p>
+      <strong>CONTRATANTE:</strong>
+      <strong>{{RAZAO_SOCIAL}}</strong>,
+      pessoa jurídica de direito privado,
+      inscrita no CNPJ sob nº <strong>{{CNPJ}}</strong>,
+      com sede em {{ENDERECO_PJ}},
+      telefone {{TELEFONE_PJ}},
+      e-mail {{EMAIL_PJ}},
+      neste ato representada por seus representantes legais abaixo identificados.
+    </p>
+
+    <h3>Representantes Legais (Sócios)</h3>
+
+    <div class="socio-bloco">
+      <p>
+        <strong>Sócio 1:</strong>
+        <strong>{{SOCIO_1_NOME}}</strong>,
+        {{SOCIO_1_NACIONALIDADE}},
+        {{SOCIO_1_ESTADO_CIVIL}},
+        {{SOCIO_1_PROFISSAO}},
+        nascido(a) em {{SOCIO_1_DATA_NASCIMENTO}},
+        portador(a) do CPF nº <strong>{{SOCIO_1_CPF}}</strong>,
+        RG nº {{SOCIO_1_RG}}.
+      </p>
+    </div>
+
+    <div class="socio-bloco">
+      <p>
+        <strong>Sócio 2:</strong>
+        <strong>{{SOCIO_2_NOME}}</strong>,
+        {{SOCIO_2_NACIONALIDADE}},
+        {{SOCIO_2_ESTADO_CIVIL}},
+        {{SOCIO_2_PROFISSAO}},
+        nascido(a) em {{SOCIO_2_DATA_NASCIMENTO}},
+        portador(a) do CPF nº <strong>{{SOCIO_2_CPF}}</strong>,
+        RG nº {{SOCIO_2_RG}}.
+      </p>
+    </div>
+
+    <h3>Fiadores</h3>
+
+    <div class="fiador-bloco">
+      <p>
+        <strong>Fiador 1:</strong>
+        <strong>{{FIADOR_1_NOME}}</strong>,
+        {{FIADOR_1_NACIONALIDADE}},
+        {{FIADOR_1_ESTADO_CIVIL}},
+        {{FIADOR_1_PROFISSAO}},
+        nascido(a) em {{FIADOR_1_DATA_NASCIMENTO}},
+        portador(a) do CPF nº <strong>{{FIADOR_1_CPF}}</strong>,
+        RG nº {{FIADOR_1_RG}},
+        residente e domiciliado(a) em {{FIADOR_1_ENDERECO}}.
+      </p>
+    </div>
+
+    <div class="fiador-bloco">
+      <p>
+        <strong>Fiador 2:</strong>
+        <strong>{{FIADOR_2_NOME}}</strong>,
+        {{FIADOR_2_NACIONALIDADE}},
+        {{FIADOR_2_ESTADO_CIVIL}},
+        {{FIADOR_2_PROFISSAO}},
+        nascido(a) em {{FIADOR_2_DATA_NASCIMENTO}},
+        portador(a) do CPF nº <strong>{{FIADOR_2_CPF}}</strong>,
+        RG nº {{FIADOR_2_RG}},
+        residente e domiciliado(a) em {{FIADOR_2_ENDERECO}}.
+      </p>
+    </div>
+  </div>
+
+  <div class="parte">
+    <p>
+      <strong>CONTRATADA:</strong>
+      <strong>AGILLOCK RASTREAMENTO LTDA</strong>,
+      pessoa jurídica de direito privado,
+      neste ato representada por seu representante legal
+      <strong>{{REPRESENTANTE_NOME}}</strong>,
+      CPF nº <strong>{{REPRESENTANTE_CPF}}</strong>.
+    </p>
+  </div>
+
+  <!-- ================================================
+       CORPO DO CONTRATO
+       TODO: Inserir aqui o texto das cláusulas do contrato
+             a partir do arquivo:
+             AgillockSite/contratos/CONTRATO PJ ASSISTENCIA VEICULAR.docx
+       Cole o texto das cláusulas abaixo, substituindo os dados
+       variáveis pelos placeholders {{CHAVE}} quando aplicável.
+  ================================================ -->
+  <div class="clausulas">
+
+    <h2>Cláusulas e Condições</h2>
+
+    <!-- INÍCIO DO TEXTO DO CONTRATO -->
+    <!-- TODO: colar aqui o conteúdo das cláusulas do .docx -->
+    <!-- EXEMPLO DE ESTRUTURA:
+    <h3>Cláusula 1ª — Do Objeto</h3>
+    <p>O presente contrato tem por objeto a prestação de serviços de rastreamento veicular com assistência veicular pela CONTRATADA à CONTRATANTE.</p>
+
+    <h3>Cláusula 2ª — ...</h3>
+    <p>...</p>
+    -->
+    <!-- FIM DO TEXTO DO CONTRATO -->
+
+  </div>
+
+  <!-- ================================================
+       ASSINATURAS
+  ================================================ -->
+  <div class="assinaturas">
+    <h2>Assinaturas</h2>
+
+    <div class="assinaturas-row">
+
+      <div class="assinatura-bloco">
+        <div class="assinatura-linha"></div>
+        <div class="assinatura-label">
+          <strong>CONTRATANTE — Sócio 1:</strong> {{SOCIO_1_NOME}}<br>
+          CPF: {{SOCIO_1_CPF}}
+        </div>
+      </div>
+
+      <div class="assinatura-bloco">
+        <div class="assinatura-linha"></div>
+        <div class="assinatura-label">
+          <strong>CONTRATANTE — Sócio 2:</strong> {{SOCIO_2_NOME}}<br>
+          CPF: {{SOCIO_2_CPF}}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="assinaturas-row">
+
+      <div class="assinatura-bloco">
+        <div class="assinatura-linha"></div>
+        <div class="assinatura-label">
+          <strong>Fiador 1:</strong> {{FIADOR_1_NOME}}<br>
+          CPF: {{FIADOR_1_CPF}}
+        </div>
+      </div>
+
+      <div class="assinatura-bloco">
+        <div class="assinatura-linha"></div>
+        <div class="assinatura-label">
+          <strong>Fiador 2:</strong> {{FIADOR_2_NOME}}<br>
+          CPF: {{FIADOR_2_CPF}}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="assinatura-bloco">
+      <div class="assinatura-linha"></div>
+      <div class="assinatura-label">
+        <strong>CONTRATADA — AGILLOCK RASTREAMENTO LTDA</strong><br>
+        Representante: {{REPRESENTANTE_NOME}}<br>
+        CPF: {{REPRESENTANTE_CPF}}
+      </div>
+    </div>
+
+    <div class="testemunhas-row">
+      <div class="testemunha-bloco">
+        <div class="assinatura-linha"></div>
+        <div class="assinatura-label">
+          <strong>Testemunha 1:</strong> {{TESTEMUNHA_1_NOME}}<br>
+          CPF: {{TESTEMUNHA_1_CPF}}
+        </div>
+      </div>
+      <div class="testemunha-bloco">
+        <div class="assinatura-linha"></div>
+        <div class="assinatura-label">
+          <strong>Testemunha 2:</strong> {{TESTEMUNHA_2_NOME}}<br>
+          CPF: {{TESTEMUNHA_2_CPF}}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

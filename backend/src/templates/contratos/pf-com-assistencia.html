@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #000;
+      margin: 0;
+      padding: 40px 60px;
+    }
+    h1, h2, h3 {
+      text-align: center;
+      text-transform: uppercase;
+    }
+    h1 { font-size: 14pt; margin-bottom: 24px; }
+    h2 { font-size: 12pt; margin-top: 24px; margin-bottom: 8px; }
+    h3 { font-size: 11pt; margin-top: 16px; margin-bottom: 4px; }
+    p {
+      text-align: justify;
+      margin-bottom: 0.8em;
+    }
+    .data-local {
+      text-align: right;
+      margin-bottom: 24px;
+    }
+    .parte {
+      margin: 16px 0;
+      padding: 12px 0;
+      border-bottom: 1px solid #ccc;
+    }
+    .parte:last-of-type {
+      border-bottom: none;
+    }
+    .clausulas {
+      margin-top: 24px;
+    }
+    .assinaturas {
+      margin-top: 64px;
+      page-break-inside: avoid;
+    }
+    .assinaturas h2 {
+      margin-bottom: 32px;
+    }
+    .assinatura-bloco {
+      margin-bottom: 40px;
+    }
+    .assinatura-linha {
+      border-top: 1px solid #000;
+      padding-top: 6px;
+      width: 65%;
+      margin-bottom: 4px;
+    }
+    .assinatura-label {
+      font-size: 10pt;
+      color: #333;
+    }
+    .testemunhas-row {
+      display: flex;
+      gap: 80px;
+      margin-top: 40px;
+    }
+    .testemunha-bloco {
+      flex: 1;
+    }
+    @media print {
+      body { padding: 20mm 25mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Contrato de Prestação de Serviços de Rastreamento Veicular<br>com Assistência Veicular — Pessoa Física</h1>
+
+  <p class="data-local">São Paulo, {{DATA_HOJE}}.</p>
+
+  <!-- ================================================
+       PARTES DO CONTRATO
+  ================================================ -->
+  <h2>Partes</h2>
+
+  <div class="parte">
+    <p>
+      <strong>CONTRATANTE:</strong>
+      <strong>{{NOME_CLIENTE}}</strong>,
+      {{ESTADO_CIVIL_CLIENTE}},
+      {{PROFISSAO_CLIENTE}},
+      portador(a) do CPF nº <strong>{{CPF_CLIENTE}}</strong>,
+      RG nº {{RG_CLIENTE}},
+      nascido(a) em {{DATA_NASCIMENTO_CLIENTE}},
+      residente e domiciliado(a) em {{ENDERECO_CLIENTE}},
+      telefone {{TELEFONE_CLIENTE}},
+      e-mail {{EMAIL_CLIENTE}}.
+    </p>
+  </div>
+
+  <div class="parte">
+    <p>
+      <strong>CONTRATADA:</strong>
+      <strong>AGILLOCK RASTREAMENTO LTDA</strong>,
+      pessoa jurídica de direito privado,
+      neste ato representada por seu representante legal
+      <strong>{{REPRESENTANTE_NOME}}</strong>,
+      CPF nº <strong>{{REPRESENTANTE_CPF}}</strong>.
+    </p>
+  </div>
+
+  <!-- ================================================
+       CORPO DO CONTRATO
+       TODO: Inserir aqui o texto das cláusulas do contrato
+             a partir do arquivo:
+             AgillockSite/contratos/CONTRATO PF ASSISTENCIA VEICULAR.docx
+       Cole o texto das cláusulas abaixo, substituindo os dados
+       variáveis pelos placeholders {{CHAVE}} quando aplicável.
+  ================================================ -->
+  <div class="clausulas">
+
+    <h2>Cláusulas e Condições</h2>
+
+    <!-- INÍCIO DO TEXTO DO CONTRATO -->
+    <!-- TODO: colar aqui o conteúdo das cláusulas do .docx -->
+    <!-- EXEMPLO DE ESTRUTURA:
+    <h3>Cláusula 1ª — Do Objeto</h3>
+    <p>O presente contrato tem por objeto a prestação de serviços de rastreamento veicular com assistência veicular pela CONTRATADA à CONTRATANTE.</p>
+
+    <h3>Cláusula 2ª — ...</h3>
+    <p>...</p>
+    -->
+    <!-- FIM DO TEXTO DO CONTRATO -->
+
+  </div>
+
+  <!-- ================================================
+       ASSINATURAS
+  ================================================ -->
+  <div class="assinaturas">
+    <h2>Assinaturas</h2>
+
+    <div class="assinatura-bloco">
+      <div class="assinatura-linha"></div>
+      <div class="assinatura-label">
+        <strong>CONTRATANTE:</strong> {{NOME_CLIENTE}}<br>
+        CPF: {{CPF_CLIENTE}}
+      </div>
+    </div>
+
+    <div class="assinatura-bloco">
+      <div class="assinatura-linha"></div>
+      <div class="assinatura-label">
+        <strong>CONTRATADA — AGILLOCK RASTREAMENTO LTDA</strong><br>
+        Representante: {{REPRESENTANTE_NOME}}<br>
+        CPF: {{REPRESENTANTE_CPF}}
+      </div>
+    </div>
+
+    <div class="testemunhas-row">
+      <div class="testemunha-bloco">
+        <div class="assinatura-linha"></div>
+        <div class="assinatura-label">
+          <strong>Testemunha 1:</strong> {{TESTEMUNHA_1_NOME}}<br>
+          CPF: {{TESTEMUNHA_1_CPF}}
+        </div>
+      </div>
+      <div class="testemunha-bloco">
+        <div class="assinatura-linha"></div>
+        <div class="assinatura-label">
+          <strong>Testemunha 2:</strong> {{TESTEMUNHA_2_NOME}}<br>
+          CPF: {{TESTEMUNHA_2_CPF}}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
