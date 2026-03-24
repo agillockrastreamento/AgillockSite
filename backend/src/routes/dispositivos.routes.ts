@@ -35,6 +35,12 @@ const DISPOSITIVO_SELECT = {
   createdAt: true, updatedAt: true,
 };
 
+const CLIENTES_VINCULADOS_INCLUDE = {
+  clientesVinculados: {
+    include: { cliente: { select: { id: true, nome: true } } },
+  },
+};
+
 // ─── GET /api/dispositivos ─────────────────────────────────────────────────
 router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const busca = query(req.query.busca);
@@ -56,6 +62,7 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
     include: {
       cliente: { select: { id: true, nome: true } },
       vendedor: { select: { id: true, nome: true } },
+      _count: { select: { clientesVinculados: true } },
     },
     orderBy: { nome: 'asc' },
   });
@@ -73,6 +80,7 @@ router.get('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
       cliente: { select: { id: true, nome: true } },
       vendedor: { select: { id: true, nome: true } },
       criadoPor: { select: { id: true, nome: true } },
+      ...CLIENTES_VINCULADOS_INCLUDE,
     },
   });
 
@@ -306,6 +314,48 @@ router.patch('/:id/vincular', requireRoles('ADMIN', 'COLABORADOR'), async (req: 
   });
 
   res.json(dispositivo);
+});
+
+// ─── POST /api/dispositivos/:id/clientes — Vincular cliente extra ──────────
+router.post('/:id/clientes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const dispositivoId = param(req, 'id');
+  const { clienteId } = req.body;
+
+  if (!clienteId) {
+    res.status(400).json({ error: 'clienteId é obrigatório.' });
+    return;
+  }
+
+  const [existe, clienteExiste] = await Promise.all([
+    prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { id: true } }),
+    prisma.cliente.findUnique({ where: { id: clienteId }, select: { id: true } }),
+  ]);
+  if (!existe) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+  if (!clienteExiste) { res.status(404).json({ error: 'Cliente não encontrado.' }); return; }
+
+  await prisma.dispositivoCliente.upsert({
+    where: { dispositivoId_clienteId: { dispositivoId, clienteId } },
+    create: { dispositivoId, clienteId },
+    update: {},
+  });
+
+  res.status(201).json({ dispositivoId, clienteId });
+});
+
+// ─── DELETE /api/dispositivos/:id/clientes/:clienteId — Desvincular extra ──
+router.delete('/:id/clientes/:clienteId', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  if (req.user!.role === 'COLABORADOR' && !req.user!.podeDesvincularDispositivo) {
+    res.status(403).json({ error: 'Sem permissão para desvincular dispositivos de clientes.' });
+    return;
+  }
+  const dispositivoId = param(req, 'id');
+  const clienteId = req.params.clienteId;
+
+  await prisma.dispositivoCliente.deleteMany({
+    where: { dispositivoId, clienteId },
+  });
+
+  res.status(204).send();
 });
 
 // ─── PATCH /api/dispositivos/:id/valor — Definir valorPadrao ──────────────
