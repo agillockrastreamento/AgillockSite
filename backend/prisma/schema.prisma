@@ -77,6 +77,11 @@ model Cliente {
   rg             String?
   profissao      String?
   estadoCivil    String?
+  tipoPessoa     String  @default("PF")
+  nirc           String?
+  emailCobranca  String?
+  origemCliente  String?
+  socios         Json?
   status      StatusCliente @default(ATIVO)
   cep         String?
   logradouro  String?
@@ -93,9 +98,10 @@ model Cliente {
   vendedorId  String?
   vendedor    User?  @relation("ClienteVendedor", fields: [vendedorId], references: [id])
 
-  placas       Placa[]
-  dispositivos Dispositivo[]
-  carnes       Carne[]
+  placas                 Placa[]
+  dispositivos           Dispositivo[]
+  dispositivosVinculados DispositivoCliente[]
+  carnes                 Carne[]
 }
 
 model Placa {
@@ -229,11 +235,20 @@ model Dispositivo {
   criadoPorId String
   criadoPor   User     @relation("DispositivoCriador", fields: [criadoPorId], references: [id])
 
-  boletos           Boleto[]
-  boletosUnificados BoletoDispositivo[]
+  boletos            Boleto[]
+  boletosUnificados  BoletoDispositivo[]
+  clientesVinculados DispositivoCliente[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model DispositivoCliente {
+  dispositivoId String
+  clienteId     String
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  cliente       Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  @@id([dispositivoId, clienteId])
 }
 
 model ComissaoVendedor {
