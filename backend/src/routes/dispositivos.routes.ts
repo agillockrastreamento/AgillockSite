@@ -164,6 +164,19 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
     },
   });
 
+  // Sincronizar clientes extras (junction)
+  const clientesExtrasRaw = req.body.clientesExtras;
+  if (clientesExtrasRaw) {
+    let extras: string[] = [];
+    try { extras = JSON.parse(clientesExtrasRaw); } catch { extras = []; }
+    if (extras.length) {
+      await prisma.dispositivoCliente.createMany({
+        data: extras.map((cId: string) => ({ dispositivoId: dispositivo.id, clienteId: cId })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
   res.status(201).json(dispositivo);
 });
 
@@ -256,6 +269,20 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
       cliente: { select: { id: true, nome: true } },
     },
   });
+
+  // Sincronizar clientes extras (junction) — substitui todos
+  const clientesExtrasRaw = req.body.clientesExtras;
+  if (clientesExtrasRaw !== undefined) {
+    let extras: string[] = [];
+    try { extras = JSON.parse(clientesExtrasRaw); } catch { extras = []; }
+    await prisma.dispositivoCliente.deleteMany({ where: { dispositivoId: id } });
+    if (extras.length) {
+      await prisma.dispositivoCliente.createMany({
+        data: extras.map((cId: string) => ({ dispositivoId: id, clienteId: cId })),
+        skipDuplicates: true,
+      });
+    }
+  }
 
   res.json(dispositivo);
 });
