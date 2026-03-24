@@ -31,6 +31,7 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
       criadoPor: { select: { id: true, nome: true } },
       placas: { where: { ativo: true }, select: { id: true, placa: true, descricao: true } },
       dispositivos: { select: { id: true, nome: true, identificador: true, placa: true, categoria: true, ativo: true } },
+      _count: { select: { dispositivosVinculados: true } },
     },
     orderBy: { nome: 'asc' },
   });
@@ -289,7 +290,8 @@ router.get('/:id/dispositivos', requireRoles('ADMIN', 'COLABORADOR'), async (req
   ]);
 
   const vinculadosSet = new Set(vinculados.map((v) => v.dispositivoId));
-  res.json(dispositivos.map((d) => ({ ...d, vinculado: vinculadosSet.has(d.id) })));
+  // Dispositivo é vinculado ao cliente se: é o responsável (clienteId) OU está na junction table
+  res.json(dispositivos.map((d) => ({ ...d, vinculado: vinculadosSet.has(d.id) || d.clienteId === clienteId })));
 });
 
 export default router;

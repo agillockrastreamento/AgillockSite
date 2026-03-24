@@ -127,7 +127,8 @@
             <th>Nome</th>
             <th>CPF/CNPJ</th>
             <th>Telefone</th>
-            <th>Vendedor</th>
+            <th>Origem</th>
+            <th style="text-align:center;width:80px;">Veículos</th>
             <th>Status</th>
             <th>Ações</th>
           </tr>
@@ -138,125 +139,6 @@
           </tr>
         </tbody>
       </table>
-    </div>
-  </div>
-
-  <!-- ═══════════════ MODAL CLIENTE ═══════════════ -->
-  <div class="modal fade" id="modal-cliente" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
-          <h4 class="modal-title" id="modal-cliente-titulo">Novo Cliente</h4>
-        </div>
-        <div class="modal-body">
-          <form id="form-cliente">
-            <input type="hidden" id="fc-id" />
-            <div class="row">
-              <div class="col-sm-8">
-                <div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="fc-nome"
-                    required /></div>
-              </div>
-              <div class="col-sm-4">
-                <div class="form-group"><label>CPF/CNPJ *</label><input type="text" class="form-control" id="fc-cpfcnpj"
-                    placeholder="Apenas números" required maxlength="18" /></div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-sm-6">
-                <div class="form-group"><label>Telefone *</label><input type="text" class="form-control"
-                    id="fc-telefone" required maxlength="15" /></div>
-              </div>
-              <div class="col-sm-6">
-                <div class="form-group"><label>E-mail</label><input type="email" class="form-control" id="fc-email" /></div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-sm-4">
-                <div class="form-group"><label>CEP *</label><input type="text" class="form-control" id="fc-cep"
-                    placeholder="00000-000" maxlength="9" required /></div>
-              </div>
-              <div class="col-sm-8">
-                <div class="form-group"><label>Logradouro *</label><input type="text" class="form-control"
-                    id="fc-logradouro" required /></div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-sm-3">
-                <div class="form-group"><label>Número *</label><input type="text" class="form-control" id="fc-numero" required />
-                </div>
-              </div>
-              <div class="col-sm-4">
-                <div class="form-group"><label>Complemento</label><input type="text" class="form-control"
-                    id="fc-complemento" /></div>
-              </div>
-              <div class="col-sm-5">
-                <div class="form-group"><label>Bairro *</label><input type="text" class="form-control" id="fc-bairro" required />
-                </div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-sm-8">
-                <div class="form-group"><label>Cidade *</label><input type="text" class="form-control" id="fc-cidade" required />
-                </div>
-              </div>
-              <div class="col-sm-4">
-                <div class="form-group"><label>UF *</label><input type="text" class="form-control" id="fc-estado"
-                    maxlength="2" style="text-transform:uppercase;" required /></div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-sm-6">
-                <div class="form-group">
-                  <label>Data de Nascimento</label>
-                  <input type="date" class="form-control" id="fc-data-nascimento" />
-                </div>
-              </div>
-              <div class="col-sm-6">
-                <div class="form-group">
-                  <label>RG</label>
-                  <input type="text" class="form-control" id="fc-rg" maxlength="20" />
-                </div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-sm-6">
-                <div class="form-group">
-                  <label>Profissão</label>
-                  <input type="text" class="form-control" id="fc-profissao" maxlength="100" />
-                </div>
-              </div>
-              <div class="col-sm-6">
-                <div class="form-group">
-                  <label>Estado Civil</label>
-                  <select class="form-control" id="fc-estado-civil">
-                    <option value="">— Selecione —</option>
-                    <option value="Solteiro(a)">Solteiro(a)</option>
-                    <option value="Casado(a)">Casado(a)</option>
-                    <option value="Divorciado(a)">Divorciado(a)</option>
-                    <option value="Viúvo(a)">Viúvo(a)</option>
-                    <option value="União Estável">União Estável</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="form-group"><label>Notas</label><textarea class="form-control" id="fc-notas"
-                rows="2"></textarea></div>
-            <div class="form-group">
-              <label>Vendedor</label>
-              <div style="position:relative;">
-                <input type="text" class="form-control" id="fc-vendedor-busca" placeholder="Digite nome ou e-mail do vendedor…" autocomplete="off" style="padding-right:32px;" />
-                <button type="button" id="fc-vendedor-limpar" title="Limpar vendedor" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#aaa;cursor:pointer;font-size:18px;line-height:1;padding:0;">&times;</button>
-                <div id="fc-vendedor-resultados" style="position:absolute;z-index:300;width:100%;background:white;border:1px solid #ddd;border-radius:4px;max-height:180px;overflow-y:auto;display:none;"></div>
-              </div>
-            </div>
-          </form>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
-          <button type="button" class="btn btn-primary-al" id="btn-salvar-cliente">Salvar</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -289,53 +171,13 @@
       document.getElementById('btn-logout').addEventListener('click', AL.logout);
       AL.initThemeToggle('btn-tema');
 
-      // ── Vendedores (para filtro + modal) ─────────────────────
-      // Carrega vendedores só para o filtro da lista
+      // ── Vendedores (para filtro) ──────────────────────────────
       AL.apiGet('/api/vendedores').then(function (list) {
         var selFiltro = document.getElementById('filtro-vendedor');
         (list || []).forEach(function (v) {
           selFiltro.insertAdjacentHTML('beforeend', '<option value="' + v.id + '">' + v.nome + '</option>');
         });
       }).catch(function () { });
-
-      // Autocomplete vendedor do modal
-      var fcVendedorId = null;
-      var fcVendTimer = null;
-      document.getElementById('fc-vendedor-busca').addEventListener('input', function () {
-        var q = this.value.trim();
-        clearTimeout(fcVendTimer);
-        fcVendedorId = null;
-        document.getElementById('fc-vendedor-limpar').style.display = 'none';
-        if (q.length < 2) { document.getElementById('fc-vendedor-resultados').style.display = 'none'; return; }
-        fcVendTimer = setTimeout(function () {
-          AL.apiGet('/api/vendedores?busca=' + encodeURIComponent(q)).then(function (list) {
-            var div = document.getElementById('fc-vendedor-resultados');
-            if (!list || !list.length) {
-              div.innerHTML = '<div style="padding:10px;color:#999;">Nenhum vendedor encontrado.</div>';
-              div.style.display = 'block'; return;
-            }
-            div.innerHTML = list.map(function (v) {
-              return '<div class="fc-vend-item" data-id="' + v.id + '" data-nome="' + v.nome + '" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;">' +
-                '<strong>' + v.nome + '</strong>' + (v.email ? ' <small class="text-muted">— ' + v.email + '</small>' : '') + '</div>';
-            }).join('');
-            div.style.display = 'block';
-            div.querySelectorAll('.fc-vend-item').forEach(function (item) {
-              item.addEventListener('click', function () {
-                fcVendedorId = this.dataset.id;
-                document.getElementById('fc-vendedor-busca').value = this.dataset.nome;
-                document.getElementById('fc-vendedor-limpar').style.display = '';
-                document.getElementById('fc-vendedor-resultados').style.display = 'none';
-              });
-            });
-          }).catch(function () { });
-        }, 300);
-      });
-      document.getElementById('fc-vendedor-limpar').addEventListener('click', function () {
-        fcVendedorId = null;
-        document.getElementById('fc-vendedor-busca').value = '';
-        this.style.display = 'none';
-        document.getElementById('fc-vendedor-busca').focus();
-      });
 
       // ── Listagem de clientes ──────────────────────────────────
       var clientes = [];
@@ -369,7 +211,9 @@
           return;
         }
         tbody.innerHTML = clientes.map(function (c) {
-          var vendNome = c.vendedor ? c.vendedor.nome : '—';
+          var origem = c.origemCliente || '—';
+          var origemExibida = origem.length > 35 ? origem.substring(0, 35) + '…' : origem;
+          var numVeiculos = (c.dispositivos || []).length + ((c._count && c._count.dispositivosVinculados) ? c._count.dispositivosVinculados : 0);
           var acoes = (canEditar ? '<button class="btn btn-xs btn-default btn-editar" data-id="' + c.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' : '') +
             (canInativar ? '<button class="btn btn-xs ' + (c.status === 'ATIVO' ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + c.id + '" data-status="' + c.status + '" title="' + (c.status === 'ATIVO' ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button>' : '');
           if (canDelete) {
@@ -379,7 +223,8 @@
             '<td>' + c.nome + '</td>' +
             '<td>' + AL.fmtCpfCnpj(c.cpfCnpj) + '</td>' +
             '<td>' + (c.telefone || '—') + '</td>' +
-            '<td>' + vendNome + '</td>' +
+            '<td title="' + origem + '">' + origemExibida + '</td>' +
+            '<td style="text-align:center;">' + numVeiculos + '</td>' +
             '<td>' + AL.badgeStatus(c.status) + '</td>' +
             '<td onclick="event.stopPropagation();">' + acoes + '</td>' +
             '</tr>';
@@ -397,7 +242,7 @@
           tbody.querySelectorAll('.btn-editar').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
               e.stopPropagation();
-              abrirModalCliente(this.dataset.id);
+              window.location.href = 'cliente-form.html?id=' + this.dataset.id;
             });
           });
         }
@@ -445,106 +290,8 @@
       document.getElementById('filtro-status').addEventListener('change', loadClientes);
       document.getElementById('filtro-vendedor').addEventListener('change', loadClientes);
 
-      // ── Modal Novo/Editar Cliente ─────────────────────────────
-      function abrirModalCliente(id) {
-        ['fc-id', 'fc-nome', 'fc-cpfcnpj', 'fc-telefone', 'fc-email', 'fc-cep', 'fc-logradouro',
-          'fc-numero', 'fc-complemento', 'fc-bairro', 'fc-cidade', 'fc-estado', 'fc-notas',
-          'fc-data-nascimento', 'fc-rg', 'fc-profissao'].forEach(function (fid) {
-            document.getElementById(fid).value = '';
-          });
-        document.getElementById('fc-estado-civil').value = '';
-        // Reset autocomplete vendedor
-        fcVendedorId = null;
-        document.getElementById('fc-vendedor-busca').value = '';
-        document.getElementById('fc-vendedor-limpar').style.display = 'none';
-
-        if (id) {
-          document.getElementById('modal-cliente-titulo').textContent = 'Editar Cliente';
-          var c = clientes.find(function (x) { return x.id === id; });
-          if (c) {
-            document.getElementById('fc-id').value = c.id;
-            document.getElementById('fc-nome').value = c.nome || '';
-            document.getElementById('fc-cpfcnpj').value = c.cpfCnpj || '';
-            document.getElementById('fc-telefone').value = c.telefone || '';
-            document.getElementById('fc-email').value = c.email || '';
-            document.getElementById('fc-cep').value = c.cep || '';
-            document.getElementById('fc-logradouro').value = c.logradouro || '';
-            document.getElementById('fc-numero').value = c.numero || '';
-            document.getElementById('fc-complemento').value = c.complemento || '';
-            document.getElementById('fc-bairro').value = c.bairro || '';
-            document.getElementById('fc-cidade').value = c.cidade || '';
-            document.getElementById('fc-estado').value = c.estado || '';
-            document.getElementById('fc-notas').value = c.notas || '';
-            document.getElementById('fc-data-nascimento').value = c.dataNascimento || '';
-            document.getElementById('fc-rg').value = c.rg || '';
-            document.getElementById('fc-profissao').value = c.profissao || '';
-            document.getElementById('fc-estado-civil').value = c.estadoCivil || '';
-            if (c.vendedor) {
-              fcVendedorId = c.vendedorId;
-              document.getElementById('fc-vendedor-busca').value = c.vendedor.nome;
-              document.getElementById('fc-vendedor-limpar').style.display = '';
-            }
-          }
-        } else {
-          document.getElementById('modal-cliente-titulo').textContent = 'Novo Cliente';
-        }
-        $('#modal-cliente').modal('show');
-        AL.maskCpfCnpj(document.getElementById('fc-cpfcnpj'));
-        AL.maskPhone(document.getElementById('fc-telefone'));
-      }
-
       document.getElementById('btn-novo-cliente').addEventListener('click', function () {
-        abrirModalCliente(null);
-      });
-
-      document.getElementById('btn-salvar-cliente').addEventListener('click', function () {
-        var id = document.getElementById('fc-id').value;
-        var payload = {
-          nome: document.getElementById('fc-nome').value.trim(),
-          cpfCnpj: document.getElementById('fc-cpfcnpj').value.replace(/\D/g, ''),
-          telefone: document.getElementById('fc-telefone').value.trim(),
-          email: document.getElementById('fc-email').value.trim(),
-          cep: document.getElementById('fc-cep').value.replace(/\D/g, ''),
-          logradouro: document.getElementById('fc-logradouro').value.trim(),
-          numero: document.getElementById('fc-numero').value.trim(),
-          complemento: document.getElementById('fc-complemento').value.trim(),
-          bairro: document.getElementById('fc-bairro').value.trim(),
-          cidade: document.getElementById('fc-cidade').value.trim(),
-          estado: document.getElementById('fc-estado').value.trim().toUpperCase(),
-          notas: document.getElementById('fc-notas').value.trim(),
-          dataNascimento: document.getElementById('fc-data-nascimento').value || null,
-          rg: document.getElementById('fc-rg').value.trim() || null,
-          profissao: document.getElementById('fc-profissao').value.trim() || null,
-          estadoCivil: document.getElementById('fc-estado-civil').value || null,
-          vendedorId: fcVendedorId || null,
-        };
-        if (!payload.nome || !payload.cpfCnpj || !payload.telefone || !payload.email) {
-          AL.showAlert('Nome, CPF/CNPJ, Telefone e E-mail são obrigatórios.', 'warning');
-          return;
-        }
-        var req = id ? AL.apiPut('/api/clientes/' + id, payload) : AL.apiPost('/api/clientes', payload);
-        req.then(function () {
-          $('#modal-cliente').modal('hide');
-          loadClientes();
-          AL.showAlert(id ? 'Cliente atualizado.' : 'Cliente criado.', 'success');
-        }).catch(function (err) {
-          AL.showAlert(err.message);
-        });
-      });
-
-      // ── ViaCEP auto-fill ──────────────────────────────────────
-      document.getElementById('fc-cep').addEventListener('blur', function () {
-        var cep = this.value.replace(/\D/g, '');
-        if (cep.length !== 8) return;
-        fetch('https://viacep.com.br/ws/' + cep + '/json/')
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (d.erro) return;
-            document.getElementById('fc-logradouro').value = d.logradouro || '';
-            document.getElementById('fc-bairro').value = d.bairro || '';
-            document.getElementById('fc-cidade').value = d.localidade || '';
-            document.getElementById('fc-estado').value = d.uf || '';
-          }).catch(function () { });
+        window.location.href = 'cliente-form.html';
       });
     })();
   </script>
