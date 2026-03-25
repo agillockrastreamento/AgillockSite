@@ -33,7 +33,7 @@ export async function htmlParaPdf(html: string): Promise<Buffer> {
         <div style="width: 100%; font-size: 8px; margin: 0 40px; text-align: center; border-top: 1px solid #ccc; padding-top: 5px; color: #555; font-family: Arial, sans-serif;">
           <p style="margin: 2px 0;"><strong>AGILLOCK GESTÃO DE RISCO</strong></p>
           <p style="margin: 2px 0;">Rua Curitiba, nº 553, bairro Henrique Jorge, CEP: 60.526-035 – Fortaleza/Ceará</p>
-          <p style="margin: 2px 0;">http://www.agillock.com.br • agillockrastreamento@gmail.com • + 55 (85) 4101-0103</p>
+          <p style="margin: 2px 0;">https://www.agillock.com.br • agillockrastreamento@gmail.com • + 55 (85) 4101-0103 (whatsapp)/(85) 99970-3738</p>
           <div style="text-align: right; margin-top: 2px;">Página <span class="pageNumber"></span> de <span class="totalPages"></span></div>
         </div>`,
       margin: {

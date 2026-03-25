@@ -75,10 +75,16 @@
 
     .assinaturas {
       margin-top: 40px;
-      page-break-inside: avoid;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      display: inline-block;
+      width: 100%;
+      clear: both;
     }
     .assinatura-bloco {
       margin-bottom: 28px;
+      display: block;
+      width: 100%;
     }
     .assinatura-linha {
       border-top: 1.5px solid #000;
@@ -92,12 +98,14 @@
       font-size: 10pt;
     }
     .testemunhas-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 40px;
       margin-top: 30px;
+      width: 100%;
     }
-    .testemunha-bloco { flex: 1; }
+    .testemunha-bloco { 
+      width: 45%;
+      display: inline-block;
+      vertical-align: top;
+    }
 
     @media print {
       .screen-header, .screen-footer { display: none !important; }
@@ -107,12 +115,12 @@
 </head>
 <body>
 
-  <h1 style="text-align:center; font-size:11pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">CONTRATO DE COMODATO DO EQUIPAMENTO E PRESTAÇÃO DE SERVIÇOS DE RASTREAMENTO</h1>
+  <h1 style="text-align:center; font-size:14pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">CONTRATO DE COMODATO DO EQUIPAMENTO E PRESTAÇÃO DE SERVIÇOS DE RASTREAMENTO</h1>
 
   <!-- ================================================
        IDENTIFICAÇÃO DAS PARTES
   ================================================ -->
-  <h2 style="font-size:11pt; font-weight:bold; text-transform:uppercase; text-align:left; border-bottom:1.5px solid #000; padding-bottom:5px; margin:20px 0 8px 0;">1. IDENTIFICAÇÃO DAS PARTES CONTRATANTES:</h2>
+  <h2 style="font-size:12pt; font-weight:bold; text-transform:uppercase; text-align:left; border-bottom:1.5px solid #000; padding-bottom:5px; margin:20px 0 8px 0;">1. IDENTIFICAÇÃO DAS PARTES CONTRATANTES:</h2>
 
   <div class="parte">
     <p>
@@ -142,32 +150,32 @@
   ================================================ -->
   <div class="clausulas">
 
-    <h3>1. CLÁUSULA PRIMEIRA – DO OBJETO –</h3>
+    <h2 style="font-size:12pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">1. CLÁUSULA PRIMEIRA – DO OBJETO </h2>
     <p>O presente contrato tem como objeto PRESTAÇÃO DE SERVIÇOS DE RASTREAMENTO, a entrega de 01 (UM) EQUIPAMENTO DE RASTREAMENTO AGILLOCK de propriedade da CONTRATADA, em forma de COMODATO, para viabilizar a prestação dos serviços de rastreamento dos veículos.</p>
     <p>1.1. Os equipamentos citados têm a função rastrear e localizar os veículos em tempo real, através da tecnologia GPS/GPRS, objetivando dificultar eventuais furtos ou roubos dos veículos em que estão instalados.</p>
     <p>1.2. Os serviços de rastreamento dos veículos equipados com o dispositivo descrito na cláusula primeira serão prestados 24 horas por dia.</p>
     <p>1.2.1. O CONTRATANTE/CLIENTE declara estar ciente de que nas ocasiões em que os veículos estiverem em locais que impossibilite a emissão de sinal, o processo de localização dos veículos não serão possíveis.</p>
 
-    <h3>2. CLÁUSULA SEGUNDA – DAS CONDIÇÕES DO COMODATO –</h3>
+    <h2 style="font-size:12pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">2. CLÁUSULA SEGUNDA – DAS CONDIÇÕES DO COMODATO </h2>
     <p>A CONTRATADA cede ao CONTRATANTE/CLIENTE os equipamentos rastreadores, em perfeitas condições, ao título de COMODATO, regido pelo art. 579 e seguintes do Código Civil Brasileiro. O CONTRATANTE/CLIENTE, por sua vez, declara que o recebe e obriga-se a mantê-lo sob sua custódia, conservando-o como se fosse seu, na qualidade de depositário fiel, enquanto viger este contrato.</p>
     <p>2.1. Havendo encerramento do contrato de prestação de serviços, o comodato será automaticamente rescindido, sem prejuízo das outras obrigações assumidas pelo CONTRATANTE/CLIENTE, devendo o CONTRATANTE/CLIENTE devolver os equipamentos no prazo de 07 (sete) dias úteis a contar da data do cancelamento ou rescisão do contrato.</p>
     <p>2.2. A não devolução dos equipamentos dado em comodato será caracterizada apropriação indébita e sujeitará o CONTRATANTE/CLIENTE à imediata cobrança do valor integral dos equipamentos estabelecido em R$ 500,00 (quinhentos reais), cada equipamento, emitindo-se o boleto de cobrança/fatura contra o CONTRATANTE/CLIENTE, o que desde já fica autorizado, cujo não pagamento ensejará a tomada das medidas judiciais cabíveis.</p>
 
-    <h3>3. CLÁUSULA TERCEIRA – DO PREÇO DOS SERVIÇOS E FORMA DE PAGAMENTO –</h3>
+    <h2 style="font-size:12pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">3. CLÁUSULA TERCEIRA – DO PREÇO DOS SERVIÇOS E FORMA DE PAGAMENTO </h2>
     <p>O preço relativo ao serviço de rastreamento e as formas de pagamento foram acordados no ato da contratação do serviço, ficando desde já autorizada a emissão dos boletos de cobrança, sendo certo que, caso o CONTRATANTE/CLIENTE não receba os boletos de cobrança referente ao serviço contratado, por se tratar de dívida portável, caberá ao CONTRATANTE/CLIENTE procurar a CONTRATADA para realizar os pagamentos.</p>
     <p>3.1. Não ocorrendo o pagamento por um período superior a 15 (quinze) dias, a CONTRATADA poderá tomar as providências cabíveis para recuperação de seu crédito, inclusive a promoção de negativação do CONTRATANTE/CLIENTE perante os órgãos de proteção do crédito.</p>
     <p>3.2. Após o período informado na cláusula 3.1. os serviços prestados pela CONTRATADA serão suspensos até que haja o pagamento dos valores vencidos.</p>
     <p><strong>Parágrafo único.</strong> Após o período de 60 (sessenta) dias inadimplente, a CONTRATADA solicitará o desligamento do equipamento rastreador, com isso o CONTRATANTE/CLIENTE estará ciente que a CONTRATADA poderá perder a comunicação com o equipamento e que o veículo PODERÁ VIR a bloquear. Então, o interessante seria regularizar a situação antes do prazo citado e disponibilizar o veículo para a retirada do equipamento, com o fim de não estar gerando custo, sem o recebimento pecuniário para a parte CONTRATADA e evitando assim, esse transtorno para a parte CONTRATANTE/CLIENTE.</p>
     <p>3.3. O não pagamento dos valores pactuados no seu respectivo vencimento implicará na cobrança de multa de 5%, juros de mora de 0,33% ao dia.</p>
-    <p>3.4. O preço dos Serviços será reajustado de acordo com a variação do Índice Geral de Preços-Série M (IGP-M/FGV), ou outro índice que venha a substituí-lo, na menor periodicidade permitida por lei.</p>
+    <p style="margin-top: 50px;">3.4. O preço dos Serviços será reajustado de acordo com a variação do Índice Geral de Preços-Série M (IGP-M/FGV), ou outro índice que venha a substituí-lo, na menor periodicidade permitida por lei.</p>
 
-    <h3>4. CLÁUSULA QUARTA – DO PRAZO DE VIGÊNCIA E DA RESCISÃO –</h3>
+    <h2 style="font-size:12pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">4. CLÁUSULA QUARTA – DO PRAZO DE VIGÊNCIA E DA RESCISÃO </h2>
     <p>O presente contrato de COMODATO e PRESTAÇÃO DE SERVIÇOS inicia-se no ato da ativação do equipamento e terá vigência de 12 (doze) meses.</p>
     <p>4.1. Findo este prazo, para que haja continuidade na prestação dos serviços o CONTRATANTE/CLIENTE deverá formalizar a RENOVAÇÃO deste contrato diretamente com a CONTRATADA, caso contrário, fica prorrogado o contrato por tempo indeterminado, salvo se não houver manifestação tácita ou expressa por qualquer das partes.</p>
     <p>4.2. Em não ocorrendo a renovação, ou em qualquer hipótese de rescisão contratual, o CONTRATANTE/CLIENTE deverá cumprir imediatamente o disposto nas cláusulas 2.1. e 2.2.</p>
     <p>4.3. Ocorrendo a rescisão contratual antes do término do prazo de vigência deste instrumento, o CONTRATANTE/CLIENTE arcará com o pagamento da multa rescisória estabelecida em 50% (cinquenta por cento) sobre o valor das parcelas vincendas, sem prejuízo das demais obrigações assumidas.</p>
 
-    <h3>5. CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATADA:</h3>
+    <h2 style="font-size:12pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">5. CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATADA:</h2>
     <p>5.1. A CONTRATADA deverá fornecer os equipamentos descritos na cláusula primeira, em perfeitas condições de funcionamento e efetivar a ATIVAÇÃO DO SISTEMA;</p>
     <p>5.2. A CONTRATADA deverá manter sua Central de Rastreamento 24h ativa e em funcionamento;</p>
     <p>5.3. Disponibilizar ao CONTRATANTE/CLIENTE tabela de preços dos serviços e acessórios;</p>
@@ -175,7 +183,7 @@
     <p>5.5. Efetivar o recall dos equipamentos, sempre que houver necessidade, para disponibilizar o melhor serviço ao CONTRATANTE/CLIENTE, sem custo pelos equipamentos, exceto aqueles relativos à visita e execução dos serviços;</p>
     <p>5.6. A CONTRATADA já disponibilizou o MONITORAMENTO WEB, fornecendo login e senha de acesso ao sistema/aplicativo.</p>
 
-    <h3>6. CLÁUSULA SEXTA – DAS OBRIGAÇÕES DO CONTRATANTE/CLIENTE:</h3>
+    <h2 style="font-size:12pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0; margin-top: 70px;">6. CLÁUSULA SEXTA – DAS OBRIGAÇÕES DO CONTRATANTE/CLIENTE:</h2>
     <p>6.1. O CONTRATANTE/CLIENTE deverá fornecer seus DADOS PESSOAIS e DADOS DOS VEÍCULOS para CADASTRO, sendo certo que, somente após o cumprimento desta condição será feita a ativação do CONTRATANTE/CLIENTE no sistema da CONTRATADA e o agendamento para a instalação dos equipamentos.</p>
     <p>6.2. O CONTRATANTE/CLIENTE obriga-se a notificar a CONTRATADA se houver troca de veículo, a fim de que se proceda à desinstalação e reinstalação do equipamento, o que será cobrado de acordo com a tabela de preços vigente à época da realização do serviço;</p>
     <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:10.5pt;">
@@ -184,7 +192,7 @@
       </thead>
       <tbody>
         <tr><td style="border:1px solid #888;padding:5px 8px;">MANUTENÇÃO (quando não for de responsabilidade da CONTRATADA)</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 54,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 54,90</td></tr>
-        <tr><td style="border:1px solid #888;padding:5px 8px;">Taxa de Instalação</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 69,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 69,90</td></tr>
+        <tr><td style="border:1px solid #888;padding:5px 8px;">Taxa de Instalação</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 59,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 59,90</td></tr>
         <tr><td style="border:1px solid #888;padding:5px 8px;">Taxa de Desinstalação</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 54,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 54,90</td></tr>
         <tr><td style="border:1px solid #888;padding:5px 8px;">Taxa de Transferência</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 99,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 99,90</td></tr>
       </tbody>
@@ -195,7 +203,7 @@
     <p>6.6. É de inteira responsabilidade do CONTRATANTE/CLIENTE o uso indevido dos serviços contratados, assim como o repasse e a comunicação a terceiros de seu código pessoal de acesso e números de telefone da Central de Rastreamento 24 horas.</p>
     <p>6.7. Se o CONTRATANTE/CLIENTE quiser fazer uso de outros serviços prestados pela CONTRATADA deverá formalizar o pedido e responsabilizar-se pelo pagamento destes serviços, conforme tabela de preços vigentes.</p>
 
-    <h3>7. CLÁUSULA SÉTIMA – DAS DISPOSIÇÕES GERAIS:</h3>
+    <h2 style="font-size:12pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">7. CLÁUSULA SÉTIMA – DAS DISPOSIÇÕES GERAIS:</h2>
     <p>7.1. O CONTRATANTE/CLIENTE declara neste ato estar ciente que a instalação dos equipamentos e a prestação do serviço não garantem a recuperação dos veículos em casos de furto ou roubo.</p>
     <p>7.2. O CONTRATANTE/CLIENTE declara neste ato estar recebendo os equipamentos em perfeitas condições de funcionamento, bem como declara estar devidamente instruído do funcionamento e condições de uso e devolução dos equipamentos.</p>
     <p>7.3. A CONTRATADA não será responsabilizada e nem terá obrigação de indenizar o CONTRATANTE/CLIENTE nas seguintes condições:</p>
@@ -219,7 +227,7 @@
   <!-- ================================================
        LOCAL E DATA
   ================================================ -->
-  <p style="margin-top:30px;">Fortaleza, {{DATA_HOJE}}.</p>
+  <p style="margin-top:50px;">Fortaleza, {{DATA_HOJE}}.</p>
 
   <!-- ================================================
        ASSINATURAS
@@ -227,7 +235,7 @@
   <div class="assinaturas">
 
     <div class="assinatura-bloco">
-      <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:82%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+      <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:60px; width:82%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
       <div class="assinatura-label">
         <strong>CONTRATADA: AGILLOCK RASTREAMENTO LTDA</strong><br>
         CNPJ: 28.424.364/0001-05
@@ -235,7 +243,7 @@
     </div>
 
     <div class="assinatura-bloco">
-      <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:82%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+      <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:60px; width:82%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
       <div class="assinatura-label">
         <strong>CONTRATANTE:</strong> {{NOME_CLIENTE}}<br>
         CPF: {{CPF_CLIENTE}}
@@ -243,7 +251,7 @@
     </div>
 
     <p style="margin-top:60px;font-weight:bold;">TESTEMUNHAS:</p>
-    <div class="testemunhas-row" style="display:flex; justify-content:space-between; gap:40px; margin-top:30px;">
+    <div class="testemunhas-row" style="display:flex; justify-content:space-between; gap:40px; margin-top:20px;">
       <div class="testemunha-bloco" style="flex:1;">
         <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:82%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">

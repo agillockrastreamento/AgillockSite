@@ -10,9 +10,13 @@ export interface DadosContrato {
   cliente: {
     nome: string; cpfCnpj?: string; tipoPessoa?: string;
     rg?: string; profissao?: string; estadoCivil?: string; dataNascimento?: string;
+    nirc?: string;
     telefone?: string; email?: string;
     logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string;
-    socios?: Array<{ nome: string; cpf?: string; rg?: string; profissao?: string; estadoCivil?: string; nacionalidade?: string; dataNascimento?: string }>;
+    socios?: Array<{
+      nome: string; cpf?: string; rg?: string; profissao?: string; estadoCivil?: string; nacionalidade?: string; dataNascimento?: string;
+      logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string;
+    }>;
   };
   fiadores?: Array<{
     nome: string; cpf?: string; rg?: string; profissao?: string; estadoCivil?: string; nacionalidade?: string; dataNascimento?: string;
@@ -101,6 +105,7 @@ export function preencherTemplate(tipo: string, dados: DadosContrato): string {
     NOME_CLIENTE: c.nome || '',
     CPF_CLIENTE: c.cpfCnpj || '',
     RG_CLIENTE: c.rg || '',
+    NIRC: c.nirc || '',
     PROFISSAO_CLIENTE: c.profissao || '',
     ESTADO_CIVIL_CLIENTE: c.estadoCivil || '',
     DATA_NASCIMENTO_CLIENTE: fmtData(c.dataNascimento),
@@ -128,6 +133,14 @@ export function preencherTemplate(tipo: string, dados: DadosContrato): string {
     vars[`SOCIO_${n}_ESTADO_CIVIL`] = s.estadoCivil || '';
     vars[`SOCIO_${n}_NACIONALIDADE`] = s.nacionalidade || '';
     vars[`SOCIO_${n}_DATA_NASCIMENTO`] = fmtData(s.dataNascimento);
+    vars[`SOCIO_${n}_ENDERECO`] = fmtEndereco(s);
+    vars[`SOCIO_${n}_LOGRADOURO`] = s.logradouro || '';
+    vars[`SOCIO_${n}_NUMERO`] = s.numero || '';
+    vars[`SOCIO_${n}_COMPLEMENTO`] = s.complemento || '';
+    vars[`SOCIO_${n}_BAIRRO`] = s.bairro || '';
+    vars[`SOCIO_${n}_CEP`] = s.cep || '';
+    vars[`SOCIO_${n}_CIDADE`] = s.cidade || '';
+    vars[`SOCIO_${n}_ESTADO`] = s.estado || '';
   });
 
   // Fiadores

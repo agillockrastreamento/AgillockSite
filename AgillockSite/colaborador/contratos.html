@@ -130,30 +130,9 @@
     </div>
   </div>
 
-  <!-- Modal Email Signatários -->
-  <div class="modal fade" id="modal-links" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-          <h4 class="modal-title"><i class="fa fa-whatsapp"></i> Reenviar via WhatsApp</h4>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted">Clique em "Reenviar WhatsApp" para reenviar o link de assinatura via WhatsApp ao signatário.</p>
-          <table class="table">
-            <thead><tr><th>Signatário</th><th>Papel</th><th>Ação</th></tr></thead>
-            <tbody id="modal-tbody-signatarios"></tbody>
-          </table>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script src="../js/jquery.js"></script>
   <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
   <script src="../js/auth-guard.js"></script>
   <script>
     var _adminBase = '/AgillockSite/colaborador/contratos.html';
@@ -232,15 +211,19 @@
       var html = '';
       contratos.forEach(function(c) {
         var isAdmin = userPerms.role === 'ADMIN';
-        var acoes = '<a href="contrato-view.html?id=' + c.id + '" class="btn btn-xs btn-info" title="Visualizar"><i class="fa fa-eye"></i></a> ';
+        var acoes = '';
+        if (c.status === 'ASSINADO') {
+          acoes += '<button class="btn btn-xs btn-success btn-ver-assinado" data-id="' + c.id + '" title="Ver Documento Assinado"><i class="fa fa-eye"></i></button> ';
+        } else if (c.status === 'AGUARDANDO_ASSINATURA') {
+          acoes += '<button class="btn btn-xs btn-info btn-ver-pdf" data-id="' + c.id + '" title="Ver PDF"><i class="fa fa-file-pdf-o"></i></button> ';
+        } else {
+          acoes += '<a href="contrato-view.html?id=' + c.id + '" class="btn btn-xs btn-info" title="Visualizar"><i class="fa fa-eye"></i></a> ';
+        }
         if (c.status === 'RASCUNHO' && (isAdmin || userPerms.podeEditarContrato)) {
           acoes += '<a href="contrato-form.html?id=' + c.id + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a> ';
         }
         if (c.status === 'RASCUNHO' && (isAdmin || userPerms.podeExcluirContrato)) {
           acoes += '<button class="btn btn-xs btn-danger btn-excluir" data-id="' + c.id + '" title="Excluir"><i class="fa fa-trash"></i></button> ';
-        }
-        if (c.status === 'AGUARDANDO_ASSINATURA') {
-          acoes += '<button class="btn btn-xs btn-success btn-links" data-id="' + c.id + '" title="Reenviar WhatsApp"><i class="fa fa-whatsapp"></i></button> ';
         }
         if (c.status === 'AGUARDANDO_ASSINATURA' && (isAdmin || userPerms.podeEditarContrato)) {
           acoes += '<button class="btn btn-xs btn-warning btn-cancelar" data-id="' + c.id + '" title="Cancelar"><i class="fa fa-times"></i></button>';
@@ -254,31 +237,39 @@
       });
       tbody.innerHTML = html;
 
-      var PAPEL_LABEL = { cliente: 'Cliente', socio: 'Sócio', fiador: 'Fiador', testemunha: 'Testemunha', agillock: 'AgilLock' };
-      tbody.querySelectorAll('.btn-links').forEach(function(btn) {
+      tbody.querySelectorAll('.btn-ver-assinado').forEach(function(btn) {
         btn.onclick = function() {
-          var contratoId = btn.dataset.id;
-          window.AL.apiGet('/api/contratos/' + contratoId)
-            .then(function(c) {
-              var signatarios = c.signatarios || [];
-              if (!signatarios.length) {
-                window.AL.showAlert('Nenhum signatário encontrado.', 'warning');
-                return;
-              }
-              var html = '';
-              signatarios.forEach(function(s) {
-                html += '<tr>'
-                  + '<td>' + escHtml(s.nome) + '<br><small class="text-muted">' + escHtml(s.email || '') + '</small></td>'
-                  + '<td>' + (PAPEL_LABEL[s.tipo] || s.tipo) + '</td>'
-                  + '<td><button class="btn btn-xs btn-success" onclick="enviarEmailSignatario(\'' + escHtml(contratoId) + '\',\'' + escHtml(s.signerId) + '\',this)"><i class="fa fa-whatsapp"></i> Reenviar WhatsApp</button></td>'
-                  + '</tr>';
-              });
-              document.getElementById('modal-tbody-signatarios').innerHTML = html;
-              $('#modal-links').modal('show');
+          var oldHtml = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+          window.AL.apiGet('/api/contratos/' + btn.dataset.id + '/download')
+            .then(function(res) {
+              if (res.url) { window.open(res.url, '_blank'); }
+              else { window.AL.showAlert('URL do documento não disponível.', 'warning'); }
             })
-            .catch(function(err) {
-              window.AL.showAlert('Erro: ' + err.message, 'danger');
-            });
+            .catch(function(err) { window.AL.showAlert('Erro: ' + err.message, 'danger'); })
+            .finally(function() { btn.innerHTML = oldHtml; btn.disabled = false; });
+        };
+      });
+
+      tbody.querySelectorAll('.btn-ver-pdf').forEach(function(btn) {
+        btn.onclick = function() {
+          var oldHtml = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+          fetch(window.API_URL + '/api/contratos/' + btn.dataset.id + '/pdf', {
+            headers: { 'Authorization': 'Bearer ' + window.AL.getToken() }
+          })
+          .then(function(res) {
+            if (!res.ok) throw new Error('Erro ao gerar PDF.');
+            return res.blob();
+          })
+          .then(function(blob) {
+            var url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+          })
+          .catch(function(err) { window.AL.showAlert('Erro ao abrir PDF: ' + err.message, 'danger'); })
+          .finally(function() { btn.innerHTML = oldHtml; btn.disabled = false; });
         };
       });
 
@@ -309,21 +300,6 @@
           })
           .catch(function(err) { window.AL.showAlert(err.message, 'danger'); });
       };
-    }
-    function enviarEmailSignatario(contratoId, signerId, btnEl) {
-      var oldHtml = btnEl.innerHTML;
-      btnEl.disabled = true;
-      btnEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
-      window.AL.apiPost('/api/contratos/' + contratoId + '/notificar/' + signerId, {})
-        .then(function() {
-          window.AL.showAlert('WhatsApp reenviado com sucesso!', 'success');
-          btnEl.innerHTML = '<i class="fa fa-check"></i> Enviado';
-        })
-        .catch(function(err) {
-          window.AL.showAlert('Erro ao reenviar: ' + err.message, 'danger');
-          btnEl.disabled = false;
-          btnEl.innerHTML = oldHtml;
-        });
     }
   </script>
 </body>

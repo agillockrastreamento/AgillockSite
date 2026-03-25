@@ -90,12 +90,47 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
 
     res.json(contrato);
-  } catch (e: any) {
+    } catch (e: any) {
     res.status(500).json({ error: 'Erro interno do servidor.' });
-  }
-});
+    }
+    });
 
-// POST /api/contratos â€” salvar rascunho
+    // GET /api/contratos/:id/download — retorna URL pre-assinada do documento assinado no ClickSign
+    router.get('/:id/download', async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+    const id = param(req, 'id');
+    const contrato = await prisma.contrato.findUnique({ where: { id } });
+    if (!contrato) { res.status(404).json({ error: 'Contrato não encontrado.' }); return; }
+    if (!contrato.clicksignEnvelopeId || !contrato.clicksignDocumentoId) {
+      res.status(400).json({ error: 'Contrato não possui documento no ClickSign.' });
+      return;
+    }
+    const urls = await clicksign.buscarUrlsDocumento(contrato.clicksignEnvelopeId, contrato.clicksignDocumentoId);
+    // Prefere o documento assinado com manifesto; fallback para o original
+    res.json({ url: urls.signed || urls.original });
+    } catch (e: any) {
+    res.status(502).json({ error: `Erro ClickSign: ${e.message}` });
+    }
+    });
+
+
+    // GET /api/contratos/:id/pdf — gera PDF do conteúdo salvo e retorna stream
+    router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+    const id = param(req, 'id');
+    const contrato = await prisma.contrato.findUnique({ where: { id } });
+    if (!contrato) { res.status(404).json({ error: 'Contrato não encontrado.' }); return; }
+    if (!contrato.htmlConteudo) { res.status(400).json({ error: 'Contrato sem conteúdo HTML.' }); return; }
+    const pdfBuffer = await htmlParaPdf(contrato.htmlConteudo);
+    res.contentType('application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+    res.send(pdfBuffer);
+    } catch (e: any) {
+    res.status(500).json({ error: `Erro ao gerar PDF: ${e.message}` });
+    }
+    });
+
+    // POST /api/contratos — salvar rascunho
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { tipo, clienteId, fiadores, testemunhas, htmlConteudo, metodoAutenticacao } = req.body;
@@ -179,8 +214,10 @@ router.post('/:id/enviar', async (req: AuthRequest, res: Response): Promise<void
   let envelopeId: string = '', documentId: string = '';
   const signatariosResult: Array<{ nome: string; email: string; signerId: string; link: string; tipo: string }> = [];
   try {
+    const sanitize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const pdfFilename = `contrato_${sanitize(contratoBase.tipo)}_${sanitize(cliente.nome)}.pdf`;
     ({ envelopeId } = await clicksign.criarEnvelope(`Contrato ${contratoBase.tipo} - ${cliente.nome}`));
-    ({ documentId } = await clicksign.uploadDocumento(envelopeId, pdfBuffer, 'contrato.pdf'));
+    ({ documentId } = await clicksign.uploadDocumento(envelopeId, pdfBuffer, pdfFilename));
 
     const isPJ = contratoBase.tipo.startsWith('PJ');
     const socios = isPJ ? ((cliente.socios as any[]) || []) : [];

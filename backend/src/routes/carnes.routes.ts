@@ -141,7 +141,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
       res.status(404).json({ error: 'Placa não encontrada ou inativa.' });
       return;
     }
-    const base = placa.descricao ? `${placa.placa} - ${placa.descricao}` : `Rastreamento ${placa.placa}`;
+    const base = placa.descricao ? `${placa.placa} - ${placa.descricao}` : `Placa ${placa.placa}`;
     itemNome = (descricaoBoleto ? `${base} - ${descricaoBoleto}` : base).slice(0, 255);
     itemVendedorId = placa.vendedorId;
     boletoExtra = { placaId };
@@ -613,7 +613,7 @@ router.post('/unificar-placas', requireRoles('ADMIN', 'COLABORADOR'), async (req
   // Montar itens EFI
   const itens = placas.map((p: any) => {
     const db = placasDb.find((x) => x.id === p.placaId)!;
-    const nomeBase = db.descricao ? `${db.placa} - ${db.descricao}` : `Rastreamento ${db.placa}`;
+    const nomeBase = db.descricao ? `${db.placa} - ${db.descricao}` : `Placa ${db.placa}`;
     const nomeCompleto = descricaoBoleto ? `${nomeBase} - ${descricaoBoleto}` : nomeBase;
     return {
       placaId: p.placaId as string,
@@ -780,8 +780,8 @@ router.post('/unificar-dispositivos', requireRoles('ADMIN', 'COLABORADOR'), asyn
   const itensDisp = dispositivos.map((d: any) => {
     const db = dispositivosDb.find((x) => x.id === d.dispositivoId)!;
     const base = db.placa
-      ? `Rastreamento ${db.placa}`
-      : `Rastreamento ${db.identificador}`;
+      ? `Placa ${db.placa}`
+      : `${db.identificador}`;
     const nomeCompleto = descricaoBoleto ? `${base} - ${descricaoBoleto}` : base;
     return {
       dispositivoId: d.dispositivoId as string,

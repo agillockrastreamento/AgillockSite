@@ -164,37 +164,6 @@
               <small class="text-muted">Cobrado por dia de atraso após o vencimento.</small>
             </div>
 
-            <hr>
-            <h4>Representante AgilLock <small>(usado nos contratos)</small></h4>
-            <div class="row">
-              <div class="col-md-6">
-                <div class="form-group">
-                  <label>Nome completo *</label>
-                  <input type="text" class="form-control" id="representanteNome" placeholder="Nome do representante">
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="form-group">
-                  <label>CPF *</label>
-                  <input type="text" class="form-control" id="representanteCpf" placeholder="000.000.000-00" maxlength="14">
-                </div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-md-6">
-                <div class="form-group">
-                  <label>E-mail *</label>
-                  <input type="email" class="form-control" id="representanteEmail" placeholder="email@empresa.com">
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="form-group">
-                  <label>Telefone</label>
-                  <input type="text" class="form-control" id="representanteTelefone" placeholder="(11) 99999-9999" maxlength="15">
-                </div>
-              </div>
-            </div>
-
             <button type="button" class="btn btn-primary-al btn-block" id="btn-salvar" style="margin-top:30px;">
               <i class="fa fa-save"></i> Salvar Configurações
             </button>
@@ -296,10 +265,6 @@
           if (data.valorReferencia !== undefined) document.getElementById('valorReferencia').value = data.valorReferencia;
           if (data.multaPercentual !== undefined) document.getElementById('multaPercentual').value = data.multaPercentual;
           if (data.jurosDiarios !== undefined) document.getElementById('jurosDiarios').value = data.jurosDiarios;
-          document.getElementById('representanteNome').value     = data.representanteNome     || '';
-          document.getElementById('representanteCpf').value      = data.representanteCpf      || '';
-          document.getElementById('representanteEmail').value    = data.representanteEmail    || '';
-          document.getElementById('representanteTelefone').value = data.representanteTelefone || '';
         })
         .catch(function (err) {
           AL.showAlert('Erro ao carregar configurações: ' + err.message);
@@ -374,10 +339,6 @@
           valorReferencia: parseNum('valorReferencia'),
           multaPercentual: multa,
           jurosDiarios: juros,
-          representanteNome:     document.getElementById('representanteNome').value.trim(),
-          representanteCpf:      document.getElementById('representanteCpf').value.trim(),
-          representanteEmail:    document.getElementById('representanteEmail').value.trim(),
-          representanteTelefone: document.getElementById('representanteTelefone').value.trim(),
         };
         AL.apiPut('/api/configuracoes', payload)
           .then(function () {

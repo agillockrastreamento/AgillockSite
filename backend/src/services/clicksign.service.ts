@@ -117,6 +117,29 @@ export async function adicionarRequisitoAutenticacao(envelopeId: string, documen
   });
 }
 
+export async function buscarDocumento(envelopeId: string, documentId: string): Promise<any> {
+  const data = await req('GET', `/api/v3/envelopes/${envelopeId}/documents/${documentId}`);
+  return (data as any).data;
+}
+
+export async function buscarEnvelope(envelopeId: string): Promise<any> {
+  const data = await req('GET', `/api/v3/envelopes/${envelopeId}`);
+  return (data as any).data;
+}
+
+// Retorna as URLs pre-assinadas do documento no ClickSign V3.
+// As URLs ficam em data[].links.files no endpoint de LISTA de documentos (expiram em ~5 min).
+export async function buscarUrlsDocumento(envelopeId: string, documentId: string): Promise<{ original: string; signed: string; ziped?: string }> {
+  const data = await req('GET', `/api/v3/envelopes/${envelopeId}/documents`);
+  const docs: any[] = (data as any).data || [];
+  const doc = docs.find((d: any) => d.id === documentId) || docs[0];
+  const files = doc?.links?.files;
+  if (!files?.signed && !files?.original) {
+    throw new Error(`ClickSign: URLs de download não encontradas. Campos em links: ${JSON.stringify(doc?.links)}`);
+  }
+  return { original: files.original, signed: files.signed, ziped: files.ziped };
+}
+
 export async function ativarEnvelope(envelopeId: string): Promise<void> {
   await req('PATCH', `/api/v3/envelopes/${envelopeId}`, {
     data: { type: 'envelopes', id: envelopeId, attributes: { status: 'running' } },

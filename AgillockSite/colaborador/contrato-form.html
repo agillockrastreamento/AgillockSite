@@ -121,7 +121,9 @@
           <div id="fiadores-container"></div>
         </div>
 
-        <button class="btn btn-primary-al" id="btn-step1-next">Próximo <i class="fa fa-arrow-right"></i></button>
+        <div style="display:flex; justify-content:flex-end; margin-top:32px;">
+          <button class="btn btn-primary-al" id="btn-step1-next">Próximo <i class="fa fa-arrow-right"></i></button>
+        </div>
       </div>
 
       <!-- Step 2 -->
@@ -136,11 +138,6 @@
               <div class="col-sm-6"><div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="t1-nome"></div></div>
               <div class="col-sm-6"><div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="t1-cpf" maxlength="14"></div></div>
             </div>
-            <div class="row">
-              <div class="col-sm-6"><div class="form-group"><label>E-mail <small class="text-muted">(obrigatório se assinar digitalmente)</small></label><input type="email" class="form-control" id="t1-email"></div></div>
-              <div class="col-sm-6"><div class="form-group"><label>Telefone <small class="text-muted">(obrigatório se assinar digitalmente)</small></label><input type="text" class="form-control" id="t1-telefone" maxlength="15"></div></div>
-            </div>
-            <div class="checkbox"><label><input type="checkbox" id="t1-digital"> Assinar digitalmente pelo ClickSign</label></div>
           </div>
         </div>
 
@@ -151,16 +148,13 @@
               <div class="col-sm-6"><div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="t2-nome"></div></div>
               <div class="col-sm-6"><div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="t2-cpf" maxlength="14"></div></div>
             </div>
-            <div class="row">
-              <div class="col-sm-6"><div class="form-group"><label>E-mail <small class="text-muted">(obrigatório se assinar digitalmente)</small></label><input type="email" class="form-control" id="t2-email"></div></div>
-              <div class="col-sm-6"><div class="form-group"><label>Telefone <small class="text-muted">(obrigatório se assinar digitalmente)</small></label><input type="text" class="form-control" id="t2-telefone" maxlength="15"></div></div>
-            </div>
-            <div class="checkbox"><label><input type="checkbox" id="t2-digital"> Assinar digitalmente pelo ClickSign</label></div>
           </div>
         </div>
 
-        <button class="btn btn-default" id="btn-step2-prev"><i class="fa fa-arrow-left"></i> Anterior</button>
-        <button class="btn btn-primary-al" id="btn-step2-next">Próximo <i class="fa fa-arrow-right"></i></button>
+        <div style="display:flex; justify-content:space-between; margin-top:32px;">
+          <button class="btn btn-default" id="btn-step2-prev"><i class="fa fa-arrow-left"></i> Anterior</button>
+          <button class="btn btn-primary-al" id="btn-step2-next">Próximo <i class="fa fa-arrow-right"></i></button>
+        </div>
       </div>
 
       <!-- Step 3 -->
@@ -192,7 +186,7 @@
           </div>
         </div>
 
-        <div style="margin-top:12px">
+        <div style="display:flex; justify-content:flex-start; margin-top:32px;">
           <button class="btn btn-default" id="btn-step3-prev"><i class="fa fa-arrow-left"></i> Anterior</button>
         </div>
       </div>
@@ -327,12 +321,9 @@
         state.htmlConteudo = this.innerHTML;
       });
 
-      // Máscaras CPF e telefone nas testemunhas
+      // Máscaras CPF nas testemunhas
       ['t1-cpf','t2-cpf'].forEach(function(id) {
         document.getElementById(id).addEventListener('input', function() { this.value = maskCpf(this.value); });
-      });
-      ['t1-telefone','t2-telefone'].forEach(function(id) {
-        document.getElementById(id).addEventListener('input', function() { this.value = maskFone(this.value); });
       });
     }
 
@@ -482,16 +473,12 @@
 
     function coletarTestemunhas() {
       var ts = [
-        { nome: document.getElementById('t1-nome').value.trim(), cpf: document.getElementById('t1-cpf').value.trim(), email: document.getElementById('t1-email').value.trim(), telefone: document.getElementById('t1-telefone').value.trim(), assinarDigital: document.getElementById('t1-digital').checked },
-        { nome: document.getElementById('t2-nome').value.trim(), cpf: document.getElementById('t2-cpf').value.trim(), email: document.getElementById('t2-email').value.trim(), telefone: document.getElementById('t2-telefone').value.trim(), assinarDigital: document.getElementById('t2-digital').checked },
+        { nome: document.getElementById('t1-nome').value.trim(), cpf: document.getElementById('t1-cpf').value.trim(), email: '', telefone: '', assinarDigital: false },
+        { nome: document.getElementById('t2-nome').value.trim(), cpf: document.getElementById('t2-cpf').value.trim(), email: '', telefone: '', assinarDigital: false },
       ];
       for (var i = 0; i < ts.length; i++) {
         if (!ts[i].nome || !ts[i].cpf) {
           window.AL.showAlert('Preencha o nome e CPF de todas as testemunhas.', 'warning');
-          return null;
-        }
-        if (ts[i].assinarDigital && (!ts[i].email || !ts[i].telefone)) {
-          window.AL.showAlert('Para assinatura digital, preencha o e-mail e telefone da Testemunha ' + (i + 1) + '.', 'warning');
           return null;
         }
       }
@@ -500,8 +487,8 @@
 
     function coletarTestemunhasDoForm() {
       return [
-        { nome: document.getElementById('t1-nome').value.trim(), cpf: document.getElementById('t1-cpf').value.trim(), email: document.getElementById('t1-email').value.trim(), telefone: document.getElementById('t1-telefone').value.trim(), assinarDigital: document.getElementById('t1-digital').checked },
-        { nome: document.getElementById('t2-nome').value.trim(), cpf: document.getElementById('t2-cpf').value.trim(), email: document.getElementById('t2-email').value.trim(), telefone: document.getElementById('t2-telefone').value.trim(), assinarDigital: document.getElementById('t2-digital').checked },
+        { nome: document.getElementById('t1-nome').value.trim(), cpf: document.getElementById('t1-cpf').value.trim(), email: '', telefone: '', assinarDigital: false },
+        { nome: document.getElementById('t2-nome').value.trim(), cpf: document.getElementById('t2-cpf').value.trim(), email: '', telefone: '', assinarDigital: false },
       ];
     }
 
@@ -677,8 +664,8 @@
           state.fiadores = c.fiadores || [];
           popularFiadores(state.fiadores);
           var ts = c.testemunhas || [];
-          if (ts[0]) { document.getElementById('t1-nome').value = ts[0].nome || ''; document.getElementById('t1-cpf').value = ts[0].cpf || ''; document.getElementById('t1-email').value = ts[0].email || ''; document.getElementById('t1-telefone').value = ts[0].telefone || ''; document.getElementById('t1-digital').checked = !!ts[0].assinarDigital; }
-          if (ts[1]) { document.getElementById('t2-nome').value = ts[1].nome || ''; document.getElementById('t2-cpf').value = ts[1].cpf || ''; document.getElementById('t2-email').value = ts[1].email || ''; document.getElementById('t2-telefone').value = ts[1].telefone || ''; document.getElementById('t2-digital').checked = !!ts[1].assinarDigital; }
+          if (ts[0]) { document.getElementById('t1-nome').value = ts[0].nome || ''; document.getElementById('t1-cpf').value = ts[0].cpf || ''; }
+          if (ts[1]) { document.getElementById('t2-nome').value = ts[1].nome || ''; document.getElementById('t2-cpf').value = ts[1].cpf || ''; }
           if (c.htmlConteudo) {
             document.getElementById('div-preview').innerHTML = c.htmlConteudo;
             state.htmlConteudo = c.htmlConteudo;
@@ -692,6 +679,19 @@
             document.getElementById('btn-salvar-rascunho').disabled = true;
             document.getElementById('btn-enviar-assinatura').disabled = true;
             document.getElementById('btn-gerar-previa').disabled = true;
+          }
+          // Contrato cancelado: bloqueia toda edição
+          if (c.status === 'CANCELADO') {
+            document.getElementById('btn-salvar-rascunho').disabled = true;
+            document.getElementById('btn-enviar-assinatura').disabled = true;
+            document.getElementById('btn-gerar-previa').disabled = true;
+            document.getElementById('btn-step1-next').disabled = true;
+            document.getElementById('btn-step2-next').disabled = true;
+            document.getElementById('div-preview').contentEditable = 'false';
+            document.querySelectorAll('#step-1 input, #step-1 select, #step-2 input').forEach(function(el) { el.disabled = true; });
+            document.querySelectorAll('.tipo-card').forEach(function(card) { card.style.pointerEvents = 'none'; card.style.opacity = '0.6'; });
+            document.querySelectorAll('.fiador-block input, .fiador-block select').forEach(function(el) { el.disabled = true; });
+            window.AL.showAlert('Este contrato foi cancelado e não pode ser editado.', 'warning');
           }
         })
         .catch(function(err) {
