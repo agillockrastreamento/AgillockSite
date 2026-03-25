@@ -5,277 +5,329 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      font-size: 12pt;
-      line-height: 1.6;
+      font-size: 11pt;
+      line-height: 1.5;
       color: #000;
       margin: 0;
-      padding: 40px 60px;
+      padding: 30px 60px 40px 60px;
+      background: #fff;
     }
-    h1, h2, h3 {
+
+    .screen-header {
+      text-align: right;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .screen-header img {
+      height: 45px;
+      width: auto;
+    }
+    .screen-footer {
+      margin-top: 40px;
+      padding-top: 10px;
+      border-top: 1px solid #ccc;
+      text-align: center;
+      font-size: 8pt;
+      color: #555;
+    }
+    .screen-footer p { margin: 2px 0; }
+
+    h1 {
       text-align: center;
       text-transform: uppercase;
+      font-size: 13pt;
+      font-weight: bold;
+      margin: 10px 0 20px 0;
     }
-    h1 { font-size: 14pt; margin-bottom: 24px; }
-    h2 { font-size: 12pt; margin-top: 24px; margin-bottom: 8px; }
-    h3 { font-size: 11pt; margin-top: 16px; margin-bottom: 4px; }
+    h2 {
+      font-size: 11pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      text-align: left;
+      margin: 20px 0 8px 0;
+    }
+    h3 {
+      font-size: 11pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      text-align: left;
+      margin: 16px 0 6px 0;
+    }
     p {
       text-align: justify;
-      margin-bottom: 0.8em;
+      margin-bottom: 0.6em;
     }
-    .data-local {
-      text-align: right;
-      margin-bottom: 24px;
+    .parte { margin: 8px 0; }
+    .clausulas { margin-top: 16px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 10.5pt;
     }
-    .parte {
-      margin: 16px 0;
-      padding: 12px 0;
-      border-bottom: 1px solid #ccc;
+    th, td {
+      border: 1px solid #888;
+      padding: 5px 8px;
     }
-    .parte:last-of-type {
-      border-bottom: none;
-    }
-    .socio-bloco, .fiador-bloco {
-      margin: 8px 0 12px 16px;
-      padding: 8px 12px;
-      background: #f9f9f9;
-      border-left: 3px solid #ccc;
-    }
-    .clausulas {
-      margin-top: 24px;
-    }
+    th { background: #e8e8e8; text-align: center; font-weight: bold; }
+    td.center { text-align: center; }
+
     .assinaturas {
-      margin-top: 64px;
+      margin-top: 40px;
       page-break-inside: avoid;
     }
-    .assinaturas h2 {
-      margin-bottom: 32px;
-    }
     .assinatura-bloco {
-      margin-bottom: 40px;
+      margin-bottom: 28px;
     }
     .assinatura-linha {
-      border-top: 1px solid #000;
-      padding-top: 6px;
-      width: 65%;
-      margin-bottom: 4px;
+      border-top: 1.5px solid #000;
+      margin-top: 50px;
+      width: 82%;
+      min-width: 200px;
+      padding-top: 4px;
+      margin-bottom: 3px;
     }
     .assinatura-label {
       font-size: 10pt;
-      color: #333;
     }
     .assinaturas-row {
       display: flex;
-      gap: 60px;
+      gap: 40px;
       flex-wrap: wrap;
     }
     .assinaturas-row .assinatura-bloco {
       flex: 1;
-      min-width: 240px;
+      min-width: 220px;
     }
     .testemunhas-row {
       display: flex;
-      gap: 80px;
-      margin-top: 40px;
+      justify-content: space-between;
+      gap: 40px;
+      margin-top: 30px;
     }
-    .testemunha-bloco {
-      flex: 1;
-    }
+    .testemunha-bloco { flex: 1; }
+
     @media print {
-      body { padding: 20mm 25mm; }
+      .screen-header, .screen-footer { display: none !important; }
+      body { padding: 0; }
     }
   </style>
 </head>
 <body>
 
-  <h1>Contrato de Prestação de Serviços de Rastreamento Veicular<br>sem Assistência Veicular — Pessoa Jurídica</h1>
-
-  <p class="data-local">São Paulo, {{DATA_HOJE}}.</p>
+  <h1 style="text-align:center; font-size:11pt; font-weight:bold; text-transform:uppercase; margin:10px 0 20px 0;">CONTRATO DE COMODATO DO EQUIPAMENTO E PRESTAÇÃO DE SERVIÇOS DE RASTREAMENTO</h1>
 
   <!-- ================================================
-       PARTES DO CONTRATO
+       IDENTIFICAÇÃO DAS PARTES
   ================================================ -->
-  <h2>Partes</h2>
+  <h2 style="font-size:11pt; font-weight:bold; text-transform:uppercase; text-align:left; border-bottom:1.5px solid #000; padding-bottom:5px; margin:20px 0 8px 0;">1. IDENTIFICAÇÃO DAS PARTES CONTRATANTES E SEUS FIADORES:</h2>
 
   <div class="parte">
     <p>
-      <strong>CONTRATANTE:</strong>
-      <strong>{{RAZAO_SOCIAL}}</strong>,
+      <strong>CONTRATADA:</strong> <strong>AGILLOCK RASTREAMENTO LTDA</strong>, pessoa jurídica de direito privado,
+      com inscrição no CNPJ/MF nº <strong>28.424.364/0001-05</strong>, com sede na Rua Curitiba, nº 553,
+      bairro Henrique Jorge, CEP: 60.526-035, cidade: Fortaleza/CE.
+    </p>
+  </div>
+
+  <div class="parte">
+    <p>
+      <strong>CONTRATANTE/CLIENTE:</strong> <strong>{{RAZAO_SOCIAL}}</strong>,
       pessoa jurídica de direito privado,
       inscrita no CNPJ sob nº <strong>{{CNPJ}}</strong>,
       com sede em {{ENDERECO_PJ}},
-      telefone {{TELEFONE_PJ}},
-      e-mail {{EMAIL_PJ}},
-      neste ato representada por seus representantes legais abaixo identificados.
+      telefone: {{TELEFONE_PJ}},
+      e-mail: {{EMAIL_PJ}},
+      representada por seus sócios da sociedade limitada abaixo identificados.
     </p>
-
-    <h3>Representantes Legais (Sócios)</h3>
-
-    <div class="socio-bloco">
-      <p>
-        <strong>Sócio 1:</strong>
-        <strong>{{SOCIO_1_NOME}}</strong>,
-        {{SOCIO_1_NACIONALIDADE}},
-        {{SOCIO_1_ESTADO_CIVIL}},
-        {{SOCIO_1_PROFISSAO}},
-        nascido(a) em {{SOCIO_1_DATA_NASCIMENTO}},
-        portador(a) do CPF nº <strong>{{SOCIO_1_CPF}}</strong>,
-        RG nº {{SOCIO_1_RG}}.
-      </p>
-    </div>
-
-    <div class="socio-bloco">
-      <p>
-        <strong>Sócio 2:</strong>
-        <strong>{{SOCIO_2_NOME}}</strong>,
-        {{SOCIO_2_NACIONALIDADE}},
-        {{SOCIO_2_ESTADO_CIVIL}},
-        {{SOCIO_2_PROFISSAO}},
-        nascido(a) em {{SOCIO_2_DATA_NASCIMENTO}},
-        portador(a) do CPF nº <strong>{{SOCIO_2_CPF}}</strong>,
-        RG nº {{SOCIO_2_RG}}.
-      </p>
-    </div>
-
-    <h3>Fiadores</h3>
-
-    <div class="fiador-bloco">
-      <p>
-        <strong>Fiador 1:</strong>
-        <strong>{{FIADOR_1_NOME}}</strong>,
-        {{FIADOR_1_NACIONALIDADE}},
-        {{FIADOR_1_ESTADO_CIVIL}},
-        {{FIADOR_1_PROFISSAO}},
-        nascido(a) em {{FIADOR_1_DATA_NASCIMENTO}},
-        portador(a) do CPF nº <strong>{{FIADOR_1_CPF}}</strong>,
-        RG nº {{FIADOR_1_RG}},
-        residente e domiciliado(a) em {{FIADOR_1_ENDERECO}}.
-      </p>
-    </div>
-
-    <div class="fiador-bloco">
-      <p>
-        <strong>Fiador 2:</strong>
-        <strong>{{FIADOR_2_NOME}}</strong>,
-        {{FIADOR_2_NACIONALIDADE}},
-        {{FIADOR_2_ESTADO_CIVIL}},
-        {{FIADOR_2_PROFISSAO}},
-        nascido(a) em {{FIADOR_2_DATA_NASCIMENTO}},
-        portador(a) do CPF nº <strong>{{FIADOR_2_CPF}}</strong>,
-        RG nº {{FIADOR_2_RG}},
-        residente e domiciliado(a) em {{FIADOR_2_ENDERECO}}.
-      </p>
-    </div>
+    <p>
+      <strong>Sócio 1:</strong> <strong>{{SOCIO_1_NOME}}</strong>, {{SOCIO_1_NACIONALIDADE}},
+      {{SOCIO_1_ESTADO_CIVIL}}, {{SOCIO_1_PROFISSAO}},
+      nascido(a) em {{SOCIO_1_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{SOCIO_1_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{SOCIO_1_CPF}}</strong>;
+    </p>
+    <p>
+      <strong>Sócio 2:</strong> <strong>{{SOCIO_2_NOME}}</strong>, {{SOCIO_2_NACIONALIDADE}},
+      {{SOCIO_2_ESTADO_CIVIL}}, {{SOCIO_2_PROFISSAO}},
+      nascido(a) em {{SOCIO_2_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{SOCIO_2_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{SOCIO_2_CPF}}</strong>;
+    </p>
   </div>
 
   <div class="parte">
     <p>
-      <strong>CONTRATADA:</strong>
-      <strong>AGILLOCK RASTREAMENTO LTDA</strong>,
-      pessoa jurídica de direito privado,
-      neste ato representada por seu representante legal
-      <strong>{{REPRESENTANTE_NOME}}</strong>,
-      CPF nº <strong>{{REPRESENTANTE_CPF}}</strong>.
+      <strong>FIADORES:</strong>
+      <strong>{{FIADOR_1_NOME}}</strong>, {{FIADOR_1_NACIONALIDADE}}, {{FIADOR_1_ESTADO_CIVIL}},
+      {{FIADOR_1_PROFISSAO}}, nascido(a) em {{FIADOR_1_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{FIADOR_1_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{FIADOR_1_CPF}}</strong>,
+      residente e domiciliado(a) em {{FIADOR_1_ENDERECO}}
+      {{#FIADOR_2_NOME}}
+      e <strong>{{FIADOR_2_NOME}}</strong>, {{FIADOR_2_NACIONALIDADE}}, {{FIADOR_2_ESTADO_CIVIL}},
+      {{FIADOR_2_PROFISSAO}}, nascido(a) em {{FIADOR_2_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{FIADOR_2_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{FIADOR_2_CPF}}</strong>,
+      residente e domiciliado(a) em {{FIADOR_2_ENDERECO}}
+      {{/FIADOR_2_NOME}};
     </p>
   </div>
 
+  <p>As partes acima identificadas têm, entre si, justas e acertadas o presente Contrato que se regerá pelas cláusulas seguintes e pelas condições descritas no presente.</p>
+
   <!-- ================================================
-       CORPO DO CONTRATO
-       TODO: Inserir aqui o texto das cláusulas do contrato
-             a partir do arquivo:
-             AgillockSite/contratos/CONTRATO PJ SEM ASSISTENCIA VEICULAR.docx
-       Cole o texto das cláusulas abaixo, substituindo os dados
-       variáveis pelos placeholders {{CHAVE}} quando aplicável.
+       CLÁUSULAS
   ================================================ -->
   <div class="clausulas">
 
-    <h2>Cláusulas e Condições</h2>
+    <h3>1. CLÁUSULA PRIMEIRA – DO OBJETO –</h3>
+    <p>O presente contrato tem como objeto PRESTAÇÃO DE SERVIÇOS DE RASTREAMENTO, a entrega de 01 (UM) EQUIPAMENTO DE RASTREAMENTO AGILLOCK de propriedade da CONTRATADA, em forma de COMODATO, para viabilizar a prestação dos serviços de rastreamento dos veículos.</p>
+    <p>1.1. Os equipamentos citados têm a função rastrear e localizar os veículos em tempo real, através da tecnologia GPS/GPRS, objetivando dificultar eventuais furtos ou roubos dos veículos em que estão instalados.</p>
+    <p>1.2. Os serviços de rastreamento dos veículos equipados com o dispositivo descrito na cláusula primeira serão prestados 24 horas por dia.</p>
+    <p>1.2.1. O CONTRATANTE/CLIENTE declara estar ciente de que nas ocasiões em que os veículos estiverem em locais que impossibilite a emissão de sinal, o processo de localização dos veículos não serão possíveis.</p>
 
-    <!-- INÍCIO DO TEXTO DO CONTRATO -->
-    <!-- TODO: colar aqui o conteúdo das cláusulas do .docx -->
-    <!-- EXEMPLO DE ESTRUTURA:
-    <h3>Cláusula 1ª — Do Objeto</h3>
-    <p>O presente contrato tem por objeto a prestação de serviços de rastreamento veicular pela CONTRATADA à CONTRATANTE.</p>
+    <h3>2. CLÁUSULA SEGUNDA – DAS CONDIÇÕES DO COMODATO –</h3>
+    <p>A CONTRATADA cede ao CONTRATANTE/CLIENTE os equipamentos rastreadores, em perfeitas condições, ao título de COMODATO, regido pelo art. 579 e seguintes do Código Civil Brasileiro. O CONTRATANTE/CLIENTE, por sua vez, declara que o recebe e obriga-se a mantê-lo sob sua custódia, conservando-o como se fosse seu, na qualidade de depositário fiel, enquanto viger este contrato.</p>
+    <p>2.1. Havendo encerramento do contrato de prestação de serviços, o comodato será automaticamente rescindido, sem prejuízo das outras obrigações assumidas pelo CONTRATANTE/CLIENTE, devendo o CONTRATANTE/CLIENTE devolver os equipamentos no prazo de 07 (sete) dias úteis a contar da data do cancelamento ou rescisão do contrato.</p>
+    <p>2.2. A não devolução dos equipamentos dado em comodato será caracterizada apropriação indébita e sujeitará o CONTRATANTE/CLIENTE à imediata cobrança do valor integral dos equipamentos estabelecido em R$ 500,00 (quinhentos reais), cada equipamento, emitindo-se o boleto de cobrança/fatura contra o CONTRATANTE/CLIENTE, o que desde já fica autorizado, cujo não pagamento ensejará a tomada das medidas judiciais cabíveis.</p>
 
-    <h3>Cláusula 2ª — ...</h3>
-    <p>...</p>
-    -->
-    <!-- FIM DO TEXTO DO CONTRATO -->
+    <h3>3. CLÁUSULA TERCEIRA – DO PREÇO DOS SERVIÇOS E FORMA DE PAGAMENTO –</h3>
+    <p>O preço relativo ao serviço de rastreamento e as formas de pagamento foram acordados no ato da contratação do serviço, ficando desde já autorizada a emissão dos boletos de cobrança, sendo certo que, caso o CONTRATANTE/CLIENTE não receba os boletos de cobrança referente ao serviço contratado, por se tratar de dívida portável, caberá ao CONTRATANTE/CLIENTE procurar a CONTRATADA para realizar os pagamentos.</p>
+    <p>3.1. Não ocorrendo o pagamento por um período superior a 15 (quinze) dias, a CONTRATADA poderá tomar as providências cabíveis para recuperação de seu crédito, inclusive a promoção de negativação do CONTRATANTE/CLIENTE perante os órgãos de proteção do crédito.</p>
+    <p>3.2. Após o período informado na cláusula 3.1. os serviços prestados pela CONTRATADA serão suspensos até que haja o pagamento dos valores vencidos.</p>
+    <p><strong>Parágrafo único.</strong> Após o período de 60 (sessenta) dias inadimplente, a CONTRATADA solicitará o desligamento do equipamento rastreador, com isso o CONTRATANTE/CLIENTE estará ciente que a CONTRATADA poderá perder a comunicação com o equipamento e que o veículo PODERÁ VIR a bloquear. Então, o interessante seria regularizar a situação antes do prazo citado e disponibilizar o veículo para a retirada do equipamento, com o fim de não estar gerando custo, sem o recebimento pecuniário para a parte CONTRATADA e evitando assim, esse transtorno para a parte CONTRATANTE/CLIENTE.</p>
+    <p>3.3. O não pagamento dos valores pactuados no seu respectivo vencimento implicará na cobrança de multa de 5%, juros de mora de 0,33% ao dia.</p>
+    <p>3.4. O preço dos Serviços será reajustado de acordo com a variação do Índice Geral de Preços-Série M (IGP-M/FGV), ou outro índice que venha a substituí-lo, na menor periodicidade permitida por lei.</p>
+
+    <h3>4. CLÁUSULA QUARTA – DO PRAZO DE VIGÊNCIA E DA RESCISÃO –</h3>
+    <p>O presente contrato de COMODATO e PRESTAÇÃO DE SERVIÇOS inicia-se no ato da ativação do equipamento e terá vigência de 12 (doze) meses.</p>
+    <p>4.1. Findo este prazo, para que haja continuidade na prestação dos serviços o CONTRATANTE/CLIENTE deverá formalizar a RENOVAÇÃO deste contrato diretamente com a CONTRATADA, caso contrário, fica prorrogado o contrato por tempo indeterminado, salvo se não houver manifestação tácita ou expressa por qualquer das partes.</p>
+    <p>4.2. Em não ocorrendo a renovação, ou em qualquer hipótese de rescisão contratual, o CONTRATANTE/CLIENTE deverá cumprir imediatamente o disposto nas cláusulas 2.1. e 2.2.</p>
+    <p>4.3. Ocorrendo a rescisão contratual antes do término do prazo de vigência deste instrumento, o CONTRATANTE/CLIENTE arcará com o pagamento da multa rescisória estabelecida em 50% (cinquenta por cento) sobre o valor das parcelas vincendas, sem prejuízo das demais obrigações assumidas.</p>
+
+    <h3>5. CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATADA:</h3>
+    <p>5.1. A CONTRATADA deverá fornecer os equipamentos descritos na cláusula primeira, em perfeitas condições de funcionamento e efetivar a ATIVAÇÃO DO SISTEMA;</p>
+    <p>5.2. A CONTRATADA deverá manter sua Central de Rastreamento 24h ativa e em funcionamento;</p>
+    <p>5.3. Disponibilizar ao CONTRATANTE/CLIENTE tabela de preços dos serviços e acessórios;</p>
+    <p>5.4. Informar imediatamente ao CONTRATANTE/CLIENTE se houver mudanças de endereço, telefones ou qualquer outro fato diretamente ligado à prestação dos serviços;</p>
+    <p>5.5. Efetivar o recall dos equipamentos, sempre que houver necessidade, para disponibilizar o melhor serviço ao CONTRATANTE/CLIENTE, sem custo pelos equipamentos, exceto aqueles relativos à visita e execução dos serviços;</p>
+    <p>5.6. A CONTRATADA já disponibilizou o MONITORAMENTO WEB, fornecendo login e senha de acesso ao sistema/aplicativo.</p>
+
+    <h3>6. CLÁUSULA SEXTA – DAS OBRIGAÇÕES DO CONTRATANTE/CLIENTE:</h3>
+    <p>6.1. O CONTRATANTE/CLIENTE deverá fornecer seus DADOS PESSOAIS e DADOS DOS VEÍCULOS para CADASTRO, sendo certo que, somente após o cumprimento desta condição será feita a ativação do CONTRATANTE/CLIENTE no sistema da CONTRATADA e o agendamento para a instalação dos equipamentos.</p>
+    <p>6.2. O CONTRATANTE/CLIENTE obriga-se a notificar a CONTRATADA se houver troca de veículo, a fim de que se proceda à desinstalação e reinstalação do equipamento, o que será cobrado de acordo com a tabela de preços vigente à época da realização do serviço;</p>
+    <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:10.5pt;">
+      <thead>
+        <tr><th style="border:1px solid #888;padding:5px 8px;background:#e8e8e8;font-weight:bold;">PERÍODO DE VIGÊNCIA 2026</th><th style="border:1px solid #888;padding:5px 8px;background:#e8e8e8;font-weight:bold;text-align:center;">MOTO</th><th style="border:1px solid #888;padding:5px 8px;background:#e8e8e8;font-weight:bold;text-align:center;">CARRO</th></tr>
+      </thead>
+      <tbody>
+        <tr><td style="border:1px solid #888;padding:5px 8px;">MANUTENÇÃO (quando não for de responsabilidade da CONTRATADA)</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 54,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 54,90</td></tr>
+        <tr><td style="border:1px solid #888;padding:5px 8px;">Taxa de Instalação</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 59,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 59,90</td></tr>
+        <tr><td style="border:1px solid #888;padding:5px 8px;">Taxa de Desinstalação</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 54,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 54,90</td></tr>
+        <tr><td style="border:1px solid #888;padding:5px 8px;">Taxa de Transferência</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 99,90</td><td style="border:1px solid #888;padding:5px 8px;text-align:center;">R$ 99,90</td></tr>
+      </tbody>
+    </table>
+    <p>6.3. Cabe ao CONTRATANTE/CLIENTE, na qualidade de fiel depositário do equipamento cedido em comodato, preservá-lo e conservá-lo, evitando qualquer tipo de avaria ou danos nas ocasiões em que o veículo for objeto de consertos mecânicos, lavagens e lubrificações gerais, reformas, colisões, choques e etc., assim como deverá manter em perfeito estado de funcionamento a bateria dos veículos.</p>
+    <p>6.5. No caso de rescisão contratual, o CONTRATANTE/CLIENTE é responsável pelo cumprimento do contido nas cláusulas 2.1. e 2.2., devendo proceder à devolução do equipamento no prazo máximo de 7 (sete) dias úteis da comunicação da rescisão, em perfeito estado de conservação, sob pena de ser caracterizada a apropriação indébita, sujeitando o CONTRATANTE/CLIENTE as medidas cabíveis na espécie, ficando autorizada desde já a emissão de boleto de cobrança/fatura no valor integral do equipamento, tornando o débito líquido, certo e exigível contra o CONTRATANTE/CLIENTE.</p>
+    <p>6.6. Pelo serviço de retirada dos equipamentos será cobrado um valor de acordo com a tabela de preços vigente à época da realização do serviço através da emissão de boleto bancário contra o CONTRATANTE/CLIENTE, que desde já fica autorizada.</p>
+    <p>6.7. É de inteira responsabilidade do CONTRATANTE/CLIENTE o uso indevido dos serviços contratados, assim como o repasse e a comunicação a terceiros de seu código pessoal de acesso e números de telefone da Central de Rastreamento 24 horas.</p>
+    <p>6.8. Se o CONTRATANTE/CLIENTE quiser fazer uso de outros serviços prestados pela CONTRATADA deverá formalizar o pedido e responsabilizar-se pelo pagamento destes serviços, conforme tabela de preços vigentes.</p>
+
+    <h3>7. CLÁUSULA SÉTIMA – DAS DISPOSIÇÕES GERAIS:</h3>
+    <p>7.1. O CONTRATANTE/CLIENTE declara neste ato estar ciente que a instalação dos equipamentos e a prestação do serviço não garantem a recuperação dos veículos em casos de furto ou roubo.</p>
+    <p>7.2. O CONTRATANTE/CLIENTE declara neste ato estar recebendo os equipamentos em perfeitas condições de funcionamento, bem como declara estar devidamente instruído do funcionamento e condições de uso e devolução dos equipamentos.</p>
+    <p>7.3. A CONTRATADA não será responsabilizada e nem terá obrigação de indenizar o CONTRATANTE/CLIENTE nas seguintes condições:</p>
+    <p>7.3.1. Eventuais problemas decorrentes da rede pública ou privada de telecomunicações que impossibilitem a prestação do serviço contratado;</p>
+    <p>7.3.2. Paralisação ou interrupção dos serviços contratados por determinação do Poder Público, por casos fortuitos ou motivos de força maior;</p>
+    <p>7.3.3. Danos, furtos, assaltos, sequestros que venham a ocorrer com os veículos do CONTRATANTE/CLIENTE e seus ocupantes;</p>
+    <p>7.3.4. Greves parciais ou gerais que afetem a prestação do serviço;</p>
+    <p>7.3.5. Condições meteorológicas excepcionalmente prejudiciais (chuvas, raios, etc.) que venham a afetar a realização dos serviços contratados;</p>
+    <p>7.3.6. Inoperância do sistema EMBRATEL ou do sistema de satélites, ou operadora de telefonia;</p>
+    <p>7.3.7. Mau uso dos equipamentos (abertura e remoção indevida dos equipamentos, alteração de voltagem do veículo, inversão do cabo de bateria, entre outros);</p>
+    <p>7.3.8. Interrupção ou suspensão temporária da prestação dos serviços, efetuada pela CONTRATADA em virtude de modificações ou reparos nos equipamentos, necessárias para melhor e correto funcionamento;</p>
+    <p>7.3.9. Interrupção ou suspensão dos serviços por inadimplência do CONTRATANTE/CLIENTE;</p>
+    <p>7.3.10. Danificação por acidente, produtos químicos, água, rupturas, cortes e/ou violação da antena de sinal ou dos equipamentos instalados nos veículos;</p>
+    <p>7.3.11. Instalação e manutenções realizadas por terceiros, estranhos à equipe de instalação da CONTRATADA ou que não tenham sido indicados por ela.</p>
+    <p>7.4. Tratando-se o CONTRATANTE/CLIENTE de pessoa jurídica, os sócios assumem a condição de devedores solidários no que tange a todas as obrigações contidas neste instrumento.</p>
+    <p>7.5. A CONTRATADA fica expressamente autorizada, para fins de cobrança dos valores devidos pelo CONTRATANTE/CLIENTE a emitir boletos de cobrança/duplicatas, levar a protesto os títulos não pagos no seu vencimento e promover a negativação do CONTRATANTE/CLIENTE perante os órgãos de proteção do crédito.</p>
+    <p>7.6. Fica eleito o Foro da comarca de Fortaleza/CE, independentemente de qualquer outro, por mais privilegiado que seja para dirimir quaisquer dúvidas e/ou controvérsias oriundas desta contratação.</p>
 
   </div>
+
+  <!-- ================================================
+       LOCAL E DATA
+  ================================================ -->
+  <p style="margin-top:30px;">Fortaleza, {{DATA_HOJE}}.</p>
 
   <!-- ================================================
        ASSINATURAS
   ================================================ -->
   <div class="assinaturas">
-    <h2>Assinaturas</h2>
 
-    <div class="assinaturas-row">
+    <div class="assinatura-bloco">
+      <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:82%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+      <div class="assinatura-label">
+        <strong>CONTRATADA: AGILLOCK RASTREAMENTO LTDA</strong><br>
+        CNPJ: 28.424.364/0001-05
+      </div>
+    </div>
 
-      <div class="assinatura-bloco">
-        <div class="assinatura-linha"></div>
+    <div class="assinaturas-row" style="display:flex; gap:40px; flex-wrap:wrap;">
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
           <strong>CONTRATANTE — Sócio 1:</strong> {{SOCIO_1_NOME}}<br>
           CPF: {{SOCIO_1_CPF}}
         </div>
       </div>
-
-      <div class="assinatura-bloco">
-        <div class="assinatura-linha"></div>
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
           <strong>CONTRATANTE — Sócio 2:</strong> {{SOCIO_2_NOME}}<br>
           CPF: {{SOCIO_2_CPF}}
         </div>
       </div>
-
     </div>
 
-    <div class="assinaturas-row">
-
-      <div class="assinatura-bloco">
-        <div class="assinatura-linha"></div>
+    <div class="assinaturas-row" style="display:flex; gap:40px; flex-wrap:wrap;">
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
           <strong>Fiador 1:</strong> {{FIADOR_1_NOME}}<br>
           CPF: {{FIADOR_1_CPF}}
         </div>
       </div>
-
-      <div class="assinatura-bloco">
-        <div class="assinatura-linha"></div>
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
           <strong>Fiador 2:</strong> {{FIADOR_2_NOME}}<br>
           CPF: {{FIADOR_2_CPF}}
         </div>
       </div>
-
     </div>
 
-    <div class="assinatura-bloco">
-      <div class="assinatura-linha"></div>
-      <div class="assinatura-label">
-        <strong>CONTRATADA — AGILLOCK RASTREAMENTO LTDA</strong><br>
-        Representante: {{REPRESENTANTE_NOME}}<br>
-        CPF: {{REPRESENTANTE_CPF}}
-      </div>
-    </div>
-
-    <div class="testemunhas-row">
-      <div class="testemunha-bloco">
-        <div class="assinatura-linha"></div>
+    <p style="margin-top:60px;font-weight:bold;">TESTEMUNHAS:</p>
+    <div class="testemunhas-row" style="display:flex; justify-content:space-between; gap:40px; margin-top:30px;">
+      <div class="testemunha-bloco" style="flex:1;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
-          <strong>Testemunha 1:</strong> {{TESTEMUNHA_1_NOME}}<br>
+          Nome: {{TESTEMUNHA_1_NOME}}<br>
           CPF: {{TESTEMUNHA_1_CPF}}
         </div>
       </div>
-      <div class="testemunha-bloco">
-        <div class="assinatura-linha"></div>
+      <div class="testemunha-bloco" style="flex:1;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
-          <strong>Testemunha 2:</strong> {{TESTEMUNHA_2_NOME}}<br>
+          Nome: {{TESTEMUNHA_2_NOME}}<br>
           CPF: {{TESTEMUNHA_2_CPF}}
         </div>
       </div>
     </div>
 
   </div>
+
 
 </body>
 </html>

@@ -36,6 +36,11 @@ services:
       EFI_SANDBOX: "true"
       EFI_CERT_PATH: ./cert/certificado.p12
       WEBHOOK_URL: ${WEBHOOK_URL:-}
+      CLICKSIGN_ACCESS_TOKEN: ${CLICKSIGN_ACCESS_TOKEN:-}
+      CLICKSIGN_WEBHOOK_SECRET: ${CLICKSIGN_WEBHOOK_SECRET:-}
+      CLICKSIGN_BASE_URL: ${CLICKSIGN_BASE_URL:-https://app.clicksign.com}
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium-browser
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "1000"
     depends_on:

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Cliente — AgilLock Colaborador</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    /* Layout: topbar fixo, conteúdo com scroll */
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding-right: 0 !important;
+    }
+    #al-alert-container { flex-shrink: 0; }
+
+    /* Área de scroll do formulário */
+    .form-scroll {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .form-wrap { max-width: 940px; padding: 20px 28px 40px; }
+
+    /* Botões PF/PJ dentro do scroll */
+    .tipo-bar-wrap {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 4px;
+    }
+
+    /* Títulos de seção */
+    .secao-titulo {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #999;
+      margin: 22px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    html.dark-theme .secao-titulo {
+      color: #7a8898;
+      border-bottom-color: #2a2f3b;
+    }
+
+    /* Botões PF/PJ */
+    .tipo-btn {
+      min-width: 190px;
+      font-weight: 600;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .tipo-btn.ativo {
+      background-color: #fab32c !important;
+      color: #fff !important;
+      border-color: #e8a020 !important;
+    }
+
+    /* Cards de sócios */
+    .socio-card {
+      border: 1px solid #dde3ee;
+      border-radius: 8px;
+      padding: 18px 18px 6px;
+      margin-bottom: 20px;
+      background: #f9f9fb;
+    }
+    html.dark-theme .socio-card {
+      background: #191e28;
+      border-color: #2a2f3b;
+    }
+    .socio-card-titulo {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 14px;
+      color: #555;
+    }
+    html.dark-theme .socio-card-titulo { color: #9aabb8; }
+
+    #fc-notas { resize: vertical; height: 34px; min-height: 34px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li class="active"><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <button class="btn btn-default btn-sm" id="btn-voltar"><i class="fa fa-arrow-left"></i></button>
+        <h2 class="topbar-title" id="page-titulo">Novo Cliente</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-primary-al" id="btn-salvar"><i class="fa fa-check"></i> Salvar</button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Área com scroll -->
+    <div class="form-scroll">
+    <div class="form-wrap">
+      <input type="hidden" id="fc-id" />
+
+      <div class="tipo-bar-wrap">
+        <button type="button" class="btn btn-default tipo-btn ativo" id="btn-tipo-pf">
+          <i class="fa fa-user"></i> Pessoa Física (PF)
+        </button>
+        <button type="button" class="btn btn-default tipo-btn" id="btn-tipo-pj">
+          <i class="fa fa-building"></i> Pessoa Jurídica (PJ)
+        </button>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           SEÇÃO PF
+      ══════════════════════════════════════════ -->
+      <div id="secao-pf">
+        <div class="secao-titulo">Dados Pessoais</div>
+        <div class="row">
+          <div class="col-sm-8">
+            <div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="fc-nome" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="fc-cpf" placeholder="Apenas números" maxlength="14" /></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-4">
+            <div class="form-group"><label>Telefone *</label><input type="text" class="form-control" id="fc-telefone" maxlength="15" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>E-mail</label><input type="email" class="form-control" id="fc-email" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>Data de Nascimento</label><input type="date" class="form-control" id="fc-data-nascimento" /></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-4">
+            <div class="form-group"><label>RG</label><input type="text" class="form-control" id="fc-rg" maxlength="20" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>Profissão</label><input type="text" class="form-control" id="fc-profissao" maxlength="100" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Estado Civil</label>
+              <select class="form-control" id="fc-estado-civil">
+                <option value="">— Selecione —</option>
+                <option value="Solteiro(a)">Solteiro(a)</option>
+                <option value="Casado(a)">Casado(a)</option>
+                <option value="Divorciado(a)">Divorciado(a)</option>
+                <option value="Viúvo(a)">Viúvo(a)</option>
+                <option value="União Estável">União Estável</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="secao-titulo">Endereço</div>
+        <div class="row">
+          <div class="col-sm-3">
+            <div class="form-group"><label>CEP *</label><input type="text" class="form-control" id="fc-cep" placeholder="00000-000" maxlength="9" /></div>
+          </div>
+          <div class="col-sm-9">
+            <div class="form-group"><label>Logradouro *</label><input type="text" class="form-control" id="fc-logradouro" /></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-2">
+            <div class="form-group"><label>Número *</label><input type="text" class="form-control" id="fc-numero" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>Complemento</label><input type="text" class="form-control" id="fc-complemento" /></div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group"><label>Bairro *</label><input type="text" class="form-control" id="fc-bairro" /></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-8">
+            <div class="form-group"><label>Cidade *</label><input type="text" class="form-control" id="fc-cidade" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>UF *</label><input type="text" class="form-control" id="fc-estado" maxlength="2" style="text-transform:uppercase;" /></div>
+          </div>
+        </div>
+      </div><!-- /secao-pf -->
+
+      <!-- ══════════════════════════════════════════
+           SEÇÃO PJ
+      ══════════════════════════════════════════ -->
+      <div id="secao-pj" style="display:none;">
+        <div class="secao-titulo">Dados da Empresa</div>
+        <div class="row">
+          <div class="col-sm-8">
+            <div class="form-group"><label>Nome da Empresa *</label><input type="text" class="form-control" id="fc-nome-pj" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>CNPJ *</label><input type="text" class="form-control" id="fc-cnpj" placeholder="Apenas números" maxlength="18" /></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-4">
+            <div class="form-group"><label>Telefone *</label><input type="text" class="form-control" id="fc-telefone-pj" maxlength="15" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>Email de Cobrança</label><input type="email" class="form-control" id="fc-email-cobranca" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>NIRC</label><input type="text" class="form-control" id="fc-nirc" maxlength="30" /></div>
+          </div>
+        </div>
+
+        <div class="secao-titulo">Endereço da Empresa</div>
+        <div class="row">
+          <div class="col-sm-3">
+            <div class="form-group"><label>CEP *</label><input type="text" class="form-control" id="fc-pj-cep" placeholder="00000-000" maxlength="9" /></div>
+          </div>
+          <div class="col-sm-9">
+            <div class="form-group"><label>Logradouro *</label><input type="text" class="form-control" id="fc-pj-logradouro" /></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-2">
+            <div class="form-group"><label>Número *</label><input type="text" class="form-control" id="fc-pj-numero" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>Complemento</label><input type="text" class="form-control" id="fc-pj-complemento" /></div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group"><label>Bairro *</label><input type="text" class="form-control" id="fc-pj-bairro" /></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-8">
+            <div class="form-group"><label>Cidade *</label><input type="text" class="form-control" id="fc-pj-cidade" /></div>
+          </div>
+          <div class="col-sm-4">
+            <div class="form-group"><label>UF *</label><input type="text" class="form-control" id="fc-pj-estado" maxlength="2" style="text-transform:uppercase;" /></div>
+          </div>
+        </div>
+
+        <div class="secao-titulo">Sócios</div>
+        <div class="row" style="margin-bottom:18px;">
+          <div class="col-sm-3">
+            <div class="form-group">
+              <label>Quantidade de Sócios</label>
+              <select class="form-control" id="fc-num-socios">
+                <option value="0">Nenhum</option>
+                <option value="1">1 sócio</option>
+                <option value="2">2 sócios</option>
+                <option value="3">3 sócios</option>
+                <option value="4">4 sócios</option>
+                <option value="5">5 sócios</option>
+                <option value="6">6 sócios</option>
+                <option value="7">7 sócios</option>
+                <option value="8">8 sócios</option>
+                <option value="9">9 sócios</option>
+                <option value="10">10 sócios</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div id="socios-container"></div>
+      </div><!-- /secao-pj -->
+
+      <!-- ══════════════════════════════════════════
+           CAMPOS COMUNS
+      ══════════════════════════════════════════ -->
+      <div class="secao-titulo">Outras Informações</div>
+      <div class="row">
+        <div class="col-sm-6">
+          <div class="form-group"><label>Origem do Cliente</label><input type="text" class="form-control" id="fc-origem" placeholder="Ex.: indicação, Instagram, site…" maxlength="120" /></div>
+        </div>
+        <div class="col-sm-6">
+          <div class="form-group"><label>Notas</label><textarea class="form-control" id="fc-notas" rows="1"></textarea></div>
+        </div>
+      </div>
+
+      <div style="padding: 20px 0 16px;">
+        <button class="btn btn-default" id="btn-voltar-bottom"><i class="fa fa-arrow-left"></i> Voltar</button>
+        <button class="btn btn-primary-al" id="btn-salvar-bottom" style="margin-left:10px;"><i class="fa fa-check"></i> Salvar</button>
+      </div>
+    </div><!-- /form-wrap -->
+    </div><!-- /form-scroll -->
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+    if (!currentUser) return;
+    var isAdmin = currentUser.role === 'ADMIN';
+
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge ' + (isAdmin ? 'badge-ativo' : 'badge-pendente');
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    // ── Params de URL ────────────────────────────────────────
+    var params = new URLSearchParams(window.location.search);
+    var clienteId = params.get('id') || '';
+    var backPage  = params.get('back') || 'clientes';
+
+    function voltar() {
+      window.location.href = backPage === 'gerar-cobranca' ? 'gerar-cobranca.html' : 'clientes.html';
+    }
+    document.getElementById('btn-voltar').addEventListener('click', voltar);
+    document.getElementById('btn-voltar-bottom').addEventListener('click', voltar);
+
+    // ── Tipo de pessoa ────────────────────────────────────────
+    var tipoPessoa = 'PF';
+    function setTipo(t) {
+      tipoPessoa = t;
+      document.getElementById('btn-tipo-pf').classList.toggle('ativo', t === 'PF');
+      document.getElementById('btn-tipo-pj').classList.toggle('ativo', t === 'PJ');
+      document.getElementById('secao-pf').style.display = t === 'PF' ? '' : 'none';
+      document.getElementById('secao-pj').style.display = t === 'PJ' ? '' : 'none';
+    }
+    document.getElementById('btn-tipo-pf').addEventListener('click', function () {
+      setTipo('PF');
+      AL.maskCpfCnpj(document.getElementById('fc-cpf'));
+      AL.maskPhone(document.getElementById('fc-telefone'));
+    });
+    document.getElementById('btn-tipo-pj').addEventListener('click', function () {
+      setTipo('PJ');
+      AL.maskCpfCnpj(document.getElementById('fc-cnpj'));
+      AL.maskPhone(document.getElementById('fc-telefone-pj'));
+    });
+
+    // ── ViaCEP helper ─────────────────────────────────────────
+    function setupViaCep(cepId, logId, bairroId, cidadeId, estadoId) {
+      var el = document.getElementById(cepId);
+      if (!el) return;
+      el.addEventListener('blur', function () {
+        var cep = this.value.replace(/\D/g, '');
+        if (cep.length !== 8) return;
+        fetch('https://viacep.com.br/ws/' + cep + '/json/')
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.erro) return;
+            document.getElementById(logId).value    = d.logradouro || '';
+            document.getElementById(bairroId).value = d.bairro     || '';
+            document.getElementById(cidadeId).value = d.localidade || '';
+            document.getElementById(estadoId).value = d.uf         || '';
+          }).catch(function () {});
+      });
+    }
+    setupViaCep('fc-cep',    'fc-logradouro',    'fc-bairro',    'fc-cidade',    'fc-estado');
+    setupViaCep('fc-pj-cep', 'fc-pj-logradouro', 'fc-pj-bairro', 'fc-pj-cidade', 'fc-pj-estado');
+
+    // ── Sócios ────────────────────────────────────────────────
+    var numSocios = 0;
+    function renderSocios(n, dadosSocios) {
+      numSocios = n;
+      var container = document.getElementById('socios-container');
+      container.innerHTML = '';
+      for (var i = 0; i < n; i++) {
+        var s = (dadosSocios && dadosSocios[i]) ? dadosSocios[i] : {};
+        var card = document.createElement('div');
+        card.className = 'socio-card';
+        card.innerHTML =
+          '<div class="socio-card-titulo"><i class="fa fa-user-o"></i> Sócio ' + (i + 1) + '</div>' +
+          '<div class="row">' +
+            '<div class="col-sm-6"><div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="s' + i + '-nome" value="' + esc(s.nome||'') + '" /></div></div>' +
+            '<div class="col-sm-3"><div class="form-group"><label>Nacionalidade *</label><input type="text" class="form-control" id="s' + i + '-nacionalidade" value="' + esc(s.nacionalidade||'') + '" /></div></div>' +
+            '<div class="col-sm-3"><div class="form-group"><label>Estado Civil *</label>' +
+              '<select class="form-control" id="s' + i + '-estado-civil">' +
+                '<option value="">— Selecione —</option>' +
+                ['Solteiro(a)','Casado(a)','Divorciado(a)','Viúvo(a)','União Estável'].map(function(o){
+                  return '<option value="' + o + '"' + (s.estadoCivil === o ? ' selected' : '') + '>' + o + '</option>';
+                }).join('') +
+              '</select>' +
+            '</div></div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<div class="col-sm-4"><div class="form-group"><label>Profissão *</label><input type="text" class="form-control" id="s' + i + '-profissao" value="' + esc(s.profissao||'') + '" maxlength="100" /></div></div>' +
+            '<div class="col-sm-4"><div class="form-group"><label>Data de Nascimento *</label><input type="date" class="form-control" id="s' + i + '-data-nascimento" value="' + esc(s.dataNascimento||'') + '" /></div></div>' +
+            '<div class="col-sm-4"><div class="form-group"><label>E-mail</label><input type="email" class="form-control" id="s' + i + '-email" value="' + esc(s.email||'') + '" /></div></div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<div class="col-sm-4"><div class="form-group"><label>RG *</label><input type="text" class="form-control" id="s' + i + '-rg" value="' + esc(s.rg||'') + '" maxlength="20" /></div></div>' +
+            '<div class="col-sm-4"><div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="s' + i + '-cpf" value="' + esc(s.cpf||'') + '" maxlength="14" /></div></div>' +
+          '</div>' +
+          '<div class="secao-titulo" style="margin-top:10px;">Endereço do Sócio ' + (i+1) + '</div>' +
+          '<div class="row">' +
+            '<div class="col-sm-3"><div class="form-group"><label>CEP</label><input type="text" class="form-control" id="s' + i + '-cep" value="' + esc(s.cep||'') + '" placeholder="00000-000" maxlength="9" /></div></div>' +
+            '<div class="col-sm-9"><div class="form-group"><label>Logradouro</label><input type="text" class="form-control" id="s' + i + '-logradouro" value="' + esc(s.logradouro||'') + '" /></div></div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<div class="col-sm-2"><div class="form-group"><label>Número</label><input type="text" class="form-control" id="s' + i + '-numero" value="' + esc(s.numero||'') + '" /></div></div>' +
+            '<div class="col-sm-4"><div class="form-group"><label>Complemento</label><input type="text" class="form-control" id="s' + i + '-complemento" value="' + esc(s.complemento||'') + '" /></div></div>' +
+            '<div class="col-sm-6"><div class="form-group"><label>Bairro</label><input type="text" class="form-control" id="s' + i + '-bairro" value="' + esc(s.bairro||'') + '" /></div></div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<div class="col-sm-8"><div class="form-group"><label>Cidade</label><input type="text" class="form-control" id="s' + i + '-cidade" value="' + esc(s.cidade||'') + '" /></div></div>' +
+            '<div class="col-sm-4"><div class="form-group"><label>UF</label><input type="text" class="form-control" id="s' + i + '-estado" value="' + esc(s.estado||'') + '" maxlength="2" style="text-transform:uppercase;" /></div></div>' +
+          '</div>';
+        container.appendChild(card);
+        (function(idx) {
+          setupViaCep('s'+idx+'-cep', 's'+idx+'-logradouro', 's'+idx+'-bairro', 's'+idx+'-cidade', 's'+idx+'-estado');
+          AL.maskCpfCnpj(document.getElementById('s'+idx+'-cpf'));
+        })(i);
+      }
+    }
+
+    document.getElementById('fc-num-socios').addEventListener('change', function () {
+      renderSocios(parseInt(this.value) || 0, null);
+    });
+
+    // ── Carregar cliente para edição ──────────────────────────
+    if (clienteId) {
+      document.getElementById('page-titulo').textContent = 'Editar Cliente';
+      AL.apiGet('/api/clientes/' + clienteId).then(function (c) {
+        document.getElementById('fc-id').value = c.id;
+        var tipo = c.tipoPessoa || 'PF';
+        setTipo(tipo);
+
+        if (tipo === 'PF') {
+          document.getElementById('fc-nome').value            = c.nome || '';
+          document.getElementById('fc-cpf').value             = c.cpfCnpj || '';
+          document.getElementById('fc-telefone').value        = c.telefone || '';
+          document.getElementById('fc-email').value           = c.email || '';
+          document.getElementById('fc-data-nascimento').value = c.dataNascimento || '';
+          document.getElementById('fc-rg').value              = c.rg || '';
+          document.getElementById('fc-profissao').value       = c.profissao || '';
+          document.getElementById('fc-estado-civil').value    = c.estadoCivil || '';
+          document.getElementById('fc-cep').value             = c.cep || '';
+          document.getElementById('fc-logradouro').value      = c.logradouro || '';
+          document.getElementById('fc-numero').value          = c.numero || '';
+          document.getElementById('fc-complemento').value     = c.complemento || '';
+          document.getElementById('fc-bairro').value          = c.bairro || '';
+          document.getElementById('fc-cidade').value          = c.cidade || '';
+          document.getElementById('fc-estado').value          = c.estado || '';
+          AL.maskCpfCnpj(document.getElementById('fc-cpf'));
+          AL.maskPhone(document.getElementById('fc-telefone'));
+        } else {
+          document.getElementById('fc-nome-pj').value         = c.nome || '';
+          document.getElementById('fc-cnpj').value            = c.cpfCnpj || '';
+          document.getElementById('fc-telefone-pj').value     = c.telefone || '';
+          document.getElementById('fc-email-cobranca').value  = c.emailCobranca || '';
+          document.getElementById('fc-nirc').value            = c.nirc || '';
+          document.getElementById('fc-pj-cep').value          = c.cep || '';
+          document.getElementById('fc-pj-logradouro').value   = c.logradouro || '';
+          document.getElementById('fc-pj-numero').value       = c.numero || '';
+          document.getElementById('fc-pj-complemento').value  = c.complemento || '';
+          document.getElementById('fc-pj-bairro').value       = c.bairro || '';
+          document.getElementById('fc-pj-cidade').value       = c.cidade || '';
+          document.getElementById('fc-pj-estado').value       = c.estado || '';
+          AL.maskCpfCnpj(document.getElementById('fc-cnpj'));
+          AL.maskPhone(document.getElementById('fc-telefone-pj'));
+          var socios = Array.isArray(c.socios) ? c.socios : [];
+          document.getElementById('fc-num-socios').value = socios.length;
+          renderSocios(socios.length, socios);
+        }
+
+        document.getElementById('fc-notas').value  = c.notas || '';
+        document.getElementById('fc-origem').value = c.origemCliente || '';
+      }).catch(function (err) { AL.showAlert(err.message, 'error'); });
+    } else {
+      AL.maskCpfCnpj(document.getElementById('fc-cpf'));
+      AL.maskPhone(document.getElementById('fc-telefone'));
+      AL.maskCpfCnpj(document.getElementById('fc-cnpj'));
+      AL.maskPhone(document.getElementById('fc-telefone-pj'));
+    }
+
+    // ── Coletar dados sócios ──────────────────────────────────
+    function getSociosPayload() {
+      var arr = [];
+      for (var i = 0; i < numSocios; i++) {
+        arr.push({
+          nome:           (document.getElementById('s'+i+'-nome')           || {}).value || '',
+          nacionalidade:  (document.getElementById('s'+i+'-nacionalidade')  || {}).value || '',
+          estadoCivil:    (document.getElementById('s'+i+'-estado-civil')   || {}).value || '',
+          profissao:      (document.getElementById('s'+i+'-profissao')      || {}).value || '',
+          dataNascimento: (document.getElementById('s'+i+'-data-nascimento')|| {}).value || '',
+          email:          (document.getElementById('s'+i+'-email')          || {}).value || '',
+          rg:             (document.getElementById('s'+i+'-rg')             || {}).value || '',
+          cpf:            (document.getElementById('s'+i+'-cpf')            || {}).value.replace(/\D/g,'') || '',
+          cep:            (document.getElementById('s'+i+'-cep')            || {}).value.replace(/\D/g,'') || '',
+          logradouro:     (document.getElementById('s'+i+'-logradouro')     || {}).value || '',
+          numero:         (document.getElementById('s'+i+'-numero')         || {}).value || '',
+          complemento:    (document.getElementById('s'+i+'-complemento')    || {}).value || '',
+          bairro:         (document.getElementById('s'+i+'-bairro')         || {}).value || '',
+          cidade:         (document.getElementById('s'+i+'-cidade')         || {}).value || '',
+          estado:         (document.getElementById('s'+i+'-estado')         || {}).value.toUpperCase() || '',
+        });
+      }
+      return arr;
+    }
+
+    // ── Salvar ────────────────────────────────────────────────
+    function salvar() {
+      var id     = document.getElementById('fc-id').value;
+      var origem = document.getElementById('fc-origem').value.trim() || null;
+      var notas  = document.getElementById('fc-notas').value.trim();
+      var payload;
+
+      if (tipoPessoa === 'PF') {
+        var nome     = document.getElementById('fc-nome').value.trim();
+        var cpfCnpj  = document.getElementById('fc-cpf').value.replace(/\D/g, '');
+        var telefone = document.getElementById('fc-telefone').value.trim();
+        var cep      = document.getElementById('fc-cep').value.replace(/\D/g, '');
+        var logradouro = document.getElementById('fc-logradouro').value.trim();
+        var numero     = document.getElementById('fc-numero').value.trim();
+        var bairro     = document.getElementById('fc-bairro').value.trim();
+        var cidade     = document.getElementById('fc-cidade').value.trim();
+        var estado     = document.getElementById('fc-estado').value.trim().toUpperCase();
+
+        if (!nome || !cpfCnpj || !telefone) {
+          AL.showAlert('Nome, CPF e Telefone são obrigatórios.', 'warning'); return;
+        }
+        if (!cep || !logradouro || !numero || !bairro || !cidade || !estado) {
+          AL.showAlert('Preencha o endereço completo.', 'warning'); return;
+        }
+
+        payload = {
+          tipoPessoa: 'PF', nome: nome, cpfCnpj: cpfCnpj, telefone: telefone,
+          email:          document.getElementById('fc-email').value.trim(),
+          dataNascimento: document.getElementById('fc-data-nascimento').value || null,
+          rg:             document.getElementById('fc-rg').value.trim()       || null,
+          profissao:      document.getElementById('fc-profissao').value.trim()|| null,
+          estadoCivil:    document.getElementById('fc-estado-civil').value    || null,
+          cep: cep, logradouro: logradouro, numero: numero,
+          complemento:    document.getElementById('fc-complemento').value.trim(),
+          bairro: bairro, cidade: cidade, estado: estado,
+          origemCliente: origem, notas: notas,
+          nirc: null, emailCobranca: null, socios: null,
+        };
+      } else {
+        var nomePJ   = document.getElementById('fc-nome-pj').value.trim();
+        var cnpj     = document.getElementById('fc-cnpj').value.replace(/\D/g, '');
+        var telPJ    = document.getElementById('fc-telefone-pj').value.trim();
+        var cepPJ    = document.getElementById('fc-pj-cep').value.replace(/\D/g, '');
+        var logPJ    = document.getElementById('fc-pj-logradouro').value.trim();
+        var numPJ    = document.getElementById('fc-pj-numero').value.trim();
+        var bairroPJ = document.getElementById('fc-pj-bairro').value.trim();
+        var cidadePJ = document.getElementById('fc-pj-cidade').value.trim();
+        var estadoPJ = document.getElementById('fc-pj-estado').value.trim().toUpperCase();
+
+        if (!nomePJ || !cnpj || !telPJ) {
+          AL.showAlert('Nome da empresa, CNPJ e Telefone são obrigatórios.', 'warning'); return;
+        }
+        if (cnpj.length !== 14) {
+          AL.showAlert('CNPJ inválido. Informe os 14 dígitos.', 'warning'); return;
+        }
+        if (!cepPJ || !logPJ || !numPJ || !bairroPJ || !cidadePJ || !estadoPJ) {
+          AL.showAlert('Preencha o endereço completo da empresa.', 'warning'); return;
+        }
+
+        var sociosArr = getSociosPayload();
+        if (sociosArr.length === 0) {
+          AL.showAlert('É obrigatório cadastrar ao menos um sócio para clientes PJ.', 'warning'); return;
+        }
+        for (var si = 0; si < sociosArr.length; si++) {
+          var sn = si + 1;
+          var s = sociosArr[si];
+          if (!s.nome)           { AL.showAlert('Nome do Sócio '              + sn + ' é obrigatório.', 'warning'); return; }
+          if (!s.nacionalidade)  { AL.showAlert('Nacionalidade do Sócio '     + sn + ' é obrigatória.', 'warning'); return; }
+          if (!s.estadoCivil)    { AL.showAlert('Estado Civil do Sócio '      + sn + ' é obrigatório.', 'warning'); return; }
+          if (!s.profissao)      { AL.showAlert('Profissão do Sócio '         + sn + ' é obrigatória.', 'warning'); return; }
+          if (!s.dataNascimento) { AL.showAlert('Data de Nascimento do Sócio '+ sn + ' é obrigatória.', 'warning'); return; }
+          if (!s.rg)             { AL.showAlert('RG do Sócio '                + sn + ' é obrigatório.', 'warning'); return; }
+          if (!s.cpf || s.cpf.length !== 11) { AL.showAlert('CPF do Sócio '  + sn + ' é obrigatório e deve ter 11 dígitos.', 'warning'); return; }
+        }
+
+        payload = {
+          tipoPessoa: 'PJ', nome: nomePJ, cpfCnpj: cnpj, telefone: telPJ,
+          emailCobranca: document.getElementById('fc-email-cobranca').value.trim() || null,
+          nirc:          document.getElementById('fc-nirc').value.trim()           || null,
+          cep: cepPJ, logradouro: logPJ, numero: numPJ,
+          complemento:   document.getElementById('fc-pj-complemento').value.trim(),
+          bairro: bairroPJ, cidade: cidadePJ, estado: estadoPJ,
+          socios: sociosArr.length > 0 ? sociosArr : null,
+          origemCliente: origem, notas: notas,
+          email: null, dataNascimento: null, rg: null, profissao: null, estadoCivil: null,
+        };
+      }
+
+      var req = id ? AL.apiPut('/api/clientes/' + id, payload) : AL.apiPost('/api/clientes', payload);
+      req.then(function () {
+        AL.showAlert(id ? 'Cliente atualizado.' : 'Cliente criado.', 'success');
+        setTimeout(voltar, 800);
+      }).catch(function (err) { AL.showAlert(err.message, 'error'); });
+    }
+
+    document.getElementById('btn-salvar').addEventListener('click', salvar);
+    document.getElementById('btn-salvar-bottom').addEventListener('click', salvar);
+
+    function esc(s) {
+      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  })();
+  </script>
+</body>
+</html>

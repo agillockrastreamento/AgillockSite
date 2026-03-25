@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+echo "==> Instalando Chromium (para geração de PDF)..."
+apk add --no-cache chromium 2>/dev/null || true
+
 echo "==> Instalando dependências..."
 npm install --silent
 

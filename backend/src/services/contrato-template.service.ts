@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 const TEMPLATES_DIR = path.resolve(process.cwd(), 'src/templates/contratos');
+const LOGO_PATH = path.resolve(process.cwd(), 'src/templates/logo_agillock_white_new.png');
 
 export interface DadosContrato {
   tipo: string;
@@ -20,6 +21,24 @@ export interface DadosContrato {
   testemunhas: Array<{ nome: string; cpf?: string }>;
   representante: { nome?: string; cpf?: string };
 }
+
+function getLogoBase64(): string {
+  try {
+    const bitmap = fs.readFileSync(LOGO_PATH);
+    return Buffer.from(bitmap).toString('base64');
+  } catch (e) {
+    console.error('Erro ao ler logo para PDF:', e);
+    return '';
+  }
+}
+
+const COMPANY_INFO = {
+  NOME: 'AGILLOCK GESTÃO DE RISCO',
+  ENDERECO: 'Rua Curitiba, nº 553, bairro Henrique Jorge, CEP: 60.526-035 – Fortaleza/Ceará',
+  SITE: 'http://www.agillock.com.br',
+  EMAIL: 'agillockrastreamento@gmail.com',
+  CONTATOS: '+ 55 (85) 4101-0103 (whatsapp) / (85) 99970-3738'
+};
 
 function fmtData(iso?: string): string {
   if (!iso) return '';
@@ -71,6 +90,13 @@ export function preencherTemplate(tipo: string, dados: DadosContrato): string {
   const vars: Record<string, string> = {
     DATA_HOJE: longa,
     DATA_HOJE_CURTA: curta,
+    // Logo e Empresa
+    LOGO_BASE64: getLogoBase64(),
+    COMPANY_NOME: COMPANY_INFO.NOME,
+    COMPANY_ENDERECO: COMPANY_INFO.ENDERECO,
+    COMPANY_SITE: COMPANY_INFO.SITE,
+    COMPANY_EMAIL: COMPANY_INFO.EMAIL,
+    COMPANY_CONTATOS: COMPANY_INFO.CONTATOS,
     // PF
     NOME_CLIENTE: c.nome || '',
     CPF_CLIENTE: c.cpfCnpj || '',

@@ -8,6 +8,70 @@ import * as efiService from '../services/efi.service';
 const router = Router();
 router.use(authMiddleware);
 
+// ─── Helper: monta objeto customer para EFI (PF e PJ) ────────────────────────
+function buildEfiCustomer(cliente: {
+  nome: string;
+  cpfCnpj?: string | null;
+  tipoPessoa?: string | null;
+  socios?: any;
+  telefone?: string | null;
+  email?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cep?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  complemento?: string | null;
+}) {
+  const isPJ = cliente.tipoPessoa === 'PJ';
+  const socios: any[] = Array.isArray(cliente.socios) ? cliente.socios : [];
+  const primeiroSocio = socios[0] || null;
+
+  const name  = isPJ && primeiroSocio?.nome ? primeiroSocio.nome : cliente.nome;
+  const cpf   = isPJ
+    ? (primeiroSocio?.cpf ? primeiroSocio.cpf.replace(/\D/g, '') : undefined)
+    : (cliente.cpfCnpj ? cliente.cpfCnpj.replace(/\D/g, '') : undefined);
+
+  const customer: Record<string, any> = { name };
+  if (cpf) customer.cpf = cpf;
+  if (cliente.telefone) customer.phone_number = cliente.telefone.replace(/\D/g, '');
+  if (cliente.email) customer.email = cliente.email;
+  if (isPJ && cliente.cpfCnpj) {
+    customer.juridical_person = {
+      corporate_name: cliente.nome,
+      cnpj: cliente.cpfCnpj.replace(/\D/g, ''),
+    };
+  }
+  if (cliente.logradouro && cliente.cidade && cliente.estado) {
+    customer.address = {
+      street: cliente.logradouro,
+      number: cliente.numero || 'S/N',
+      neighborhood: cliente.bairro || '',
+      zipcode: (cliente.cep || '').replace(/\D/g, ''),
+      city: cliente.cidade,
+      state: cliente.estado,
+      ...(cliente.complemento ? { complement: cliente.complemento } : {}),
+    };
+  }
+  return customer;
+}
+
+// ─── Helper: valida se cliente pode gerar carnê na EFI ───────────────────────
+function validarClienteParaCarne(cliente: { tipoPessoa?: string | null; socios?: any; cpfCnpj?: string | null }): string | null {
+  if (cliente.tipoPessoa === 'PJ') {
+    const socios: any[] = Array.isArray(cliente.socios) ? cliente.socios : [];
+    const cpf = socios[0]?.cpf?.replace(/\D/g, '');
+    if (!cpf || cpf.length !== 11) {
+      return 'Para clientes PJ, é necessário cadastrar ao menos um sócio com CPF válido no cadastro do cliente antes de gerar cobranças.';
+    }
+    if (!cliente.cpfCnpj || cliente.cpfCnpj.replace(/\D/g, '').length !== 14) {
+      return 'CNPJ inválido no cadastro do cliente. Verifique o CNPJ antes de gerar cobranças.';
+    }
+  }
+  return null;
+}
+
 // ─── POST /api/carnes — Gerar carnê individual (1 dispositivo ou placa) ───────
 router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const { clienteId, placaId, dispositivoId, valor, dataVencimento, numeroParcelas, vendedorId, descricaoBoleto } = req.body;
@@ -24,7 +88,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
     select: {
-      id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true,
+      id: true, nome: true, cpfCnpj: true, tipoPessoa: true, socios: true, telefone: true, email: true, vendedorId: true,
       cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
     },
   });
@@ -104,28 +168,16 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
       : undefined,
   } : undefined;
 
+  // Validar cliente para EFI
+  const erroCliente = validarClienteParaCarne(cliente);
+  if (erroCliente) { res.status(400).json({ error: erroCliente }); return; }
+
   // Chamar EFI
   const valorCentavos = Math.round(Number(valor) * 100);
   let efiResult: efiService.EfiCarneResult;
   try {
     efiResult = await efiService.criarCarne({
-      customer: {
-        name: cliente.nome,
-        ...(cliente.cpfCnpj ? { cpf: cliente.cpfCnpj.replace(/\D/g, '') } : {}),
-        ...(cliente.telefone ? { phone_number: cliente.telefone.replace(/\D/g, '') } : {}),
-        ...(cliente.email ? { email: cliente.email } : {}),
-        ...(cliente.logradouro && cliente.cidade && cliente.estado ? {
-          address: {
-            street: cliente.logradouro,
-            number: cliente.numero || 'S/N',
-            neighborhood: cliente.bairro || '',
-            zipcode: (cliente.cep || '').replace(/\D/g, ''),
-            city: cliente.cidade,
-            state: cliente.estado.toUpperCase(),
-            ...(cliente.complemento ? { complement: cliente.complemento } : {}),
-          },
-        } : {}),
-      },
+      customer: buildEfiCustomer(cliente),
       items: [{ name: itemNome, value: valorCentavos, amount: 1 }],
       expire_at: dataVencimento,
       repeats: Number(numeroParcelas),
@@ -300,7 +352,7 @@ router.post('/unificar', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthR
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
     select: {
-      id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true,
+      id: true, nome: true, cpfCnpj: true, tipoPessoa: true, socios: true, telefone: true, email: true, vendedorId: true,
       cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
     },
   });
@@ -393,27 +445,15 @@ router.post('/unificar', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthR
       : undefined,
   } : undefined;
 
+  // Validar cliente para EFI
+  const erroClienteUnif = validarClienteParaCarne(cliente);
+  if (erroClienteUnif) { res.status(400).json({ error: erroClienteUnif }); return; }
+
   // Criar carnê unificado no EFI
   let efiResult: efiService.EfiCarneResult;
   try {
     efiResult = await efiService.criarCarne({
-      customer: {
-        name: cliente.nome,
-        ...(cliente.cpfCnpj ? { cpf: cliente.cpfCnpj.replace(/\D/g, '') } : {}),
-        ...(cliente.telefone ? { phone_number: cliente.telefone.replace(/\D/g, '') } : {}),
-        ...(cliente.email ? { email: cliente.email } : {}),
-        ...(cliente.logradouro && cliente.cidade && cliente.estado ? {
-          address: {
-            street: cliente.logradouro,
-            number: cliente.numero || 'S/N',
-            neighborhood: cliente.bairro || '',
-            zipcode: (cliente.cep || '').replace(/\D/g, ''),
-            city: cliente.cidade,
-            state: cliente.estado.toUpperCase(),
-            ...(cliente.complemento ? { complement: cliente.complemento } : {}),
-          },
-        } : {}),
-      },
+      customer: buildEfiCustomer(cliente),
       items: itens.map((i) => ({
         name: i.nome,
         value: Math.round(i.valor * 100),
@@ -508,7 +548,7 @@ router.post('/unificar-placas', requireRoles('ADMIN', 'COLABORADOR'), async (req
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
     select: {
-      id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true,
+      id: true, nome: true, cpfCnpj: true, tipoPessoa: true, socios: true, telefone: true, email: true, vendedorId: true,
       cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
     },
   });
@@ -589,26 +629,13 @@ router.post('/unificar-placas', requireRoles('ADMIN', 'COLABORADOR'), async (req
       : undefined,
   } : undefined;
 
+  const erroClientePlacas = validarClienteParaCarne(cliente);
+  if (erroClientePlacas) { res.status(400).json({ error: erroClientePlacas }); return; }
+
   let efiResult: efiService.EfiCarneResult;
   try {
     efiResult = await efiService.criarCarne({
-      customer: {
-        name: cliente.nome,
-        ...(cliente.cpfCnpj ? { cpf: cliente.cpfCnpj.replace(/\D/g, '') } : {}),
-        ...(cliente.telefone ? { phone_number: cliente.telefone.replace(/\D/g, '') } : {}),
-        ...(cliente.email ? { email: cliente.email } : {}),
-        ...(cliente.logradouro && cliente.cidade && cliente.estado ? {
-          address: {
-            street: cliente.logradouro,
-            number: cliente.numero || 'S/N',
-            neighborhood: cliente.bairro || '',
-            zipcode: (cliente.cep || '').replace(/\D/g, ''),
-            city: cliente.cidade,
-            state: cliente.estado.toUpperCase(),
-            ...(cliente.complemento ? { complement: cliente.complemento } : {}),
-          },
-        } : {}),
-      },
+      customer: buildEfiCustomer(cliente),
       items: itens.map((i) => ({ name: i.nome, value: Math.round(i.valor * 100), amount: 1 })),
       expire_at: dataVencimento,
       repeats: Number(numeroParcelas),
@@ -688,7 +715,7 @@ router.post('/unificar-dispositivos', requireRoles('ADMIN', 'COLABORADOR'), asyn
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
     select: {
-      id: true, nome: true, cpfCnpj: true, telefone: true, email: true, vendedorId: true,
+      id: true, nome: true, cpfCnpj: true, tipoPessoa: true, socios: true, telefone: true, email: true, vendedorId: true,
       cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
     },
   });
@@ -770,26 +797,13 @@ router.post('/unificar-dispositivos', requireRoles('ADMIN', 'COLABORADOR'), asyn
       : undefined,
   } : undefined;
 
+  const erroClienteDisp = validarClienteParaCarne(cliente);
+  if (erroClienteDisp) { res.status(400).json({ error: erroClienteDisp }); return; }
+
   let efiResultDisp: efiService.EfiCarneResult;
   try {
     efiResultDisp = await efiService.criarCarne({
-      customer: {
-        name: cliente.nome,
-        ...(cliente.cpfCnpj ? { cpf: cliente.cpfCnpj.replace(/\D/g, '') } : {}),
-        ...(cliente.telefone ? { phone_number: cliente.telefone.replace(/\D/g, '') } : {}),
-        ...(cliente.email ? { email: cliente.email } : {}),
-        ...(cliente.logradouro && cliente.cidade && cliente.estado ? {
-          address: {
-            street: cliente.logradouro,
-            number: cliente.numero || 'S/N',
-            neighborhood: cliente.bairro || '',
-            zipcode: (cliente.cep || '').replace(/\D/g, ''),
-            city: cliente.cidade,
-            state: cliente.estado.toUpperCase(),
-            ...(cliente.complemento ? { complement: cliente.complemento } : {}),
-          },
-        } : {}),
-      },
+      customer: buildEfiCustomer(cliente),
       items: itensDisp.map((i) => ({ name: i.nome, value: Math.round(i.valor * 100), amount: 1 })),
       expire_at: dataVencimento,
       repeats: Number(numeroParcelas),

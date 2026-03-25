@@ -341,6 +341,13 @@
     maskPlaca: maskPlaca,
     confirmar: confirmar,
     isHoje: isHoje,
+    /** Executa callback quando o DOM estiver pronto. Se o usuário estiver logado, passa-o como argumento. */
+    onReady: function (callback) {
+      document.addEventListener('DOMContentLoaded', function () {
+        var user = getUser();
+        callback(user);
+      });
+    },
   };
 
   // ─── Fix altura real no mobile (Chrome Android / iOS) ───────────────────

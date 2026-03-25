@@ -21,6 +21,9 @@ export interface JwtPayload {
   podeBaixaManual?: boolean;
   podeCancelarCarne?: boolean;
   podeAlterarVencimento?: boolean;
+  podeCriarContrato?: boolean;
+  podeEditarContrato?: boolean;
+  podeExcluirContrato?: boolean;
 }
 
 export function signToken(payload: JwtPayload): string {

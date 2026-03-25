@@ -13,6 +13,8 @@ import dashboardRoutes from './routes/dashboard.routes';
 import vendedorRoutes from './routes/vendedor.routes';
 import configuracoesRoutes from './routes/configuracoes.routes';
 import adminRoutes from './routes/admin.routes';
+import webhooksRoutes from './routes/webhooks.routes';
+import contratosRoutes from './routes/contratos.routes';
 
 const app = express();
 
@@ -30,8 +32,11 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false })); // EFI webhook envia application/x-www-form-urlencoded
+// Webhook routes ANTES do express.json() para receber o body como Buffer bruto
+app.use('/api/webhooks', webhooksRoutes);
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: false })); // EFI webhook envia application/x-www-form-urlencoded
 
 // Servir arquivos estáticos de uploads (imagens de dispositivos, etc.)
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
@@ -48,9 +53,11 @@ app.use('/api/clientes', clientesRoutes);
 app.use('/api/carnes', carnesRoutes);
 app.use('/api/boletos', boletosRoutes);
 app.use('/api', efiRoutes);               // webhook público — antes de routers com authMiddleware
+// webhooksRoutes já registrado antes do express.json() no topo
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/vendedor', vendedorRoutes);   // deve vir antes de app.use('/api', usuariosRoutes)
 app.use('/api/configuracoes', configuracoesRoutes);
+app.use('/api/contratos', contratosRoutes);
 app.use('/api', placasRoutes);             // authMiddleware global no router
 app.use('/api/dispositivos', dispositivosRoutes);
 app.use('/api', usuariosRoutes);           // colaboradores + vendedores (authMiddleware global ADMIN)

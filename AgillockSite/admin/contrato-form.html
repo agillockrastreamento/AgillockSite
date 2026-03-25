@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contrato — AgilLock</title>
+  <script>(function(){var t=localStorage.getItem('al-theme');if(t==='dark')document.documentElement.classList.add('dark-theme');})();</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="../css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/admin.css">
+  <style>
+    /* wizard: admin.css já define o estilo completo (fundo colorido, igual gerar-cobrança) */
+    .step-panel { display:none; }
+    .step-panel.active { display:block; }
+    .tipo-card { cursor:pointer; border:2px solid #ddd; border-radius:8px; padding:16px; text-align:center; transition:border-color .2s, background-color .2s; margin-bottom:12px; }
+    .tipo-card:hover { border-color:var(--al-primary); }
+    .tipo-card.selected { border-color:var(--al-primary); background:rgba(250, 179, 44, 0.08); }
+    .tipo-card .fa { font-size:28px; color:var(--al-primary); margin-bottom:8px; display:block; }
+    .fiador-block { border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:12px; }
+    #tipos-container { display:flex !important; flex-wrap:wrap; justify-content:center; }
+    #tipos-container > [class*="col-"] { float:none; }
+    #div-preview { border:1px solid #ddd; padding:16px; min-height:200px; background:#fff; overflow-y:auto; max-height:600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.05); font-family:Arial,sans-serif; }
+    #div-preview h1, #div-preview h2, #div-preview h3 { text-align:center; text-transform:uppercase; }
+    #div-preview h1 { font-size:14pt; } #div-preview h2 { font-size:12pt; } #div-preview h3 { font-size:11pt; }
+    #div-preview p { text-align:justify; margin-bottom:0.8em; }
+    #div-preview .data-local { text-align:right; margin-bottom:24px; }
+    #div-preview .parte { margin:16px 0; padding:12px 0; border-bottom:1px solid #ccc; }
+    #div-preview .clausulas { margin-top:24px; }
+    #div-preview .assinaturas { margin-top:64px; }
+    #div-preview .assinaturas h2 { margin-bottom:32px; }
+    #div-preview .assinatura-bloco { margin-bottom:40px; }
+    #div-preview .assinatura-linha { border-top:1px solid #000; padding-top:6px; width:65%; margin-bottom:4px; }
+    #div-preview .assinatura-label { font-size:10pt; color:#333; }
+    #div-preview .testemunhas-row { display:flex; gap:80px; margin-top:40px; }
+    #div-preview .testemunha-bloco { flex:1; }
+    html.dark-theme #div-preview .assinatura-linha { border-top-color:#7a8898; }
+    html.dark-theme #div-preview .assinatura-label { color:#adb5bd; }
+    html.dark-theme #div-preview .parte { border-bottom-color:#2d3748; }
+    #panel-signatarios { display:none; }
+    html.dark-theme #div-preview { background: #1e2530; border-color: #2d3748; }
+  </style>
+</head>
+<body>
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li class="active"><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <a href="contratos.html" class="btn btn-default btn-xs" style="padding: 6px 10px; margin-right: 4px;" title="Voltar"><i class="fa fa-arrow-left"></i></a>
+        <h2 class="topbar-title" id="topbar-title">Novo Contrato</h2>
+      </div>
+    </div>
+    <div class="container-fluid">
+
+      <div class="wizard-steps" id="wizard-steps">
+        <div class="wizard-step active" data-step="1">1. Tipo e Partes</div>
+        <div class="wizard-step" data-step="2">2. Testemunhas</div>
+        <div class="wizard-step" data-step="3">3. Prévia e Assinatura</div>
+      </div>
+
+      <!-- Step 1 -->
+      <div class="step-panel active" id="step-1">
+        <h4>Tipo de Contrato</h4>
+        <div class="row" id="tipos-container">
+          <div class="col-sm-3"><div class="tipo-card" data-tipo="PF_COM_ASSISTENCIA"><i class="fa fa-user"></i><div><strong>PF</strong></div><small>Com Assistência Veicular</small></div></div>
+          <div class="col-sm-3"><div class="tipo-card" data-tipo="PF_SEM_ASSISTENCIA"><i class="fa fa-user-o"></i><div><strong>PF</strong></div><small>Sem Assistência Veicular</small></div></div>
+          <div class="col-sm-3"><div class="tipo-card" data-tipo="PJ_COM_ASSISTENCIA"><i class="fa fa-building"></i><div><strong>PJ</strong></div><small>Com Assistência Veicular</small></div></div>
+          <div class="col-sm-3"><div class="tipo-card" data-tipo="PJ_SEM_ASSISTENCIA"><i class="fa fa-building-o"></i><div><strong>PJ</strong></div><small>Sem Assistência Veicular</small></div></div>
+        </div>
+
+        <hr>
+        <h4>Cliente</h4>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Buscar cliente</label>
+              <input type="text" class="form-control" id="busca-cliente" placeholder="Digite o nome ou CPF/CNPJ...">
+            </div>
+          </div>
+        </div>
+        <div id="lista-clientes" style="display:none; max-height:200px; overflow-y:auto; border:1px solid #ddd; border-radius:4px; margin-bottom:12px;"></div>
+        <div id="cliente-selecionado" style="display:none" class="alert alert-info">
+          <strong id="cliente-nome">—</strong> <button type="button" class="btn btn-xs btn-default" id="btn-trocar-cliente">Trocar</button>
+        </div>
+
+        <div id="bloco-fiadores" style="display:none">
+          <hr>
+          <h4>Fiadores</h4>
+          <div class="form-group">
+            <label>Número de fiadores</label>
+            <select class="form-control" id="num-fiadores" style="width:auto">
+              <option value="0">0 fiadores</option>
+              <option value="1">1 fiador</option>
+              <option value="2">2 fiadores</option>
+              <option value="3">3 fiadores</option>
+            </select>
+          </div>
+          <div id="fiadores-container"></div>
+        </div>
+
+        <button class="btn btn-primary-al" id="btn-step1-next">Próximo <i class="fa fa-arrow-right"></i></button>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step-panel" id="step-2">
+        <h4>Testemunhas</h4>
+        <p class="text-muted">Preencha os dados das 2 testemunhas do contrato.</p>
+
+        <div class="panel panel-default">
+          <div class="panel-heading"><strong>Testemunha 1</strong></div>
+          <div class="panel-body">
+            <div class="row">
+              <div class="col-sm-6"><div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="t1-nome"></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="t1-cpf" maxlength="14"></div></div>
+            </div>
+            <div class="row">
+              <div class="col-sm-6"><div class="form-group"><label>E-mail <small class="text-muted">(obrigatório se assinar digitalmente)</small></label><input type="email" class="form-control" id="t1-email"></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>Telefone <small class="text-muted">(obrigatório se assinar digitalmente)</small></label><input type="text" class="form-control" id="t1-telefone" maxlength="15"></div></div>
+            </div>
+            <div class="checkbox"><label><input type="checkbox" id="t1-digital"> Assinar digitalmente pelo ClickSign</label></div>
+          </div>
+        </div>
+
+        <div class="panel panel-default">
+          <div class="panel-heading"><strong>Testemunha 2</strong></div>
+          <div class="panel-body">
+            <div class="row">
+              <div class="col-sm-6"><div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="t2-nome"></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="t2-cpf" maxlength="14"></div></div>
+            </div>
+            <div class="row">
+              <div class="col-sm-6"><div class="form-group"><label>E-mail <small class="text-muted">(obrigatório se assinar digitalmente)</small></label><input type="email" class="form-control" id="t2-email"></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>Telefone <small class="text-muted">(obrigatório se assinar digitalmente)</small></label><input type="text" class="form-control" id="t2-telefone" maxlength="15"></div></div>
+            </div>
+            <div class="checkbox"><label><input type="checkbox" id="t2-digital"> Assinar digitalmente pelo ClickSign</label></div>
+          </div>
+        </div>
+
+        <button class="btn btn-default" id="btn-step2-prev"><i class="fa fa-arrow-left"></i> Anterior</button>
+        <button class="btn btn-primary-al" id="btn-step2-next">Próximo <i class="fa fa-arrow-right"></i></button>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step-panel" id="step-3">
+        <div style="margin-bottom:8px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <button class="btn btn-default" id="btn-gerar-previa"><i class="fa fa-eye"></i> Gerar Prévia</button>
+          <button class="btn btn-info" id="btn-ver-pdf" disabled title="Gere a prévia primeiro"><i class="fa fa-file-pdf-o"></i> Ver PDF</button>
+          <button class="btn btn-default" id="btn-salvar-rascunho"><i class="fa fa-save"></i> Salvar Rascunho</button>
+          <button class="btn btn-success" id="btn-enviar-assinatura" disabled><i class="fa fa-send"></i> Enviar para Assinatura</button>
+          <span id="spinner-envio" style="display:none"><i class="fa fa-spinner fa-spin"></i> Processando PDF e ClickSign...</span>
+        </div>
+        <p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+          <i class="fa fa-info-circle"></i>
+          A prévia abaixo é uma aproximação visual. Para ver o PDF exato como será gerado, clique em <strong>Ver PDF</strong> após gerar a prévia.
+        </p>
+
+        <div id="div-preview" contenteditable="false">
+          <p class="text-muted" style="margin-top:40px;text-align:center">Clique em "Gerar Prévia" para visualizar o contrato preenchido.</p>
+        </div>
+
+        <div id="panel-signatarios" class="panel panel-success" style="margin-top:24px">
+          <div class="panel-heading"><i class="fa fa-check"></i> <strong>Contrato enviado para assinatura!</strong></div>
+          <div class="panel-body">
+            <p class="text-muted"><i class="fa fa-envelope-o"></i> O link de assinatura foi enviado automaticamente por email a cada signatário. Use o botão abaixo para reenviar o email se necessário.</p>
+            <table class="table table-striped">
+              <thead><tr><th>Signatário</th><th>Email</th><th>Papel</th><th>Ações</th></tr></thead>
+              <tbody id="tbody-signatarios"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <button class="btn btn-default" id="btn-step3-prev"><i class="fa fa-arrow-left"></i> Anterior</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    var _adminBase = '/AgillockSite/admin/contrato-form.html';
+    var AL_ROLE_REQUIRED = ['ADMIN'];
+
+    var currentUser = null;
+    var state = {
+      contratoId: null, tipo: null, clienteId: null, clienteObj: null,
+      fiadores: [], metodoAutenticacao: 'token_email', htmlConteudo: null, previaGerada: false,
+      testemunhas: [],
+    };
+
+    var params = new URLSearchParams(window.location.search);
+    var editId = params.get('id');
+
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function maskCpf(v) {
+      return v.replace(/\D/g,'').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2').slice(0,14);
+    }
+    function maskCep(v) {
+      return v.replace(/\D/g,'').replace(/(\d{5})(\d)/,'$1-$2').slice(0,9);
+    }
+    function maskFone(v) {
+      v = v.replace(/\D/g,'');
+      if (v.length <= 10) return v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+      return v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3').slice(0,15);
+    }
+    function buscarCep(input) {
+      var cep = input.value.replace(/\D/g,'');
+      if (cep.length !== 8) return;
+      var block = input.closest('.fiador-block');
+      if (!block) return;
+      fetch('https://viacep.com.br/ws/' + cep + '/json/')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (d.erro) return;
+          block.querySelector('.fiador-logradouro').value = d.logradouro || '';
+          block.querySelector('.fiador-bairro').value = d.bairro || '';
+          block.querySelector('.fiador-cidade').value = d.localidade || '';
+          block.querySelector('.fiador-estado').value = d.uf || '';
+        }).catch(function(){});
+    }
+
+    window.AL.onReady(function(user) {
+      if (!user) return;
+      currentUser = user;
+
+      // Exibe usuário
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = user.role;
+      ub.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+      window.AL.initThemeToggle('btn-tema');
+      document.getElementById('btn-logout').onclick = window.AL.logout;
+      document.getElementById('sidebar-toggle').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      if (editId) {
+        document.getElementById('topbar-title').textContent = 'Editar Contrato';
+        state.contratoId = editId;
+        carregarContrato(editId);
+      }
+      initWizard();
+    });
+
+    function initWizard() {
+      document.querySelectorAll('.tipo-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+          document.querySelectorAll('.tipo-card').forEach(function(c) { c.classList.remove('selected'); });
+          card.classList.add('selected');
+          state.tipo = card.dataset.tipo;
+          var isPJ = state.tipo && state.tipo.startsWith('PJ');
+          document.getElementById('bloco-fiadores').style.display = isPJ ? '' : 'none';
+        });
+      });
+
+      var buscaTimer;
+      document.getElementById('busca-cliente').addEventListener('input', function() {
+        clearTimeout(buscaTimer);
+        var q = this.value.trim();
+        if (q.length < 2) { document.getElementById('lista-clientes').style.display = 'none'; return; }
+        buscaTimer = setTimeout(function() { buscarClientes(q); }, 300);
+      });
+
+      document.getElementById('num-fiadores').addEventListener('change', function() {
+        renderFiadores(parseInt(this.value));
+      });
+
+      document.getElementById('btn-trocar-cliente').onclick = function() {
+        state.clienteId = null; state.clienteObj = null; state.tipo = null;
+        document.getElementById('cliente-selecionado').style.display = 'none';
+        document.getElementById('bloco-fiadores').style.display = 'none';
+        document.querySelectorAll('.tipo-card').forEach(function(c) { c.classList.remove('selected'); c.parentElement.style.display = ''; });
+      };
+
+      document.getElementById('btn-step1-next').onclick = function() {
+        if (!state.tipo) { window.AL.showAlert('Selecione o tipo de contrato.', 'warning'); return; }
+        if (!state.clienteId) { window.AL.showAlert('Selecione um cliente.', 'warning'); return; }
+        state.fiadores = coletarFiadores();
+        irParaStep(2);
+      };
+      document.getElementById('btn-step2-prev').onclick = function() { irParaStep(1); };
+      document.getElementById('btn-step2-next').onclick = function() {
+        var ts = coletarTestemunhas();
+        if (!ts) return;
+        state.testemunhas = ts;
+        irParaStep(3);
+      };
+      document.getElementById('btn-step3-prev').onclick = function() { irParaStep(2); };
+      document.getElementById('btn-gerar-previa').onclick = gerarPrevia;
+      document.getElementById('btn-ver-pdf').onclick = verPdf;
+      document.getElementById('btn-salvar-rascunho').onclick = salvarRascunho;
+      document.getElementById('btn-enviar-assinatura').onclick = enviarAssinatura;
+      document.getElementById('div-preview').addEventListener('input', function() {
+        state.htmlConteudo = this.innerHTML;
+      });
+
+      // Máscaras CPF e telefone nas testemunhas
+      ['t1-cpf','t2-cpf'].forEach(function(id) {
+        document.getElementById(id).addEventListener('input', function() { this.value = maskCpf(this.value); });
+      });
+      ['t1-telefone','t2-telefone'].forEach(function(id) {
+        document.getElementById(id).addEventListener('input', function() { this.value = maskFone(this.value); });
+      });
+    }
+
+    function irParaStep(n) {
+      document.querySelectorAll('.step-panel').forEach(function(p) { p.classList.remove('active'); });
+      document.getElementById('step-' + n).classList.add('active');
+      document.querySelectorAll('.wizard-step').forEach(function(s) {
+        var sn = parseInt(s.dataset.step);
+        s.classList.remove('active', 'done');
+        if (sn === n) s.classList.add('active');
+        if (sn < n) s.classList.add('done');
+      });
+    }
+
+    function buscarClientes(q) {
+      window.AL.apiGet('/api/clientes?busca=' + encodeURIComponent(q))
+        .then(function(data) {
+          var lista = document.getElementById('lista-clientes');
+          if (!data.length) { lista.style.display = 'none'; return; }
+          var html = '';
+          data.forEach(function(c) {
+            html += '<div class="cliente-item" data-id="' + c.id + '" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee">'
+                 + '<strong>' + escHtml(c.nome) + '</strong>'
+                 + (c.cpfCnpj ? ' <small class="text-muted">' + window.AL.fmtCpfCnpj(c.cpfCnpj) + '</small>' : '')
+                 + ' <span class="label ' + (c.tipoPessoa === 'PJ' ? 'label-warning' : 'label-info') + '">' + (c.tipoPessoa || 'PF') + '</span>'
+                 + '</div>';
+          });
+          lista.innerHTML = html;
+          lista.style.display = '';
+          lista.querySelectorAll('.cliente-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+              selecionarCliente(data.find(function(c) { return c.id === item.dataset.id; }));
+            });
+          });
+        })
+        .catch(function(err) {
+          console.error('Erro ao buscar clientes:', err);
+        });
+    }
+
+    function selecionarCliente(cliente) {
+      state.clienteId = cliente.id;
+      state.clienteObj = cliente;
+      document.getElementById('lista-clientes').style.display = 'none';
+      document.getElementById('busca-cliente').value = '';
+      document.getElementById('cliente-nome').textContent = cliente.nome + (cliente.cpfCnpj ? ' — ' + window.AL.fmtCpfCnpj(cliente.cpfCnpj) : '');
+      document.getElementById('cliente-selecionado').style.display = '';
+      var isPJ = cliente.tipoPessoa === 'PJ';
+      document.getElementById('bloco-fiadores').style.display = isPJ ? '' : 'none';
+      document.querySelectorAll('.tipo-card').forEach(function(card) {
+        var tipoIsPJ = card.dataset.tipo.startsWith('PJ');
+        card.parentElement.style.display = (isPJ === tipoIsPJ) ? '' : 'none';
+        if (state.tipo && card.dataset.tipo === state.tipo && isPJ !== tipoIsPJ) {
+          card.classList.remove('selected'); state.tipo = null;
+        }
+      });
+    }
+
+    function popularFiadores(fiadores) {
+      if (!fiadores || !fiadores.length) return;
+      document.getElementById('num-fiadores').value = String(fiadores.length);
+      renderFiadores(fiadores.length);
+      fiadores.forEach(function(f, i) {
+        var block = document.querySelectorAll('.fiador-block')[i];
+        if (!block) return;
+        block.querySelector('.fiador-nome').value = f.nome || '';
+        block.querySelector('.fiador-cpf').value = f.cpf || '';
+        block.querySelector('.fiador-rg').value = f.rg || '';
+        block.querySelector('.fiador-profissao').value = f.profissao || '';
+        block.querySelector('.fiador-estadocivil').value = f.estadoCivil || '';
+        block.querySelector('.fiador-nascimento').value = f.dataNascimento || '';
+        block.querySelector('.fiador-email').value = f.email || '';
+        block.querySelector('.fiador-telefone').value = f.telefone || '';
+        block.querySelector('.fiador-cep').value = f.cep || '';
+        block.querySelector('.fiador-logradouro').value = f.logradouro || '';
+        block.querySelector('.fiador-numero').value = f.numero || '';
+        block.querySelector('.fiador-bairro').value = f.bairro || '';
+        block.querySelector('.fiador-cidade').value = f.cidade || '';
+        block.querySelector('.fiador-estado').value = f.estado || '';
+      });
+    }
+
+    function renderFiadores(n) {
+      var container = document.getElementById('fiadores-container');
+      var html = '';
+      for (var i = 1; i <= n; i++) {
+        html += '<div class="fiador-block"><h5>Fiador ' + i + '</h5>'
+          + '<div class="row">'
+          + '<div class="col-sm-6"><div class="form-group"><label>Nome *</label><input type="text" class="form-control fiador-nome" data-idx="' + i + '"></div></div>'
+          + '<div class="col-sm-6"><div class="form-group"><label>CPF *</label><input type="text" class="form-control fiador-cpf" data-idx="' + i + '" maxlength="14"></div></div>'
+          + '</div><div class="row">'
+          + '<div class="col-sm-3"><div class="form-group"><label>RG</label><input type="text" class="form-control fiador-rg" data-idx="' + i + '"></div></div>'
+          + '<div class="col-sm-3"><div class="form-group"><label>Profissão</label><input type="text" class="form-control fiador-profissao" data-idx="' + i + '"></div></div>'
+          + '<div class="col-sm-3"><div class="form-group"><label>Estado Civil</label><input type="text" class="form-control fiador-estadocivil" data-idx="' + i + '"></div></div>'
+          + '<div class="col-sm-3"><div class="form-group"><label>Nascimento</label><input type="date" class="form-control fiador-nascimento" data-idx="' + i + '"></div></div>'
+          + '</div><div class="row">'
+          + '<div class="col-sm-6"><div class="form-group"><label>E-mail</label><input type="email" class="form-control fiador-email" data-idx="' + i + '"></div></div>'
+          + '<div class="col-sm-6"><div class="form-group"><label>Telefone</label><input type="text" class="form-control fiador-telefone" data-idx="' + i + '" maxlength="15"></div></div>'
+          + '</div><div class="row">'
+          + '<div class="col-sm-4"><div class="form-group"><label>CEP</label><input type="text" class="form-control fiador-cep" data-idx="' + i + '" maxlength="9"></div></div>'
+          + '<div class="col-sm-5"><div class="form-group"><label>Logradouro</label><input type="text" class="form-control fiador-logradouro" data-idx="' + i + '"></div></div>'
+          + '<div class="col-sm-3"><div class="form-group"><label>Número</label><input type="text" class="form-control fiador-numero" data-idx="' + i + '"></div></div>'
+          + '</div><div class="row">'
+          + '<div class="col-sm-4"><div class="form-group"><label>Bairro</label><input type="text" class="form-control fiador-bairro" data-idx="' + i + '"></div></div>'
+          + '<div class="col-sm-4"><div class="form-group"><label>Cidade</label><input type="text" class="form-control fiador-cidade" data-idx="' + i + '"></div></div>'
+          + '<div class="col-sm-2"><div class="form-group"><label>UF</label><input type="text" class="form-control fiador-estado" data-idx="' + i + '" maxlength="2"></div></div>'
+          + '</div></div>';
+      }
+      container.innerHTML = html;
+
+      // Máscaras e ViaCEP nos fiadores recém-renderizados
+      container.querySelectorAll('.fiador-cpf').forEach(function(inp) {
+        inp.addEventListener('input', function() { this.value = maskCpf(this.value); });
+      });
+      container.querySelectorAll('.fiador-telefone').forEach(function(inp) {
+        inp.addEventListener('input', function() { this.value = maskFone(this.value); });
+      });
+      container.querySelectorAll('.fiador-cep').forEach(function(inp) {
+        inp.addEventListener('input', function() { this.value = maskCep(this.value); });
+        inp.addEventListener('blur', function() { buscarCep(this); });
+      });
+    }
+
+    function coletarFiadores() {
+      var fiadores = [];
+      document.querySelectorAll('.fiador-block').forEach(function(block) {
+        var f = {
+          nome: block.querySelector('.fiador-nome').value.trim(),
+          cpf: block.querySelector('.fiador-cpf').value.trim(),
+          rg: block.querySelector('.fiador-rg').value.trim(),
+          profissao: block.querySelector('.fiador-profissao').value.trim(),
+          estadoCivil: block.querySelector('.fiador-estadocivil').value.trim(),
+          dataNascimento: block.querySelector('.fiador-nascimento').value,
+          email: block.querySelector('.fiador-email').value.trim(),
+          telefone: block.querySelector('.fiador-telefone').value.trim(),
+          cep: block.querySelector('.fiador-cep').value.trim(),
+          logradouro: block.querySelector('.fiador-logradouro').value.trim(),
+          numero: block.querySelector('.fiador-numero').value.trim(),
+          bairro: block.querySelector('.fiador-bairro').value.trim(),
+          cidade: block.querySelector('.fiador-cidade').value.trim(),
+          estado: block.querySelector('.fiador-estado').value.trim(),
+        };
+        fiadores.push(f);
+      });
+      return fiadores;
+    }
+
+    function coletarTestemunhas() {
+      var ts = [
+        { nome: document.getElementById('t1-nome').value.trim(), cpf: document.getElementById('t1-cpf').value.trim(), email: document.getElementById('t1-email').value.trim(), telefone: document.getElementById('t1-telefone').value.trim(), assinarDigital: document.getElementById('t1-digital').checked },
+        { nome: document.getElementById('t2-nome').value.trim(), cpf: document.getElementById('t2-cpf').value.trim(), email: document.getElementById('t2-email').value.trim(), telefone: document.getElementById('t2-telefone').value.trim(), assinarDigital: document.getElementById('t2-digital').checked },
+      ];
+      for (var i = 0; i < ts.length; i++) {
+        if (!ts[i].nome || !ts[i].cpf) {
+          window.AL.showAlert('Preencha o nome e CPF de todas as testemunhas.', 'warning');
+          return null;
+        }
+        if (ts[i].assinarDigital && (!ts[i].email || !ts[i].telefone)) {
+          window.AL.showAlert('Para assinatura digital, preencha o e-mail e telefone da Testemunha ' + (i + 1) + '.', 'warning');
+          return null;
+        }
+      }
+      return ts;
+    }
+
+    function coletarTestemunhasDoForm() {
+      return [
+        { nome: document.getElementById('t1-nome').value.trim(), cpf: document.getElementById('t1-cpf').value.trim(), email: document.getElementById('t1-email').value.trim(), telefone: document.getElementById('t1-telefone').value.trim(), assinarDigital: document.getElementById('t1-digital').checked },
+        { nome: document.getElementById('t2-nome').value.trim(), cpf: document.getElementById('t2-cpf').value.trim(), email: document.getElementById('t2-email').value.trim(), telefone: document.getElementById('t2-telefone').value.trim(), assinarDigital: document.getElementById('t2-digital').checked },
+      ];
+    }
+
+    function gerarPrevia() {
+      if (!state.clienteObj) { window.AL.showAlert('Selecione um cliente antes de gerar a prévia.', 'warning'); return; }
+      if (!state.tipo) { window.AL.showAlert('Selecione o tipo de contrato antes de gerar a prévia.', 'warning'); return; }
+      var ts = coletarTestemunhasDoForm();
+      var payload = { tipo: state.tipo, cliente: state.clienteObj, fiadores: state.fiadores, testemunhas: ts, representante: {} };
+      window.AL.apiPost('/api/contratos/preview', payload)
+        .then(function(data) {
+          // Remove <style> tags e wrapper HTML para não vazar estilos do template na página
+          var html = data.html
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<\/?(?:html|head|body|!DOCTYPE)[^>]*>/gi, '');
+          var div = document.getElementById('div-preview');
+          div.innerHTML = html;
+          div.contentEditable = 'true';
+          state.htmlConteudo = html;
+          state.previaGerada = true;
+          document.getElementById('btn-enviar-assinatura').disabled = false;
+          document.getElementById('btn-ver-pdf').disabled = false;
+          document.getElementById('btn-ver-pdf').removeAttribute('title');
+          window.AL.showAlert('Prévia gerada. Você pode editar o texto antes de enviar. Para ver o PDF final, clique em "Ver PDF".', 'info');
+        })
+        .catch(function(err) {
+          window.AL.showAlert('Erro ao gerar prévia: ' + err.message, 'danger');
+        });
+    }
+
+    function verPdf() {
+      var html = document.getElementById('div-preview').innerHTML || state.htmlConteudo;
+      if (!html) { window.AL.showAlert('Gere a prévia primeiro.', 'warning'); return; }
+
+      var btn = document.getElementById('btn-ver-pdf');
+      var oldHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando...';
+      btn.disabled = true;
+
+      fetch(window.API_URL + '/api/contratos/view-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + window.AL.getToken()
+        },
+        body: JSON.stringify({ htmlConteudo: html })
+      })
+      .then(function(res) {
+        if (!res.ok) throw new Error('Falha ao gerar PDF.');
+        return res.blob();
+      })
+      .then(function(blob) {
+        var url = window.URL.createObjectURL(blob);
+        var win = window.open(url, '_blank');
+        if (!win) window.AL.showAlert('O navegador bloqueou o pop-up do PDF.', 'warning');
+      })
+      .catch(function(err) {
+        window.AL.showAlert(err.message, 'danger');
+      })
+      .finally(function() {
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
+      });
+    }
+
+    function salvarRascunho() {
+      // Contrato novo exige prévia; edição permite salvar sem gerar nova prévia
+      if (!state.contratoId && !state.htmlConteudo) {
+        window.AL.showAlert('Gere a prévia antes de salvar.', 'warning'); return;
+      }
+      var ts = coletarTestemunhasDoForm();
+      var divHtml = document.getElementById('div-preview').innerHTML;
+      var payload = {
+        tipo: state.tipo, clienteId: state.clienteId,
+        fiadores: state.fiadores, testemunhas: ts,
+        metodoAutenticacao: 'assinatura',
+      };
+      // Inclui htmlConteudo apenas se uma nova prévia foi gerada
+      if (state.htmlConteudo) {
+        payload.htmlConteudo = divHtml || state.htmlConteudo;
+      }
+      if (state.contratoId) {
+        window.AL.apiPut('/api/contratos/' + state.contratoId, payload)
+          .then(function() { window.location.href = 'contratos.html'; })
+          .catch(function(err) { window.AL.showAlert(err.message, 'danger'); });
+      } else {
+        window.AL.apiPost('/api/contratos', payload)
+          .then(function() { window.location.href = 'contratos.html'; })
+          .catch(function(err) { window.AL.showAlert(err.message, 'danger'); });
+      }
+    }
+
+    function enviarAssinatura() {
+      if (!state.htmlConteudo && !document.getElementById('div-preview').innerHTML.trim()) {
+        window.AL.showAlert('Gere a prévia antes de enviar.', 'warning'); return;
+      }
+      document.getElementById('btn-enviar-assinatura').disabled = true;
+      document.getElementById('spinner-envio').style.display = '';
+      var ts = coletarTestemunhasDoForm();
+      var payload = {
+        tipo: state.tipo, clienteId: state.clienteId, fiadores: state.fiadores, testemunhas: ts,
+        htmlConteudo: document.getElementById('div-preview').innerHTML || state.htmlConteudo,
+        metodoAutenticacao: 'assinatura',
+      };
+      
+      var afterSave = function(contratoId) {
+        return window.AL.apiPost('/api/contratos/' + contratoId + '/enviar', {})
+          .then(function(data) {
+            document.getElementById('spinner-envio').style.display = 'none';
+            window.AL.showAlert('Contrato enviado para assinatura com sucesso!', 'success');
+            setTimeout(function() { window.location.href = 'contratos.html'; }, 1200);
+          })
+          .catch(function(err) {
+            document.getElementById('spinner-envio').style.display = 'none';
+            document.getElementById('btn-enviar-assinatura').disabled = false;
+            window.AL.showAlert('Erro: ' + err.message, 'danger');
+          });
+      };
+      
+      if (state.contratoId) {
+        window.AL.apiPut('/api/contratos/' + state.contratoId, payload)
+          .then(function() {
+            return afterSave(state.contratoId);
+          })
+          .catch(function(err) {
+            document.getElementById('spinner-envio').style.display = 'none';
+            document.getElementById('btn-enviar-assinatura').disabled = false;
+            window.AL.showAlert(err.message, 'danger');
+          });
+      } else {
+        window.AL.apiPost('/api/contratos', payload)
+          .then(function(data) {
+            state.contratoId = data.id;
+            return afterSave(data.id);
+          })
+          .catch(function(err) {
+            document.getElementById('spinner-envio').style.display = 'none';
+            document.getElementById('btn-enviar-assinatura').disabled = false;
+            window.AL.showAlert(err.message, 'danger');
+          });
+      }
+    }
+
+    var PAPEL_LABEL = { cliente: 'Cliente', socio: 'Sócio', fiador: 'Fiador', testemunha: 'Testemunha', agillock: 'AgilLock' };
+
+    function renderSignatarios(signatarios) {
+      document.getElementById('panel-signatarios').style.display = '';
+      var html = '';
+      (signatarios || []).forEach(function(s) {
+        html += '<tr>'
+          + '<td>' + escHtml(s.nome) + '</td>'
+          + '<td>' + escHtml(s.email || '—') + '</td>'
+          + '<td>' + (PAPEL_LABEL[s.tipo] || s.tipo) + '</td>'
+          + '<td><button class="btn btn-xs btn-default" onclick="reenviarEmailSignatario(\'' + escHtml(s.signerId) + '\')"><i class="fa fa-envelope-o"></i> Reenviar Email</button></td>'
+          + '</tr>';
+      });
+      document.getElementById('tbody-signatarios').innerHTML = html;
+    }
+
+    function reenviarEmailSignatario(signerId) {
+      if (!state.contratoId) return;
+      window.AL.apiPost('/api/contratos/' + state.contratoId + '/notificar/' + signerId, {})
+        .then(function() { window.AL.showAlert('Email reenviado com sucesso!', 'success'); })
+        .catch(function(err) { window.AL.showAlert('Erro ao reenviar: ' + err.message, 'danger'); });
+    }
+
+    function carregarContrato(id) {
+      window.AL.apiGet('/api/contratos/' + id)
+        .then(function(c) {
+          state.tipo = c.tipo;
+          document.querySelectorAll('.tipo-card').forEach(function(card) {
+            if (card.dataset.tipo === c.tipo) card.classList.add('selected');
+          });
+          // Carrega cliente e filtra tipos
+          if (c.cliente) {
+            selecionarCliente(c.cliente);
+          } else {
+            window.AL.apiGet('/api/clientes/' + c.clienteId)
+              .then(function(cliente) { selecionarCliente(cliente); })
+              .catch(function() {});
+          }
+          state.fiadores = c.fiadores || [];
+          popularFiadores(state.fiadores);
+          var ts = c.testemunhas || [];
+          if (ts[0]) { document.getElementById('t1-nome').value = ts[0].nome || ''; document.getElementById('t1-cpf').value = ts[0].cpf || ''; document.getElementById('t1-email').value = ts[0].email || ''; document.getElementById('t1-telefone').value = ts[0].telefone || ''; document.getElementById('t1-digital').checked = !!ts[0].assinarDigital; }
+          if (ts[1]) { document.getElementById('t2-nome').value = ts[1].nome || ''; document.getElementById('t2-cpf').value = ts[1].cpf || ''; document.getElementById('t2-email').value = ts[1].email || ''; document.getElementById('t2-telefone').value = ts[1].telefone || ''; document.getElementById('t2-digital').checked = !!ts[1].assinarDigital; }
+          if (c.htmlConteudo) {
+            document.getElementById('div-preview').innerHTML = c.htmlConteudo;
+            state.htmlConteudo = c.htmlConteudo;
+            document.getElementById('btn-enviar-assinatura').disabled = false;
+            document.getElementById('btn-ver-pdf').disabled = false;
+          }
+          irParaStep(1);
+          if (c.signatarios) renderSignatarios(c.signatarios);
+          // Colaborador sem permissão de edição: bloqueia salvar/enviar
+          if (currentUser && currentUser.role === 'COLABORADOR' && !currentUser.podeEditarContrato) {
+            document.getElementById('btn-salvar-rascunho').disabled = true;
+            document.getElementById('btn-enviar-assinatura').disabled = true;
+            document.getElementById('btn-gerar-previa').disabled = true;
+          }
+        })
+        .catch(function(err) {
+          window.AL.showAlert('Erro ao carregar contrato: ' + err.message, 'danger');
+        });
+    }
+  </script>
+</body>
+</html>

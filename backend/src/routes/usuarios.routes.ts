@@ -18,6 +18,7 @@ const COLAB_SELECT = {
   podeExcluirDispositivo: true, podeInativarDispositivo: true,
   podeCriarDispositivo: true, podeEditarDispositivo: true, podeDesvincularDispositivo: true,
   podeBaixaManual: true, podeCancelarCarne: true, podeAlterarVencimento: true,
+  podeCriarContrato: true, podeEditarContrato: true, podeExcluirContrato: true,
 } as const;
 
 async function criarUsuario(
@@ -29,6 +30,7 @@ async function criarUsuario(
     podeExcluirDispositivo?: boolean; podeInativarDispositivo?: boolean;
     podeCriarDispositivo?: boolean; podeEditarDispositivo?: boolean; podeDesvincularDispositivo?: boolean;
     podeBaixaManual?: boolean; podeCancelarCarne?: boolean; podeAlterarVencimento?: boolean;
+    podeCriarContrato?: boolean; podeEditarContrato?: boolean; podeExcluirContrato?: boolean;
   }
 ) {
   const { nome, email, senha, role } = dados;
@@ -57,6 +59,9 @@ async function criarUsuario(
     data.podeBaixaManual          = dados.podeBaixaManual          ?? true;
     data.podeCancelarCarne     = dados.podeCancelarCarne     ?? true;
     data.podeAlterarVencimento = dados.podeAlterarVencimento ?? true;
+    data.podeCriarContrato      = dados.podeCriarContrato      ?? true;
+    data.podeEditarContrato     = dados.podeEditarContrato     ?? true;
+    data.podeExcluirContrato    = dados.podeExcluirContrato    ?? true;
   }
   const user = await prisma.user.create({ data, select: COLAB_SELECT });
   res.status(201).json(user);
@@ -68,7 +73,7 @@ async function editarUsuario(
   role: 'COLABORADOR' | 'VENDEDOR'
 ) {
   const id = param(req, 'id');
-  const { nome, email, senha, podeExcluirCliente, podeEditarCliente, podeInativarCliente, podeExcluirPlaca, podeInativarPlaca, podeExcluirDispositivo, podeInativarDispositivo, podeCriarDispositivo, podeEditarDispositivo, podeDesvincularDispositivo, podeBaixaManual, podeCancelarCarne, podeAlterarVencimento } = req.body;
+  const { nome, email, senha, podeExcluirCliente, podeEditarCliente, podeInativarCliente, podeExcluirPlaca, podeInativarPlaca, podeExcluirDispositivo, podeInativarDispositivo, podeCriarDispositivo, podeEditarDispositivo, podeDesvincularDispositivo, podeBaixaManual, podeCancelarCarne, podeAlterarVencimento, podeCriarContrato, podeEditarContrato, podeExcluirContrato } = req.body;
 
   const existe = await prisma.user.findFirst({ where: { id, role }, select: { id: true } });
   if (!existe) {
@@ -100,6 +105,9 @@ async function editarUsuario(
     if (podeBaixaManual         !== undefined) data.podeBaixaManual         = podeBaixaManual;
     if (podeCancelarCarne     !== undefined) data.podeCancelarCarne     = podeCancelarCarne;
     if (podeAlterarVencimento !== undefined) data.podeAlterarVencimento = podeAlterarVencimento;
+    if (podeCriarContrato      !== undefined) data.podeCriarContrato      = podeCriarContrato;
+    if (podeEditarContrato     !== undefined) data.podeEditarContrato     = podeEditarContrato;
+    if (podeExcluirContrato    !== undefined) data.podeExcluirContrato    = podeExcluirContrato;
   }
 
   const user = await prisma.user.update({ where: { id }, data, select: COLAB_SELECT });

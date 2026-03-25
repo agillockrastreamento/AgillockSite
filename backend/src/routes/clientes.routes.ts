@@ -236,6 +236,12 @@ router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequ
     return;
   }
 
+  const contratosCount = await prisma.contrato.count({ where: { clienteId: id } });
+  if (contratosCount > 0) {
+    res.status(400).json({ error: 'Não é possível excluir um cliente com contratos.' });
+    return;
+  }
+
   const activeBoletosCount = await prisma.boleto.count({
     where: { carne: { clienteId: id }, status: { in: ['PENDENTE', 'ATRASADO'] } },
   });

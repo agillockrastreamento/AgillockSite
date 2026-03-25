@@ -89,6 +89,7 @@
       <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li class="active"><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
     </ul>
     <div class="sidebar-footer">
       <div class="sidebar-user">
@@ -146,70 +147,6 @@
             </div>
             <button class="btn btn-xs btn-default" id="btn-trocar-cliente"><i class="fa fa-times"></i> Trocar</button>
           </div>
-        </div>
-
-        <!-- Mini-form novo cliente -->
-        <div id="novo-cliente-wrap"
-          style="display:none;background:#fffbf0;border:1px solid #fab32c;border-radius:8px;padding:16px;margin-bottom:16px;">
-          <h5 style="margin-top:0;color:#333;">Novo Cliente</h5>
-          <div class="row">
-            <div class="col-sm-6">
-              <div class="form-group"><label style="color:#555;">Nome *</label><input class="form-control"
-                  id="nc-nome" /></div>
-            </div>
-            <div class="col-sm-6">
-              <div class="form-group"><label style="color:#555;">CPF/CNPJ *</label><input class="form-control"
-                  id="nc-cpfcnpj" placeholder="000.000.000-00" maxlength="18" /></div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-sm-6">
-              <div class="form-group"><label style="color:#555;">Telefone *</label><input class="form-control"
-                  id="nc-telefone" maxlength="15" /></div>
-            </div>
-            <div class="col-sm-6">
-              <div class="form-group"><label style="color:#555;">E-mail *</label><input type="email"
-                  class="form-control" id="nc-email" /></div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-sm-4">
-              <div class="form-group"><label style="color:#555;">CEP</label><input class="form-control" id="nc-cep"
-                  placeholder="00000-000" maxlength="9" /></div>
-            </div>
-            <div class="col-sm-8">
-              <div class="form-group"><label style="color:#555;">Logradouro</label><input class="form-control"
-                  id="nc-logradouro" /></div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-sm-3">
-              <div class="form-group"><label style="color:#555;">Número</label><input class="form-control"
-                  id="nc-numero" /></div>
-            </div>
-            <div class="col-sm-4">
-              <div class="form-group"><label style="color:#555;">Complemento</label><input class="form-control"
-                  id="nc-complemento" /></div>
-            </div>
-            <div class="col-sm-5">
-              <div class="form-group"><label style="color:#555;">Bairro</label><input class="form-control"
-                  id="nc-bairro" /></div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-sm-8">
-              <div class="form-group"><label style="color:#555;">Cidade</label><input class="form-control"
-                  id="nc-cidade" /></div>
-            </div>
-            <div class="col-sm-4">
-              <div class="form-group"><label style="color:#555;">UF</label><input class="form-control" id="nc-estado"
-                  maxlength="2" style="text-transform:uppercase;" /></div>
-            </div>
-          </div>
-          <div id="nc-alert"></div>
-          <button class="btn btn-primary-al" id="btn-criar-cliente-inline"><i class="fa fa-check"></i> Criar
-            Cliente</button>
-          <button class="btn btn-default" id="btn-cancelar-nc" style="margin-left:8px;">Cancelar</button>
         </div>
 
         <button class="btn btn-default" id="btn-mostrar-nc" style="margin-bottom:16px;">
@@ -457,6 +394,28 @@
       document.getElementById('btn-logout').addEventListener('click', AL.logout);
       AL.initThemeToggle('btn-tema');
 
+      // ── Humanizador de erros EFI ──────────────────────────────
+      function humanizarErro(msg) {
+        if (!msg) return 'Erro desconhecido.';
+        var m = msg.toLowerCase();
+        if (m.indexOf('sócio com cpf') !== -1 || m.indexOf('socio com cpf') !== -1)
+          return msg;
+        if (m.indexOf('cpf') !== -1 && m.indexOf('obrigatória') !== -1)
+          return 'CPF obrigatório. Para clientes PJ, cadastre ao menos um sócio com CPF válido no cadastro do cliente.';
+        if (m.indexOf('cnpj') !== -1 && m.indexOf('inválido') !== -1)
+          return 'CNPJ inválido. Verifique o CNPJ cadastrado no perfil do cliente.';
+        if (m.indexOf('cpf') !== -1 && (m.indexOf('inválido') !== -1 || m.indexOf('invalid') !== -1))
+          return 'CPF inválido. Verifique o CPF cadastrado no perfil do cliente.';
+        if (m.indexOf('validation_error') !== -1) {
+          var match = msg.match(/"message"\s*:\s*"([^"]+)"/);
+          if (match) return 'Dados inválidos: ' + match[1];
+          return 'Dados inválidos enviados à operadora de cobrança. Verifique o cadastro do cliente.';
+        }
+        if (m.indexOf('efi bank') !== -1 || m.indexOf('comunicar') !== -1)
+          return 'Erro de comunicação com a operadora de cobrança. Tente novamente em instantes.';
+        return msg;
+      }
+
       // ── Estado do wizard ──────────────────────────────────────
       var state = {
         step: 1, cliente: null, placa: null,
@@ -595,7 +554,6 @@
         document.getElementById('cliente-selecionado-card').style.display = 'block';
         document.getElementById('busca-cliente').style.display = 'none';
         document.getElementById('btn-mostrar-nc').style.display = 'none';
-        document.getElementById('novo-cliente-wrap').style.display = 'none';
         document.getElementById('btn-step1-next').disabled = false;
       }
 
@@ -608,56 +566,9 @@
         document.getElementById('btn-step1-next').disabled = true;
       });
 
+      // Novo cliente → página dedicada
       document.getElementById('btn-mostrar-nc').addEventListener('click', function () {
-        document.getElementById('novo-cliente-wrap').style.display = 'block';
-        this.style.display = 'none';
-      });
-      document.getElementById('btn-cancelar-nc').addEventListener('click', function () {
-        document.getElementById('novo-cliente-wrap').style.display = 'none';
-        document.getElementById('btn-mostrar-nc').style.display = 'inline-block';
-      });
-
-      // ViaCEP para novo cliente
-      document.getElementById('nc-cep').addEventListener('blur', function () {
-        var cep = this.value.replace(/\D/g, '');
-        if (cep.length !== 8) return;
-        fetch('https://viacep.com.br/ws/' + cep + '/json/')
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (d.erro) return;
-            document.getElementById('nc-logradouro').value = d.logradouro || '';
-            document.getElementById('nc-bairro').value = d.bairro || '';
-            document.getElementById('nc-cidade').value = d.localidade || '';
-            document.getElementById('nc-estado').value = d.uf || '';
-          }).catch(function () { });
-      });
-      AL.maskCpfCnpj(document.getElementById('nc-cpfcnpj'));
-      AL.maskPhone(document.getElementById('nc-telefone'));
-
-      document.getElementById('btn-criar-cliente-inline').addEventListener('click', function () {
-        var nome = document.getElementById('nc-nome').value.trim();
-        var cpf = document.getElementById('nc-cpfcnpj').value.replace(/\D/g, '');
-        var telefone = document.getElementById('nc-telefone').value.trim();
-        var email = document.getElementById('nc-email').value.trim();
-        if (!nome || !cpf || !telefone || !email) {
-          document.getElementById('nc-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;margin:4px 0;">Nome, CPF/CNPJ, Telefone e E-mail são obrigatórios.</div>';
-          return;
-        }
-        AL.apiPost('/api/clientes', {
-          nome: nome, cpfCnpj: cpf, telefone: telefone, email: email,
-          cep: document.getElementById('nc-cep').value.replace(/\D/g, ''),
-          logradouro: document.getElementById('nc-logradouro').value.trim(),
-          numero: document.getElementById('nc-numero').value.trim(),
-          complemento: document.getElementById('nc-complemento').value.trim(),
-          bairro: document.getElementById('nc-bairro').value.trim(),
-          cidade: document.getElementById('nc-cidade').value.trim(),
-          estado: document.getElementById('nc-estado').value.trim().toUpperCase(),
-        }).then(function (c) {
-          selecionarCliente(c);
-          document.getElementById('nc-alert').innerHTML = '';
-        }).catch(function (err) {
-          document.getElementById('nc-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;margin:4px 0;">' + err.message + '</div>';
-        });
+        window.location.href = 'cliente-form.html?back=gerar-cobranca';
       });
 
       document.getElementById('btn-step1-next').addEventListener('click', function () {
@@ -667,11 +578,15 @@
       });
 
       // ── Step 2: Dispositivos ──────────────────────────────────
-      var todasPlacas = []; // dispositivos ativos do cliente
+      var todasPlacas = []; // dispositivos ativos do cliente (onde é responsável)
+      var temVinculadoSemResponsabilidade = false; // vinculado via junction mas não é responsável
 
       function renderPlacasLista(dispositivos, dispComCarne, dispComCarneUnificado) {
         if (!dispositivos.length) {
-          document.getElementById('lista-placas').innerHTML = '<p class="text-muted">Nenhum dispositivo ativo. <a href="dispositivo.html?clienteId=' + (state.cliente ? state.cliente.id : '') + '">Adicione um dispositivo</a>.</p>';
+          var msg = temVinculadoSemResponsabilidade
+            ? '<p class="text-muted"><i class="fa fa-info-circle"></i> Este cliente possui dispositivos vinculados, mas não é o responsável pelo faturamento deles. Para gerar cobranças, o cliente precisa ser o <strong>Responsável (Faturamento)</strong> do dispositivo.</p>'
+            : '<p class="text-muted">Nenhum dispositivo ativo. <a href="dispositivo.html?clienteId=' + (state.cliente ? state.cliente.id : '') + '">Adicione um dispositivo</a>.</p>';
+          document.getElementById('lista-placas').innerHTML = msg;
           return;
         }
         var busca = document.getElementById('busca-placa').value.trim().toLowerCase();
@@ -749,6 +664,7 @@
             clienteVendedorNome = c.vendedor ? c.vendedor.nome : null;
 
             todasPlacas = (c.dispositivos || []).filter(function (d) { return d.ativo === true; });
+            temVinculadoSemResponsabilidade = false;
             var dispMap = {};
             (c.dispositivos || []).forEach(function (d) { dispMap[d.id] = d; });
             var carnes = c.carnes || [];
@@ -787,7 +703,16 @@
               }
             });
 
-            renderPlacasLista(todasPlacas, dispComCarne, dispComCarneUnificado);
+            if (!todasPlacas.length && state.cliente) {
+              AL.apiGet('/api/clientes/' + state.cliente.id + '/dispositivos')
+                .then(function (todos) {
+                  temVinculadoSemResponsabilidade = (todos || []).some(function (d) { return d.vinculado && d.ativo; });
+                  renderPlacasLista(todasPlacas, dispComCarne, dispComCarneUnificado);
+                })
+                .catch(function () { renderPlacasLista(todasPlacas, dispComCarne, dispComCarneUnificado); });
+            } else {
+              renderPlacasLista(todasPlacas, dispComCarne, dispComCarneUnificado);
+            }
             document.getElementById('busca-placa').oninput = function () {
               renderPlacasLista(todasPlacas, dispComCarne, dispComCarneUnificado);
               state.placa = null;
@@ -819,7 +744,7 @@
             }
           })
           .catch(function (err) {
-            document.getElementById('lista-placas').innerHTML = '<div class="text-danger">' + err.message + '</div>';
+            document.getElementById('lista-placas').innerHTML = '<div class="text-danger">' + humanizarErro(err.message) + '</div>';
           });
       }
 
@@ -1009,7 +934,7 @@
           document.getElementById('btn-unif-gerar-spinner').style.display = 'none';
           document.getElementById('btn-unif-gerar').disabled = false;
           document.getElementById('btn-unif-cancelar').disabled = false;
-          document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger"><strong>Erro:</strong> ' + err.message + '</div>';
+          document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger"><strong>Erro:</strong> ' + humanizarErro(err.message) + '</div>';
         });
       });
 
@@ -1112,7 +1037,7 @@
 
           document.getElementById('resultado-erro').style.display = 'block';
           document.getElementById('resultado-erro').innerHTML =
-            '<div class="alert alert-danger"><strong>Erro ao gerar carnê:</strong> ' + err.message + '</div>';
+            '<div class="alert alert-danger"><strong>Erro ao gerar carnê:</strong> ' + humanizarErro(err.message) + '</div>';
         });
       });
 

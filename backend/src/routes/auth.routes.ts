@@ -43,6 +43,9 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     payload.podeBaixaManual         = user.podeBaixaManual;
     payload.podeCancelarCarne     = user.podeCancelarCarne;
     payload.podeAlterarVencimento = user.podeAlterarVencimento;
+    payload.podeCriarContrato      = user.podeCriarContrato;
+    payload.podeEditarContrato     = user.podeEditarContrato;
+    payload.podeExcluirContrato    = user.podeExcluirContrato;
   }
   const token = signToken(payload);
 

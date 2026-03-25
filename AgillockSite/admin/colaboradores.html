@@ -75,6 +75,7 @@
       <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
       <li class="active"><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
       <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
       <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
@@ -207,6 +208,16 @@
                 </label>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-vencimento" checked /> Pode alterar data de vencimento
+                </label>
+                <div style="margin-top:8px;font-weight:600;color:#555">Contratos</div>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-criar-contrato" checked /> Pode criar contratos
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-editar-contrato" checked /> Pode editar contratos
+                </label>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-excluir-contrato" checked /> Pode excluir contratos
                 </label>
               </div>
             </div>
@@ -378,6 +389,9 @@
       document.getElementById('f-pode-baixa').checked                  = true;
       document.getElementById('f-pode-cancelar').checked          = true;
       document.getElementById('f-pode-vencimento').checked        = true;
+      document.getElementById('f-pode-criar-contrato').checked    = true;
+      document.getElementById('f-pode-editar-contrato').checked   = true;
+      document.getElementById('f-pode-excluir-contrato').checked  = true;
 
       if (id) {
         document.getElementById('modal-titulo').textContent = 'Editar Colaborador';
@@ -401,6 +415,9 @@
           document.getElementById('f-pode-baixa').checked             = c.podeBaixaManual       !== false;
           document.getElementById('f-pode-cancelar').checked          = c.podeCancelarCarne     !== false;
           document.getElementById('f-pode-vencimento').checked        = c.podeAlterarVencimento !== false;
+          document.getElementById('f-pode-criar-contrato').checked    = c.podeCriarContrato     !== false;
+          document.getElementById('f-pode-editar-contrato').checked   = c.podeEditarContrato    !== false;
+          document.getElementById('f-pode-excluir-contrato').checked  = c.podeExcluirContrato   !== false;
         }
       } else {
         document.getElementById('modal-titulo').textContent = 'Novo Colaborador';
@@ -447,6 +464,9 @@
         podeBaixaManual:       document.getElementById('f-pode-baixa').checked,
         podeCancelarCarne:     document.getElementById('f-pode-cancelar').checked,
         podeAlterarVencimento: document.getElementById('f-pode-vencimento').checked,
+        podeCriarContrato:     document.getElementById('f-pode-criar-contrato').checked,
+        podeEditarContrato:    document.getElementById('f-pode-editar-contrato').checked,
+        podeExcluirContrato:   document.getElementById('f-pode-excluir-contrato').checked,
       };
       if (senha) payload.senha = senha;
 

@@ -136,14 +136,20 @@ body.admin-body {
     left: 240px;
     right: 0;
     height: 56px;
-    background: #fff;
+    background: #ffffff;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.02);
-    border-bottom: 1px solid #f0f0f0; 
+    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    border-bottom: 1px solid #e8e8e8;
     gap: 12px;
+    z-index: 100;
+}
+html.dark-theme .admin-topbar {
+    background: #191e28;
+    border-bottom-color: #2d3748;
+    box-shadow: 0 2px 12px rgba(0,0,0,.3);
 }
 .topbar-left { display: flex; align-items: center; gap: 12px; }
 .topbar-title { margin: 0; font-size: 20px; font-weight: 700; color: #1e2530; }
@@ -939,6 +945,16 @@ html.dark-theme .form-control { background: #252d3d; color: #e0e6f0; border-colo
 html.dark-theme .form-control:focus { border-color: #fab32c; box-shadow: 0 0 0 2px rgba(250,179,44,.2); }
 html.dark-theme .form-group label { color: #adb5bd; }
 html.dark-theme select.form-control > option { background: #252d3d; }
+
+/* Checkboxes em tema escuro */
+html.dark-theme .checkbox label { color: #c9d1d9; }
+html.dark-theme .checkbox { color: #c9d1d9; }
+
+/* Painéis (panels) em tema escuro */
+html.dark-theme .panel { background: #1e2530; border-color: #2d3748; }
+html.dark-theme .panel-default { border-color: #2d3748; }
+html.dark-theme .panel-heading { background: #252d3d; color: #c9d1d9; border-color: #2d3748; }
+html.dark-theme .panel-body { background: #1e2530; color: #c9d1d9; }
 
 /* Modais */
 html.dark-theme .modal-content { background: #1e2530; color: #c9d1d9; }

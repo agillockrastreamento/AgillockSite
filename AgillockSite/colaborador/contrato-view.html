@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visualizar Contrato — AgilLock</title>
+  <script>(function(){var t=localStorage.getItem('al-theme');if(t==='dark')document.documentElement.classList.add('dark-theme');})();</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="../css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/admin.css">
+  <style>
+    #div-view {
+      border: 1px solid #ddd; padding: 32px 48px; background: #fff;
+      border-radius: 8px; max-width: 860px; margin: 0 auto;
+      font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    html.dark-theme #div-view { background: #1e2530; border-color: #2d3748; color: #c9d1d9; }
+    #div-view h1, #div-view h2, #div-view h3 { text-align: center; text-transform: uppercase; }
+    #div-view h1 { font-size: 14pt; margin-bottom: 24px; }
+    #div-view h2 { font-size: 12pt; margin-top: 24px; margin-bottom: 8px; }
+    #div-view h3 { font-size: 11pt; margin-top: 16px; margin-bottom: 4px; }
+    #div-view p { text-align: justify; margin-bottom: 0.8em; }
+    #div-view .data-local { text-align: right; margin-bottom: 24px; }
+    #div-view .parte { margin: 16px 0; padding: 12px 0; border-bottom: 1px solid #ccc; }
+    #div-view .clausulas { margin-top: 24px; }
+    #div-view .assinaturas { margin-top: 64px; }
+    #div-view .assinaturas h2 { margin-bottom: 32px; }
+    #div-view .assinatura-bloco { margin-bottom: 40px; }
+    #div-view .assinatura-linha { border-top: 1px solid #000; padding-top: 6px; width: 65%; margin-bottom: 4px; }
+    #div-view .assinatura-label { font-size: 10pt; color: #333; }
+    #div-view .testemunhas-row { display: flex; gap: 80px; margin-top: 40px; }
+    #div-view .testemunha-bloco { flex: 1; }
+    html.dark-theme #div-view .assinatura-linha { border-top-color: #7a8898; }
+    html.dark-theme #div-view .assinatura-label { color: #adb5bd; }
+    html.dark-theme #div-view .parte { border-bottom-color: #2d3748; }
+    @media print {
+      .admin-sidebar, .admin-topbar, .no-print { display: none !important; }
+      .admin-content { margin-left: 0 !important; padding: 0 !important; }
+      #div-view { border: none; box-shadow: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li class="active"><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar no-print">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <a href="contratos.html" class="btn btn-default btn-xs" style="padding:6px 10px;" title="Voltar"><i class="fa fa-arrow-left"></i></a>
+        <h2 class="topbar-title" id="topbar-title">Visualizar Contrato</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-default btn-sm" id="btn-imprimir"><i class="fa fa-print"></i> Imprimir</button>
+        <span id="btn-editar-wrap"></span>
+      </div>
+    </div>
+    <div class="container-fluid" style="padding-top:16px;padding-bottom:32px;">
+      <div id="info-contrato" style="max-width:860px;margin:0 auto 16px;"></div>
+      <div id="div-view">
+        <p class="text-muted" style="padding:40px 0;text-align:center">Carregando...</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    var _adminBase = '/AgillockSite/colaborador/contrato-view.html';
+    var AL_ROLE_REQUIRED = ['COLABORADOR'];
+
+    var params = new URLSearchParams(window.location.search);
+    var contratoId = params.get('id');
+
+    var TIPO_LABEL = {
+      PF_COM_ASSISTENCIA: 'PF c/ Assistência', PF_SEM_ASSISTENCIA: 'PF s/ Assistência',
+      PJ_COM_ASSISTENCIA: 'PJ c/ Assistência', PJ_SEM_ASSISTENCIA: 'PJ s/ Assistência',
+    };
+    var STATUS_BADGE = {
+      RASCUNHO: '<span class="al-badge">Rascunho</span>',
+      AGUARDANDO_ASSINATURA: '<span class="al-badge badge-pendente">Aguardando Assinatura</span>',
+      ASSINADO: '<span class="al-badge badge-ativo">Assinado</span>',
+      CANCELADO: '<span class="al-badge badge-cancelado">Cancelado</span>',
+    };
+
+    window.AL.onReady(function(user) {
+      if (!user) return;
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = user.role;
+      ub.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+      window.AL.initThemeToggle('btn-tema');
+      document.getElementById('btn-logout').onclick = window.AL.logout;
+      document.getElementById('btn-imprimir').onclick = function() { window.print(); };
+      document.getElementById('sidebar-toggle').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      if (!contratoId) { window.AL.showAlert('ID do contrato não informado.', 'danger'); return; }
+      carregarContrato(contratoId, user);
+    });
+
+    function carregarContrato(id, user) {
+      window.AL.apiGet('/api/contratos/' + id)
+        .then(function(c) {
+          var nomeCliente = c.cliente ? c.cliente.nome : '—';
+          document.getElementById('topbar-title').textContent = 'Contrato — ' + nomeCliente;
+          document.getElementById('info-contrato').innerHTML =
+            '<div class="alert alert-info" style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-bottom:0">'
+            + '<span><strong>Cliente:</strong> ' + nomeCliente + '</span>'
+            + '<span><strong>Tipo:</strong> ' + (TIPO_LABEL[c.tipo] || c.tipo) + '</span>'
+            + '<span><strong>Status:</strong> ' + (STATUS_BADGE[c.status] || c.status) + '</span>'
+            + '<span><strong>Criado em:</strong> ' + window.AL.fmtDate(c.createdAt) + '</span>'
+            + '</div>';
+          // Botão editar — só aparece se tiver permissão e contrato em rascunho
+          if (user.podeEditarContrato && c.status === 'RASCUNHO') {
+            document.getElementById('btn-editar-wrap').innerHTML =
+              '<a href="contrato-form.html?id=' + id + '" class="btn btn-primary-al btn-sm"><i class="fa fa-pencil"></i> Editar</a>';
+          }
+          if (c.htmlConteudo) {
+            var html = c.htmlConteudo
+              .replace(/<style[\s\S]*?<\/style>/gi, '')
+              .replace(/<\/?(?:html|head|body|!DOCTYPE)[^>]*>/gi, '');
+            document.getElementById('div-view').innerHTML = html;
+          } else {
+            document.getElementById('div-view').innerHTML =
+              '<p class="text-muted" style="padding:40px 0;text-align:center">Nenhum conteúdo disponível. Gere uma prévia para visualizar.</p>';
+          }
+        })
+        .catch(function(err) {
+          window.AL.showAlert('Erro ao carregar contrato: ' + err.message, 'danger');
+        });
+    }
+  </script>
+</body>
+</html>

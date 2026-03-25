@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contratos — AgilLock</title>
+  <script>(function(){var t=localStorage.getItem('al-theme');if(t==='dark')document.documentElement.classList.add('dark-theme');})();</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="../css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/admin.css">
+  <style>
+    /* Efeito App: travar filtros e rolar apenas a tabela */
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
+    .filter-bar, .admin-topbar { flex-shrink: 0; }
+    .table-responsive { flex: 1; overflow-y: auto; border-radius: 8px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 0; }
+    html.dark-theme .table-responsive { background: #141820; }
+    .admin-table thead th { position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li class="active"><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Contratos</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <a href="contrato-form.html" class="btn btn-primary-al" id="btn-novo">
+          <i class="fa fa-plus"></i> Novo Contrato
+        </a>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-5">
+          <input type="text" class="form-control" id="busca" placeholder="Buscar cliente...">
+        </div>
+        <div class="col-sm-3">
+          <select class="form-control" id="filtro-status">
+            <option value="">Todos os status</option>
+            <option value="RASCUNHO">Rascunho</option>
+            <option value="AGUARDANDO_ASSINATURA">Aguardando Assinatura</option>
+            <option value="ASSINADO">Assinado</option>
+            <option value="CANCELADO">Cancelado</option>
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <select class="form-control" id="filtro-tipo">
+            <option value="">Todos os tipos</option>
+            <option value="PF_COM_ASSISTENCIA">PF c/ Assistência</option>
+            <option value="PF_SEM_ASSISTENCIA">PF s/ Assistência</option>
+            <option value="PJ_COM_ASSISTENCIA">PJ c/ Assistência</option>
+            <option value="PJ_SEM_ASSISTENCIA">PJ s/ Assistência</option>
+          </select>
+        </div>
+        <div class="col-sm-1">
+          <button class="btn btn-default btn-block" id="btn-filtrar"><i class="fa fa-search"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Criado em</th>
+            <th>Criado por</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-contratos">
+          <tr><td colspan="6" class="text-center text-muted" style="padding:24px">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal Cancelar Contrato -->
+  <div class="modal fade" id="modal-cancelar" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-times-circle text-danger"></i> Cancelar Contrato</h4>
+        </div>
+        <div class="modal-body">
+          <p>O contrato será marcado como <strong>Cancelado</strong> no sistema.</p>
+          <div class="alert alert-warning" style="margin-bottom:0">
+            <i class="fa fa-exclamation-triangle"></i>
+            <strong>Atenção:</strong> A API V3 do ClickSign não permite cancelamento automático de envelopes em andamento.
+            Após confirmar, acesse o <strong>painel do ClickSign</strong> e cancele o documento manualmente para evitar que o signatário ainda receba lembretes.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Voltar</button>
+          <button type="button" class="btn btn-danger" id="btn-confirmar-cancelar"><i class="fa fa-times"></i> Confirmar Cancelamento</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Email Signatários -->
+  <div class="modal fade" id="modal-links" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-whatsapp"></i> Reenviar via WhatsApp</h4>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">Clique em "Reenviar WhatsApp" para reenviar o link de assinatura via WhatsApp ao signatário.</p>
+          <table class="table">
+            <thead><tr><th>Signatário</th><th>Papel</th><th>Ação</th></tr></thead>
+            <tbody id="modal-tbody-signatarios"></tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    var _adminBase = '/AgillockSite/admin/contratos.html';
+    var AL_ROLE_REQUIRED = ['ADMIN'];
+
+    var TIPO_LABEL = {
+      PF_COM_ASSISTENCIA: 'PF c/ Assistência',
+      PF_SEM_ASSISTENCIA: 'PF s/ Assistência',
+      PJ_COM_ASSISTENCIA: 'PJ c/ Assistência',
+      PJ_SEM_ASSISTENCIA: 'PJ s/ Assistência',
+    };
+
+    var STATUS_BADGE = {
+      RASCUNHO: '<span class="al-badge badge-default">Rascunho</span>',
+      AGUARDANDO_ASSINATURA: '<span class="al-badge badge-pendente">Aguardando Assinatura</span>',
+      ASSINADO: '<span class="al-badge badge-ativo">Assinado</span>',
+      CANCELADO: '<span class="al-badge badge-cancelado">Cancelado</span>',
+    };
+
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    var userPerms = {};
+
+    window.AL.onReady(function(user) {
+      if (!user) return;
+      userPerms = user;
+      
+      // Exibe usuário
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = user.role;
+      ub.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+      if (!user.podeCriarContrato && user.role !== 'ADMIN') {
+        document.getElementById('btn-novo').style.display = 'none';
+      }
+      carregarContratos();
+      window.AL.initThemeToggle('btn-tema');
+      document.getElementById('btn-logout').onclick = window.AL.logout;
+      document.getElementById('sidebar-toggle').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-filtrar').onclick = carregarContratos;
+      document.getElementById('busca').addEventListener('keypress', function(e) { if (e.which === 13) carregarContratos(); });
+    });
+
+
+    function carregarContratos() {
+      var params = new URLSearchParams();
+      var busca = document.getElementById('busca').value.trim();
+      var status = document.getElementById('filtro-status').value;
+      var tipo = document.getElementById('filtro-tipo').value;
+      if (busca) params.set('busca', busca);
+      if (status) params.set('status', status);
+      if (tipo) params.set('tipo', tipo);
+      window.AL.apiGet('/api/contratos?' + params.toString())
+        .then(function(contratos) {
+          renderTabela(contratos);
+        })
+        .catch(function(err) {
+          document.getElementById('tbody-contratos').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Erro ao carregar contratos.</td></tr>';
+        });
+    }
+
+    function renderTabela(contratos) {
+      var tbody = document.getElementById('tbody-contratos');
+      if (!contratos.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:24px">Nenhum contrato encontrado.</td></tr>';
+        return;
+      }
+      var html = '';
+      contratos.forEach(function(c) {
+        var isAdmin = userPerms.role === 'ADMIN';
+        var acoes = '<a href="contrato-view.html?id=' + c.id + '" class="btn btn-xs btn-info" title="Visualizar"><i class="fa fa-eye"></i></a> ';
+        if (c.status === 'RASCUNHO' && (isAdmin || userPerms.podeEditarContrato)) {
+          acoes += '<a href="contrato-form.html?id=' + c.id + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a> ';
+        }
+        if (c.status === 'RASCUNHO' && (isAdmin || userPerms.podeExcluirContrato)) {
+          acoes += '<button class="btn btn-xs btn-danger btn-excluir" data-id="' + c.id + '" title="Excluir"><i class="fa fa-trash"></i></button> ';
+        }
+        if (c.status === 'AGUARDANDO_ASSINATURA') {
+          acoes += '<button class="btn btn-xs btn-success btn-links" data-id="' + c.id + '" title="Reenviar WhatsApp"><i class="fa fa-whatsapp"></i></button> ';
+        }
+        if (c.status === 'AGUARDANDO_ASSINATURA' && (isAdmin || userPerms.podeEditarContrato)) {
+          acoes += '<button class="btn btn-xs btn-warning btn-cancelar" data-id="' + c.id + '" title="Cancelar"><i class="fa fa-times"></i></button>';
+        }
+        html += '<tr><td>' + escHtml(c.cliente.nome) + '</td>'
+             + '<td>' + (TIPO_LABEL[c.tipo] || c.tipo) + '</td>'
+             + '<td>' + (STATUS_BADGE[c.status] || c.status) + '</td>'
+             + '<td>' + window.AL.fmtDate(c.createdAt) + '</td>'
+             + '<td>' + escHtml(c.criadoPor.nome) + '</td>'
+             + '<td>' + acoes + '</td></tr>';
+      });
+      tbody.innerHTML = html;
+
+      var PAPEL_LABEL = { cliente: 'Cliente', socio: 'Sócio', fiador: 'Fiador', testemunha: 'Testemunha', agillock: 'AgilLock' };
+      tbody.querySelectorAll('.btn-links').forEach(function(btn) {
+        btn.onclick = function() {
+          var contratoId = btn.dataset.id;
+          window.AL.apiGet('/api/contratos/' + contratoId)
+            .then(function(c) {
+              var signatarios = c.signatarios || [];
+              if (!signatarios.length) {
+                window.AL.showAlert('Nenhum signatário encontrado.', 'warning');
+                return;
+              }
+              var html = '';
+              signatarios.forEach(function(s) {
+                html += '<tr>'
+                  + '<td>' + escHtml(s.nome) + '<br><small class="text-muted">' + escHtml(s.email || '') + '</small></td>'
+                  + '<td>' + (PAPEL_LABEL[s.tipo] || s.tipo) + '</td>'
+                  + '<td><button class="btn btn-xs btn-success" onclick="enviarEmailSignatario(\'' + escHtml(contratoId) + '\',\'' + escHtml(s.signerId) + '\',this)"><i class="fa fa-whatsapp"></i> Reenviar WhatsApp</button></td>'
+                  + '</tr>';
+              });
+              document.getElementById('modal-tbody-signatarios').innerHTML = html;
+              $('#modal-links').modal('show');
+            })
+            .catch(function(err) {
+              window.AL.showAlert('Erro ao buscar links: ' + err.message, 'danger');
+            });
+        };
+      });
+
+      tbody.querySelectorAll('.btn-excluir').forEach(function(btn) {
+        btn.onclick = function() {
+          var id = btn.dataset.id;
+          if (!confirm('Excluir este rascunho?')) return;
+          window.AL.apiDelete('/api/contratos/' + id)
+            .then(function() {
+              window.AL.showAlert('Contrato excluído.', 'success');
+              carregarContratos();
+            })
+            .catch(function(err) { 
+              window.AL.showAlert(err.message, 'danger'); 
+            });
+        };
+      });
+      var _cancelarId = null;
+      tbody.querySelectorAll('.btn-cancelar').forEach(function(btn) {
+        btn.onclick = function() {
+          _cancelarId = btn.dataset.id;
+          $('#modal-cancelar').modal('show');
+        };
+      });
+      document.getElementById('btn-confirmar-cancelar').onclick = function() {
+        if (!_cancelarId) return;
+        var id = _cancelarId;
+        $('#modal-cancelar').modal('hide');
+        window.AL.apiPost('/api/contratos/' + id + '/cancelar', {})
+          .then(function(data) {
+            window.AL.showAlert(data.aviso || 'Contrato cancelado no sistema.', data.aviso ? 'warning' : 'success');
+            carregarContratos();
+          })
+          .catch(function(err) { window.AL.showAlert(err.message, 'danger'); });
+      };
+    }
+    function enviarEmailSignatario(contratoId, signerId, btnEl) {
+      var oldHtml = btnEl.innerHTML;
+      btnEl.disabled = true;
+      btnEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+      window.AL.apiPost('/api/contratos/' + contratoId + '/notificar/' + signerId, {})
+        .then(function() {
+          window.AL.showAlert('WhatsApp reenviado com sucesso!', 'success');
+          btnEl.innerHTML = '<i class="fa fa-check"></i> Enviado';
+        })
+        .catch(function(err) {
+          window.AL.showAlert('Erro ao reenviar: ' + err.message, 'danger');
+          btnEl.disabled = false;
+          btnEl.innerHTML = oldHtml;
+        });
+    }
+  </script>
+</body>
+</html>
