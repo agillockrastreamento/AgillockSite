@@ -34,7 +34,9 @@ function buildEfiCustomer(cliente: {
     : (cliente.cpfCnpj ? cliente.cpfCnpj.replace(/\D/g, '') : undefined);
 
   const customer: efiService.EfiCustomer = { name };
-  if (cpf) customer.cpf = cpf;
+  // A EFI aceita no mÃ¡ximo 11 dÃ­gitos no campo 'cpf'. Se for CNPJ (14), nÃ£o deve ir aqui.
+  if (cpf && cpf.length <= 11) customer.cpf = cpf;
+  
   if (cliente.telefone) customer.phone_number = cliente.telefone.replace(/\D/g, '');
   if (cliente.email) customer.email = cliente.email;
   if (isPJ && cliente.cpfCnpj) {
