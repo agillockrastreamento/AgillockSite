@@ -485,7 +485,7 @@ function parseExpireAt(expireAt: string | null | undefined): Date {
  */
 function parsePlacaFromNome(nome: string): { placa: string; descricao: string | null } {
   let resto = nome.trim();
-  if (resto.startsWith('Rastreamento ')) {
+  if (resto.startsWith('Placa ')) {
     resto = resto.slice(13).trim();
   }
   const dashIdx = resto.indexOf(' - ');

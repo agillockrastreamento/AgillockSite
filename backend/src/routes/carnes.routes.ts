@@ -122,8 +122,8 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
       return;
     }
     const base = dispositivo.placa
-      ? `Rastreamento ${dispositivo.placa}`
-      : `Rastreamento ${dispositivo.identificador}`;
+      ? `Placa ${dispositivo.placa}`
+      : `Placa ${dispositivo.identificador}`;
     itemNome = (descricaoBoleto ? `${base} - ${descricaoBoleto}` : base).slice(0, 255);
     itemVendedorId = dispositivo.vendedorId;
     boletoExtra = { dispositivoId };
@@ -407,7 +407,7 @@ router.post('/unificar', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthR
           placaId: boleto.placa.id,
           nome: boleto.placa.descricao
             ? `${boleto.placa.placa} - ${boleto.placa.descricao}`
-            : `Rastreamento ${boleto.placa.placa}`,
+            : `Placa ${boleto.placa.placa}`,
           valor: Number(boleto.valor),
         });
       }
