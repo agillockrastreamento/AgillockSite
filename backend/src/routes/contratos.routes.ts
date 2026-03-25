@@ -177,7 +177,7 @@ router.post('/:id/enviar', async (req: AuthRequest, res: Response): Promise<void
 
   // ClickSign flow
   let envelopeId: string = '', documentId: string = '';
-  const signatariosResult: Array<{ nome: string; signerId: string; link: string; tipo: string }> = [];
+  const signatariosResult: Array<{ nome: string; email: string; signerId: string; link: string; tipo: string }> = [];
   try {
     ({ envelopeId } = await clicksign.criarEnvelope(`Contrato ${contratoBase.tipo} - ${cliente.nome}`));
     ({ documentId } = await clicksign.uploadDocumento(envelopeId, pdfBuffer, 'contrato.pdf'));

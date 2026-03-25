@@ -380,7 +380,7 @@ router.delete('/:id/clientes/:clienteId', requireRoles('ADMIN', 'COLABORADOR'), 
     return;
   }
   const dispositivoId = param(req, 'id');
-  const clienteId = req.params.clienteId;
+  const clienteId = param(req, 'clienteId');
 
   await prisma.dispositivoCliente.deleteMany({
     where: { dispositivoId, clienteId },

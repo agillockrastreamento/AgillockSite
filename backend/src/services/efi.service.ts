@@ -47,6 +47,10 @@ export interface EfiCustomer {
   phone_number?: string;
   email?: string;
   address?: EfiCustomerAddress;
+  juridical_person?: {
+    corporate_name: string;
+    cnpj: string;
+  };
 }
 
 export interface EfiItem {

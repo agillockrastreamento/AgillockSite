@@ -23,7 +23,7 @@ function buildEfiCustomer(cliente: {
   cidade?: string | null;
   estado?: string | null;
   complemento?: string | null;
-}) {
+}): efiService.EfiCustomer {
   const isPJ = cliente.tipoPessoa === 'PJ';
   const socios: any[] = Array.isArray(cliente.socios) ? cliente.socios : [];
   const primeiroSocio = socios[0] || null;
@@ -33,7 +33,7 @@ function buildEfiCustomer(cliente: {
     ? (primeiroSocio?.cpf ? primeiroSocio.cpf.replace(/\D/g, '') : undefined)
     : (cliente.cpfCnpj ? cliente.cpfCnpj.replace(/\D/g, '') : undefined);
 
-  const customer: Record<string, any> = { name };
+  const customer: efiService.EfiCustomer = { name };
   if (cpf) customer.cpf = cpf;
   if (cliente.telefone) customer.phone_number = cliente.telefone.replace(/\D/g, '');
   if (cliente.email) customer.email = cliente.email;
