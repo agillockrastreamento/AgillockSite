@@ -482,12 +482,21 @@ html.dark-theme .filter-bar { background: #1e2530; }
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
     padding: 10px 12px;
     border: 1px solid #eee;
     border-radius: 6px;
     margin-bottom: 8px;
     transition: background 0.15s;
 }
+
+/* Toggle de vínculo no placa-item */
+.vinc-toggle { width:42px; height:24px; border-radius:12px; background:#ccc; position:relative; transition:background .2s; flex-shrink:0; cursor:pointer; }
+.vinc-toggle.on { background:#fab32c; }
+.vinc-toggle .vinc-toggle-knob { position:absolute; width:20px; height:20px; border-radius:50%; background:#fff; top:2px; left:2px; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+.vinc-toggle.on .vinc-toggle-knob { transform:translateX(18px); }
+html.dark-theme .vinc-toggle { background:#3a4050; }
+html.dark-theme .vinc-toggle.on { background:#fab32c; }
 .placa-item:hover { background: #fafbfc; }
 .placa-item .placa-info strong { font-size: 14px; }
 .placa-item .placa-info small  { display: block; color: #888; }

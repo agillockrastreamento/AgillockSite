@@ -401,6 +401,50 @@ Melhorias incrementais aplicadas após a conclusão das etapas principais.
 
 ---
 
+---
+
+## Ajustes Pós-Etapa 9 ✅ CONCLUÍDOS (2026-03-26)
+
+### Ajuste 6 — Contratos: sócios e fiadores condicionais no PDF
+- [x] Template service (`contrato-template.service.ts`) processa blocos `{{#IF_SOCIO_N}}...{{/IF_SOCIO_N}}` e `{{#IF_FIADOR_N}}...{{/IF_FIADOR_N}}` **antes** da substituição de variáveis — evita variáveis vazias no PDF quando há menos sócios/fiadores que o máximo
+- [x] Templates `pj-com-assistencia.html` e `pj-sem-assistencia.html` atualizados com blocos condicionais em parágrafos de identificação e blocos de assinatura para sócios 2–5 e fiadores 1–5
+- [x] `SOCIOS_LABEL` dinâmico: "seu sócio" (1 sócio) ou "seus sócios" (N sócios)
+- [x] Suporte escalado de 2 para **5 sócios** e de 3 para **5 fiadores**
+- [x] Seletor de sócios em `admin/cliente-form.html` e `colaborador/cliente-form.html` limitado ao máximo de 5
+- [x] Seletor de fiadores em `admin/contrato-form.html` e `colaborador/contrato-form.html` escalado para 0–5
+
+### Ajuste 7 — Contratos: campo telefone nos sócios
+- [x] Campo **Telefone** adicionado ao card de cada sócio em `admin/cliente-form.html` e `colaborador/cliente-form.html` (mesma linha de RG + CPF, 3 colunas `col-sm-4`)
+- [x] `getSociosPayload()` agora inclui `telefone`
+- [x] Máscara de telefone aplicada via `AL.maskPhone()` em cada sócio
+- [x] **Motivação**: cada sócio é um signatário individual no ClickSign com notificação WhatsApp própria — sem telefone, todos compartilhariam o número da empresa
+
+### Ajuste 8 — Contratos: auto-fill de fiadores a partir dos sócios
+- [x] Em `admin/contrato-form.html` e `colaborador/contrato-form.html`: ao selecionar cliente PJ com sócios, os campos de fiadores são pré-preenchidos automaticamente com os dados dos sócios (nome, CPF, RG, profissão, estado civil, nascimento, e-mail, telefone, endereço)
+- [x] Parâmetro `skipAutoFill` em `selecionarCliente(cliente, skipAutoFill)` — passado como `true` ao carregar contrato existente para não sobrescrever os fiadores já salvos
+- [x] Toast informativo exibido após o auto-fill
+
+### Ajuste 9 — Toggle switch nos dispositivos (gerar-cobrança)
+- [x] `admin/gerar-cobranca.html` e `colaborador/gerar-cobranca.html`: radio buttons na lista de dispositivos substituídos por **toggle switches** (`.disp-card` + `.disp-toggle` + `.disp-toggle-knob`)
+- [x] Toggle posicionado à **esquerda** do nome do dispositivo
+- [x] Comportamento: clicar ativa o dispositivo; clicar novamente no mesmo desativa (deselect) — habilita/desabilita o botão "Próximo" conforme seleção
+- [x] Estilo adaptado ao tema escuro
+
+### Ajuste 10 — Toggle switch de vínculo nos dispositivos (cliente-detalhe)
+- [x] `admin/cliente-detalhe.html` e `colaborador/cliente-detalhe.html` — aba Dispositivos: adicionado **toggle switch** (`.vinc-toggle`) à esquerda de cada item
+- [x] ON (âmbar) = vinculado; OFF (cinza) = desvinculado
+- [x] Clicar no toggle OFF → vincula via `POST /api/dispositivos/:id/clientes` imediatamente
+- [x] Clicar no toggle ON → abre modal de confirmação antes de desvincular via `DELETE /api/dispositivos/:id/clientes/:clienteId`
+- [x] No colaborador: desvincular via toggle respeita a permissão `canDesvincularDispositivo`
+- [x] CSS `.vinc-toggle` e `.vinc-toggle.on` adicionados em `css/admin.css` (dark theme incluído)
+- [x] Badges e botões existentes mantidos intactos
+
+### Ajuste 11 — Permissões de contratos em colaboradores
+- [x] `admin/colaboradores.html`: badges de permissão na tabela agora incluem `podeCriarContrato`, `podeEditarContrato`, `podeExcluirContrato`
+- [x] Modal de novo/editar colaborador: permissões organizadas com **cabeçalhos por grupo** (`Clientes`, `Placas`, `Dispositivos`, `Cobranças`, `Contratos`) via classe `.perm-group-label` — cor `#555` no tema claro, `#adb5bd` no tema escuro
+
+---
+
 ## Resumo Visual
 
 ```
@@ -413,5 +457,6 @@ Etapa 6  → Painel Admin (frontend)
 Etapa 7  → Painel Colaborador (frontend)
 Etapa 8  → Painel Vendedor/Carteira (frontend)
 Etapa 9  → Deploy em Produção
-Ajustes  → E-mail opcional, endereço obrigatório/no boleto, data correta, pagamento comissão
+Ajustes 1–5  → E-mail opcional, endereço obrigatório/no boleto, data correta, pagamento comissão
+Ajustes 6–11 → Contratos condicionais PDF, telefone nos sócios, auto-fill fiadores, toggle switches, permissões por grupo
 ```

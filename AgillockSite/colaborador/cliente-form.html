@@ -283,11 +283,6 @@
                 <option value="3">3 sócios</option>
                 <option value="4">4 sócios</option>
                 <option value="5">5 sócios</option>
-                <option value="6">6 sócios</option>
-                <option value="7">7 sócios</option>
-                <option value="8">8 sócios</option>
-                <option value="9">9 sócios</option>
-                <option value="10">10 sócios</option>
               </select>
             </div>
           </div>
@@ -426,6 +421,7 @@
           '<div class="row">' +
             '<div class="col-sm-4"><div class="form-group"><label>RG *</label><input type="text" class="form-control" id="s' + i + '-rg" value="' + esc(s.rg||'') + '" maxlength="20" /></div></div>' +
             '<div class="col-sm-4"><div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="s' + i + '-cpf" value="' + esc(s.cpf||'') + '" maxlength="14" /></div></div>' +
+            '<div class="col-sm-4"><div class="form-group"><label>Telefone</label><input type="text" class="form-control" id="s' + i + '-telefone" value="' + esc(s.telefone||'') + '" maxlength="15" placeholder="(85) 99999-9999" /></div></div>' +
           '</div>' +
           '<div class="secao-titulo" style="margin-top:10px;">Endereço do Sócio ' + (i+1) + '</div>' +
           '<div class="row">' +
@@ -445,6 +441,7 @@
         (function(idx) {
           setupViaCep('s'+idx+'-cep', 's'+idx+'-logradouro', 's'+idx+'-bairro', 's'+idx+'-cidade', 's'+idx+'-estado');
           AL.maskCpfCnpj(document.getElementById('s'+idx+'-cpf'));
+          AL.maskPhone(document.getElementById('s'+idx+'-telefone'));
         })(i);
       }
     }
@@ -520,6 +517,7 @@
           profissao:      (document.getElementById('s'+i+'-profissao')      || {}).value || '',
           dataNascimento: (document.getElementById('s'+i+'-data-nascimento')|| {}).value || '',
           email:          (document.getElementById('s'+i+'-email')          || {}).value || '',
+          telefone:       (document.getElementById('s'+i+'-telefone')       || {}).value || '',
           rg:             (document.getElementById('s'+i+'-rg')             || {}).value || '',
           cpf:            (document.getElementById('s'+i+'-cpf')            || {}).value.replace(/\D/g,'') || '',
           cep:            (document.getElementById('s'+i+'-cep')            || {}).value.replace(/\D/g,'') || '',

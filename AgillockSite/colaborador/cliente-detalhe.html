@@ -641,7 +641,9 @@
           var btnVinc = d.vinculado
             ? (canDesvincularDispositivo ? '<button class="btn btn-xs btn-warning btn-desv-disp" data-did="' + d.id + '" title="Desvincular"><i class="fa fa-chain-broken"></i> Desvincular</button>' : '')
             : '<button class="btn btn-xs btn-success btn-vinc-disp" data-did="' + d.id + '" title="Vincular"><i class="fa fa-link"></i> Vincular</button>';
-          return '<div class="placa-item"><div>' +
+          return '<div class="placa-item">' +
+            '<div class="vinc-toggle' + (d.vinculado ? ' on' : '') + '" data-did="' + d.id + '"><div class="vinc-toggle-knob"></div></div>' +
+            '<div style="flex:1;">' +
             '<strong>' + esc(d.identificador) + '</strong>' +
             (d.cliente ? '<small class="text-muted" style="margin-left:8px;">Resp.: ' + esc(d.cliente.nome) + '</small>' : '') +
             '<br><small class="text-muted">' + esc(d.nome) + (d.placa ? ' &mdash; Placa: <strong>' + esc(d.placa) + '</strong>' : '') + '</small>' +
@@ -703,6 +705,30 @@
       function bindDispositivosBtns() {
         var listDiv = document.getElementById('disp-lista');
         if (!listDiv) return;
+
+        listDiv.querySelectorAll('.vinc-toggle').forEach(function (sw) {
+          sw.addEventListener('click', function () {
+            var did = this.dataset.did;
+            if (this.classList.contains('on')) {
+              if (!canDesvincularDispositivo) return;
+              AL.confirmar({
+                titulo: 'Desvincular Dispositivo',
+                mensagem: 'Deseja desvincular este dispositivo deste cliente?',
+                consequencias: 'O dispositivo ficará sem vínculo com este cliente mas não será excluído.',
+                btnTexto: '<i class="fa fa-chain-broken"></i> Desvincular',
+              }).then(function (ok) {
+                if (!ok) return;
+                AL.apiDelete('/api/dispositivos/' + did + '/clientes/' + clienteId)
+                  .then(function () { renderDispositivos(); })
+                  .catch(function (err) { AL.showAlert(err.message); });
+              });
+            } else {
+              AL.apiPost('/api/dispositivos/' + did + '/clientes', { clienteId: clienteId })
+                .then(function () { renderDispositivos(); })
+                .catch(function (err) { AL.showAlert(err.message); });
+            }
+          });
+        });
 
         listDiv.querySelectorAll('.btn-toggle-disp').forEach(function (btn) {
           btn.addEventListener('click', function () {

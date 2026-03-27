@@ -146,33 +146,60 @@
       inscrita no CNPJ sob nº <strong>{{CNPJ}}</strong>,
       com sede em {{ENDERECO_PJ}},
       telefone: {{TELEFONE_PJ}}, constituído e arquivado JUCEC sob o NIRC {{NIRC}},
-      representada por seus sócios da sociedade limitada, <strong>{{SOCIO_1_NOME}}</strong>, {{SOCIO_1_NACIONALIDADE}},
+      representada por {{SOCIOS_LABEL}} da sociedade limitada, <strong>{{SOCIO_1_NOME}}</strong>, {{SOCIO_1_NACIONALIDADE}},
       {{SOCIO_1_ESTADO_CIVIL}}, {{SOCIO_1_PROFISSAO}},
       nascido(a) em {{SOCIO_1_DATA_NASCIMENTO}},
       portador(a) do RG nº {{SOCIO_1_RG}},
-      inscrito(a) no CPF sob o nº <strong>{{SOCIO_1_CPF}}</strong>; residente e domiciliado na {{SOCIO_1_ENDERECO}}, n° {{SOCIO_1_NUMERO}}, complemento {{SOCIO_1_COMPLEMENTO}}, bairro {{SOCIO_1_BAIRRO}}, CEP: {{SOCIO_1_CEP}}, {{SOCIO_1_CIDADE}}/{{SOCIO_1_ESTADO}} e <strong>{{SOCIO_2_NOME}}</strong>, {{SOCIO_2_NACIONALIDADE}},
+      inscrito(a) no CPF sob o nº <strong>{{SOCIO_1_CPF}}</strong>; residente e domiciliado na {{SOCIO_1_ENDERECO}}, n° {{SOCIO_1_NUMERO}}, complemento {{SOCIO_1_COMPLEMENTO}}, bairro {{SOCIO_1_BAIRRO}}, CEP: {{SOCIO_1_CEP}}, {{SOCIO_1_CIDADE}}/{{SOCIO_1_ESTADO}}{{#IF_SOCIO_2}}; <strong>{{SOCIO_2_NOME}}</strong>, {{SOCIO_2_NACIONALIDADE}},
       {{SOCIO_2_ESTADO_CIVIL}}, {{SOCIO_2_PROFISSAO}},
       nascido(a) em {{SOCIO_2_DATA_NASCIMENTO}},
       portador(a) do RG nº {{SOCIO_2_RG}},
-      inscrito(a) no CPF sob o nº <strong>{{SOCIO_2_CPF}}</strong>, residente e domiciliado na {{SOCIO_2_ENDERECO}}, n° {{SOCIO_2_NUMERO}}, complemento {{SOCIO_2_COMPLEMENTO}}, bairro {{SOCIO_2_BAIRRO}}, CEP: {{SOCIO_2_CEP}}, {{SOCIO_2_CIDADE}}/{{SOCIO_2_ESTADO}};
+      inscrito(a) no CPF sob o nº <strong>{{SOCIO_2_CPF}}</strong>, residente e domiciliado na {{SOCIO_2_ENDERECO}}, n° {{SOCIO_2_NUMERO}}, complemento {{SOCIO_2_COMPLEMENTO}}, bairro {{SOCIO_2_BAIRRO}}, CEP: {{SOCIO_2_CEP}}, {{SOCIO_2_CIDADE}}/{{SOCIO_2_ESTADO}}{{/IF_SOCIO_2}}{{#IF_SOCIO_3}}; <strong>{{SOCIO_3_NOME}}</strong>, {{SOCIO_3_NACIONALIDADE}},
+      {{SOCIO_3_ESTADO_CIVIL}}, {{SOCIO_3_PROFISSAO}},
+      nascido(a) em {{SOCIO_3_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{SOCIO_3_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{SOCIO_3_CPF}}</strong>, residente e domiciliado na {{SOCIO_3_ENDERECO}}, n° {{SOCIO_3_NUMERO}}, complemento {{SOCIO_3_COMPLEMENTO}}, bairro {{SOCIO_3_BAIRRO}}, CEP: {{SOCIO_3_CEP}}, {{SOCIO_3_CIDADE}}/{{SOCIO_3_ESTADO}}{{/IF_SOCIO_3}}{{#IF_SOCIO_4}}; <strong>{{SOCIO_4_NOME}}</strong>, {{SOCIO_4_NACIONALIDADE}},
+      {{SOCIO_4_ESTADO_CIVIL}}, {{SOCIO_4_PROFISSAO}},
+      nascido(a) em {{SOCIO_4_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{SOCIO_4_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{SOCIO_4_CPF}}</strong>, residente e domiciliado na {{SOCIO_4_ENDERECO}}, n° {{SOCIO_4_NUMERO}}, complemento {{SOCIO_4_COMPLEMENTO}}, bairro {{SOCIO_4_BAIRRO}}, CEP: {{SOCIO_4_CEP}}, {{SOCIO_4_CIDADE}}/{{SOCIO_4_ESTADO}}{{/IF_SOCIO_4}}{{#IF_SOCIO_5}}; <strong>{{SOCIO_5_NOME}}</strong>, {{SOCIO_5_NACIONALIDADE}},
+      {{SOCIO_5_ESTADO_CIVIL}}, {{SOCIO_5_PROFISSAO}},
+      nascido(a) em {{SOCIO_5_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{SOCIO_5_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{SOCIO_5_CPF}}</strong>, residente e domiciliado na {{SOCIO_5_ENDERECO}}, n° {{SOCIO_5_NUMERO}}, complemento {{SOCIO_5_COMPLEMENTO}}, bairro {{SOCIO_5_BAIRRO}}, CEP: {{SOCIO_5_CEP}}, {{SOCIO_5_CIDADE}}/{{SOCIO_5_ESTADO}}{{/IF_SOCIO_5}};
     </p>
   </div>
 
-  <div class="parte">
+{{#IF_FIADORES}}  <div class="parte">
     <p>
       <strong>FIADORES:</strong>
       <strong>{{FIADOR_1_NOME}}</strong>, {{FIADOR_1_NACIONALIDADE}}, {{FIADOR_1_ESTADO_CIVIL}},
       {{FIADOR_1_PROFISSAO}}, nascido(a) em {{FIADOR_1_DATA_NASCIMENTO}},
       portador(a) do RG nº {{FIADOR_1_RG}},
       inscrito(a) no CPF sob o nº <strong>{{FIADOR_1_CPF}}</strong>,
-      residente e domiciliado(a) em {{FIADOR_1_ENDERECO}}
+      residente e domiciliado(a) em {{FIADOR_1_ENDERECO}}{{#IF_FIADOR_2}}
       e <strong>{{FIADOR_2_NOME}}</strong>, {{FIADOR_2_NACIONALIDADE}}, {{FIADOR_2_ESTADO_CIVIL}},
       {{FIADOR_2_PROFISSAO}}, nascido(a) em {{FIADOR_2_DATA_NASCIMENTO}},
       portador(a) do RG nº {{FIADOR_2_RG}},
       inscrito(a) no CPF sob o nº <strong>{{FIADOR_2_CPF}}</strong>,
-      residente e domiciliado(a) em {{FIADOR_2_ENDERECO}};
+      residente e domiciliado(a) em {{FIADOR_2_ENDERECO}}{{/IF_FIADOR_2}}{{#IF_FIADOR_3}}
+      e <strong>{{FIADOR_3_NOME}}</strong>, {{FIADOR_3_NACIONALIDADE}}, {{FIADOR_3_ESTADO_CIVIL}},
+      {{FIADOR_3_PROFISSAO}}, nascido(a) em {{FIADOR_3_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{FIADOR_3_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{FIADOR_3_CPF}}</strong>,
+      residente e domiciliado(a) em {{FIADOR_3_ENDERECO}}{{/IF_FIADOR_3}}{{#IF_FIADOR_4}}
+      e <strong>{{FIADOR_4_NOME}}</strong>, {{FIADOR_4_NACIONALIDADE}}, {{FIADOR_4_ESTADO_CIVIL}},
+      {{FIADOR_4_PROFISSAO}}, nascido(a) em {{FIADOR_4_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{FIADOR_4_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{FIADOR_4_CPF}}</strong>,
+      residente e domiciliado(a) em {{FIADOR_4_ENDERECO}}{{/IF_FIADOR_4}}{{#IF_FIADOR_5}}
+      e <strong>{{FIADOR_5_NOME}}</strong>, {{FIADOR_5_NACIONALIDADE}}, {{FIADOR_5_ESTADO_CIVIL}},
+      {{FIADOR_5_PROFISSAO}}, nascido(a) em {{FIADOR_5_DATA_NASCIMENTO}},
+      portador(a) do RG nº {{FIADOR_5_RG}},
+      inscrito(a) no CPF sob o nº <strong>{{FIADOR_5_CPF}}</strong>,
+      residente e domiciliado(a) em {{FIADOR_5_ENDERECO}}{{/IF_FIADOR_5}};
     </p>
-  </div>
+  </div>{{/IF_FIADORES}}
 
   <p>As partes acima identificadas têm, entre si, justas e acertadas o presente Contrato que se regerá pelas cláusulas seguintes e pelas condições descritas no presente.</p>
 
@@ -287,16 +314,37 @@
           CPF: {{SOCIO_1_CPF}}
         </div>
       </div>
-      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+      {{#IF_SOCIO_2}}<div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
         <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
           <strong>CONTRATANTE — Sócio 2:</strong> {{SOCIO_2_NOME}}<br>
           CPF: {{SOCIO_2_CPF}}
         </div>
-      </div>
+      </div>{{/IF_SOCIO_2}}{{#IF_SOCIO_3}}
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+        <div class="assinatura-label">
+          <strong>CONTRATANTE — Sócio 3:</strong> {{SOCIO_3_NOME}}<br>
+          CPF: {{SOCIO_3_CPF}}
+        </div>
+      </div>{{/IF_SOCIO_3}}{{#IF_SOCIO_4}}
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+        <div class="assinatura-label">
+          <strong>CONTRATANTE — Sócio 4:</strong> {{SOCIO_4_NOME}}<br>
+          CPF: {{SOCIO_4_CPF}}
+        </div>
+      </div>{{/IF_SOCIO_4}}{{#IF_SOCIO_5}}
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+        <div class="assinatura-label">
+          <strong>CONTRATANTE — Sócio 5:</strong> {{SOCIO_5_NOME}}<br>
+          CPF: {{SOCIO_5_CPF}}
+        </div>
+      </div>{{/IF_SOCIO_5}}
     </div>
 
-    <div class="assinaturas-row" style="display:flex; gap:40px; flex-wrap:wrap;">
+{{#IF_FIADORES}}    <div class="assinaturas-row" style="display:flex; gap:40px; flex-wrap:wrap;">
       <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
         <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
@@ -304,14 +352,35 @@
           CPF: {{FIADOR_1_CPF}}
         </div>
       </div>
-      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+      {{#IF_FIADOR_2}}<div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
         <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
         <div class="assinatura-label">
           <strong>Fiador 2:</strong> {{FIADOR_2_NOME}}<br>
           CPF: {{FIADOR_2_CPF}}
         </div>
-      </div>
-    </div>
+      </div>{{/IF_FIADOR_2}}{{#IF_FIADOR_3}}
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+        <div class="assinatura-label">
+          <strong>Fiador 3:</strong> {{FIADOR_3_NOME}}<br>
+          CPF: {{FIADOR_3_CPF}}
+        </div>
+      </div>{{/IF_FIADOR_3}}{{#IF_FIADOR_4}}
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+        <div class="assinatura-label">
+          <strong>Fiador 4:</strong> {{FIADOR_4_NOME}}<br>
+          CPF: {{FIADOR_4_CPF}}
+        </div>
+      </div>{{/IF_FIADOR_4}}{{#IF_FIADOR_5}}
+      <div class="assinatura-bloco" style="flex:1; min-width:220px; margin-bottom:28px;">
+        <div class="assinatura-linha" style="display:block; border-top:1.5px solid #000; margin-top:50px; width:90%; min-width:200px; padding-top:4px; margin-bottom:3px;"></div>
+        <div class="assinatura-label">
+          <strong>Fiador 5:</strong> {{FIADOR_5_NOME}}<br>
+          CPF: {{FIADOR_5_CPF}}
+        </div>
+      </div>{{/IF_FIADOR_5}}
+    </div>{{/IF_FIADORES}}
 
     <p style="margin-top:240px;font-weight:bold;">TESTEMUNHAS:</p>
     <div class="testemunhas-row" style="display:flex; justify-content:space-between; gap:40px; margin-top:20px;">

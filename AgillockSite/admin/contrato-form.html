@@ -120,6 +120,8 @@
               <option value="1">1 fiador</option>
               <option value="2">2 fiadores</option>
               <option value="3">3 fiadores</option>
+              <option value="4">4 fiadores</option>
+              <option value="5">5 fiadores</option>
             </select>
           </div>
           <div id="fiadores-container"></div>
@@ -139,8 +141,8 @@
           <div class="panel-heading"><strong>Testemunha 1</strong></div>
           <div class="panel-body">
             <div class="row">
-              <div class="col-sm-6"><div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="t1-nome"></div></div>
-              <div class="col-sm-6"><div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="t1-cpf" maxlength="14"></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>Nome</label><input type="text" class="form-control" id="t1-nome"></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>CPF</label><input type="text" class="form-control" id="t1-cpf" maxlength="14"></div></div>
             </div>
           </div>
         </div>
@@ -149,8 +151,8 @@
           <div class="panel-heading"><strong>Testemunha 2</strong></div>
           <div class="panel-body">
             <div class="row">
-              <div class="col-sm-6"><div class="form-group"><label>Nome *</label><input type="text" class="form-control" id="t2-nome"></div></div>
-              <div class="col-sm-6"><div class="form-group"><label>CPF *</label><input type="text" class="form-control" id="t2-cpf" maxlength="14"></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>Nome</label><input type="text" class="form-control" id="t2-nome"></div></div>
+              <div class="col-sm-6"><div class="form-group"><label>CPF</label><input type="text" class="form-control" id="t2-cpf" maxlength="14"></div></div>
             </div>
           </div>
         </div>
@@ -368,7 +370,7 @@
         });
     }
 
-    function selecionarCliente(cliente) {
+    function selecionarCliente(cliente, skipAutoFill) {
       state.clienteId = cliente.id;
       state.clienteObj = cliente;
       document.getElementById('lista-clientes').style.display = 'none';
@@ -384,6 +386,31 @@
           card.classList.remove('selected'); state.tipo = null;
         }
       });
+      // Auto-preencher fiadores com dados dos sócios (apenas na seleção inicial, não ao carregar contrato salvo)
+      if (isPJ && !skipAutoFill && cliente.socios && cliente.socios.length > 0) {
+        var socios = cliente.socios;
+        document.getElementById('num-fiadores').value = String(socios.length);
+        renderFiadores(socios.length);
+        socios.forEach(function(s, i) {
+          var block = document.querySelectorAll('.fiador-block')[i];
+          if (!block) return;
+          block.querySelector('.fiador-nome').value = s.nome || '';
+          block.querySelector('.fiador-cpf').value = s.cpf ? maskCpf(s.cpf) : '';
+          block.querySelector('.fiador-rg').value = s.rg || '';
+          block.querySelector('.fiador-profissao').value = s.profissao || '';
+          block.querySelector('.fiador-estadocivil').value = s.estadoCivil || '';
+          block.querySelector('.fiador-nascimento').value = s.dataNascimento ? s.dataNascimento.split('T')[0] : '';
+          block.querySelector('.fiador-email').value = s.email || '';
+          block.querySelector('.fiador-telefone').value = s.telefone ? maskFone(s.telefone) : '';
+          block.querySelector('.fiador-cep').value = s.cep ? maskCep(s.cep) : '';
+          block.querySelector('.fiador-logradouro').value = s.logradouro || '';
+          block.querySelector('.fiador-numero').value = s.numero || '';
+          block.querySelector('.fiador-bairro').value = s.bairro || '';
+          block.querySelector('.fiador-cidade').value = s.cidade || '';
+          block.querySelector('.fiador-estado').value = s.estado || '';
+        });
+        window.AL.showAlert('Fiador(es) pré-preenchido(s) com os dados do(s) sócio(s). Confira e ajuste se necessário.', 'info');
+      }
     }
 
     function popularFiadores(fiadores) {
@@ -481,10 +508,6 @@
         { nome: document.getElementById('t2-nome').value.trim(), cpf: document.getElementById('t2-cpf').value.trim(), email: '', telefone: '', assinarDigital: false },
       ];
       for (var i = 0; i < ts.length; i++) {
-        if (!ts[i].nome || !ts[i].cpf) {
-          window.AL.showAlert('Preencha o nome e CPF de todas as testemunhas.', 'warning');
-          return null;
-        }
       }
       return ts;
     }
@@ -667,10 +690,10 @@
           });
           // Carrega cliente e filtra tipos
           if (c.cliente) {
-            selecionarCliente(c.cliente);
+            selecionarCliente(c.cliente, true);
           } else {
             window.AL.apiGet('/api/clientes/' + c.clienteId)
-              .then(function(cliente) { selecionarCliente(cliente); })
+              .then(function(cliente) { selecionarCliente(cliente, true); })
               .catch(function() {});
           }
           state.fiadores = c.fiadores || [];

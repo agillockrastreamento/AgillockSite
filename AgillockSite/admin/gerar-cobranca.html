@@ -77,6 +77,17 @@
     html.dark-theme .unif-total-bar { background: #252d3d !important; }
     html.dark-theme #form-unif .input-group-addon { background: #2d3748; border-color: #4a5568; color: #c9d1d9; }
     html.dark-theme .unif-total-bar strong { color: #c9d1d9 !important; }
+
+    /* ── Toggle switch dispositivos ── */
+    .disp-card { display:flex; align-items:center; gap:10px; padding:10px; border:2px solid #eee; border-radius:8px; margin-bottom:8px; cursor:pointer; transition:border-color .15s; }
+    .disp-card.selected { border-color:#fab32c; }
+    .disp-toggle { width:42px; height:24px; border-radius:12px; background:#ccc; position:relative; transition:background .2s; flex-shrink:0; }
+    .disp-card.selected .disp-toggle { background:#fab32c; }
+    .disp-toggle-knob { position:absolute; width:20px; height:20px; border-radius:50%; background:#fff; top:2px; left:2px; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+    .disp-card.selected .disp-toggle-knob { transform:translateX(18px); }
+    html.dark-theme .disp-card { border-color:#2d3748; }
+    html.dark-theme .disp-card.selected { border-color:#fab32c; }
+    html.dark-theme .disp-toggle { background:#3a4050; }
   </style>
 
 </head>
@@ -598,29 +609,36 @@
         var badges = '';
         if (temCarneUnif) badges += ' <span class="al-badge badge-pendente" style="font-size:10px;vertical-align:middle;">Carnê Unificado</span>';
         else if (temCarne) badges += ' <span class="al-badge badge-atrasado" style="font-size:10px;vertical-align:middle;">Possui Carnê</span>';
-        return '<label style="display:flex;align-items:center;gap:10px;padding:10px;border:2px solid #eee;border-radius:8px;margin-bottom:8px;cursor:pointer;">' +
-          '<input type="radio" name="placa" value="' + d.id + '" data-placa="' + d.nome + (d.placa ? ' (' + d.placa + ')' : '') + '" style="margin:0;" />' +
+        return '<div class="disp-card" data-id="' + d.id + '" data-placa="' + d.nome + (d.placa ? ' (' + d.placa + ')' : '') + '">' +
+          '<div class="disp-toggle"><div class="disp-toggle-knob"></div></div>' +
           '<div style="flex:1;"><strong>' + d.nome + '</strong>' + badges +
           '<br><small class="text-muted">' + d.identificador + (d.placa ? ' &mdash; Placa: <strong>' + d.placa + '</strong>' : '') + '</small>' +
-          '</div></label>';
+          '</div>' +
+          '</div>';
       }).join('');
 
-      document.querySelectorAll('input[name="placa"]').forEach(function (radio) {
-        radio.addEventListener('change', function () {
-          state.placa = { id: this.value, placa: this.dataset.placa };
-          document.getElementById('btn-step2-next').disabled = false;
-          document.querySelectorAll('input[name="placa"]').forEach(function (r) {
-            r.closest('label').style.borderColor = r.checked ? '#fab32c' : '#eee';
-          });
-          document.getElementById('prompt-add-unif').style.display = 'none';
-          if (carneUnificadoAtivo && document.getElementById('sugestao-unif').style.display === 'none') {
-            var estaNoUnif = carneUnificadoAtivo.placas.some(function (p) { return p.placaId === state.placa.id; });
-            if (!estaNoUnif) {
-              var nomesUnif = carneUnificadoAtivo.placas.map(function (p) { return p.placa; }).join(', ');
-              document.getElementById('prompt-add-unif-texto').textContent =
-                'Este dispositivo não faz parte do boleto unificado atual (' + nomesUnif + '). ' +
-                'Deseja adicioná-lo? O carnê unificado atual será cancelado e um novo será gerado.';
-              document.getElementById('prompt-add-unif').style.display = 'block';
+      document.querySelectorAll('.disp-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          var alreadySelected = this.classList.contains('selected');
+          document.querySelectorAll('.disp-card').forEach(function (c) { c.classList.remove('selected'); });
+          if (alreadySelected) {
+            state.placa = null;
+            document.getElementById('btn-step2-next').disabled = true;
+            document.getElementById('prompt-add-unif').style.display = 'none';
+          } else {
+            this.classList.add('selected');
+            state.placa = { id: this.dataset.id, placa: this.dataset.placa };
+            document.getElementById('btn-step2-next').disabled = false;
+            document.getElementById('prompt-add-unif').style.display = 'none';
+            if (carneUnificadoAtivo && document.getElementById('sugestao-unif').style.display === 'none') {
+              var estaNoUnif = carneUnificadoAtivo.placas.some(function (p) { return p.placaId === state.placa.id; });
+              if (!estaNoUnif) {
+                var nomesUnif = carneUnificadoAtivo.placas.map(function (p) { return p.placa; }).join(', ');
+                document.getElementById('prompt-add-unif-texto').textContent =
+                  'Este dispositivo não faz parte do boleto unificado atual (' + nomesUnif + '). ' +
+                  'Deseja adicioná-lo? O carnê unificado atual será cancelado e um novo será gerado.';
+                document.getElementById('prompt-add-unif').style.display = 'block';
+              }
             }
           }
         });

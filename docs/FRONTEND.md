@@ -113,6 +113,7 @@ Substituir o link do Banco do Brasil por um campo de busca simples:
 **Painel de detalhes do cliente:**
 - Dados cadastrais + endereço
 - Lista de placas (com botão Adicionar Placa / Editar / Inativar)
+- **Aba Dispositivos**: cada dispositivo exibe um **toggle switch** à esquerda — ON (âmbar) = vinculado, OFF (cinza) = desvinculado; clicar no toggle OFF vincula imediatamente; clicar no toggle ON abre confirmação antes de desvincular; badges e botões existentes permanecem intactos
 - Lista de carnês:
   - Carnê unificado ou individual
   - Status de cada parcela (Pendente / Pago / Atrasado)
@@ -133,9 +134,11 @@ Substituir o link do Banco do Brasil por um campo de busca simples:
 - Campo de busca (busca cliente existente) OU cadastrar novo
 - Ao selecionar cliente existente: exibe placas
 
-**Etapa 2 — Placa(s)**
-- Selecionar placa(s) para incluir no carnê
-- Se cliente tem carnê unificado: avisar que será incluída ao unificado
+**Etapa 2 — Dispositivos**
+- Lista de dispositivos exibida com **toggle switch** à esquerda de cada item
+- Clicar no toggle ativa o dispositivo (borda âmbar + switch deslizante); clicar novamente desativa
+- Comportamento deselect: clicar num dispositivo já selecionado limpa a seleção e desabilita o botão "Próximo"
+- Se cliente tem carnê unificado: avisa que o dispositivo será adicionado ao unificado
 
 **Etapa 3 — Cobrança**
 - Valor por placa (R$)
@@ -157,6 +160,7 @@ Substituir o link do Banco do Brasil por um campo de busca simples:
 
 **Tabela:**
 - Nome, Email, Status, Data Cadastro, Badges de permissão, Ações
+- Badges de permissão incluem ícones para todas as 16 permissões, incluindo as de contratos
 
 **Ações:** Editar, Ativar/Inativar, Excluir
 
@@ -165,10 +169,12 @@ Substituir o link do Banco do Brasil por um campo de busca simples:
 - Email
 - Senha (somente no cadastro / opção de redefinir)
 - Status (Ativo/Inativo)
-- 8 checkboxes de permissões granulares (todas marcadas por padrão):
-  - Pode excluir clientes / Pode editar dados do cliente / Pode inativar/ativar clientes
-  - Pode excluir placas / Pode inativar/ativar placas
-  - Pode dar baixa manual / Pode cancelar/excluir carnês / Pode alterar data de vencimento
+- **16 checkboxes de permissões granulares** (todas marcadas por padrão), agrupadas com cabeçalhos por categoria (adaptados ao tema escuro via `.perm-group-label`):
+  - **Clientes**: excluir / editar dados / inativar/ativar
+  - **Placas**: excluir / inativar/ativar
+  - **Dispositivos**: criar / editar / excluir / inativar/ativar / desvincular de clientes
+  - **Cobranças**: baixa manual / cancelar/excluir carnês / alterar data de vencimento
+  - **Contratos**: criar / editar / excluir
 
 ---
 

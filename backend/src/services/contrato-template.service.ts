@@ -15,6 +15,7 @@ export interface DadosContrato {
     logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string;
     socios?: Array<{
       nome: string; cpf?: string; rg?: string; profissao?: string; estadoCivil?: string; nacionalidade?: string; dataNascimento?: string;
+      email?: string; telefone?: string;
       logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string;
     }>;
   };
@@ -91,6 +92,23 @@ export function preencherTemplate(tipo: string, dados: DadosContrato): string {
   const fiadores = dados.fiadores || [];
   const testemunhas = dados.testemunhas;
 
+  // Processar blocos condicionais ANTES da substituição de variáveis
+  const conditions: Record<string, boolean> = {
+    IF_SOCIO_2:   socios.length >= 2,
+    IF_SOCIO_3:   socios.length >= 3,
+    IF_SOCIO_4:   socios.length >= 4,
+    IF_SOCIO_5:   socios.length >= 5,
+    IF_FIADORES:  fiadores.length >= 1,
+    IF_FIADOR_2:  fiadores.length >= 2,
+    IF_FIADOR_3:  fiadores.length >= 3,
+    IF_FIADOR_4:  fiadores.length >= 4,
+    IF_FIADOR_5:  fiadores.length >= 5,
+  };
+  for (const [cond, show] of Object.entries(conditions)) {
+    const re = new RegExp(`\\{\\{#${cond}\\}\\}([\\s\\S]*?)\\{\\{\\/${cond}\\}\\}`, 'g');
+    html = html.replace(re, show ? '$1' : '');
+  }
+
   const vars: Record<string, string> = {
     DATA_HOJE: longa,
     DATA_HOJE_CURTA: curta,
@@ -113,6 +131,7 @@ export function preencherTemplate(tipo: string, dados: DadosContrato): string {
     EMAIL_CLIENTE: c.email || '',
     ENDERECO_CLIENTE: fmtEndereco(c),
     // PJ
+    SOCIOS_LABEL: socios.length === 1 ? 'seu sócio' : 'seus sócios',
     RAZAO_SOCIAL: c.nome || '',
     CNPJ: c.cpfCnpj || '',
     TELEFONE_PJ: c.telefone || '',

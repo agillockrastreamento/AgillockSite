@@ -59,6 +59,8 @@
         z-index: 10;
         box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); /* Uma sombrinha sutil para separar as linhas do cabeçalho */
     }
+    .perm-group-label { font-weight:600; color:#555; }
+    html.dark-theme .perm-group-label { color:#adb5bd; }
   </style>
 
 </head>
@@ -170,6 +172,7 @@
             <div class="form-group" style="margin-top:12px;">
               <label style="font-weight:700;display:block;margin-bottom:8px;">Permissões</label>
               <div style="background:#f8f9fa;border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+                <div class="perm-group-label">Clientes</div>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-excluir" checked /> Pode excluir clientes
                 </label>
@@ -179,12 +182,14 @@
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-inativar-cliente" checked /> Pode inativar/ativar clientes
                 </label>
+                <div class="perm-group-label" style="margin-top:8px;">Placas</div>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-excluir-placa" checked /> Pode excluir placas
                 </label>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-inativar-placa" checked /> Pode inativar/ativar placas
                 </label>
+                <div class="perm-group-label" style="margin-top:8px;">Dispositivos</div>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-criar-dispositivo" checked /> Pode criar novos dispositivos
                 </label>
@@ -200,6 +205,7 @@
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-desvincular-dispositivo" checked /> Pode desvincular dispositivos de clientes
                 </label>
+                <div class="perm-group-label" style="margin-top:8px;">Cobranças</div>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-baixa" checked /> Pode dar baixa manual em boletos
                 </label>
@@ -209,7 +215,7 @@
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-vencimento" checked /> Pode alterar data de vencimento
                 </label>
-                <div style="margin-top:8px;font-weight:600;color:#555">Contratos</div>
+                <div class="perm-group-label" style="margin-top:8px;">Contratos</div>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-criar-contrato" checked /> Pode criar contratos
                 </label>
@@ -317,6 +323,9 @@
       if (c.podeBaixaManual)       icons.push('<span title="Baixa manual" style="color:#27ae60;"><i class="fa fa-check-circle"></i></span>');
       if (c.podeCancelarCarne)     icons.push('<span title="Cancelar carnê" style="color:#e67e22;"><i class="fa fa-ban"></i></span>');
       if (c.podeAlterarVencimento) icons.push('<span title="Alterar vencimento" style="color:#3498db;"><i class="fa fa-calendar"></i></span>');
+      if (c.podeCriarContrato)     icons.push('<span title="Criar contratos" style="color:#27ae60;"><i class="fa fa-file-text-o"></i></span>');
+      if (c.podeEditarContrato)    icons.push('<span title="Editar contratos" style="color:#8e44ad;"><i class="fa fa-pencil-square-o"></i></span>');
+      if (c.podeExcluirContrato)   icons.push('<span title="Excluir contratos" style="color:#c0392b;"><i class="fa fa-file-excel-o"></i></span>');
       return icons.length ? icons.join(' ') : '<span class="text-muted" style="font-size:11px;">Nenhuma</span>';
     }
 
