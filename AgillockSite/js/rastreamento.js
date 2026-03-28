@@ -157,7 +157,7 @@ function renderMarcadores() {
       marcadores[id].getPopup().setContent(criarPopup(v));
     } else {
       const marker = L.marker([latitude, longitude], { icon: icone })
-        .bindPopup(criarPopup(v))
+        .bindPopup(criarPopup(v), { autoPanPadding: L.point(10, 70) })
         .addTo(map);
       marker.on('click', () => destacar(id));
       marcadores[id] = marker;
@@ -279,24 +279,23 @@ function criarPopup(v) {
   const apiBase = window.API_URL || '';
 
   const imgHtml = v.imagemUrl
-    ? `<div style="margin:-13px -19px 10px;overflow:hidden;border-radius:8px 8px 0 0;height:90px">
-        <img src="${apiBase}${v.imagemUrl}" style="width:100%;height:100%;object-fit:cover;
-          clip-path:polygon(0 0,100% 0,100% 80%,0 100%);display:block"
+    ? `<div style="margin:-13px -24px 10px;overflow:hidden;border-radius:8px 8px 0 0;height:110px">
+        <img src="${apiBase}${v.imagemUrl}" style="width:100%;height:100%;object-fit:cover;display:block"
           onerror="this.parentElement.style.display='none'" />
       </div>`
     : '';
 
-  return `<div style="min-width:210px;font-size:13px">
+  return `<div style="min-width:220px;font-size:13px">
     ${imgHtml}
     <strong style="display:block;margin-bottom:3px">${v.nome}</strong>
     ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}
-    <div style="margin-top:5px;font-size:12px;color:${corStatus}">● ${txtStatus}</div>
+    ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
+    <div style="font-size:12px;color:${corStatus}">● ${txtStatus}</div>
     ${ign ? `<div style="font-size:11px;margin-top:2px">${ign}</div>` : ''}
     ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px"><i class="fa fa-user" style="width:12px"></i> ${v.cliente.nome}</div>` : ''}
-    ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
-    ${p?.fixTime ? `<div style="font-size:11px;margin-top:4px;color:#888"><i class="fa fa-clock-o"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
+    ${p?.fixTime ? `<div style="font-size:11px;margin-top:5px;color:#888"><i class="fa fa-clock-o"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
     ${p ? `<div style="font-size:11px;margin-top:2px;color:#888;line-height:1.4"><i class="fa fa-map-pin"></i>
-        <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="color:#888">Buscando endereço...</span>
+        <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">Buscando...</span>
       </div>` : ''}
     <div style="margin-top:8px">
       <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
@@ -416,15 +415,41 @@ function ajustarBounds() {
 
 // ── Geocodificação reversa (Nominatim) ────────────────────────────────────────
 
+const _geocodeCache = {};
+
+function _formatarEndereco(a) {
+  // Monta endereço sem os campos "Região Geográfica"
+  const partes = [];
+  if (a.amenity)  partes.push(a.amenity);
+  if (a.road)     partes.push(a.house_number ? `${a.road}, ${a.house_number}` : a.road);
+  const bairro = a.suburb || a.neighbourhood || a.quarter;
+  if (bairro)     partes.push(bairro);
+  const cidade = a.city || a.town || a.village || a.municipality;
+  if (cidade)     partes.push(cidade);
+  if (a.state)    partes.push(a.state);
+  if (a.postcode) partes.push(a.postcode);
+  if (a.country)  partes.push(a.country);
+  return partes.join(', ');
+}
+
 window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const el = document.getElementById(elementId);
   if (!el) return;
   const coords = `(${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+  const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`; // ~100 m de precisão
+
+  if (_geocodeCache[cacheKey]) {
+    el.textContent = `${_geocodeCache[cacheKey]} ${coords}`;
+    return;
+  }
+
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=pt-BR`;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=pt-BR`;
     const res = await fetch(url);
     const data = await res.json();
-    el.textContent = data.display_name ? `${data.display_name} ${coords}` : coords;
+    const end = data.address ? _formatarEndereco(data.address) : '';
+    _geocodeCache[cacheKey] = end;
+    el.textContent = end ? `${end} ${coords}` : coords;
   } catch {
     el.textContent = coords;
   }
