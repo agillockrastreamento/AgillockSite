@@ -41,9 +41,9 @@ Implementa local → commit → push → pull no servidor → testa com disposit
 
 ### 1.3 — Traccar rodando em produção *(no servidor via SSH)*
 
-- [ ] `docker compose ps traccar` mostra status `Up`
-- [ ] `docker compose logs traccar` mostra `Liquibase: Update has been successful`
-- [ ] Banco `traccar` criado no PostgreSQL de produção com as tabelas
+- [✅] `docker compose ps traccar` mostra status `Up`
+- [✅] `docker compose logs traccar` mostra `Liquibase: Update has been successful`
+- [✅] Banco `traccar` criado no PostgreSQL de produção com as tabelas
 
 ```bash
 # Verificar no servidor

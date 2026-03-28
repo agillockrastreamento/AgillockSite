@@ -256,8 +256,8 @@ Planejadas após a Etapa 6 estar estável:
 | Etapa | Status | Observações |
 |---|---|---|
 | 1a — Deploy dev | ✅ Concluído | Traccar rodando, banco criado, conta admin criada |
-| 1b — Deploy produção | ⬜ Pendente | Próximo passo |
-| 2 — GT06 em produção | ⬜ Pendente | Aguarda Etapa 1b |
+| 1b — Deploy produção | ✅ Concluído | Traccar rodando em produção, banco criado, conta admin criada |
+| 2 — GT06 em produção | ⬜ Pendente | Próximo passo |
 | 3 — Backend Node.js | ⬜ Pendente | Pode implementar localmente já |
 | 4 — Frontend mapa | ⬜ Pendente | Aguarda Etapa 3 deployada |
 | 5 — Tela detalhes | ⬜ Pendente | Aguarda Etapa 4 |

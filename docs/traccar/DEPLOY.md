@@ -123,56 +123,105 @@ Browser → ws://localhost:3000/ws/rastreamento → Backend Node.js → ws://tra
 
 ---
 
-## Produção (Hostinger)
+## Produção (Hostinger) ✅ Concluído
+
+Servidor: `root@72.62.13.73` — path: `/opt/agillock/backend`
 
 ### Diferenças em relação ao dev
 
-1. O serviço `traccar` entra no `docker-compose.yml` (produção)
-2. A porta `8082` **não é exposta** no host — o backend acessa via rede Docker interna
-3. A config usa `traccar/traccar.xml` (com filtros ativos e senha via variável)
-4. O nginx faz proxy do Traccar Web UI se precisar acessar pelo browser
+1. O serviço `traccar` já está no `docker-compose.yml` (produção)
+2. A porta `8082` **não é exposta** no host — o backend acessa via rede Docker interna (`backend_agillock_net`)
+3. A configuração usa variáveis de ambiente (`CONFIG_USE_ENVIRONMENT_VARIABLES=true`) — sem XML montado
+4. Filtros de posição ativos (descarta dados inválidos)
 
-### Adicionar ao `docker-compose.yml` de produção (quando for fazer deploy)
+### Passo a passo executado (histórico)
 
-```yaml
-# Adicionar ao services:
-  traccar:
-    image: traccar/traccar:latest
-    container_name: traccar
-    restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "5023:5023"   # GT06 — exposto publicamente
-      # 8082 NÃO exposto — backend acessa via rede interna
-    volumes:
-      - ./traccar/traccar.xml:/opt/traccar/conf/traccar.xml:ro
-      - traccar_logs:/opt/traccar/logs
-    environment:
-      - TZ=America/Sao_Paulo
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    networks:
-      - agillock_net
+#### 1. Puxar atualizações no servidor
 
-# Adicionar ao volumes:
-  traccar_logs:
+```bash
+cd /opt/agillock/backend
+git pull origin main
 ```
+
+#### 2. Abrir porta 5023 no firewall (para os dispositivos GPS)
+
+```bash
+ufw allow 5023/tcp
+ufw reload
+```
+
+> O firewall estava desabilitado (`ufw status: inactive`), mas a regra foi adicionada com sucesso. Se o firewall for ativado no futuro, a porta já estará liberada.
+
+#### 3. Criar o banco `traccar` no PostgreSQL
+
+```bash
+docker compose exec postgres psql -U agillock_user -d agillock -c "CREATE DATABASE traccar;"
+```
+
+> Importante: usar `-d agillock` (não omitir o banco) para evitar erro `database agillock_user does not exist`.
+
+#### 4. Adicionar variáveis de ambiente ao `.env` do servidor
+
+```bash
+echo "" >> /opt/agillock/backend/.env
+echo "TRACCAR_URL=http://traccar:8082" >> /opt/agillock/backend/.env
+echo "TRACCAR_USER=admin@agillock.com.br" >> /opt/agillock/backend/.env
+echo "TRACCAR_PASSWORD=AdminTraccar@Agillock2026" >> /opt/agillock/backend/.env
+```
+
+#### 5. Subir o container Traccar
+
+```bash
+cd /opt/agillock/backend
+docker compose up -d traccar
+```
+
+Aguardar a linha nos logs:
+```bash
+docker compose logs traccar 2>&1 | tail -5
+# Esperar: "Liquibase: Update has been successful."
+```
+
+#### 6. Criar conta admin (primeira vez — newServer=true)
+
+Como a porta 8082 não está exposta, o comando é executado via container temporário na rede Docker:
+
+```bash
+docker run --rm --network backend_agillock_net curlimages/curl:latest \
+  -s -X POST http://traccar:8082/api/users \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Admin","email":"admin@agillock.com.br","password":"AdminTraccar@Agillock2026"}'
+```
+
+> Não enviar `"administrator":true` — o Traccar define automaticamente o primeiro usuário como admin (modo `newServer`).
+
+**Credenciais de produção:**
+- Email: `admin@agillock.com.br`
+- Senha: `AdminTraccar@Agillock2026`
+
+---
+
+### Acessar o painel Traccar de produção pelo browser
+
+A porta 8082 não é exposta publicamente. Para acessar via browser, usar **túnel SSH**:
+
+```powershell
+# Rodar no PowerShell ou terminal local — manter aberto enquanto usar
+ssh -L 8082:traccar:8082 root@72.62.13.73
+```
+
+Enquanto o terminal estiver aberto, acessar: `http://localhost:8082`
+
+> Embora pareça local, o browser está se comunicando com o Traccar **de produção**. Qualquer dispositivo adicionado aqui é real. Se o Traccar de desenvolvimento também estiver rodando localmente na porta 8082, feche-o antes de abrir o túnel para evitar conflito.
+
+---
 
 ### Variáveis de ambiente de produção (`.env` do servidor)
 
 ```env
 TRACCAR_URL=http://traccar:8082
 TRACCAR_USER=admin@agillock.com.br
-TRACCAR_PASSWORD=SenhaSeguraDeProducao123
-```
-
-### Criar banco em produção (apenas uma vez)
-
-```bash
-docker compose exec postgres \
-  psql -U agillock_user -c "CREATE DATABASE traccar;"
-docker compose up -d traccar
+TRACCAR_PASSWORD=AdminTraccar@Agillock2026
 ```
 
 ### Nginx — proxy para o Web UI do Traccar (opcional)
