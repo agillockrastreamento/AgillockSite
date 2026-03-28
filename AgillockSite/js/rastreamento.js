@@ -20,10 +20,28 @@ document.addEventListener('DOMContentLoaded', function () {
 function inicializarMapa() {
   map = L.map('mapa', { zoomControl: true }).setView([-15.78, -47.93], 5);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-    maxZoom: 19,
-  }).addTo(map);
+  const tilesEsri = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    { attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>', maxZoom: 19 }
+  );
+  const tilesOsm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19 }
+  );
+  const tilesCartoDB = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxZoom: 19 }
+  );
+
+  tilesEsri.addTo(map);
+
+  L.control.layers(
+    { 'ESRI Street': tilesEsri, 'OpenStreetMap': tilesOsm, 'CartoDB Voyager': tilesCartoDB },
+    {},
+    { position: 'topright', collapsed: true }
+  ).addTo(map);
+
+  L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
   // Auto-geocodifica o endereço quando o popup abre
   map.on('popupopen', function (e) {
@@ -245,21 +263,60 @@ function criarIcone(v) {
 
 function svgVelocimetro(velocidade, limite) {
   if (velocidade == null) return '';
-  const max = Math.max(limite || 120, 120);
+  const max = Math.max(limite || 120, velocidade, 120);
   const f = Math.min(velocidade / max, 1);
-  const angRad = Math.PI * (1 - f);
-  const ex = (40 + 30 * Math.cos(angRad)).toFixed(1);
-  const ey = (45 - 30 * Math.sin(angRad)).toFixed(1);
-  const largeArc = f > 0.5 ? 1 : 0;
-  const cor = limite && velocidade > limite ? '#e74c3c' : velocidade > 80 ? '#f39c12' : '#27ae60';
-  const arc = f > 0.01
-    ? `<path d="M 10 45 A 30 30 0 ${largeArc} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>`
+  const cor = (limite && velocidade > limite) ? '#e74c3c'
+    : f >= 0.8 ? '#e74c3c' : f >= 0.55 ? '#f39c12' : '#00b894';
+
+  const cx = 90, cy = 95, R = 70;
+  const pt = t => [+(cx + R * Math.cos(Math.PI * (1 - t))).toFixed(1), +(cy - R * Math.sin(Math.PI * (1 - t))).toFixed(1)];
+  const [sx, sy] = pt(0);
+  const [ex, ey] = pt(1);
+  const [fx, fy] = pt(f);
+
+  // Zonas de fundo coloridas (verde / amarelo / vermelho)
+  const zonasBg = [[0, 0.55, '#c8f7c5'], [0.55, 0.8, '#fef0cd'], [0.8, 1, '#ffd7d7']].map(([t0, t1, c]) => {
+    const [ax, ay] = pt(t0);
+    const [bx2, by2] = pt(t1);
+    return `<path d="M ${ax} ${ay} A ${R} ${R} 0 ${(t1 - t0) > 0.5 ? 1 : 0} 1 ${bx2} ${by2}" fill="none" stroke="${c}" stroke-width="10" stroke-linecap="butt"/>`;
+  }).join('');
+
+  // Marcas de escala
+  const ticks = Array.from({ length: 11 }, (_, i) => {
+    const a = Math.PI * (1 - i / 10);
+    const major = i % 5 === 0;
+    const r1 = major ? R - 13 : R - 7;
+    return `<line x1="${+(cx + r1 * Math.cos(a)).toFixed(1)}" y1="${+(cy - r1 * Math.sin(a)).toFixed(1)}"
+                  x2="${+(cx + (R - 2) * Math.cos(a)).toFixed(1)}" y2="${+(cy - (R - 2) * Math.sin(a)).toFixed(1)}"
+                  stroke="${major ? '#888' : '#bbb'}" stroke-width="${major ? 1.5 : 1}"/>`;
+  }).join('');
+
+  // Arco de preenchimento (velocidade atual)
+  const fillArc = f > 0.01
+    ? `<path d="M ${sx} ${sy} A ${R} ${R} 0 ${f > 0.5 ? 1 : 0} 1 ${fx} ${fy}" fill="none" stroke="${cor}" stroke-width="10" stroke-linecap="round" opacity="0.9"/>`
     : '';
-  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:4px auto 0">
-    <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="#e9ecef" stroke-width="7" stroke-linecap="round"/>
-    ${arc}
-    <text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#333">${velocidade}</text>
-    <text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#aaa">km/h</text>
+
+  // Marcador de limite de velocidade
+  const limitMark = (limite && limite < max) ? (() => {
+    const [lx, ly] = pt(limite / max);
+    return `<circle cx="${lx}" cy="${ly}" r="4.5" fill="#e74c3c" stroke="white" stroke-width="1.5"/>`;
+  })() : '';
+
+  // Agulha
+  const na = Math.PI * (1 - f);
+  const [nnx, nny] = [+(cx + (R - 16) * Math.cos(na)).toFixed(1), +(cy - (R - 16) * Math.sin(na)).toFixed(1)];
+
+  return `<svg width="100%" height="96" viewBox="0 0 180 102" style="display:block;margin:5px 0 0">
+    <path d="M ${sx} ${sy} A ${R} ${R} 0 0 1 ${ex} ${ey}" fill="none" stroke="#ecf0f1" stroke-width="10" stroke-linecap="round"/>
+    ${zonasBg}
+    ${ticks}
+    ${fillArc}
+    ${limitMark}
+    <line x1="${cx}" y1="${cy}" x2="${nnx}" y2="${nny}" stroke="${cor}" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="5.5" fill="${cor}" stroke="white" stroke-width="2"/>
+    <circle cx="${cx}" cy="${cy}" r="2" fill="white"/>
+    <text x="${cx}" y="${cy - 20}" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#2d3436">${velocidade}</text>
+    <text x="${cx}" y="${cy - 7}" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#95a5a6" letter-spacing="1">km/h</text>
   </svg>`;
 }
 
@@ -405,9 +462,9 @@ function pesoStatus(v) {
 window.focar = function (dispositivoId) {
   const v = veiculosMap[dispositivoId];
   if (!v?.posicao) return;
-
-  map.setView([v.posicao.latitude, v.posicao.longitude], 16);
-  marcadores[dispositivoId]?.openPopup();
+  const { latitude, longitude } = v.posicao;
+  map.once('moveend', () => marcadores[dispositivoId]?.openPopup());
+  map.setView([latitude, longitude], 16);
   destacar(dispositivoId);
 };
 
@@ -431,18 +488,18 @@ function ajustarBounds() {
 
 const _geocodeCache = {};
 
-function _formatarEndereco(a) {
-  // Monta endereço sem os campos "Região Geográfica"
+// Formata resposta do Photon (GeoJSON properties)
+function _formatarEndereco(props) {
   const partes = [];
-  if (a.amenity)  partes.push(a.amenity);
-  if (a.road)     partes.push(a.house_number ? `${a.road}, ${a.house_number}` : a.road);
-  const bairro = a.suburb || a.neighbourhood || a.quarter;
-  if (bairro)     partes.push(bairro);
-  const cidade = a.city || a.town || a.village || a.municipality;
-  if (cidade)     partes.push(cidade);
-  if (a.state)    partes.push(a.state);
-  if (a.postcode) partes.push(a.postcode);
-  if (a.country)  partes.push(a.country);
+  if (props.name && props.name !== props.street) partes.push(props.name);
+  if (props.street) partes.push(props.housenumber ? `${props.street}, ${props.housenumber}` : props.street);
+  const bairro = props.suburb || props.district || props.neighbourhood;
+  if (bairro) partes.push(bairro);
+  const cidade = props.city || props.town || props.village;
+  if (cidade) partes.push(cidade);
+  if (props.state)    partes.push(props.state);
+  if (props.postcode) partes.push(props.postcode);
+  if (props.country)  partes.push(props.country);
   return partes.join(', ');
 }
 
@@ -458,10 +515,11 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   }
 
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=pt-BR`;
+    const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&lang=pt`;
     const res = await fetch(url);
     const data = await res.json();
-    const end = data.address ? _formatarEndereco(data.address) : '';
+    const props = data.features?.[0]?.properties;
+    const end = props ? _formatarEndereco(props) : '';
     _geocodeCache[cacheKey] = end;
     el.textContent = end ? `${end} ${coords}` : coords;
   } catch {
