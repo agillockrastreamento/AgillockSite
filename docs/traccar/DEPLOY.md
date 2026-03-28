@@ -12,6 +12,15 @@
 | **Filtros de posição** | Desativados (facilita testes) | Ativos (descarta dados inválidos) |
 | **Nginx** | Não tem | Proxy reverso para backend + Traccar admin |
 
+### Importante — dispositivo físico só funciona em produção
+
+O dispositivo GT06 usa rede celular (4G/2G) e precisa de um **IP público** para se conectar. Se o aparelho estiver em outra rede (caso normal de uso real), ele não consegue alcançar `localhost` nem o IP local da máquina de desenvolvimento.
+
+**Consequência prática:**
+- Tudo que envolve o dispositivo físico (posições reais, testes GT06) → feito **diretamente em produção**
+- Desenvolvimento local serve para: implementar código, testar rotas via Postman/Insomnia, desenvolver o frontend
+- **Fluxo de trabalho:** código local → commit → push → pull no servidor → testar com dispositivo real
+
 ---
 
 ## Desenvolvimento

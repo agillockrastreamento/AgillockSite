@@ -1,349 +1,326 @@
 # Plano de Testes — Integração Traccar
 
 > Execute os testes na ordem apresentada. Cada fase depende da anterior.
-> Marque cada item com ✅ ao concluir. Registre problemas encontrados abaixo de cada bloco.
+> Marque cada item com ✅ ao concluir. Registre problemas encontrados na tabela no final.
+
+## Onde cada fase é executada
+
+| Fase | Ambiente | Motivo |
+|---|---|---|
+| 1.1 e 1.2 — Traccar rodando | Desenvolvimento ✅ | Já concluído |
+| 1.3 e 1.4 — Dispositivo conecta | **Produção** | GT06 precisa de IP público |
+| 2 — API REST Traccar | **Produção** | Requer dispositivo online com posições reais |
+| 3.1 — Conexão básica backend | Desenvolvimento ou Produção | Não requer dispositivo |
+| 3.2 a 3.5 — Rotas com dados reais | **Produção** | Requer posições reais do dispositivo |
+| 4 — WebSocket tempo real | **Produção** | Requer dispositivo enviando posições |
+| 5 — Frontend mapa | **Produção** | Requer posições reais para validar comportamento |
+| 6 — Filtros e estabilidade | **Produção** | Filtros já ativos em produção |
+
+**Fluxo de trabalho para fases em produção:**
+```
+Implementa local → commit → push → pull no servidor → testa com dispositivo real
+```
+
+**Teste de rotas sem dispositivo (Postman):**
+- Apontar para `http://localhost:3000` (dev local, sem posições reais) para testar se a rota responde
+- Apontar para `https://api.agillock.com.br` (produção) para testar com dados reais do dispositivo
 
 ---
 
-## Fase 1 — Conectividade (Traccar isolado)
+## Fase 1 — Conectividade Traccar
 
-Objetivo: garantir que o Traccar está rodando e o dispositivo consegue se conectar, **antes de escrever qualquer linha de código no backend**.
+### 1.1 — Traccar rodando em desenvolvimento
 
-### 1.1 — Traccar Web UI acessível
-
-- [✅] `http://localhost:8082` abre a tela de login do Traccar
+- [✅] `http://localhost:8082` abre a tela de login
 - [✅] Login com `admin@agillock.com.br` / `AdminTraccar@dev` funciona
-- [✅] Menu lateral exibe: Devices, Reports, Settings
+- [✅] Menu lateral exibe Devices, Reports, Settings
 
-### 1.2 — Banco de dados criado corretamente
+### 1.2 — Banco de dados criado corretamente (desenvolvimento)
 
-- [✅] No DBeaver/psql, conectar em `localhost:5433` com `agillock_user / dev_password`
-- [✅] Banco `traccar` existe e contém as tabelas: `tc_devices`, `tc_positions`, `tc_users`, `tc_events`
+- [✅] Banco `traccar` existe com as tabelas `tc_devices`, `tc_positions`, `tc_users`, `tc_events`
 
-```sql
--- Verificar tabelas criadas
-SELECT table_name FROM information_schema.tables
-WHERE table_schema = 'public' AND table_catalog = 'traccar'
-ORDER BY table_name;
-```
+### 1.3 — Traccar rodando em produção *(no servidor via SSH)*
 
-Esperado: ~20 tabelas listadas.
+- [ ] `docker compose ps traccar` mostra status `Up`
+- [ ] `docker compose logs traccar` mostra `Liquibase: Update has been successful`
+- [ ] Banco `traccar` criado no PostgreSQL de produção com as tabelas
 
-### 1.3 — Cadastro do dispositivo de teste
-
-- [ ] No Traccar Web UI: Devices → `+`
-  - Name: `Teste GT06`
-  - Identifier: IMEI do aparelho (15 dígitos)
-- [ ] Dispositivo aparece na lista com status `Unknown` (cinza)
-
-### 1.4 — Dispositivo GT06 se conecta ao Traccar
-
-Antes de enviar os SMS, descobrir o IP local da máquina:
 ```bash
-# Windows — procurar "Endereço IPv4" da rede Wi-Fi ou Ethernet
-ipconfig
-# Exemplo de resultado: 192.168.1.10
+# Verificar no servidor
+docker compose exec postgres psql -U agillock_user -d traccar -c "\dt tc_*"
 ```
 
-Enviar SMS para o número do chip do aparelho:
-```
-APN,NOME_DA_OPERADORA#
-SERVER,0,192.168.1.10,5023,0#
-RESET#
-```
+### 1.4 — Dispositivo GT06 se conecta ao Traccar de produção *(no servidor + SMS)*
 
-- [ ] Após ~2 minutos, dispositivo aparece como `Online` (verde) no Traccar Web UI
-- [ ] Posição aparece no mapa do Traccar Web UI (pode ser em área aberta para garantir fix GPS)
-- [ ] Logs do Traccar mostram conexão:
+1. Descobrir o IMEI enviando SMS para o chip do dispositivo:
+   ```
+   IMEI#
+   ```
+2. Cadastrar o dispositivo via API (executar no servidor via SSH):
+   ```bash
+   curl -X POST http://localhost:8082/api/devices \
+     -u "admin@agillock.com.br:SENHA_TRACCAR" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Teste GT06","uniqueId":"IMEI_AQUI","category":"car"}'
+   ```
+3. Enviar SMS de configuração para o chip do dispositivo:
+   ```
+   APN,OPERADORA#
+   SERVER,0,seudominio.com.br,5023,0#
+   RESET#
+   ```
+4. Verificar conexão nos logs:
+   ```bash
+   docker compose logs -f traccar
+   ```
+
+- [ ] Dispositivo aparece com `"status": "online"` na API:
   ```bash
-  docker compose -f docker-compose.dev.yml logs traccar | grep -i "gt06\|connected\|position"
+  curl -s http://localhost:8082/api/devices -u "admin@agillock.com.br:SENHA" | python3 -m json.tool
+  ```
+- [ ] Posições chegando em `tc_positions`:
+  ```bash
+  docker compose exec postgres psql -U agillock_user -d traccar \
+    -c "SELECT id, deviceid, latitude, longitude, fixtime FROM tc_positions ORDER BY fixtime DESC LIMIT 5;"
   ```
 
-**Problemas comuns nesta fase:**
-- Status permanece Unknown → APN errado ou porta 5023 bloqueada (verificar firewall do Windows)
+**Problemas comuns:**
+- Status permanece Unknown → APN errado ou porta 5023 não aberta no firewall da Hostinger
 - Posição não aparece → dispositivo sem fix GPS (testar em área aberta)
 
 ---
 
-## Fase 2 — API REST do Traccar
+## Fase 2 — API REST do Traccar *(produção — executar no servidor via SSH ou Postman)*
 
-Objetivo: confirmar que a API do Traccar responde corretamente antes de integrar ao backend.
+Objetivo: confirmar que a API do Traccar responde corretamente com dados reais do dispositivo.
 
-> Usar Postman, Insomnia ou `curl`. Basic Auth: `admin@agillock.com.br:AdminTraccar@dev`
+> Todos os `curl` abaixo são executados **no servidor via SSH**. Alternativamente, usar Postman apontando para `https://api.agillock.com.br` (se o nginx tiver proxy para o Traccar configurado) ou via SSH tunnel.
 
 ### 2.1 — Listar dispositivos
 
-```
-GET http://localhost:8082/api/devices
-Authorization: Basic YWRtaW5AYWdpbGxvY2suY29tLmJyOkFkbWluVHJhY2NhckBkZXY=
+```bash
+curl -s http://localhost:8082/api/devices \
+  -u "admin@agillock.com.br:SENHA_TRACCAR" | python3 -m json.tool
 ```
 
 - [ ] Retorna array com o dispositivo cadastrado
 - [ ] Campo `status` é `"online"`
-- [ ] Campo `uniqueId` bate com o IMEI cadastrado
+- [ ] Campo `uniqueId` bate com o IMEI
 
 ### 2.2 — Última posição
 
-```
-GET http://localhost:8082/api/positions?deviceId=ID_DO_DISPOSITIVO
+```bash
+curl -s "http://localhost:8082/api/positions?deviceId=ID_DO_DISPOSITIVO" \
+  -u "admin@agillock.com.br:SENHA_TRACCAR" | python3 -m json.tool
 ```
 
-- [ ] Retorna array com pelo menos uma posição
-- [ ] Campos `latitude` e `longitude` têm valores reais (não `0.0`)
+- [ ] Retorna posição com `latitude` e `longitude` reais (não `0.0`)
 - [ ] Campo `valid` é `true`
-- [ ] Campo `speed` tem valor numérico (mesmo que 0 se parado)
-- [ ] `attributes.ignition` presente e é `true` ou `false`
+- [ ] `attributes.ignition` presente (`true` ou `false`)
+- [ ] `speed` tem valor em knots (ex: `0.0` se parado, `10.8` se a ~20km/h)
 
 ### 2.3 — Histórico de posições
 
+```bash
+curl -s "http://localhost:8082/api/positions?deviceId=ID&from=2026-03-28T00:00:00Z&to=2026-03-28T23:59:59Z" \
+  -u "admin@agillock.com.br:SENHA_TRACCAR" | python3 -m json.tool
 ```
-GET http://localhost:8082/api/positions?deviceId=ID&from=2026-03-28T00:00:00Z&to=2026-03-28T23:59:59Z
-```
 
-- [ ] Retorna array de posições do período
-- [ ] Posições em ordem cronológica
-
-### 2.4 — WebSocket do Traccar (opcional, diagnóstico)
-
-Usar o próprio browser para testar: abrir o console em `http://localhost:8082` após login e verificar que o WebSocket `/api/socket` está ativo na aba Network.
-
-- [ ] Na aba Network → WS, conexão `api/socket` aparece com status 101 (Switching Protocols)
-- [ ] Mensagens chegam quando o dispositivo se move
+- [ ] Retorna array de posições do período com mais de um item (após o dispositivo se mover)
 
 ---
 
-## Fase 3 — Backend Node.js
+## Fase 3 — Backend Node.js *(implementação local, testes via Postman em produção)*
 
 Objetivo: confirmar que o backend AgilLock consome o Traccar corretamente.
 
-> Pré-requisito: Etapa 3 do ROADMAP implementada (serviço + rotas criados).
+> Pré-requisito: Etapa 3 do ROADMAP implementada e deployada no servidor.
 
-### 3.1 — Serviço `traccar.service.ts` — conexão básica
+### 3.1 — Conexão básica (sem dispositivo) *(desenvolvimento local)*
 
-- [ ] `GET http://localhost:3000/api/rastreamento/posicoes` retorna `200`
-- [ ] Response é um array (mesmo que vazio se o dispositivo não estiver no banco AgilLock)
-- [ ] Sem erros `502` (indicaria que o backend não consegue chegar no Traccar)
+Testar antes mesmo de ter posições reais — só verifica se o backend consegue falar com o Traccar.
 
-### 3.2 — Dispositivo sincronizado entre AgilLock e Traccar
+```
+GET http://localhost:3000/api/rastreamento/posicoes
+Authorization: Bearer <token_admin>
+```
 
-- [ ] Cadastrar um `Dispositivo` no AgilLock com o mesmo IMEI do aparelho cadastrado no Traccar
-  - Ir em Admin → Dispositivos → Novo
-  - Preencher `identificador` com o IMEI
-- [ ] `GET /api/rastreamento/posicoes` retorna o dispositivo com `traccarId` preenchido (não `null`)
-- [ ] Campo `posicao` no response tem `latitude` e `longitude` válidos
-- [ ] Campo `velocidade` está em km/h (não em knots — verificar se é valor razoável)
+- [ ] Retorna `200` (não `502`)
+- [ ] Response é um array (vazio se nenhum dispositivo do AgilLock tem IMEI cadastrado no Traccar)
+
+### 3.2 — Dispositivo sincronizado entre AgilLock e Traccar *(Postman → produção)*
+
+```
+GET https://api.agillock.com.br/api/rastreamento/posicoes
+Authorization: Bearer <token_admin>
+```
+
+- [ ] Cadastrar `Dispositivo` no AgilLock com o mesmo IMEI do aparelho (Admin → Dispositivos → Novo)
+- [ ] Response retorna o dispositivo com `traccarId` preenchido (não `null`)
+- [ ] Campo `posicao.latitude` e `posicao.longitude` têm valores reais
+- [ ] Campo `posicao.velocidade` está em **km/h** (valor razoável — não em knots)
 - [ ] Campo `status` é `"online"`
 
-### 3.3 — Histórico de posições via backend
+### 3.3 — Histórico de posições *(Postman → produção)*
 
 ```
-GET http://localhost:3000/api/rastreamento/dispositivos/ID_AGILLOCK/historico
-Authorization: Bearer <token>
+GET https://api.agillock.com.br/api/rastreamento/dispositivos/ID_AGILLOCK/historico
+Authorization: Bearer <token_admin>
 ```
 
-- [ ] Retorna `200` com objeto `{ dispositivo, total, posicoes }`
-- [ ] `total` é maior que 0
+- [ ] Retorna `200` com `{ dispositivo, total, posicoes }`
+- [ ] `total` maior que 0
 - [ ] Posições têm `latitude`, `longitude`, `velocidade`, `fixTime`
 
-### 3.4 — Relatório de viagens
+### 3.4 — Relatório de viagens *(Postman → produção, após o dispositivo fazer uma viagem)*
 
-> Requer que o dispositivo tenha feito pelo menos uma viagem (ligou, andou, desligou).
+> Requer que o dispositivo tenha ligado, se movido e desligado pelo menos uma vez.
 
 ```
-GET http://localhost:3000/api/rastreamento/dispositivos/ID_AGILLOCK/viagens
+GET https://api.agillock.com.br/api/rastreamento/dispositivos/ID_AGILLOCK/viagens
+Authorization: Bearer <token_admin>
 ```
 
-- [ ] Retorna array de viagens
-- [ ] Cada viagem tem `inicio`, `fim`, `distancia` (em km), `velocidadeMedia`, `duracao` (em minutos)
+- [ ] Retorna array de viagens com `inicio`, `fim`, `distancia` (km), `velocidadeMedia`, `duracao` (minutos)
 
-### 3.5 — Tratamento de erro (Traccar offline)
+### 3.5 — Tratamento de erro (Traccar offline) *(no servidor via SSH)*
 
-- [ ] Parar o container Traccar: `docker compose -f docker-compose.dev.yml stop traccar`
-- [ ] `GET /api/rastreamento/posicoes` retorna `502` com `{ "error": "Servidor de rastreamento indisponível." }`
-- [ ] Subir novamente: `docker compose -f docker-compose.dev.yml start traccar`
-- [ ] Rota volta a funcionar normalmente
+```bash
+docker compose stop traccar
+```
+
+```
+GET https://api.agillock.com.br/api/rastreamento/posicoes
+```
+
+- [ ] Retorna `502` com `{ "error": "Servidor de rastreamento indisponível." }`
+
+```bash
+docker compose start traccar
+```
+
+- [ ] Rota volta a retornar `200` após o Traccar reiniciar
 
 ---
 
-## Fase 4 — WebSocket (tempo real)
+## Fase 4 — WebSocket tempo real *(produção)*
 
-Objetivo: confirmar que atualizações de posição chegam ao frontend em tempo real via WebSocket.
+Objetivo: confirmar que atualizações de posição chegam ao frontend em ~1-2 segundos.
 
-### 4.1 — WebSocket bridge conectado
+### 4.1 — Bridge conectada ao Traccar *(logs do servidor)*
 
-- [ ] Ao subir o backend, logs mostram:
-  ```
-  [WS Traccar] Conectando...
-  [WS Traccar] Conectado.
-  ```
-- [ ] Sem mensagens de erro de autenticação
+```bash
+docker compose logs backend | grep -i "WS Traccar"
+```
 
-### 4.2 — Cliente frontend recebe mensagens
+- [ ] Mostra `[WS Traccar] Conectando...`
+- [ ] Mostra `[WS Traccar] Conectado.`
+- [ ] Sem erros de autenticação
 
-Teste rápido no console do browser (com token válido):
+### 4.2 — Frontend recebe mensagens em tempo real *(browser em produção)*
+
+Abrir o console do browser na tela do AgilLock e executar:
 
 ```javascript
 const token = localStorage.getItem('al_token');
-const ws = new WebSocket(`ws://localhost:3000/ws/rastreamento?token=${token}`);
-ws.onmessage = (e) => console.log('WS recebido:', JSON.parse(e.data));
-ws.onopen = () => console.log('WS conectado!');
+const ws = new WebSocket(`wss://api.agillock.com.br/ws/rastreamento?token=${token}`);
+ws.onmessage = (e) => console.log('WS:', JSON.parse(e.data));
+ws.onopen = () => console.log('Conectado!');
 ```
 
-- [ ] Console mostra `WS conectado!`
-- [ ] Ao mover o dispositivo, mensagem com `positions` aparece no console em ~1-2 segundos
-- [ ] Campos `velocidade` (km/h), `latitude`, `longitude`, `curso` presentes na mensagem
+- [ ] Console mostra `Conectado!`
+- [ ] Ao mover o dispositivo, mensagem com `positions` aparece em ~1-2 segundos
+- [ ] Campos `velocidade`, `latitude`, `longitude`, `curso` presentes
 
-### 4.3 — Reconexão automática
+### 4.3 — Reconexão automática *(no servidor via SSH)*
 
-- [ ] Parar o container Traccar por 10s e religar
+```bash
+docker compose restart traccar
+```
+
 - [ ] Logs do backend mostram `[WS Traccar] Conexão fechada. Reconectando em 5s...`
-- [ ] Após ~5s, `[WS Traccar] Conectado.` aparece nos logs
-- [ ] Frontend continua recebendo mensagens após a reconexão
+- [ ] Após ~5-10s, `[WS Traccar] Conectado.` aparece
+- [ ] Frontend volta a receber mensagens sem precisar recarregar a página
 
 ---
 
-## Fase 5 — Frontend (tela rastreamento.html)
+## Fase 5 — Frontend tela rastreamento.html *(produção)*
 
-Objetivo: validar a tela de mapa com todos os comportamentos esperados.
+Objetivo: validar a tela de mapa com dados reais do dispositivo.
 
 ### 5.1 — Carregamento inicial
 
 - [ ] Tela abre sem erros no console do browser
-- [ ] Mapa renderiza corretamente (tiles OpenStreetMap carregam)
+- [ ] Mapa renderiza com tiles OpenStreetMap
 - [ ] Badge `● Tempo real ativo` (verde) aparece no canto inferior direito
-- [ ] Sidebar mostra o veículo de teste na lista
-- [ ] Contador de status (online/offline) está correto
+- [ ] Sidebar mostra o veículo com status correto
+- [ ] Marcador aparece na posição real do dispositivo
 
-### 5.2 — Marcador no mapa
+### 5.2 — Marcador e popup
 
-- [ ] Marcador aparece na posição correta do dispositivo
-- [ ] Cor do marcador: azul se em movimento, verde se parado online, cinza se offline
-- [ ] Ao clicar no marcador, popup abre com nome, placa, status, velocidade
-- [ ] Link "Ver detalhes" no popup está presente
+- [ ] Cor do marcador correta: azul (em movimento), verde (parado online), cinza (offline)
+- [ ] Clicar no marcador abre popup com nome, placa, status, velocidade, cliente
+- [ ] Triângulo do marcador aponta na direção de movimento (`curso`)
 
 ### 5.3 — Atualização em tempo real
 
-- [ ] Mover o dispositivo (ou simular movimento)
-- [ ] Marcador se move no mapa **sem recarregar a página**
-- [ ] Item na sidebar atualiza velocidade/status em tempo real
-- [ ] Rotação do marcador (triângulo) acompanha a direção do veículo (`curso`)
+- [ ] Mover o dispositivo → marcador se move no mapa sem recarregar a página
+- [ ] Velocidade na sidebar atualiza em tempo real
+- [ ] Status muda de verde (parado) para azul (em movimento) conforme o veículo anda
 
 ### 5.4 — Sidebar e filtro
 
-- [ ] Digitar parte do nome ou placa no campo de busca → lista filtra em tempo real
-- [ ] Clicar em um item da sidebar → mapa centraliza no veículo e abre popup
-- [ ] Item fica destacado (fundo azul) após ser clicado
+- [ ] Campo de busca filtra por nome/placa em tempo real
+- [ ] Clicar na sidebar centraliza o mapa no veículo e abre popup
 - [ ] Veículos em movimento aparecem no topo da lista
 
-### 5.5 — Veículo sem posição
+### 5.5 — Resiliência (Traccar offline) *(no servidor via SSH)*
 
-- [ ] Cadastrar um dispositivo no AgilLock com IMEI que **não existe** no Traccar
-- [ ] Dispositivo aparece na sidebar com texto `Sem posição` em laranja
-- [ ] Nenhum marcador no mapa para esse dispositivo
-- [ ] Não gera erro no console
-
-### 5.6 — Traccar offline (resiliência)
-
-- [ ] Parar o container Traccar
-- [ ] Recarregar a tela `rastreamento.html`
-- [ ] Badge muda para `● Reconectando...` (amarelo/laranja)
-- [ ] Nenhum erro crítico no console (sem tela em branco)
-- [ ] Religar o Traccar → badge volta para `● Tempo real ativo` automaticamente
-
----
-
-## Fase 6 — Ativar filtros e testar comportamento de produção
-
-Objetivo: validar que o sistema se comporta corretamente com os filtros de posição ativos.
-
-### 6.1 — Ativar filtros no `traccar.dev.xml`
-
-Descomentar o bloco de filtros em `backend/traccar/traccar.dev.xml`:
-
-```xml
-<entry key='filter.enable'>true</entry>
-<entry key='filter.invalid'>true</entry>
-<entry key='filter.zero'>true</entry>
-<entry key='filter.duplicate'>true</entry>
-<entry key='filter.future'>600</entry>
-```
-
-Reiniciar o container:
 ```bash
-docker compose -f docker-compose.dev.yml restart traccar
+docker compose stop traccar
 ```
 
-### 6.2 — Verificar comportamento
+- [ ] Badge muda para `● Reconectando...`
+- [ ] Nenhum erro crítico no console (sem tela em branco)
 
-- [ ] Posições com `valid=true` continuam chegando normalmente
-- [ ] Posições duplicadas (dispositivo parado por muito tempo) não poluem o banco
-- [ ] Nenhuma posição `0.0, 0.0` aparece no banco `tc_positions`
-
-```sql
--- Verificar se existe alguma posição inválida que escapou
-SELECT id, deviceid, valid, latitude, longitude, fixtime
-FROM tc_positions
-WHERE valid = false OR (latitude = 0 AND longitude = 0)
-ORDER BY fixtime DESC LIMIT 10;
+```bash
+docker compose start traccar
 ```
 
-- [ ] Query retorna 0 linhas (todos os inválidos foram filtrados)
-
-### 6.3 — Confirmar que filtros não quebram o fluxo
-
-- [ ] `GET /api/rastreamento/posicoes` continua retornando posições válidas
-- [ ] WebSocket continua recebendo atualizações de posição válidas
-- [ ] Mapa do frontend atualiza normalmente
+- [ ] Badge volta para `● Tempo real ativo` automaticamente
 
 ---
 
-## Fase 7 — Pré-deploy (validação final antes de ir para produção)
+## Fase 6 — Estabilidade e filtros *(produção — após uso contínuo)*
 
-Objetivo: checklist final para garantir que tudo está pronto para o servidor Hostinger.
+Objetivo: garantir que o sistema está estável com filtros ativos após uso real prolongado.
 
-### 7.1 — Configurações de produção
+### 6.1 — Verificar filtros ativos no banco *(após ~30min de uso)*
 
-- [ ] `traccar/traccar.xml` revisado (filtros ativos, senha via `${POSTGRES_PASSWORD}`)
-- [ ] `docker-compose.yml` tem o serviço `traccar` adicionado
-- [ ] Porta `8082` **não** está exposta no `docker-compose.yml` de produção
-- [ ] Porta `5023` está exposta no `docker-compose.yml` de produção
-- [ ] Variáveis `TRACCAR_URL`, `TRACCAR_USER`, `TRACCAR_PASSWORD` estão no `.env` do servidor
+```bash
+docker compose exec postgres psql -U agillock_user -d traccar -c "
+SELECT COUNT(*) as total,
+       COUNT(*) FILTER (WHERE valid = false) as invalidas,
+       COUNT(*) FILTER (WHERE latitude = 0 AND longitude = 0) as zeradas
+FROM tc_positions;"
+```
 
-### 7.2 — Testes de carga mínima
+- [ ] `invalidas` = 0 (filtro descartou posições com `valid=false`)
+- [ ] `zeradas` = 0 (filtro descartou coordenadas 0,0)
 
-- [ ] Dispositivo funcionando por 30 minutos contínuos sem erros nos logs
-- [ ] Banco `traccar` acumulando posições sem crescimento anormal
-- [ ] Backend Node.js sem memory leak (monitorar com `docker stats`)
+### 6.2 — Funcionamento contínuo por 30 minutos
 
-### 7.3 — Simulação de queda e recuperação
+- [ ] Dispositivo funcionando 30min sem erros nos logs do Traccar
+- [ ] Backend sem erros relacionados ao WebSocket bridge
+- [ ] `docker stats` mostra memória estável (sem crescimento contínuo)
 
-- [ ] Reiniciar o container Traccar em "produção simulada" → dispositivo reconecta sozinho
-- [ ] Reiniciar o container backend → WebSocket bridge reconecta com o Traccar
-- [ ] Frontend detecta reconexão e exibe badge correto
-
-### 7.4 — Firewall do servidor Hostinger
-
-- [ ] Porta `5023` TCP aberta no painel de firewall da Hostinger
-- [ ] Porta `8082` **bloqueada** para acesso externo (só Docker interno)
-- [ ] Porta `443` aberta para HTTPS (frontend + API)
-
-### 7.5 — Deploy
-
-- [ ] Código enviado para o servidor (git pull / build)
-- [ ] Banco `traccar` criado no PostgreSQL de produção
-- [ ] `docker compose up -d` sobe todos os serviços incluindo Traccar
-- [ ] Dispositivo reconfigurado via SMS apontando para o domínio/IP de produção:
-  ```
-  SERVER,0,seudominio.com.br,5023,0#
-  ```
-- [ ] Dispositivo aparece online na Web UI do Traccar em produção
-- [ ] Tela `rastreamento.html` funcionando em produção com tempo real
+```bash
+docker stats --no-stream
+```
 
 ---
 
 ## Registro de problemas
-
-> Anotar aqui qualquer problema encontrado durante os testes com descrição e solução.
 
 | Data | Fase | Problema | Solução |
 |---|---|---|---|
