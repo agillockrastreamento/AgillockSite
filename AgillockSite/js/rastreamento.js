@@ -157,7 +157,7 @@ function renderMarcadores() {
       marcadores[id].getPopup().setContent(criarPopup(v));
     } else {
       const marker = L.marker([latitude, longitude], { icon: icone })
-        .bindPopup(criarPopup(v), { autoPanPadding: L.point(10, 70) })
+        .bindPopup(criarPopup(v), { autoPanPadding: L.point(10, 70), className: 'popup-veiculo' })
         .addTo(map);
       marker.on('click', () => destacar(id));
       marcadores[id] = marker;
@@ -180,7 +180,7 @@ function atualizarMarcador(dispositivoId) {
     }
   } else {
     const marker = L.marker([latitude, longitude], { icon: icone })
-      .bindPopup(criarPopup(v))
+      .bindPopup(criarPopup(v), { autoPanPadding: L.point(10, 70), className: 'popup-veiculo' })
       .addTo(map);
     marker.on('click', () => destacar(dispositivoId));
     marcadores[dispositivoId] = marker;
@@ -278,29 +278,43 @@ function criarPopup(v) {
   const addrId = `addr-${v.dispositivoId}`;
   const apiBase = window.API_URL || '';
 
+  // Endereço: usa cache para não mostrar "Buscando..." se já foi resolvido
+  const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
+  const coords = p ? `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})` : '';
+  const cachedAddr = cacheKey ? _geocodeCache[cacheKey] : null;
+  const addrTxt = cachedAddr ? `${cachedAddr} ${coords}` : 'Buscando...';
+
+  // Bateria
+  const bat = p?.bateria != null ? p.bateria : null;
+  const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
+  const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
+
   const imgHtml = v.imagemUrl
-    ? `<div style="margin:-13px -24px 10px;overflow:hidden;border-radius:8px 8px 0 0;height:110px">
-        <img src="${apiBase}${v.imagemUrl}" style="width:100%;height:100%;object-fit:cover;display:block"
-          onerror="this.parentElement.style.display='none'" />
-      </div>`
+    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:115px;object-fit:cover;display:block;image-rendering:auto"
+        onerror="this.style.display='none'" />`
     : '';
 
-  return `<div style="min-width:220px;font-size:13px">
+  return `<div style="font-size:13px">
     ${imgHtml}
-    <strong style="display:block;margin-bottom:3px">${v.nome}</strong>
-    ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}
-    ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
-    <div style="font-size:12px;color:${corStatus}">● ${txtStatus}</div>
-    ${ign ? `<div style="font-size:11px;margin-top:2px">${ign}</div>` : ''}
-    ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px"><i class="fa fa-user" style="width:12px"></i> ${v.cliente.nome}</div>` : ''}
-    ${p?.fixTime ? `<div style="font-size:11px;margin-top:5px;color:#888"><i class="fa fa-clock-o"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
-    ${p ? `<div style="font-size:11px;margin-top:2px;color:#888;line-height:1.4"><i class="fa fa-map-pin"></i>
-        <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">Buscando...</span>
-      </div>` : ''}
-    <div style="margin-top:8px">
-      <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
-        <i class="fa fa-map-marker"></i> Ver detalhes
-      </a>
+    <div style="padding:10px 14px 12px">
+      <strong style="display:block;font-size:14px;margin-bottom:3px">${v.nome}</strong>
+      ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}
+      ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px">
+        <span style="color:${corStatus}">● ${txtStatus}</span>
+        ${ign ? `<span style="font-size:11px">${ign}</span>` : ''}
+      </div>
+      ${bat != null ? `<div style="font-size:11px;color:#888;margin-top:3px"><i class="fa ${batFa}" style="color:${batCor}"></i> Bateria: ${bat}%</div>` : ''}
+      ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px"><i class="fa fa-user" style="width:12px"></i> ${v.cliente.nome}</div>` : ''}
+      ${p?.fixTime ? `<div style="font-size:11px;color:#888;margin-top:5px"><i class="fa fa-clock-o"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
+      ${p ? `<div style="font-size:11px;color:#888;margin-top:2px;line-height:1.4"><i class="fa fa-map-pin"></i>
+          <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
+        </div>` : ''}
+      <div style="margin-top:8px">
+        <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
+          <i class="fa fa-map-marker"></i> Ver detalhes
+        </a>
+      </div>
     </div>
   </div>`;
 }
