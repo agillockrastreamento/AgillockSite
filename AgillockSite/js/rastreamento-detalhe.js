@@ -25,11 +25,30 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function inicializarMapa() {
-  map = L.map('mapa-detalhe', { zoomControl: true }).setView([-15.78, -47.93], 5);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-    maxZoom: 19,
-  }).addTo(map);
+  map = L.map('mapa-detalhe', { zoomControl: true, maxZoom: 21 }).setView([-15.78, -47.93], 5);
+
+  const tilesCartoDB = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxNativeZoom: 19, maxZoom: 21 }
+  );
+  const tilesOsm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>', maxNativeZoom: 19, maxZoom: 21 }
+  );
+  const tilesEsri = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    { attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>', maxNativeZoom: 19, maxZoom: 21 }
+  );
+
+  tilesCartoDB.addTo(map);
+
+  L.control.layers(
+    { 'CartoDB Voyager': tilesCartoDB, 'OpenStreetMap': tilesOsm, 'ESRI Street': tilesEsri },
+    {},
+    { position: 'topright', collapsed: true }
+  ).addTo(map);
+
+  L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 }
 
 // ── Seletor de período ────────────────────────────────────────────────────────
