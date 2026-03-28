@@ -16,6 +16,22 @@ services:
       timeout: 5s
       retries: 10
 
+  traccar:
+    image: traccar/traccar:latest
+    container_name: traccar_dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8082:8082"   # Web UI + API — acessível em http://localhost:8082
+      - "5023:5023"   # Protocolo GT06 (TCP) — dispositivos GPS apontam para este IP
+    volumes:
+      - ./traccar/traccar.dev.xml:/opt/traccar/conf/traccar.xml:ro
+      - traccar_dev_logs:/opt/traccar/logs
+    environment:
+      - TZ=America/Sao_Paulo
+
   backend:
     image: node:20-alpine
     working_dir: /app
@@ -43,6 +59,10 @@ services:
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium-browser
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "1000"
+      # Traccar (rede interna Docker — backend acessa via nome do serviço)
+      TRACCAR_URL: http://traccar:8082
+      TRACCAR_USER: ${TRACCAR_USER:-admin@agillock.com.br}
+      TRACCAR_PASSWORD: ${TRACCAR_PASSWORD:-AdminTraccar@dev}
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,3 +70,4 @@ services:
 
 volumes:
   postgres_dev_data:
+  traccar_dev_logs:

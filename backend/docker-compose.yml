@@ -33,6 +33,36 @@ services:
     networks:
       - agillock_net
 
+  traccar:
+    image: traccar/traccar:latest
+    container_name: traccar
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5023:5023"   # Protocolo GT06 — exposto publicamente para os dispositivos GPS
+      # Porta 8082 NÃO exposta — backend acessa via rede interna Docker
+    environment:
+      - CONFIG_USE_ENVIRONMENT_VARIABLES=true
+      - DATABASE_DRIVER=org.postgresql.Driver
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/traccar
+      - DATABASE_USER=agillock_user
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
+      - WEB_PORT=8082
+      - GT06_PORT=5023
+      - TIME_ZONE=America/Sao_Paulo
+      - FILTER_ENABLE=true
+      - FILTER_INVALID=true
+      - FILTER_ZERO=true
+      - FILTER_DUPLICATE=true
+      - FILTER_FUTURE=600
+      - DATABASE_POSITIONS_HISTORY_DAYS=365
+    volumes:
+      - traccar_logs:/opt/traccar/logs
+    networks:
+      - agillock_net
+
   nginx:
     image: nginx:alpine
     restart: always
@@ -52,3 +82,4 @@ networks:
 
 volumes:
   postgres_data:
+  traccar_logs:

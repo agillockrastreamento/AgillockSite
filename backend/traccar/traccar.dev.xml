@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+
+<properties>
+
+  <!-- ── Banco de dados ── -->
+  <!-- Conecta ao serviço "postgres" da rede interna Docker (docker-compose.dev.yml) -->
+  <entry key='database.driver'>org.postgresql.Driver</entry>
+  <entry key='database.url'>jdbc:postgresql://postgres:5432/traccar</entry>
+  <entry key='database.user'>agillock_user</entry>
+  <entry key='database.password'>dev_password</entry>
+
+  <!-- ── Web Server ── -->
+  <entry key='web.port'>8082</entry>
+
+  <!-- ── Protocolo GT06 ── -->
+  <entry key='gt06.port'>5023</entry>
+
+  <!-- ── Fuso horário ── -->
+  <entry key='time.zone'>America/Sao_Paulo</entry>
+
+  <!-- ── Filtros de posição ── -->
+  <!--
+    FASE 1 (início dos testes): manter DESATIVADO.
+    O dispositivo pode enviar posições com valid=false ou lat/lng 0,0 enquanto
+    ainda não tem fix GPS. Com filtro ativo essas posições são descartadas
+    silenciosamente, dificultando o diagnóstico de conexão.
+
+    FASE 2 (conexão confirmada, posições chegando): ATIVAR descomentando abaixo.
+    Isso torna o comportamento idêntico à produção.
+
+  <entry key='filter.enable'>true</entry>
+  <entry key='filter.invalid'>true</entry>
+  <entry key='filter.zero'>true</entry>
+  <entry key='filter.duplicate'>true</entry>
+  <entry key='filter.future'>600</entry>
+  -->
+
+</properties>
