@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Rastreamento — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+
+  <style>
+    body { overflow: hidden; }
+
+    #rastreamento-layout {
+      display: flex;
+      height: calc(100vh - 50px);
+    }
+
+    /* ── Sidebar ── */
+    #sidebar-rastr {
+      width: 280px;
+      min-width: 280px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #ddd;
+      background: #fff;
+      z-index: 10;
+    }
+    .dark-theme #sidebar-rastr { background: #1e1e2e; border-color: #333; }
+
+    #sidebar-header-rastr { padding: 10px 12px; border-bottom: 1px solid #eee; }
+    .dark-theme #sidebar-header-rastr { border-color: #333; }
+
+    #sidebar-counters { font-size: 11px; color: #888; margin-top: 6px; }
+
+    #lista-veiculos { flex: 1; overflow-y: auto; }
+
+    .veiculo-item {
+      padding: 9px 12px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .dark-theme .veiculo-item { border-color: #2a2a3e; }
+    .veiculo-item:hover { background: #f7f7f7; }
+    .dark-theme .veiculo-item:hover { background: #252535; }
+    .veiculo-item.ativo { background: #e8f4fd; }
+    .dark-theme .veiculo-item.ativo { background: #1a3a5c; }
+
+    .v-nome { font-weight: 600; font-size: 13px; }
+    .v-placa {
+      display: inline-block;
+      background: #333; color: #fff;
+      padding: 0 5px; border-radius: 3px;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .v-status { font-size: 11px; margin-top: 3px; }
+    .v-cliente { font-size: 11px; color: #888; margin-top: 1px; }
+
+    .dot-online  { color: #27ae60; }
+    .dot-moving  { color: #2980b9; }
+    .dot-offline { color: #bdc3c7; }
+
+    /* ── Mapa ── */
+    #mapa { flex: 1; }
+
+    /* ── Badge WS status ── */
+    #ws-status {
+      position: fixed; bottom: 14px; right: 14px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+      z-index: 1000; opacity: 0.9;
+    }
+    #ws-status.conectado    { background: #27ae60; color: #fff; }
+    #ws-status.desconectado { background: #e74c3c; color: #fff; }
+    #ws-status.reconectando { background: #f39c12; color: #fff; }
+  </style>
+</head>
+
+<body>
+
+  <!-- Sidebar admin -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;"
+        onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout">
+        <i class="fa fa-sign-out"></i> Sair
+      </button>
+    </div>
+  </div>
+
+  <!-- Topbar -->
+  <div class="admin-topbar">
+    <button class="sidebar-toggle" id="sidebar-toggle">
+      <i class="fa fa-bars"></i>
+    </button>
+    <span class="topbar-title">Rastreamento</span>
+  </div>
+
+  <div class="admin-main">
+    <div id="rastreamento-layout">
+
+      <!-- Sidebar de veículos -->
+      <div id="sidebar-rastr">
+        <div id="sidebar-header-rastr">
+          <input type="text" id="filtro" class="form-control input-sm"
+                 placeholder="Buscar veículo ou placa...">
+          <div id="sidebar-counters">Carregando...</div>
+        </div>
+        <div id="lista-veiculos">
+          <div style="padding:20px;text-align:center;color:#aaa;font-size:12px">
+            <i class="fa fa-spin fa-spinner"></i> Carregando veículos...
+          </div>
+        </div>
+      </div>
+
+      <!-- Mapa -->
+      <div id="mapa"></div>
+
+    </div>
+  </div>
+
+  <!-- Badge WebSocket -->
+  <div id="ws-status" class="reconectando">
+    <i class="fa fa-circle"></i> Conectando...
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="rastreamento.js"></script>
+
+</body>
+</html>
