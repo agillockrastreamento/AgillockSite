@@ -9,6 +9,7 @@ let ws = null;
 let wsReconectando = false;
 let wsReconectTimer = null;
 let ativoId = null;
+const marcadoresIconeKey = {}; // cache do estado visual de cada marcador
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -189,21 +190,36 @@ function atualizarMarcador(dispositivoId) {
   if (!v?.posicao) return;
 
   const { latitude, longitude } = v.posicao;
-  const icone = criarIcone(v);
 
   if (marcadores[dispositivoId]) {
     marcadores[dispositivoId].setLatLng([latitude, longitude]);
-    marcadores[dispositivoId].setIcon(icone);
+
+    // Só recria o ícone se a cor ou categoria mudou (evita piscar)
+    const iconKey = _iconeKey(v);
+    if (marcadoresIconeKey[dispositivoId] !== iconKey) {
+      marcadores[dispositivoId].setIcon(criarIcone(v));
+      marcadoresIconeKey[dispositivoId] = iconKey;
+    }
+
     if (marcadores[dispositivoId].isPopupOpen()) {
       marcadores[dispositivoId].getPopup().setContent(criarPopup(v));
     }
   } else {
+    const icone = criarIcone(v);
+    marcadoresIconeKey[dispositivoId] = _iconeKey(v);
     const marker = L.marker([latitude, longitude], { icon: icone })
       .bindPopup(criarPopup(v), { autoPanPadding: L.point(10, 70), className: 'popup-veiculo' })
       .addTo(map);
     marker.on('click', () => destacar(dispositivoId));
     marcadores[dispositivoId] = marker;
   }
+}
+
+function _iconeKey(v) {
+  let cor = '#95a5a6';
+  if (v.status === 'online') cor = v.posicao?.motion ? '#2980b9' : '#27ae60';
+  if (v.limiteVelocidade && v.posicao?.velocidade > v.limiteVelocidade) cor = '#e74c3c';
+  return `${cor}|${v.categoria}`;
 }
 
 // ── Mapeamento categoria → ícone FontAwesome ──────────────────────────────────
@@ -323,7 +339,7 @@ function criarPopup(v) {
   return `<div style="font-size:13px;min-width:240px">
     ${imgHtml}
     <div style="padding:10px 14px 0">
-      <strong style="font-size:14px;line-height:1.2;display:block;text-align:center">${v.nome}</strong>
+      <strong style="font-size:14px;line-height:1.2;display:block">${v.nome}</strong>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
         ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1.5px">${v.placa}</span>` : '<span></span>'}
         <span style="font-size:11px;color:${corHeader}">● ${txtStatus}</span>
@@ -381,10 +397,16 @@ function renderSidebar() {
 function atualizarItemSidebar(dispositivoId) {
   const el = document.getElementById(`item-${dispositivoId}`);
   if (!el) { renderSidebar(); return; }
-  el.outerHTML = itemSidebarHtml(veiculosMap[dispositivoId]);
+  // Atualiza apenas o conteúdo interno — preserva o elemento no DOM (evita piscar)
+  el.className = `veiculo-item${dispositivoId === ativoId ? ' ativo' : ''}`;
+  el.innerHTML = _itemSidebarInner(veiculosMap[dispositivoId]);
 }
 
 function itemSidebarHtml(v) {
+  return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" id="item-${v.dispositivoId}" onclick="focar('${v.dispositivoId}')">${_itemSidebarInner(v)}</div>`;
+}
+
+function _itemSidebarInner(v) {
   const p = v.posicao;
   let dotClass = 'dot-offline', txtStatus = 'Offline';
   if (v.status === 'online' && p?.motion) {
@@ -408,7 +430,7 @@ function itemSidebarHtml(v) {
     batIcon = `<i class="fa ${faClass}" title="Bateria: ${pct}%" style="color:${corBat}"></i>`;
   }
 
-  return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" id="item-${v.dispositivoId}" onclick="focar('${v.dispositivoId}')">
+  return `
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div class="v-nome">${v.nome}
         ${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}
@@ -420,7 +442,7 @@ function itemSidebarHtml(v) {
       ${!p ? '&nbsp;<span style="color:#e67e22">· Sem posição</span>' : ''}
     </div>
     ${v.cliente ? `<div class="v-cliente">${v.cliente.nome}</div>` : ''}
-  </div>`;
+  `;
 }
 
 function pesoStatus(v) {
