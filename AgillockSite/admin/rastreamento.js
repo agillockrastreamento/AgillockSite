@@ -213,7 +213,7 @@ function criarPopup(v) {
     ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px">${v.cliente.nome}</div>` : ''}
     ${p?.fixTime ? `<div style="font-size:10px;color:#aaa;margin-top:4px">${window.AL.fmtDate(p.fixTime)}</div>` : ''}
     <div style="margin-top:8px">
-      <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary">
+      <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
         <i class="fa fa-map-marker"></i> Ver detalhes
       </a>
     </div>
