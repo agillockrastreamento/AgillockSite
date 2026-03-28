@@ -273,7 +273,7 @@ function svgVelocimetro(velocidade, limite) {
   const arc = f > 0.01
     ? `<path d="M 10 45 A 30 30 0 ${largeArc} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>`
     : '';
-  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:10px auto 10px">
+  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:4px auto 8px">
     <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="#e9ecef" stroke-width="7" stroke-linecap="round"/>
     ${arc}
     <text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#333">${velocidade}</text>
@@ -322,14 +322,14 @@ function criarPopup(v) {
 
   return `<div style="font-size:13px;min-width:240px">
     ${imgHtml}
-    <div style="background:${corHeader};padding:10px 14px 9px;color:#fff">
-      <div style="font-weight:700;font-size:14px;line-height:1.2;margin-bottom:5px">${v.nome}</div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        ${v.placa ? `<span style="background:rgba(0,0,0,0.22);padding:1px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1.5px">${v.placa}</span>` : '<span></span>'}
-        <span style="font-size:11px;opacity:0.92">${txtStatus}</span>
+    <div style="padding:10px 14px 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <strong style="font-size:14px;line-height:1.2">${v.nome}</strong>
+        ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1.5px;flex-shrink:0;margin-left:8px">${v.placa}</span>` : ''}
       </div>
+      <div style="font-size:11px;color:${corHeader};margin-top:3px">● ${txtStatus}</div>
     </div>
-    <div style="padding:8px 14px 12px">
+    <div style="padding:0 14px 12px">
       ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
       ${(ignHtml || bat != null) ? `<div style="display:flex;gap:14px;font-size:11px;margin-bottom:6px">
         ${ignHtml}
