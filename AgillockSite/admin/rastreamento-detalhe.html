@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Detalhe Rastreamento — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+
+  <style>
+    body { overflow: hidden; }
+
+    .admin-content {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #detalhe-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar de detalhe ── */
+    #sidebar-detalhe {
+      width: 300px;
+      min-width: 300px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #ddd;
+      background: #fff;
+      z-index: 10;
+      overflow: hidden;
+    }
+    .dark-theme #sidebar-detalhe { background: #1e1e2e; border-color: #333; }
+
+    .detalhe-section {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eee;
+      flex-shrink: 0;
+    }
+    .dark-theme .detalhe-section { border-color: #2a2a3e; }
+
+    .detalhe-section-titulo {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #aaa;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    /* ── Stats cards ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .stat-card {
+      background: #f7f7f7;
+      border-radius: 6px;
+      padding: 7px 8px;
+      text-align: center;
+    }
+    .dark-theme .stat-card { background: #252535; }
+    .stat-valor { font-size: 17px; font-weight: 700; color: #2980b9; }
+    .stat-label { font-size: 10px; color: #aaa; margin-top: 1px; }
+
+    /* ── Lista de viagens ── */
+    #viagens-lista {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .viagem-card {
+      padding: 8px 12px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .dark-theme .viagem-card { border-color: #2a2a3e; }
+    .viagem-card:hover { background: #f7f7f7; }
+    .dark-theme .viagem-card:hover { background: #252535; }
+    .viagem-card.ativo { background: #e8f4fd; }
+    .dark-theme .viagem-card.ativo { background: #1a3a5c; }
+
+    .viagem-hora { font-size: 12px; font-weight: 600; }
+    .viagem-info { font-size: 11px; color: #888; margin-top: 2px; }
+
+    /* ── Seletor de período ── */
+    #periodo-selector { display: flex; flex-direction: column; gap: 6px; }
+    #periodo-selector .btn-group { width: 100%; }
+    #periodo-selector .btn-group .btn { flex: 1; font-size: 11px; }
+    .input-periodo { display: flex; align-items: center; gap: 4px; }
+    .input-periodo input[type=date] { flex: 1; font-size: 11px; }
+    .input-periodo span { font-size: 11px; color: #aaa; }
+
+    /* ── Área do mapa ── */
+    #mapa-wrap {
+      flex: 1;
+      position: relative;
+    }
+    #mapa-detalhe { width: 100%; height: 100%; }
+
+    #mapa-sem-dados {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.85);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
+      color: #888;
+    }
+    .dark-theme #mapa-sem-dados { background: rgba(20,24,32,0.85); }
+
+    /* ── Loading overlay ── */
+    #loading-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.7);
+      z-index: 600;
+      align-items: center;
+      justify-content: center;
+    }
+    .dark-theme #loading-overlay { background: rgba(20,24,32,0.7); }
+
+    /* ── Período activo btn ── */
+    #btn-hoje.active, #btn-ontem.active, #btn-7dias.active {
+      background: #2980b9;
+      color: #fff;
+      border-color: #2980b9;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar admin -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <a href="rastreamento.html" class="btn btn-default btn-sm">
+          <i class="fa fa-arrow-left"></i> Rastreamento
+        </a>
+        <h2 class="topbar-title" id="topbar-nome-veiculo" style="margin:0;font-size:15px">Carregando...</h2>
+      </div>
+    </div>
+
+    <div id="detalhe-layout">
+
+      <!-- Sidebar de detalhe -->
+      <div id="sidebar-detalhe">
+
+        <!-- Info do veículo -->
+        <div class="detalhe-section">
+          <div class="detalhe-section-titulo">Veículo</div>
+          <div id="info-veiculo">
+            <div style="color:#aaa;font-size:12px"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+          </div>
+        </div>
+
+        <!-- Seletor de período -->
+        <div class="detalhe-section">
+          <div class="detalhe-section-titulo">Período</div>
+          <div id="periodo-selector">
+            <div class="btn-group">
+              <button id="btn-hoje" class="btn btn-default btn-sm active">Hoje</button>
+              <button id="btn-ontem" class="btn btn-default btn-sm">Ontem</button>
+              <button id="btn-7dias" class="btn btn-default btn-sm">7 dias</button>
+            </div>
+            <div class="input-periodo">
+              <input type="date" id="input-from" class="form-control input-sm" />
+              <span>até</span>
+              <input type="date" id="input-to" class="form-control input-sm" />
+              <button id="btn-buscar" class="btn btn-sm btn-primary-al" title="Buscar">
+                <i class="fa fa-search"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="detalhe-section">
+          <div class="detalhe-section-titulo">Resumo do período</div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-valor" id="stat-km">—</div>
+              <div class="stat-label">Distância</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-valor" id="stat-velmax">—</div>
+              <div class="stat-label">Vel. Máxima</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-valor" id="stat-tempo">—</div>
+              <div class="stat-label">Em Movimento</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-valor" id="stat-viagens">—</div>
+              <div class="stat-label">Viagens</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de viagens -->
+        <div class="detalhe-section" style="padding-bottom:6px;">
+          <div class="detalhe-section-titulo">Viagens</div>
+        </div>
+        <div id="viagens-lista">
+          <div id="viagens-carregando" style="padding:16px;text-align:center;color:#aaa;font-size:12px">
+            <i class="fa fa-spinner fa-spin"></i> Carregando...
+          </div>
+          <div id="viagens-sem-dados" style="display:none;padding:16px;text-align:center;color:#aaa;font-size:12px">
+            Nenhuma viagem registrada neste período.
+          </div>
+        </div>
+
+      </div><!-- /sidebar-detalhe -->
+
+      <!-- Mapa -->
+      <div id="mapa-wrap">
+        <div id="mapa-detalhe"></div>
+        <div id="mapa-sem-dados">
+          <i class="fa fa-map-o" style="font-size:36px;color:#ddd"></i>
+          <span>Nenhuma posição registrada neste período.</span>
+        </div>
+        <div id="loading-overlay">
+          <i class="fa fa-spinner fa-spin fa-2x" style="color:#2980b9"></i>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || user.email || '—';
+      var badge = document.getElementById('user-badge');
+      badge.textContent = user.role;
+      badge.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+    })();
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="rastreamento-detalhe.js"></script>
+
+</body>
+</html>
