@@ -8,6 +8,7 @@ let traccarIdParaDispositivoId = {};
 let ws = null;
 let wsReconectando = false;
 let wsReconectTimer = null;
+let ativoId = null;
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -322,7 +323,7 @@ function criarPopup(v) {
   return `<div style="font-size:13px;min-width:240px">
     ${imgHtml}
     <div style="padding:10px 14px 0">
-      <strong style="font-size:14px;line-height:1.2;display:block">${v.nome}</strong>
+      <strong style="font-size:14px;line-height:1.2;display:block;text-align:center">${v.nome}</strong>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
         ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1.5px">${v.placa}</span>` : '<span></span>'}
         <span style="font-size:11px;color:${corHeader}">● ${txtStatus}</span>
@@ -407,7 +408,7 @@ function itemSidebarHtml(v) {
     batIcon = `<i class="fa ${faClass}" title="Bateria: ${pct}%" style="color:${corBat}"></i>`;
   }
 
-  return `<div class="veiculo-item" id="item-${v.dispositivoId}" onclick="focar('${v.dispositivoId}')">
+  return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" id="item-${v.dispositivoId}" onclick="focar('${v.dispositivoId}')">
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div class="v-nome">${v.nome}
         ${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}
@@ -440,6 +441,7 @@ window.focar = function (dispositivoId) {
 };
 
 function destacar(dispositivoId) {
+  ativoId = dispositivoId;
   document.querySelectorAll('.veiculo-item').forEach(el => el.classList.remove('ativo'));
   const el = document.getElementById(`item-${dispositivoId}`);
   if (el) { el.classList.add('ativo'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
