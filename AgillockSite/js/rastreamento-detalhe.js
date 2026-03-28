@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', function () {
   inicializarMapa();
   configurarPeriodo();
   carregarDados();
+  document.getElementById('btn-pdf').addEventListener('click', () => window.print());
 });
 
 function inicializarMapa() {

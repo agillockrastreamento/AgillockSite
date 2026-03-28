@@ -97,9 +97,23 @@
     #periodo-selector { display: flex; flex-direction: column; gap: 6px; }
     #periodo-selector .btn-group { width: 100%; }
     #periodo-selector .btn-group .btn { flex: 1; font-size: 11px; }
-    .input-periodo { display: flex; align-items: center; gap: 4px; }
-    .input-periodo input[type=date] { flex: 1; font-size: 11px; }
-    .input-periodo span { font-size: 11px; color: #aaa; }
+    #periodo-selector input[type=date] { font-size: 11px; }
+
+    /* ── Impressão ── */
+    @media print {
+      .admin-sidebar, .sidebar-overlay, .admin-topbar, #mapa-wrap, #loading-overlay { display: none !important; }
+      body { overflow: visible !important; }
+      .admin-content { height: auto !important; }
+      #detalhe-layout { flex-direction: column !important; }
+      #sidebar-detalhe {
+        width: 100% !important; min-width: unset !important;
+        border: none !important; overflow: visible !important;
+      }
+      #viagens-lista { overflow: visible !important; max-height: none !important; }
+      .viagem-card { break-inside: avoid; page-break-inside: avoid; }
+      #periodo-selector { display: none !important; }
+      .detalhe-section-titulo { font-size: 12px !important; }
+    }
 
     /* ── Área do mapa ── */
     #mapa-wrap {
@@ -178,10 +192,15 @@
     <div class="admin-topbar">
       <div style="display:flex;align-items:center;gap:12px;">
         <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
-        <a href="rastreamento.html" class="btn btn-default btn-sm">
-          <i class="fa fa-arrow-left"></i> Rastreamento
+        <a href="rastreamento.html" class="btn btn-default btn-sm" title="Voltar para Rastreamento">
+          <i class="fa fa-arrow-left"></i>
         </a>
         <h2 class="topbar-title" id="topbar-nome-veiculo" style="margin:0;font-size:15px">Carregando...</h2>
+      </div>
+      <div>
+        <button id="btn-pdf" class="btn btn-default btn-sm">
+          <i class="fa fa-file-pdf-o"></i> Relatório PDF
+        </button>
       </div>
     </div>
 
@@ -207,14 +226,13 @@
               <button id="btn-ontem" class="btn btn-default btn-sm">Ontem</button>
               <button id="btn-7dias" class="btn btn-default btn-sm">7 dias</button>
             </div>
-            <div class="input-periodo">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:2px">
               <input type="date" id="input-from" class="form-control input-sm" />
-              <span>até</span>
               <input type="date" id="input-to" class="form-control input-sm" />
-              <button id="btn-buscar" class="btn btn-sm btn-primary-al" title="Buscar">
-                <i class="fa fa-search"></i>
-              </button>
             </div>
+            <button id="btn-buscar" class="btn btn-sm btn-primary-al" style="width:100%;margin-top:4px">
+              <i class="fa fa-search"></i> Buscar
+            </button>
           </div>
         </div>
 
