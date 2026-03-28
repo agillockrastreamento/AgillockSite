@@ -15,6 +15,7 @@ import configuracoesRoutes from './routes/configuracoes.routes';
 import adminRoutes from './routes/admin.routes';
 import webhooksRoutes from './routes/webhooks.routes';
 import contratosRoutes from './routes/contratos.routes';
+import rastreamentoRoutes from './routes/rastreamento.routes';
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api', placasRoutes);             // authMiddleware global no router
 app.use('/api/dispositivos', dispositivosRoutes);
 app.use('/api', usuariosRoutes);           // colaboradores + vendedores (authMiddleware global ADMIN)
 app.use('/api', adminRoutes);              // rotas admin utilitárias
+app.use('/api/rastreamento', rastreamentoRoutes);
 
 // Rota não encontrada
 app.use((_req, res) => {
