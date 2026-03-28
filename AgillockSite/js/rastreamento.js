@@ -293,8 +293,7 @@ function criarPopup(v) {
   const isOnline = v.status === 'online';
   const isMoving = isOnline && p?.motion;
   const corHeader = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#95a5a6';
-  const txtStatus = isMoving ? `Em movimento · ${p.velocidade} km/h`
-    : isOnline ? 'Parado' : 'Offline';
+  const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : 'Offline';
 
   const addrId = `addr-${v.dispositivoId}`;
   const apiBase = window.API_URL || '';
@@ -316,25 +315,23 @@ function criarPopup(v) {
     : '';
 
   const imgHtml = v.imagemUrl
-    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:105px;object-fit:cover;display:block"
+    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:140px;object-fit:cover;display:block"
         onerror="this.style.display='none'" />`
     : '';
 
   return `<div style="font-size:13px;min-width:240px">
     ${imgHtml}
     <div style="padding:10px 14px 0">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <strong style="font-size:14px;line-height:1.2">${v.nome}</strong>
-        ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1.5px;flex-shrink:0;margin-left:8px">${v.placa}</span>` : ''}
+      <strong style="font-size:14px;line-height:1.2;display:block">${v.nome}</strong>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1.5px">${v.placa}</span>` : '<span></span>'}
+        <span style="font-size:11px;color:${corHeader}">● ${txtStatus}</span>
       </div>
-      <div style="font-size:11px;color:${corHeader};margin-top:3px">● ${txtStatus}</div>
     </div>
     <div style="padding:0 14px 12px">
       ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
-      ${(ignHtml || bat != null) ? `<div style="display:flex;gap:14px;font-size:11px;margin-bottom:6px">
-        ${ignHtml}
-        ${bat != null ? `<span style="color:${batCor}"><i class="fa ${batFa}"></i> ${bat}%</span>` : ''}
-      </div>` : ''}
+      ${ignHtml ? `<div style="font-size:11px;margin-bottom:4px">${ignHtml}</div>` : ''}
+      ${bat != null ? `<div style="font-size:11px;color:${batCor};margin-bottom:6px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
       ${v.cliente ? `<div style="font-size:11px;color:#555;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
       ${p?.fixTime ? `<div style="font-size:11px;color:#555;margin-bottom:4px"><i class="fa fa-clock-o" style="color:#e67e22;width:13px"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
       ${p ? `<div style="font-size:11px;color:#555;line-height:1.4;border-top:1px solid #f0f0f0;padding-top:6px;margin-top:2px">
