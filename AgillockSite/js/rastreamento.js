@@ -20,8 +20,8 @@ document.addEventListener('DOMContentLoaded', function () {
 function inicializarMapa() {
   map = L.map('mapa', { zoomControl: true }).setView([-15.78, -47.93], 5);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
     maxZoom: 19,
   }).addTo(map);
 }
@@ -178,9 +178,40 @@ function atualizarMarcador(dispositivoId) {
   }
 }
 
+// ── Mapeamento categoria → ícone FontAwesome ──────────────────────────────────
+
+const _ICONE_CATEGORIA = {
+  ambulancia: 'fa-ambulance',
+  aviao_passageiros: 'fa-plane', helicoptero: 'fa-plane', drone: 'fa-rocket',
+  bicicleta: 'fa-bicycle', pedicalo: 'fa-bicycle',
+  motocicleta: 'fa-motorcycle', motocicleta_cruzada: 'fa-motorcycle',
+  taxi: 'fa-taxi',
+  onibus: 'fa-bus', van: 'fa-bus', van_campista: 'fa-bus', caravana: 'fa-bus',
+  caixa_estacionaria: 'fa-cube', container_20: 'fa-cube', container_40: 'fa-cube',
+  container_tanque: 'fa-cube', reboque_gerador: 'fa-cube',
+  caminhao: 'fa-truck', caminhao_trator: 'fa-truck', caminhao_bau: 'fa-truck',
+  caminhao_bomba_concreto: 'fa-truck', caminhao_betoneira: 'fa-truck',
+  caminhao_reboque: 'fa-truck', caminhao_reboque_estrado: 'fa-truck',
+  caminhao_tanque_combustivel: 'fa-truck', caminhao_pipa: 'fa-truck',
+  caminhao_vacuo: 'fa-truck', caminhao_bombeiros: 'fa-truck',
+  caminhao_esgoto: 'fa-truck', caminhao_recuperacao: 'fa-truck',
+  caminhao_transporte: 'fa-truck', pickup: 'fa-truck', pickup_reboque: 'fa-truck',
+  plataforma_reboque: 'fa-truck', reboque_reefer: 'fa-truck',
+  reboque_tanque: 'fa-truck', reboque_residuos: 'fa-truck',
+  reboque_caixa: 'fa-truck', reboque_carro: 'fa-truck',
+  reboque_container_gerador: 'fa-truck', retroescavadeira: 'fa-truck',
+  escavadeira: 'fa-truck', escavadora: 'fa-truck',
+  empilhadeira: 'fa-truck', trator: 'fa-truck', aclo_compressor: 'fa-truck',
+  carro: 'fa-car', carro_executivo: 'fa-car', carro_hatchback: 'fa-car',
+  carro_assistencia: 'fa-car', carro_luxo: 'fa-car', viatura: 'fa-car',
+};
+
+function categoriaParaIcone(categoria) {
+  return _ICONE_CATEGORIA[categoria] || 'fa-car';
+}
+
 function criarIcone(v) {
-  const curso = v.posicao?.curso ?? 0;
-  let cor = '#bdc3c7';
+  let cor = '#95a5a6';
   if (v.status === 'online') {
     cor = v.posicao?.motion ? '#2980b9' : '#27ae60';
   }
@@ -188,13 +219,19 @@ function criarIcone(v) {
     cor = '#e74c3c';
   }
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-    <g transform="rotate(${curso},14,14)">
-      <polygon points="14,2 24,26 14,20 4,26" fill="${cor}" stroke="white" stroke-width="1.5"/>
-    </g>
-  </svg>`;
+  const fa = categoriaParaIcone(v.categoria);
 
-  return L.divIcon({ html: svg, className: '', iconSize: [28, 28], iconAnchor: [14, 14] });
+  const html = `<div style="
+    width:34px;height:34px;
+    background:${cor};
+    border-radius:50%;
+    border:3px solid #fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.35);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:14px;
+  "><i class="fa ${fa}"></i></div>`;
+
+  return L.divIcon({ html, className: '', iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 
 function criarPopup(v) {
