@@ -24,6 +24,15 @@ function inicializarMapa() {
     attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
     maxZoom: 19,
   }).addTo(map);
+
+  // Auto-geocodifica o endereço quando o popup abre
+  map.on('popupopen', function (e) {
+    const container = e.popup.getElement();
+    if (!container) return;
+    const el = container.querySelector('[id^="addr-"]');
+    if (!el || !el.dataset.lat) return;
+    geocodificarCoordenadas(parseFloat(el.dataset.lat), parseFloat(el.dataset.lng), el.id);
+  });
 }
 
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
@@ -234,28 +243,61 @@ function criarIcone(v) {
   return L.divIcon({ html, className: '', iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 
+function svgVelocimetro(velocidade, limite) {
+  if (velocidade == null) return '';
+  const max = Math.max(limite || 120, 120);
+  const f = Math.min(velocidade / max, 1);
+  const angRad = Math.PI * (1 - f);
+  const ex = (40 + 30 * Math.cos(angRad)).toFixed(1);
+  const ey = (45 - 30 * Math.sin(angRad)).toFixed(1);
+  const largeArc = f > 0.5 ? 1 : 0;
+  const cor = limite && velocidade > limite ? '#e74c3c' : velocidade > 80 ? '#f39c12' : '#27ae60';
+  const arc = f > 0.01
+    ? `<path d="M 10 45 A 30 30 0 ${largeArc} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>`
+    : '';
+  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:4px auto 0">
+    <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="#e9ecef" stroke-width="7" stroke-linecap="round"/>
+    ${arc}
+    <text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#333">${velocidade}</text>
+    <text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#aaa">km/h</text>
+  </svg>`;
+}
+
+function fmtGPSTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' +
+    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
 function criarPopup(v) {
   const p = v.posicao;
   const corStatus = v.status === 'online' ? '#27ae60' : '#bdc3c7';
-  const txtStatus = v.status === 'online'
-    ? (p?.motion ? `Em movimento · ${p.velocidade} km/h` : 'Parado')
-    : 'Offline';
+  const txtStatus = v.status === 'online' ? (p?.motion ? 'Em movimento' : 'Parado') : 'Offline';
   const ign = p?.ignition === true ? '🔑 Ligado' : p?.ignition === false ? '🔑 Desligado' : '';
-
   const addrId = `addr-${v.dispositivoId}`;
-  const lat = p?.latitude?.toFixed(6);
-  const lng = p?.longitude?.toFixed(6);
-  const coordsTxt = p ? `${lat}, ${lng}` : '';
+  const apiBase = window.API_URL || '';
 
-  return `<div style="min-width:200px;font-size:13px">
+  const imgHtml = v.imagemUrl
+    ? `<div style="margin:-13px -19px 10px;overflow:hidden;border-radius:8px 8px 0 0;height:90px">
+        <img src="${apiBase}${v.imagemUrl}" style="width:100%;height:100%;object-fit:cover;
+          clip-path:polygon(0 0,100% 0,100% 80%,0 100%);display:block"
+          onerror="this.parentElement.style.display='none'" />
+      </div>`
+    : '';
+
+  return `<div style="min-width:210px;font-size:13px">
+    ${imgHtml}
     <strong style="display:block;margin-bottom:3px">${v.nome}</strong>
     ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}
-    <div style="margin-top:6px;color:${corStatus}">● ${txtStatus}</div>
+    <div style="margin-top:5px;font-size:12px;color:${corStatus}">● ${txtStatus}</div>
     ${ign ? `<div style="font-size:11px;margin-top:2px">${ign}</div>` : ''}
-    ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px">${v.cliente.nome}</div>` : ''}
-    ${p?.velocidade != null ? `<div style="font-size:11px;margin-top:4px"><i class="fa fa-tachometer" style="color:#888"></i> <strong>${p.velocidade}</strong> km/h</div>` : ''}
-    ${p?.fixTime ? `<div style="font-size:11px;margin-top:2px"><i class="fa fa-clock-o" style="color:#888"></i> Hora GPS: ${window.AL.fmtDate(p.fixTime)}</div>` : ''}
-    ${p ? `<div style="font-size:11px;margin-top:2px"><i class="fa fa-map-pin" style="color:#888"></i> Endereço: <span id="${addrId}" onclick="geocodificarCoordenadas(${p.latitude},${p.longitude},'${addrId}')" style="color:#2980b9;cursor:pointer;text-decoration:underline">${coordsTxt}</span></div>` : ''}
+    ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px"><i class="fa fa-user" style="width:12px"></i> ${v.cliente.nome}</div>` : ''}
+    ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
+    ${p?.fixTime ? `<div style="font-size:11px;margin-top:4px;color:#888"><i class="fa fa-clock-o"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
+    ${p ? `<div style="font-size:11px;margin-top:2px;color:#888;line-height:1.4"><i class="fa fa-map-pin"></i>
+        <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="color:#888">Buscando endereço...</span>
+      </div>` : ''}
     <div style="margin-top:8px">
       <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
         <i class="fa fa-map-marker"></i> Ver detalhes
@@ -377,19 +419,13 @@ function ajustarBounds() {
 window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const el = document.getElementById(elementId);
   if (!el) return;
-  el.textContent = 'Buscando...';
-  el.onclick = null;
-  el.style.cursor = 'default';
+  const coords = `(${lat.toFixed(5)}, ${lng.toFixed(5)})`;
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=pt-BR`;
     const res = await fetch(url);
     const data = await res.json();
-    el.textContent = data.display_name || `${lat}, ${lng}`;
-    el.style.color = 'inherit';
-    el.style.textDecoration = 'none';
+    el.textContent = data.display_name ? `${data.display_name} ${coords}` : coords;
   } catch {
-    el.textContent = `${lat}, ${lng}`;
-    el.style.color = 'inherit';
-    el.style.textDecoration = 'none';
+    el.textContent = coords;
   }
 };

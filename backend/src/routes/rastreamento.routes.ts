@@ -22,7 +22,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
     where: { ativo: true },
     select: {
       id: true, nome: true, identificador: true, placa: true,
-      categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true,
+      categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true, imagemUrl: true,
       cliente: { select: { id: true, nome: true } },
     },
   });
@@ -59,6 +59,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       nome: d.nome,
       placa: d.placa,
       categoria: d.categoria,
+      imagemUrl: d.imagemUrl,
       marca: d.marca,
       modeloVeiculo: d.modeloVeiculo,
       cor: d.cor,
