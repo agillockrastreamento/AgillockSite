@@ -290,47 +290,59 @@ function fmtGPSTime(iso) {
 
 function criarPopup(v) {
   const p = v.posicao;
-  const corStatus = v.status === 'online' ? '#27ae60' : '#bdc3c7';
-  const txtStatus = v.status === 'online' ? (p?.motion ? 'Em movimento' : 'Parado') : 'Offline';
-  const ign = p?.ignition === true ? '🔑 Ligado' : p?.ignition === false ? '🔑 Desligado' : '';
+  const isOnline = v.status === 'online';
+  const isMoving = isOnline && p?.motion;
+  const corHeader = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#95a5a6';
+  const txtStatus = isMoving ? `Em movimento · ${p.velocidade} km/h`
+    : isOnline ? 'Parado' : 'Offline';
+
   const addrId = `addr-${v.dispositivoId}`;
   const apiBase = window.API_URL || '';
 
-  // Endereço: usa cache; verifica existência da chave (não apenas valor truthy)
   const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
   const coords = p ? `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})` : '';
   const hasCached = cacheKey != null && cacheKey in _geocodeCache;
   const cachedAddr = hasCached ? _geocodeCache[cacheKey] : null;
   const addrTxt = hasCached ? (cachedAddr ? `${cachedAddr} ${coords}` : coords) : 'Buscando...';
 
-  // Bateria
   const bat = p?.bateria != null ? p.bateria : null;
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
   const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
 
+  const ignHtml = p?.ignition === true
+    ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>`
+    : p?.ignition === false
+    ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>`
+    : '';
+
   const imgHtml = v.imagemUrl
-    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:115px;object-fit:cover;display:block;image-rendering:auto"
+    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:105px;object-fit:cover;display:block"
         onerror="this.style.display='none'" />`
     : '';
 
-  return `<div style="font-size:13px">
+  return `<div style="font-size:13px;min-width:240px">
     ${imgHtml}
-    <div style="padding:10px 14px 12px">
-      <strong style="display:block;font-size:14px;margin-bottom:3px">${v.nome}</strong>
-      ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}
-      ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
-      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px">
-        <span style="color:${corStatus}">● ${txtStatus}</span>
-        ${ign ? `<span style="font-size:11px">${ign}</span>` : ''}
+    <div style="background:${corHeader};padding:10px 14px 9px;color:#fff">
+      <div style="font-weight:700;font-size:14px;line-height:1.2;margin-bottom:5px">${v.nome}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        ${v.placa ? `<span style="background:rgba(0,0,0,0.22);padding:1px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1.5px">${v.placa}</span>` : '<span></span>'}
+        <span style="font-size:11px;opacity:0.92">${txtStatus}</span>
       </div>
-      ${bat != null ? `<div style="font-size:11px;color:#888;margin-top:3px"><i class="fa ${batFa}" style="color:${batCor}"></i> Bateria: ${bat}%</div>` : ''}
-      ${v.cliente ? `<div style="font-size:11px;color:#555;margin-top:2px"><i class="fa fa-user" style="color:#333;width:12px"></i> ${v.cliente.nome}</div>` : ''}
-      ${p?.fixTime ? `<div style="font-size:11px;color:#555;margin-top:5px"><i class="fa fa-clock-o" style="color:#333"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
-      ${p ? `<div style="font-size:11px;color:#555;margin-top:2px;line-height:1.4"><i class="fa fa-map-pin" style="color:#333"></i>
+    </div>
+    <div style="padding:8px 14px 12px">
+      ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
+      ${(ignHtml || bat != null) ? `<div style="display:flex;gap:14px;font-size:11px;margin-bottom:6px">
+        ${ignHtml}
+        ${bat != null ? `<span style="color:${batCor}"><i class="fa ${batFa}"></i> ${bat}%</span>` : ''}
+      </div>` : ''}
+      ${v.cliente ? `<div style="font-size:11px;color:#555;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
+      ${p?.fixTime ? `<div style="font-size:11px;color:#555;margin-bottom:4px"><i class="fa fa-clock-o" style="color:#e67e22;width:13px"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
+      ${p ? `<div style="font-size:11px;color:#555;line-height:1.4;border-top:1px solid #f0f0f0;padding-top:6px;margin-top:2px">
+          <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
           <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
         </div>` : ''}
       <div style="margin-top:8px">
-        <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
+        <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff;display:block;text-align:center">
           <i class="fa fa-map-marker"></i> Ver detalhes
         </a>
       </div>
