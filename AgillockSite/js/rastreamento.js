@@ -18,19 +18,19 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function inicializarMapa() {
-  map = L.map('mapa', { zoomControl: true }).setView([-15.78, -47.93], 5);
+  map = L.map('mapa', { zoomControl: true, maxZoom: 21 }).setView([-15.78, -47.93], 5);
 
   const tilesEsri = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>', maxZoom: 19 }
+    { attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>', maxNativeZoom: 19, maxZoom: 21 }
   );
   const tilesOsm = L.tileLayer(
     'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19 }
+    { attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>', maxNativeZoom: 19, maxZoom: 21 }
   );
   const tilesCartoDB = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxZoom: 19 }
+    { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxNativeZoom: 19, maxZoom: 21 }
   );
 
   tilesCartoDB.addTo(map);
@@ -348,10 +348,10 @@ function criarPopup(v) {
         ${ign ? `<span style="font-size:11px">${ign}</span>` : ''}
       </div>
       ${bat != null ? `<div style="font-size:11px;color:#888;margin-top:3px"><i class="fa ${batFa}" style="color:${batCor}"></i> Bateria: ${bat}%</div>` : ''}
-      ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px"><i class="fa fa-user" style="width:12px"></i> <strong>${v.cliente.nome}</strong></div>` : ''}
-      ${p?.fixTime ? `<div style="font-size:11px;color:#888;margin-top:5px"><i class="fa fa-clock-o"></i> <strong>${fmtGPSTime(p.fixTime)}</strong></div>` : ''}
-      ${p ? `<div style="font-size:11px;color:#888;margin-top:2px;line-height:1.4"><i class="fa fa-map-pin"></i>
-          <strong><span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span></strong>
+      ${v.cliente ? `<div style="font-size:11px;color:#555;margin-top:2px"><i class="fa fa-user" style="color:#333;width:12px"></i> ${v.cliente.nome}</div>` : ''}
+      ${p?.fixTime ? `<div style="font-size:11px;color:#555;margin-top:5px"><i class="fa fa-clock-o" style="color:#333"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
+      ${p ? `<div style="font-size:11px;color:#555;margin-top:2px;line-height:1.4"><i class="fa fa-map-pin" style="color:#333"></i>
+          <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
         </div>` : ''}
       <div style="margin-top:8px">
         <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
@@ -470,22 +470,21 @@ function ajustarBounds() {
   map.fitBounds(group.getBounds().pad(0.15));
 }
 
-// ── Geocodificação reversa (Nominatim) ────────────────────────────────────────
+// ── Geocodificação reversa (Nominatim) ───────────────────────────────────────
 
 const _geocodeCache = {};
 
-// Formata resposta do Photon (GeoJSON properties)
-function _formatarEndereco(props) {
+function _formatarEndereco(a) {
   const partes = [];
-  if (props.name && props.name !== props.street) partes.push(props.name);
-  if (props.street) partes.push(props.housenumber ? `${props.street}, ${props.housenumber}` : props.street);
-  const bairro = props.suburb || props.district || props.neighbourhood;
-  if (bairro) partes.push(bairro);
-  const cidade = props.city || props.town || props.village;
-  if (cidade) partes.push(cidade);
-  if (props.state)    partes.push(props.state);
-  if (props.postcode) partes.push(props.postcode);
-  if (props.country)  partes.push(props.country);
+  if (a.amenity)  partes.push(a.amenity);
+  if (a.road)     partes.push(a.house_number ? `${a.road}, ${a.house_number}` : a.road);
+  const bairro = a.suburb || a.neighbourhood || a.quarter;
+  if (bairro)     partes.push(bairro);
+  const cidade = a.city || a.town || a.village || a.municipality;
+  if (cidade)     partes.push(cidade);
+  if (a.state)    partes.push(a.state);
+  if (a.postcode) partes.push(a.postcode);
+  if (a.country)  partes.push(a.country);
   return partes.join(', ');
 }
 
@@ -502,11 +501,10 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   }
 
   try {
-    const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&lang=pt`;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=pt-BR`;
     const res = await fetch(url);
     const data = await res.json();
-    const props = data.features?.[0]?.properties;
-    const end = props ? _formatarEndereco(props) : '';
+    const end = data.address ? _formatarEndereco(data.address) : '';
     _geocodeCache[cacheKey] = end;
     el.textContent = end ? `${end} ${coords}` : coords;
   } catch {
