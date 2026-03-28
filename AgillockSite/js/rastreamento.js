@@ -33,10 +33,10 @@ function inicializarMapa() {
     { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxZoom: 19 }
   );
 
-  tilesEsri.addTo(map);
+  tilesCartoDB.addTo(map);
 
   L.control.layers(
-    { 'ESRI Street': tilesEsri, 'OpenStreetMap': tilesOsm, 'CartoDB Voyager': tilesCartoDB },
+    { 'CartoDB Voyager': tilesCartoDB, 'OpenStreetMap': tilesOsm, 'ESRI Street': tilesEsri },
     {},
     { position: 'topright', collapsed: true }
   ).addTo(map);
@@ -268,24 +268,17 @@ function svgVelocimetro(velocidade, limite) {
   const cor = (limite && velocidade > limite) ? '#e74c3c'
     : f >= 0.8 ? '#e74c3c' : f >= 0.55 ? '#f39c12' : '#00b894';
 
-  const cx = 90, cy = 95, R = 70;
+  const cx = 80, cy = 83, R = 62;
   const pt = t => [+(cx + R * Math.cos(Math.PI * (1 - t))).toFixed(1), +(cy - R * Math.sin(Math.PI * (1 - t))).toFixed(1)];
   const [sx, sy] = pt(0);
   const [ex, ey] = pt(1);
   const [fx, fy] = pt(f);
 
-  // Zonas de fundo coloridas (verde / amarelo / vermelho)
-  const zonasBg = [[0, 0.55, '#c8f7c5'], [0.55, 0.8, '#fef0cd'], [0.8, 1, '#ffd7d7']].map(([t0, t1, c]) => {
-    const [ax, ay] = pt(t0);
-    const [bx2, by2] = pt(t1);
-    return `<path d="M ${ax} ${ay} A ${R} ${R} 0 ${(t1 - t0) > 0.5 ? 1 : 0} 1 ${bx2} ${by2}" fill="none" stroke="${c}" stroke-width="10" stroke-linecap="butt"/>`;
-  }).join('');
-
   // Marcas de escala
   const ticks = Array.from({ length: 11 }, (_, i) => {
     const a = Math.PI * (1 - i / 10);
     const major = i % 5 === 0;
-    const r1 = major ? R - 13 : R - 7;
+    const r1 = major ? R - 11 : R - 6;
     return `<line x1="${+(cx + r1 * Math.cos(a)).toFixed(1)}" y1="${+(cy - r1 * Math.sin(a)).toFixed(1)}"
                   x2="${+(cx + (R - 2) * Math.cos(a)).toFixed(1)}" y2="${+(cy - (R - 2) * Math.sin(a)).toFixed(1)}"
                   stroke="${major ? '#888' : '#bbb'}" stroke-width="${major ? 1.5 : 1}"/>`;
@@ -293,30 +286,22 @@ function svgVelocimetro(velocidade, limite) {
 
   // Arco de preenchimento (velocidade atual)
   const fillArc = f > 0.01
-    ? `<path d="M ${sx} ${sy} A ${R} ${R} 0 ${f > 0.5 ? 1 : 0} 1 ${fx} ${fy}" fill="none" stroke="${cor}" stroke-width="10" stroke-linecap="round" opacity="0.9"/>`
+    ? `<path d="M ${sx} ${sy} A ${R} ${R} 0 ${f > 0.5 ? 1 : 0} 1 ${fx} ${fy}" fill="none" stroke="${cor}" stroke-width="9" stroke-linecap="round" opacity="0.9"/>`
     : '';
 
   // Marcador de limite de velocidade
   const limitMark = (limite && limite < max) ? (() => {
     const [lx, ly] = pt(limite / max);
-    return `<circle cx="${lx}" cy="${ly}" r="4.5" fill="#e74c3c" stroke="white" stroke-width="1.5"/>`;
+    return `<circle cx="${lx}" cy="${ly}" r="4" fill="#e74c3c" stroke="white" stroke-width="1.5"/>`;
   })() : '';
 
-  // Agulha
-  const na = Math.PI * (1 - f);
-  const [nnx, nny] = [+(cx + (R - 16) * Math.cos(na)).toFixed(1), +(cy - (R - 16) * Math.sin(na)).toFixed(1)];
-
-  return `<svg width="100%" height="96" viewBox="0 0 180 102" style="display:block;margin:5px 0 0">
-    <path d="M ${sx} ${sy} A ${R} ${R} 0 0 1 ${ex} ${ey}" fill="none" stroke="#ecf0f1" stroke-width="10" stroke-linecap="round"/>
-    ${zonasBg}
+  return `<svg width="100%" height="80" viewBox="0 0 160 90" style="display:block;margin:5px 0 8px">
+    <path d="M ${sx} ${sy} A ${R} ${R} 0 0 1 ${ex} ${ey}" fill="none" stroke="#ecf0f1" stroke-width="9" stroke-linecap="round"/>
     ${ticks}
     ${fillArc}
     ${limitMark}
-    <line x1="${cx}" y1="${cy}" x2="${nnx}" y2="${nny}" stroke="${cor}" stroke-width="2.5" stroke-linecap="round"/>
-    <circle cx="${cx}" cy="${cy}" r="5.5" fill="${cor}" stroke="white" stroke-width="2"/>
-    <circle cx="${cx}" cy="${cy}" r="2" fill="white"/>
-    <text x="${cx}" y="${cy - 20}" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#2d3436">${velocidade}</text>
-    <text x="${cx}" y="${cy - 7}" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#95a5a6" letter-spacing="1">km/h</text>
+    <text x="${cx}" y="${cy - 18}" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#2d3436">${velocidade}</text>
+    <text x="${cx}" y="${cy - 5}" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#95a5a6" letter-spacing="1">km/h</text>
   </svg>`;
 }
 
@@ -335,11 +320,12 @@ function criarPopup(v) {
   const addrId = `addr-${v.dispositivoId}`;
   const apiBase = window.API_URL || '';
 
-  // Endereço: usa cache para não mostrar "Buscando..." se já foi resolvido
+  // Endereço: usa cache; verifica existência da chave (não apenas valor truthy)
   const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
   const coords = p ? `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})` : '';
-  const cachedAddr = cacheKey ? _geocodeCache[cacheKey] : null;
-  const addrTxt = cachedAddr ? `${cachedAddr} ${coords}` : 'Buscando...';
+  const hasCached = cacheKey != null && cacheKey in _geocodeCache;
+  const cachedAddr = hasCached ? _geocodeCache[cacheKey] : null;
+  const addrTxt = hasCached ? (cachedAddr ? `${cachedAddr} ${coords}` : coords) : 'Buscando...';
 
   // Bateria
   const bat = p?.bateria != null ? p.bateria : null;
@@ -362,10 +348,10 @@ function criarPopup(v) {
         ${ign ? `<span style="font-size:11px">${ign}</span>` : ''}
       </div>
       ${bat != null ? `<div style="font-size:11px;color:#888;margin-top:3px"><i class="fa ${batFa}" style="color:${batCor}"></i> Bateria: ${bat}%</div>` : ''}
-      ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px"><i class="fa fa-user" style="width:12px"></i> ${v.cliente.nome}</div>` : ''}
-      ${p?.fixTime ? `<div style="font-size:11px;color:#888;margin-top:5px"><i class="fa fa-clock-o"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
+      ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px"><i class="fa fa-user" style="width:12px"></i> <strong>${v.cliente.nome}</strong></div>` : ''}
+      ${p?.fixTime ? `<div style="font-size:11px;color:#888;margin-top:5px"><i class="fa fa-clock-o"></i> <strong>${fmtGPSTime(p.fixTime)}</strong></div>` : ''}
       ${p ? `<div style="font-size:11px;color:#888;margin-top:2px;line-height:1.4"><i class="fa fa-map-pin"></i>
-          <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
+          <strong><span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span></strong>
         </div>` : ''}
       <div style="margin-top:8px">
         <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
@@ -509,8 +495,9 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const coords = `(${lat.toFixed(5)}, ${lng.toFixed(5)})`;
   const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`; // ~100 m de precisão
 
-  if (_geocodeCache[cacheKey]) {
-    el.textContent = `${_geocodeCache[cacheKey]} ${coords}`;
+  if (cacheKey in _geocodeCache) {
+    const cached = _geocodeCache[cacheKey];
+    el.textContent = cached ? `${cached} ${coords}` : coords;
     return;
   }
 
