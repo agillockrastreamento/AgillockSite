@@ -74,11 +74,11 @@ docker compose exec postgres psql -U agillock_user -d traccar -c "\dt tc_*"
    docker compose logs -f traccar
    ```
 
-- [ ] Dispositivo aparece com `"status": "online"` na API:
+- [✅] Dispositivo aparece com `"status": "online"` na API:
   ```bash
   curl -s http://localhost:8082/api/devices -u "admin@agillock.com.br:SENHA" | python3 -m json.tool
   ```
-- [ ] Posições chegando em `tc_positions`:
+- [✅] Posições chegando em `tc_positions`:
   ```bash
   docker compose exec postgres psql -U agillock_user -d traccar \
     -c "SELECT id, deviceid, latitude, longitude, fixtime FROM tc_positions ORDER BY fixtime DESC LIMIT 5;"

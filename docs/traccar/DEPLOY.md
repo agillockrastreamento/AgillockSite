@@ -207,8 +207,14 @@ A porta 8082 não é exposta publicamente. Para acessar via browser, usar **tún
 
 ```powershell
 # Rodar no PowerShell ou terminal local — manter aberto enquanto usar
-ssh -L 8082:traccar:8082 root@72.62.13.73
+ssh -L 18082:172.18.0.5:8082 root@72.62.13.73
 ```
+
+Acessar: `http://localhost:18082`
+
+> **Por que porta 18082 e não 8082?** Se o Traccar de desenvolvimento estiver rodando localmente, ele já ocupa a porta 8082. Usar uma porta diferente (18082) evita conflito — o browser vai direto para o túnel SSH (produção).
+>
+> **Por que IP e não hostname?** O hostname `traccar` só é resolvível dentro da rede Docker, não pelo host Ubuntu. Usar o IP do container (`172.18.0.5`) contorna isso. Para confirmar o IP atual: `docker inspect traccar --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'`
 
 Enquanto o terminal estiver aberto, acessar: `http://localhost:8082`
 

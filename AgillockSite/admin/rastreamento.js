@@ -205,13 +205,20 @@ function criarPopup(v) {
     : 'Offline';
   const ign = p?.ignition === true ? '🔑 Ligado' : p?.ignition === false ? '🔑 Desligado' : '';
 
-  return `<div style="min-width:180px;font-size:13px">
+  const addrId = `addr-${v.dispositivoId}`;
+  const lat = p?.latitude?.toFixed(6);
+  const lng = p?.longitude?.toFixed(6);
+  const coordsTxt = p ? `${lat}, ${lng}` : '';
+
+  return `<div style="min-width:200px;font-size:13px">
     <strong style="display:block;margin-bottom:3px">${v.nome}</strong>
     ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}
     <div style="margin-top:6px;color:${corStatus}">● ${txtStatus}</div>
     ${ign ? `<div style="font-size:11px;margin-top:2px">${ign}</div>` : ''}
     ${v.cliente ? `<div style="font-size:11px;color:#888;margin-top:2px">${v.cliente.nome}</div>` : ''}
-    ${p?.fixTime ? `<div style="font-size:10px;color:#aaa;margin-top:4px">${window.AL.fmtDate(p.fixTime)}</div>` : ''}
+    ${p?.velocidade != null ? `<div style="font-size:11px;margin-top:4px"><i class="fa fa-tachometer" style="color:#888"></i> <strong>${p.velocidade}</strong> km/h</div>` : ''}
+    ${p?.fixTime ? `<div style="font-size:11px;margin-top:2px"><i class="fa fa-clock-o" style="color:#888"></i> Hora GPS: ${window.AL.fmtDate(p.fixTime)}</div>` : ''}
+    ${p ? `<div style="font-size:11px;margin-top:2px"><i class="fa fa-map-pin" style="color:#888"></i> Endereço: <span id="${addrId}" onclick="geocodificarCoordenadas(${p.latitude},${p.longitude},'${addrId}')" style="color:#2980b9;cursor:pointer;text-decoration:underline">${coordsTxt}</span></div>` : ''}
     <div style="margin-top:8px">
       <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff">
         <i class="fa fa-map-marker"></i> Ver detalhes
@@ -265,9 +272,27 @@ function itemSidebarHtml(v) {
     dotClass = 'dot-online'; txtStatus = 'Parado';
   }
 
+  let ignIcon = '';
+  if (p?.ignition === true) {
+    ignIcon = `<i class="fa fa-key" title="Ignição: Sim" style="color:#27ae60"></i>`;
+  } else if (p?.ignition === false) {
+    ignIcon = `<i class="fa fa-key" title="Ignição: Não" style="color:#bdc3c7"></i>`;
+  }
+
+  let batIcon = '';
+  if (p?.bateria != null) {
+    const pct = p.bateria;
+    const faClass = pct >= 80 ? 'fa-battery-full' : pct >= 60 ? 'fa-battery-3' : pct >= 40 ? 'fa-battery-2' : pct >= 20 ? 'fa-battery-1' : 'fa-battery-0';
+    const corBat = pct >= 40 ? '#27ae60' : pct >= 20 ? '#f39c12' : '#e74c3c';
+    batIcon = `<i class="fa ${faClass}" title="Bateria: ${pct}%" style="color:${corBat}"></i>`;
+  }
+
   return `<div class="veiculo-item" id="item-${v.dispositivoId}" onclick="focar('${v.dispositivoId}')">
-    <div class="v-nome">${v.nome}
-      ${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div class="v-nome">${v.nome}
+        ${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}
+      </div>
+      ${(ignIcon || batIcon) ? `<div style="display:flex;gap:5px;font-size:12px;flex-shrink:0;padding-left:4px;padding-top:1px">${ignIcon}${batIcon}</div>` : ''}
     </div>
     <div class="v-status">
       <i class="fa fa-circle ${dotClass}"></i> ${txtStatus}
@@ -309,3 +334,25 @@ function ajustarBounds() {
   );
   map.fitBounds(group.getBounds().pad(0.15));
 }
+
+// ── Geocodificação reversa (Nominatim) ────────────────────────────────────────
+
+window.geocodificarCoordenadas = async function (lat, lng, elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.textContent = 'Buscando...';
+  el.onclick = null;
+  el.style.cursor = 'default';
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=pt-BR`;
+    const res = await fetch(url);
+    const data = await res.json();
+    el.textContent = data.display_name || `${lat}, ${lng}`;
+    el.style.color = 'inherit';
+    el.style.textDecoration = 'none';
+  } catch {
+    el.textContent = `${lat}, ${lng}`;
+    el.style.color = 'inherit';
+    el.style.textDecoration = 'none';
+  }
+};
