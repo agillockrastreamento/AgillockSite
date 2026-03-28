@@ -443,7 +443,7 @@ function ajustarBounds() {
   const group = new L.FeatureGroup(
     comPosicao.map(v => L.marker([v.posicao.latitude, v.posicao.longitude]))
   );
-  map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 19 });
+  map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 16 });
 }
 
 // ── Geocodificação reversa (Nominatim) ───────────────────────────────────────
