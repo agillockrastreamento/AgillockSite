@@ -263,45 +263,21 @@ function criarIcone(v) {
 
 function svgVelocimetro(velocidade, limite) {
   if (velocidade == null) return '';
-  const max = Math.max(limite || 120, velocidade, 120);
+  const max = Math.max(limite || 120, 120);
   const f = Math.min(velocidade / max, 1);
-  const cor = (limite && velocidade > limite) ? '#e74c3c'
-    : f >= 0.8 ? '#e74c3c' : f >= 0.55 ? '#f39c12' : '#00b894';
-
-  const cx = 80, cy = 83, R = 62;
-  const pt = t => [+(cx + R * Math.cos(Math.PI * (1 - t))).toFixed(1), +(cy - R * Math.sin(Math.PI * (1 - t))).toFixed(1)];
-  const [sx, sy] = pt(0);
-  const [ex, ey] = pt(1);
-  const [fx, fy] = pt(f);
-
-  // Marcas de escala
-  const ticks = Array.from({ length: 11 }, (_, i) => {
-    const a = Math.PI * (1 - i / 10);
-    const major = i % 5 === 0;
-    const r1 = major ? R - 11 : R - 6;
-    return `<line x1="${+(cx + r1 * Math.cos(a)).toFixed(1)}" y1="${+(cy - r1 * Math.sin(a)).toFixed(1)}"
-                  x2="${+(cx + (R - 2) * Math.cos(a)).toFixed(1)}" y2="${+(cy - (R - 2) * Math.sin(a)).toFixed(1)}"
-                  stroke="${major ? '#888' : '#bbb'}" stroke-width="${major ? 1.5 : 1}"/>`;
-  }).join('');
-
-  // Arco de preenchimento (velocidade atual)
-  const fillArc = f > 0.01
-    ? `<path d="M ${sx} ${sy} A ${R} ${R} 0 ${f > 0.5 ? 1 : 0} 1 ${fx} ${fy}" fill="none" stroke="${cor}" stroke-width="9" stroke-linecap="round" opacity="0.9"/>`
+  const angRad = Math.PI * (1 - f);
+  const ex = (40 + 30 * Math.cos(angRad)).toFixed(1);
+  const ey = (45 - 30 * Math.sin(angRad)).toFixed(1);
+  const largeArc = f > 0.5 ? 1 : 0;
+  const cor = limite && velocidade > limite ? '#e74c3c' : velocidade > 80 ? '#f39c12' : '#27ae60';
+  const arc = f > 0.01
+    ? `<path d="M 10 45 A 30 30 0 ${largeArc} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>`
     : '';
-
-  // Marcador de limite de velocidade
-  const limitMark = (limite && limite < max) ? (() => {
-    const [lx, ly] = pt(limite / max);
-    return `<circle cx="${lx}" cy="${ly}" r="4" fill="#e74c3c" stroke="white" stroke-width="1.5"/>`;
-  })() : '';
-
-  return `<svg width="100%" height="80" viewBox="0 0 160 90" style="display:block;margin:5px 0 8px">
-    <path d="M ${sx} ${sy} A ${R} ${R} 0 0 1 ${ex} ${ey}" fill="none" stroke="#ecf0f1" stroke-width="9" stroke-linecap="round"/>
-    ${ticks}
-    ${fillArc}
-    ${limitMark}
-    <text x="${cx}" y="${cy - 18}" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#2d3436">${velocidade}</text>
-    <text x="${cx}" y="${cy - 5}" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#95a5a6" letter-spacing="1">km/h</text>
+  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:10px auto 10px">
+    <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="#e9ecef" stroke-width="7" stroke-linecap="round"/>
+    ${arc}
+    <text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#333">${velocidade}</text>
+    <text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#aaa">km/h</text>
   </svg>`;
 }
 
