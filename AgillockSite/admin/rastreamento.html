@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
   <link rel="icon" href="../favicon.ico" type="image/x-icon" />
   <title>Rastreamento — AgilLock Admin</title>
   <link rel="stylesheet" href="../css/bootstrap.min.css" />
@@ -16,12 +15,19 @@
   <style>
     body { overflow: hidden; }
 
-    #rastreamento-layout {
+    .admin-content {
+      height: 100vh;
       display: flex;
-      height: calc(100vh - 50px);
+      flex-direction: column;
     }
 
-    /* ── Sidebar ── */
+    #rastreamento-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar de veículos ── */
     #sidebar-rastr {
       width: 280px;
       min-width: 280px;
@@ -82,14 +88,12 @@
     #ws-status.reconectando { background: #f39c12; color: #fff; }
   </style>
 </head>
-
 <body>
 
   <!-- Sidebar admin -->
   <div class="admin-sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;"
-        onerror="this.style.display='none'" />
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
     </div>
     <ul class="sidebar-nav">
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
@@ -109,21 +113,20 @@
         <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
       </div>
       <button id="btn-tema" class="btn-tema-sidebar"></button>
-      <button id="btn-logout" class="btn-logout">
-        <i class="fa fa-sign-out"></i> Sair
-      </button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
     </div>
   </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-  <!-- Topbar -->
-  <div class="admin-topbar">
-    <button class="sidebar-toggle" id="sidebar-toggle">
-      <i class="fa fa-bars"></i>
-    </button>
-    <span class="topbar-title">Rastreamento</span>
-  </div>
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Rastreamento</h2>
+      </div>
+    </div>
 
-  <div class="admin-main">
     <div id="rastreamento-layout">
 
       <!-- Sidebar de veículos -->
@@ -151,9 +154,34 @@
     <i class="fa fa-circle"></i> Conectando...
   </div>
 
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
   <script src="../js/auth-guard.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || user.email || '—';
+      var badge = document.getElementById('user-badge');
+      badge.textContent = user.role;
+      badge.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+    })();
+  </script>
   <script src="rastreamento.js"></script>
 
 </body>

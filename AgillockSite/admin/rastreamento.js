@@ -30,7 +30,7 @@ function inicializarMapa() {
 
 async function carregarPosicoes() {
   try {
-    const lista = await window.AL.apiGet('/rastreamento/posicoes');
+    const lista = await window.AL.apiGet('/api/rastreamento/posicoes');
     veiculosMap = {};
     traccarIdParaDispositivoId = {};
     lista.forEach(v => {
@@ -55,9 +55,8 @@ async function carregarPosicoes() {
 function conectarWebSocket() {
   if (ws && ws.readyState < 2) return;
 
-  const apiBase = window.AL._apiBase || 'http://localhost:3000/api';
-  const wsBase = apiBase.replace(/^http/, 'ws').replace('/api', '');
-  const wsUrl = `${wsBase}/ws/rastreamento`;
+  const apiBase = window.API_URL || 'http://localhost:3000';
+  const wsUrl = `${apiBase.replace(/^http/, 'ws')}/ws/rastreamento`;
 
   const token = localStorage.getItem('al_token');
   const url = token ? `${wsUrl}?token=${token}` : wsUrl;
