@@ -78,7 +78,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
         motion: posicao.attributes.motion ?? null,
         endereco: posicao.address,
         sat: posicao.attributes.sat ?? null,
-        bateria: posicao.attributes.power ?? null,
+        bateria: posicao.attributes.batteryLevel ?? null,
       } : null,
     };
   });

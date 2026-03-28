@@ -112,7 +112,7 @@ function transformTraccarMessage(msg: TraccarWsMessage): object | null {
       ignition: p.attributes?.ignition ?? null,
       motion: p.attributes?.motion ?? null,
       sat: p.attributes?.sat ?? null,
-      bateria: p.attributes?.power ?? null,
+      bateria: p.attributes?.batteryLevel ?? null,
       endereco: p.address,
     }));
   }
