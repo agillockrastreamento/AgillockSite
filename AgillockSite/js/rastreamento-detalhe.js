@@ -94,7 +94,21 @@ function setAtivo(btnId) {
 }
 
 function dataStr(d) {
-  return d.toISOString().slice(0, 10);
+  // Usa data local (não UTC) para evitar virada de dia pelo fuso horário
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isoComFuso(dateStr, fimDoDia) {
+  // Inclui o offset local (ex: -03:00) para o backend interpretar corretamente
+  const off = new Date().getTimezoneOffset(); // minutos a OESTE do UTC (Brasil = 180)
+  const sign = off <= 0 ? '+' : '-';
+  const h = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0');
+  const min = String(Math.abs(off) % 60).padStart(2, '0');
+  const time = fimDoDia ? 'T23:59:59' : 'T00:00:00';
+  return `${dateStr}${time}${sign}${h}:${min}`;
 }
 
 // ── Ícone por categoria ───────────────────────────────────────────────────────
@@ -133,8 +147,8 @@ async function carregarDados() {
   const to   = document.getElementById('input-to').value;
   if (!from || !to) return;
 
-  const fromISO = `${from}T00:00:00`;
-  const toISO   = `${to}T23:59:59`;
+  const fromISO = isoComFuso(from, false);
+  const toISO   = isoComFuso(to, true);
 
   setCarregando(true);
   limparMapa();
