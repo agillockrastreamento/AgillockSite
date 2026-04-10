@@ -6,6 +6,12 @@ import { param, query } from '../utils/params';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import {
+  traccarCreateDevice,
+  traccarUpdateDevice,
+  traccarDeleteDevice,
+  traccarGetDeviceByImei,
+} from '../services/traccar.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -181,6 +187,10 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
     }
   }
 
+  // Registrar na Traccar (best-effort — falha não bloqueia criação)
+  traccarCreateDevice(dispositivo.nome, dispositivo.identificador)
+    .catch(err => console.error('[Traccar] Falha ao criar dispositivo:', err.message));
+
   res.status(201).json(dispositivo);
 });
 
@@ -192,7 +202,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
   }
   const id = param(req, 'id');
 
-  const existe = await prisma.dispositivo.findUnique({ where: { id }, select: { id: true, identificador: true, imagemUrl: true, clienteId: true } });
+  const existe = await prisma.dispositivo.findUnique({ where: { id }, select: { id: true, nome: true, identificador: true, imagemUrl: true, clienteId: true } });
   if (!existe) {
     res.status(404).json({ error: 'Dispositivo não encontrado.' });
     return;
@@ -287,6 +297,16 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
       });
     }
   }
+
+  // Atualizar na Traccar — se não existir, cria (best-effort)
+  const nomeFinal = dispositivo.nome;
+  const imeiFinal = dispositivo.identificador;
+  traccarGetDeviceByImei(existe.identificador)
+    .then(td => {
+      if (td) return traccarUpdateDevice(td.id, nomeFinal, imeiFinal);
+      return traccarCreateDevice(nomeFinal, imeiFinal);
+    })
+    .catch(err => console.error('[Traccar] Falha ao sincronizar dispositivo:', err.message));
 
   res.json(dispositivo);
 });
@@ -422,7 +442,7 @@ router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequ
   }
   const id = param(req, 'id');
 
-  const existe = await prisma.dispositivo.findUnique({ where: { id }, select: { id: true } });
+  const existe = await prisma.dispositivo.findUnique({ where: { id }, select: { id: true, identificador: true } });
   if (!existe) {
     res.status(404).json({ error: 'Dispositivo não encontrado.' });
     return;
@@ -435,6 +455,12 @@ router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequ
   }
 
   await prisma.dispositivo.delete({ where: { id } });
+
+  // Remover da Traccar (best-effort)
+  traccarGetDeviceByImei(existe.identificador)
+    .then(td => { if (td) return traccarDeleteDevice(td.id); })
+    .catch(err => console.error('[Traccar] Falha ao excluir dispositivo:', err.message));
+
   res.status(204).send();
 });
 
