@@ -155,34 +155,9 @@
           <i class="fa fa-bolt" style="color:#fab32c"></i> Comandos
         </h4>
         <div class="cmd-btn-grid" id="cmd-grid">
-          <button class="cmd-btn cmd-btn-block" data-tipo="engineStop" onclick="enviarComando('engineStop')">
-            <span class="cmd-icon"><i class="fa fa-lock"></i></span>
-            <span>Bloquear motor</span>
-          </button>
-          <button class="cmd-btn cmd-btn-unlock" data-tipo="engineResume" onclick="enviarComando('engineResume')">
-            <span class="cmd-icon"><i class="fa fa-unlock"></i></span>
-            <span>Desbloquear motor</span>
-          </button>
-          <button class="cmd-btn cmd-btn-info" data-tipo="positionSingle" onclick="enviarComando('positionSingle')">
-            <span class="cmd-icon"><i class="fa fa-map-marker"></i></span>
-            <span>Solicitar posição</span>
-          </button>
-          <button class="cmd-btn cmd-btn-info" data-tipo="positionPeriodic" onclick="enviarComandoComAtrib('positionPeriodic', {frequency: 60})">
-            <span class="cmd-icon"><i class="fa fa-refresh"></i></span>
-            <span>Rastreamento periódico</span>
-          </button>
-          <button class="cmd-btn cmd-btn-warn" data-tipo="alarmSos" onclick="enviarComando('alarmSos')">
-            <span class="cmd-icon"><i class="fa fa-exclamation-triangle"></i></span>
-            <span>Alarme SOS</span>
-          </button>
-          <button class="cmd-btn cmd-btn-neutral" data-tipo="silenceAlarm" onclick="enviarComando('silenceAlarm')">
-            <span class="cmd-icon"><i class="fa fa-bell-slash"></i></span>
-            <span>Silenciar alarme</span>
-          </button>
-          <button class="cmd-btn cmd-btn-neutral" data-tipo="rebootDevice" onclick="confirmarEEnviar('rebootDevice', 'Reiniciar o dispositivo?')">
-            <span class="cmd-icon"><i class="fa fa-power-off"></i></span>
-            <span>Reiniciar dispositivo</span>
-          </button>
+          <div id="cmd-placeholder" style="grid-column:1/-1;padding:16px 0;color:#aaa;font-size:13px;text-align:center">
+            <i class="fa fa-info-circle"></i> Selecione um dispositivo para ver os comandos disponíveis.
+          </div>
         </div>
       </div>
 
