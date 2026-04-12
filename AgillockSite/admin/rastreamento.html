@@ -56,7 +56,19 @@
     #device-detail-card {
       flex: 1;
       overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #ccc #fff;
     }
+    html.dark-theme #device-detail-card {
+      scrollbar-color: #3a3a5c #1e1e2e;
+    }
+    #device-detail-card::-webkit-scrollbar { width: 5px; }
+    #device-detail-card::-webkit-scrollbar-track { background: #fff; }
+    #device-detail-card::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    #device-detail-card::-webkit-scrollbar-thumb:hover { background: #aaa; }
+    html.dark-theme #device-detail-card::-webkit-scrollbar-track { background: #1e1e2e; }
+    html.dark-theme #device-detail-card::-webkit-scrollbar-thumb { background: #3a3a5c; }
+    html.dark-theme #device-detail-card::-webkit-scrollbar-thumb:hover { background: #555580; }
     .dcard-header {
       display: flex;
       justify-content: space-between;

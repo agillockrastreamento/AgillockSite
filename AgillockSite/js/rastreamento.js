@@ -17,6 +17,11 @@ document.addEventListener('DOMContentLoaded', function () {
   inicializarMapa();
   carregarPosicoes();
   document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
+
+  // Re-renderiza o card aberto quando o tema muda (para atualizar cores do velocímetro SVG)
+  new MutationObserver(function () {
+    if (ativoId) mostrarCardDispositivo(ativoId);
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 });
 
 function inicializarMapa() {
