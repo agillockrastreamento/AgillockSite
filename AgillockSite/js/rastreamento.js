@@ -284,8 +284,8 @@ function criarPopupSimples(v) {
 function svgVelocimetro(velocidade, limite) {
   if (velocidade == null) return '';
   const isDark = document.documentElement.classList.contains('dark-theme');
-  const numColor = isDark ? '#e0e6ed' : '#333';
-  const lblColor = isDark ? '#6c7a8a' : '#aaa';
+  const numColor = isDark ? '#f0f2f5' : '#333';
+  const lblColor = isDark ? '#adb5bd' : '#555';
   const trackColor = isDark ? '#2d3748' : '#e9ecef';
   const max = Math.max(limite || 120, 120);
   const f = Math.min(velocidade / max, 1);
@@ -443,12 +443,12 @@ function mostrarCardDispositivo(id) {
     : '';
 
   // Três horários com data + hora + segundos
-  const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px';
+  const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
   const horasHtml = p ? `
-    <div style="font-size:11px;color:#888;border-top:1px solid rgba(128,128,128,.2);padding-top:6px;margin-top:4px">
-      <div style="margin-bottom:3px"><i class="fa fa-server" style="${ico}"></i> <strong>Servidor:</strong> ${fmtGPSTimeSec(p.serverTime)}</div>
-      <div style="margin-bottom:3px"><i class="fa fa-mobile" style="${ico}"></i> <strong>Dispositivo:</strong> ${fmtGPSTimeSec(p.deviceTime)}</div>
-      <div><i class="fa fa-crosshairs" style="${ico}"></i> <strong>GPS:</strong> ${fmtGPSTimeSec(p.fixTime)}</div>
+    <div class="dcard-section dcard-val">
+      <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> ${fmtGPSTimeSec(p.serverTime)}</div>
+      <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> ${fmtGPSTimeSec(p.deviceTime)}</div>
+      <div><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> ${fmtGPSTimeSec(p.fixTime)}</div>
     </div>` : '';
 
   const card = document.getElementById('device-detail-card');
@@ -472,7 +472,7 @@ function mostrarCardDispositivo(id) {
       ${bat != null ? `<div style="font-size:12px;color:${batCor};margin-bottom:4px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
       ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
       ${horasHtml}
-      ${p ? `<div style="font-size:11px;color:#888;line-height:1.4;border-top:1px solid rgba(128,128,128,.2);padding-top:6px;margin-top:4px">
+      ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
           <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
           <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
         </div>` : ''}

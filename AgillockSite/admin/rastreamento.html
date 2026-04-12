@@ -111,10 +111,24 @@
     .leaflet-grab { cursor: crosshair !important; }
     .leaflet-drag-target { cursor: grabbing !important; }
 
-    /* ── Card do dispositivo — texto tema escuro ── */
-    html.dark-theme .dcard-body { color: #dde2e8; }
-    html.dark-theme .dcard-body strong { color: #f0f2f5; }
-    html.dark-theme .v-nome { color: #f0f2f5; }
+    /* ── Card do dispositivo — texto adaptável ao tema ── */
+    /* Texto de valor (data/hora, endereço, km/h numérico) */
+    .dcard-val  { color: #333; }
+    html.dark-theme .dcard-val  { color: #f0f2f5; }
+
+    /* Label ("Servidor:", "Dispositivo:", "GPS:") — bold, tom ligeiramente diferente */
+    .dcard-lbl  { font-weight: 600; color: #333; }
+    html.dark-theme .dcard-lbl  { font-weight: 600; color: #adb5bd; }
+
+    /* Blocos de timestamps e endereço */
+    .dcard-section {
+      font-size: 11px;
+      border-top: 1px solid rgba(128,128,128,.18);
+      padding-top: 6px;
+      margin-top: 4px;
+      line-height: 1.7;
+    }
+    html.dark-theme .dcard-section { border-top-color: rgba(255,255,255,.1); }
 
     /* ── Badge WS status ── */
     #ws-status {
