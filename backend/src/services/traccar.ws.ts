@@ -108,6 +108,8 @@ function transformTraccarMessage(msg: TraccarWsMessage): object | null {
       curso: p.course,
       altitude: p.altitude,
       fixTime: p.fixTime,
+      deviceTime: p.deviceTime,
+      serverTime: p.serverTime,
       valida: p.valid,
       ignition: p.attributes?.ignition ?? null,
       motion: p.attributes?.motion ?? null,
@@ -150,6 +152,8 @@ interface TraccarWsMessage {
     speed: number;
     course: number;
     fixTime: string;
+    deviceTime: string;
+    serverTime: string;
     valid: boolean;
     address: string | null;
     attributes: Record<string, unknown>;

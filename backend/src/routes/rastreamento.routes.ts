@@ -80,6 +80,8 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
         curso: posicao.course,
         altitude: posicao.altitude,
         fixTime: posicao.fixTime,
+        deviceTime: posicao.deviceTime,
+        serverTime: posicao.serverTime,
         valida: posicao.valid,
         ignition: posicao.attributes.ignition ?? null,
         motion: posicao.attributes.motion ?? null,

@@ -118,6 +118,8 @@ function processarMensagemWs(msg) {
         curso: pos.curso,
         altitude: pos.altitude,
         fixTime: pos.fixTime,
+        deviceTime: pos.deviceTime,
+        serverTime: pos.serverTime,
         valida: pos.valida,
         ignition: pos.ignition,
         motion: pos.motion,
@@ -271,17 +273,9 @@ function criarIcone(v) {
 // ── Popup simplificado (só nome + placa + status) ─────────────────────────────
 
 function criarPopupSimples(v) {
-  const p = v.posicao;
-  const isOnline = v.status === 'online';
-  const isMoving = isOnline && p?.motion;
-  const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#95a5a6';
-  const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : 'Offline';
-
-  return `<div style="padding:8px 12px;font-size:12px;min-width:130px">
-    <div style="font-weight:600;font-size:13px;margin-bottom:3px">${v.nome}</div>
-    ${v.placa ? `<div style="margin-bottom:4px"><span style="background:#333;color:#fff;padding:0 5px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span></div>` : ''}
-    <div style="color:${corStatus}"><i class="fa fa-circle" style="font-size:8px"></i> ${txtStatus}</div>
-    ${!isOnline && p?.fixTime ? `<div style="font-size:10px;color:#e67e22;margin-top:2px"><i class="fa fa-clock-o"></i> há ${fmtTempoDecorrido(p.fixTime)}</div>` : ''}
+  return `<div style="padding:8px 12px;font-size:12px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:4px">${v.nome}</div>
+    ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}
   </div>`;
 }
 
@@ -312,6 +306,13 @@ function fmtGPSTime(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('pt-BR') + ' ' +
     d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtGPSTimeSec(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' +
+    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function fmtTempoDecorrido(iso) {
@@ -434,8 +435,16 @@ function mostrarCardDispositivo(id) {
   const addrTxt = hasCached ? (cachedAddr ? `${cachedAddr} ${coords}` : coords) : (p ? 'Buscando...' : '—');
 
   const imgHtml = v.imagemUrl
-    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:130px;object-fit:cover;display:block" onerror="this.style.display='none'" />`
+    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none'" />`
     : '';
+
+  // Três horários com data + hora + segundos
+  const horasHtml = p ? `
+    <div style="font-size:11px;color:#888;border-top:1px solid #eee;padding-top:6px;margin-top:4px">
+      <div style="margin-bottom:3px"><i class="fa fa-server" style="color:#7f8c8d;width:13px"></i> <strong>Servidor:</strong> ${fmtGPSTimeSec(p.serverTime)}</div>
+      <div style="margin-bottom:3px"><i class="fa fa-mobile" style="color:#7f8c8d;width:13px"></i> <strong>Dispositivo:</strong> ${fmtGPSTimeSec(p.deviceTime)}</div>
+      <div><i class="fa fa-satellite" style="color:#7f8c8d;width:13px" title="GPS"></i> <strong>GPS:</strong> ${fmtGPSTimeSec(p.fixTime)}</div>
+    </div>` : '';
 
   const card = document.getElementById('device-detail-card');
   card.innerHTML = `
@@ -453,15 +462,15 @@ function mostrarCardDispositivo(id) {
         ${tempoHtml}
         ${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}
       </div>
-      ${isMoving && p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
+      ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
       ${ignHtml ? `<div style="font-size:12px;margin-bottom:4px">${ignHtml}</div>` : ''}
       ${bat != null ? `<div style="font-size:12px;color:${batCor};margin-bottom:4px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
       ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
-      ${p?.fixTime ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-clock-o" style="color:#e67e22;width:13px"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
       ${p ? `<div style="font-size:11px;color:#888;line-height:1.4;border-top:1px solid #eee;padding-top:6px;margin-top:4px">
           <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
           <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
         </div>` : ''}
+      ${horasHtml}
       <div style="margin-top:10px;display:flex;gap:6px">
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff">
           <i class="fa fa-bar-chart"></i> Relatório
