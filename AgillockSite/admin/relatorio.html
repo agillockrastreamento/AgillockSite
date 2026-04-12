@@ -262,6 +262,31 @@
     /* ── Loading / empty ── */
     .rel-loading { padding: 40px; text-align: center; color: #aaa; font-size: 14px; }
     .rel-empty   { padding: 40px; text-align: center; color: #aaa; font-size: 13px; }
+
+    /* ── Overlay de loading no mapa ── */
+    #mapa-rota-loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.75);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      color: #555;
+      gap: 10px;
+      pointer-events: none;
+    }
+    html.dark-theme #mapa-rota-loading {
+      background: rgba(20,24,32,0.80);
+      color: #adb5bd;
+    }
+    #mapa-rota-loading .mapa-loading-spinner {
+      font-size: 28px;
+      color: var(--al-primary);
+    }
+    #tab-rota { position: relative; }
   </style>
 </head>
 <body>
@@ -350,6 +375,10 @@
       <div class="tab-content rel-content">
         <!-- Rota -->
         <div class="tab-pane active" id="tab-rota" style="padding:0">
+          <div id="mapa-rota-loading" style="display:none">
+            <i class="fa fa-spinner fa-spin mapa-loading-spinner"></i>
+            <span>Carregando dados...</span>
+          </div>
           <div id="mapa-rota"></div>
           <div id="rota-stats" style="padding:10px 16px;font-size:13px"></div>
         </div>

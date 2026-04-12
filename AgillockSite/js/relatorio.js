@@ -159,6 +159,7 @@ async function carregarRelatorio() {
     document.getElementById(k).innerHTML = loadHtml;
   });
   document.getElementById('rota-stats').innerHTML = '';
+  document.getElementById('mapa-rota-loading').style.display = 'flex';
 
   const qs = `from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`;
   try {
@@ -182,6 +183,8 @@ async function carregarRelatorio() {
     renderGrafico(historico.status === 'fulfilled' ? historico.value : null);
   } catch (err) {
     AL.showAlert('Erro ao carregar dados: ' + err.message, 'danger');
+  } finally {
+    document.getElementById('mapa-rota-loading').style.display = 'none';
   }
 }
 

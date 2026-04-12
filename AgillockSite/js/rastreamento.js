@@ -283,6 +283,10 @@ function criarPopupSimples(v) {
 
 function svgVelocimetro(velocidade, limite) {
   if (velocidade == null) return '';
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  const numColor = isDark ? '#e0e6ed' : '#333';
+  const lblColor = isDark ? '#6c7a8a' : '#aaa';
+  const trackColor = isDark ? '#2d3748' : '#e9ecef';
   const max = Math.max(limite || 120, 120);
   const f = Math.min(velocidade / max, 1);
   const angRad = Math.PI * (1 - f);
@@ -294,10 +298,10 @@ function svgVelocimetro(velocidade, limite) {
     ? `<path d="M 10 45 A 30 30 0 ${largeArc} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>`
     : '';
   return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:4px auto 8px">
-    <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="#e9ecef" stroke-width="7" stroke-linecap="round"/>
+    <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="${trackColor}" stroke-width="7" stroke-linecap="round"/>
     ${arc}
-    <text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="#333">${velocidade}</text>
-    <text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#aaa">km/h</text>
+    <text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="${numColor}">${velocidade}</text>
+    <text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="${lblColor}">km/h</text>
   </svg>`;
 }
 
@@ -439,11 +443,12 @@ function mostrarCardDispositivo(id) {
     : '';
 
   // Três horários com data + hora + segundos
+  const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px';
   const horasHtml = p ? `
-    <div style="font-size:11px;color:#888;border-top:1px solid #eee;padding-top:6px;margin-top:4px">
-      <div style="margin-bottom:3px"><i class="fa fa-server" style="color:#7f8c8d;width:13px"></i> <strong>Servidor:</strong> ${fmtGPSTimeSec(p.serverTime)}</div>
-      <div style="margin-bottom:3px"><i class="fa fa-mobile" style="color:#7f8c8d;width:13px"></i> <strong>Dispositivo:</strong> ${fmtGPSTimeSec(p.deviceTime)}</div>
-      <div><i class="fa fa-satellite" style="color:#7f8c8d;width:13px" title="GPS"></i> <strong>GPS:</strong> ${fmtGPSTimeSec(p.fixTime)}</div>
+    <div style="font-size:11px;color:#888;border-top:1px solid rgba(128,128,128,.2);padding-top:6px;margin-top:4px">
+      <div style="margin-bottom:3px"><i class="fa fa-server" style="${ico}"></i> <strong>Servidor:</strong> ${fmtGPSTimeSec(p.serverTime)}</div>
+      <div style="margin-bottom:3px"><i class="fa fa-mobile" style="${ico}"></i> <strong>Dispositivo:</strong> ${fmtGPSTimeSec(p.deviceTime)}</div>
+      <div><i class="fa fa-crosshairs" style="${ico}"></i> <strong>GPS:</strong> ${fmtGPSTimeSec(p.fixTime)}</div>
     </div>` : '';
 
   const card = document.getElementById('device-detail-card');
@@ -466,11 +471,11 @@ function mostrarCardDispositivo(id) {
       ${ignHtml ? `<div style="font-size:12px;margin-bottom:4px">${ignHtml}</div>` : ''}
       ${bat != null ? `<div style="font-size:12px;color:${batCor};margin-bottom:4px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
       ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
-      ${p ? `<div style="font-size:11px;color:#888;line-height:1.4;border-top:1px solid #eee;padding-top:6px;margin-top:4px">
+      ${horasHtml}
+      ${p ? `<div style="font-size:11px;color:#888;line-height:1.4;border-top:1px solid rgba(128,128,128,.2);padding-top:6px;margin-top:4px">
           <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
           <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
         </div>` : ''}
-      ${horasHtml}
       <div style="margin-top:10px;display:flex;gap:6px">
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff">
           <i class="fa fa-bar-chart"></i> Relatório
