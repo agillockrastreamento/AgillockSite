@@ -4,6 +4,9 @@ let map;
 const marcadores = {};
 let veiculosMap = {};
 let traccarIdParaDispositivoId = {};
+let boundsAjustados = false;
+
+const CACHE_KEY = 'rastr_pos_v1';
 
 let ws = null;
 let wsReconectando = false;
@@ -54,8 +57,38 @@ function inicializarMapa() {
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
 
 async function carregarPosicoes() {
+  // 1. Renderizar cache instantaneamente enquanto o REST carrega
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const lista = JSON.parse(raw);
+      lista.forEach(v => {
+        veiculosMap[v.dispositivoId] = v;
+        if (v.traccarId) traccarIdParaDispositivoId[v.traccarId] = v.dispositivoId;
+      });
+      renderMarcadores();
+      renderSidebar();
+      ajustarBounds();
+      boundsAjustados = true;
+    }
+  } catch {}
+
+  // 2. Conectar WebSocket imediatamente (já tem o mapeamento do cache)
+  conectarWebSocket();
+
+  // 3. Buscar dados frescos em segundo plano
   try {
     const lista = await window.AL.apiGet('/api/rastreamento/posicoes');
+
+    // Remove marcadores de dispositivos que não existem mais
+    Object.keys(marcadores).forEach(id => {
+      if (!lista.find(v => v.dispositivoId === id)) {
+        map.removeLayer(marcadores[id]);
+        delete marcadores[id];
+        delete marcadoresIconeKey[id];
+      }
+    });
+
     veiculosMap = {};
     traccarIdParaDispositivoId = {};
     lista.forEach(v => {
@@ -63,14 +96,17 @@ async function carregarPosicoes() {
       if (v.traccarId) traccarIdParaDispositivoId[v.traccarId] = v.dispositivoId;
     });
 
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(lista)); } catch {}
+
     renderMarcadores();
     renderSidebar();
-    ajustarBounds();
-    conectarWebSocket();
+    if (!boundsAjustados) { ajustarBounds(); boundsAjustados = true; }
   } catch (err) {
     console.error('Erro ao carregar posições:', err);
-    document.getElementById('sidebar-counters').innerHTML =
-      '<span style="color:#e74c3c"><i class="fa fa-exclamation-triangle"></i> Erro ao carregar</span>';
+    if (!Object.keys(veiculosMap).length) {
+      document.getElementById('sidebar-counters').innerHTML =
+        '<span style="color:#e74c3c"><i class="fa fa-exclamation-triangle"></i> Erro ao carregar</span>';
+    }
   }
 }
 
