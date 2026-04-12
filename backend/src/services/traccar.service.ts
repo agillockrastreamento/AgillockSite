@@ -99,6 +99,57 @@ export async function traccarGetTrips(
   return res.json() as Promise<TraccarTrip[]>;
 }
 
+export async function traccarGetEvents(
+  deviceId: number,
+  from: Date,
+  to: Date,
+  types?: string[],
+): Promise<TraccarEvent[]> {
+  const params = new URLSearchParams({
+    deviceId: String(deviceId),
+    from: from.toISOString(),
+    to: to.toISOString(),
+  });
+  if (types?.length) types.forEach(t => params.append('type', t));
+  const res = await fetch(`${TRACCAR_URL}/api/reports/events?${params}`, { headers: defaultHeaders });
+  if (!res.ok) throw new Error(`Traccar ${res.status}`);
+  return res.json() as Promise<TraccarEvent[]>;
+}
+
+export async function traccarGetSummary(
+  deviceId: number,
+  from: Date,
+  to: Date,
+): Promise<TraccarSummary[]> {
+  const params = new URLSearchParams({
+    deviceId: String(deviceId),
+    from: from.toISOString(),
+    to: to.toISOString(),
+  });
+  const res = await fetch(`${TRACCAR_URL}/api/reports/summary?${params}`, { headers: defaultHeaders });
+  if (!res.ok) throw new Error(`Traccar ${res.status}`);
+  return res.json() as Promise<TraccarSummary[]>;
+}
+
+export async function traccarSendCommand(
+  deviceId: number,
+  type: string,
+  attributes: Record<string, unknown> = {},
+): Promise<void> {
+  const res = await fetch(`${TRACCAR_URL}/api/commands/send`, {
+    method: 'POST',
+    headers: defaultHeaders,
+    body: JSON.stringify({ deviceId, type, attributes }),
+  });
+  if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
+}
+
+export async function traccarGetCommandTypes(deviceId: number): Promise<string[]> {
+  const res = await fetch(`${TRACCAR_URL}/api/commands/types?deviceId=${deviceId}`, { headers: defaultHeaders });
+  if (!res.ok) throw new Error(`Traccar ${res.status}`);
+  return res.json() as Promise<string[]>;
+}
+
 export async function traccarGetStops(
   deviceId: number,
   from: Date,
@@ -176,6 +227,27 @@ export interface TraccarPosition {
     alarm?: string;
     [key: string]: unknown;
   };
+}
+
+export interface TraccarEvent {
+  id: number;
+  deviceId: number;
+  type: string;
+  eventTime: string;
+  positionId: number;
+  geofenceId: number;
+  maintenanceId: number;
+  attributes: Record<string, unknown>;
+}
+
+export interface TraccarSummary {
+  deviceId: number;
+  deviceName: string;
+  distance: number;
+  averageSpeed: number;
+  maxSpeed: number;
+  engineHours: number;
+  spentFuel: number;
 }
 
 export interface TraccarTrip {

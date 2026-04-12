@@ -350,6 +350,17 @@
     },
   };
 
+  // ─── Sidebar dropdown toggle ─────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.dropdown-toggle-link').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        var li = this.closest('.sidebar-dropdown');
+        if (li) li.classList.toggle('open');
+      });
+    });
+  });
+
   // ─── Fix altura real no mobile (Chrome Android / iOS) ───────────────────
   // window.innerHeight é a altura visível real, sem a barra do browser.
   // Define --real-vh para ser usado no CSS em vez de 100vh.

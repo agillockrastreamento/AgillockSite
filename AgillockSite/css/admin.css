@@ -84,6 +84,52 @@ body.admin-body {
     margin: 8px 0;
 }
 
+/* ─── Sidebar dropdown (Área de Controle) ───────────────────────────────── */
+.sidebar-dropdown > a.dropdown-toggle-link {
+    justify-content: flex-start;
+    cursor: pointer;
+    user-select: none;
+}
+.sidebar-dropdown > a.dropdown-toggle-link span {
+    flex: 1;
+}
+.sidebar-arrow {
+    transition: transform 0.22s;
+    font-size: 11px;
+    opacity: 0.6;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.sidebar-dropdown.open .sidebar-arrow {
+    transform: rotate(180deg);
+}
+.sidebar-submenu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+    background: rgba(0,0,0,0.18);
+}
+.sidebar-dropdown.open .sidebar-submenu {
+    max-height: 200px;
+}
+.sidebar-submenu li a {
+    padding-left: 40px !important;
+    font-size: 13px;
+    border-left: 3px solid transparent !important;
+}
+.sidebar-submenu li.active > a {
+    color: #fab32c !important;
+    background: rgba(254,209,54,0.08) !important;
+    border-left-color: #fab32c !important;
+}
+.sidebar-submenu li a:hover {
+    background: #2d3748 !important;
+    color: #fff !important;
+}
+
 .sidebar-footer {
     padding: 16px 20px;
     border-top: 1px solid #2d3748;

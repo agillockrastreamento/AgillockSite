@@ -44,8 +44,41 @@
 
     #sidebar-counters { font-size: 11px; color: #888; margin-top: 6px; }
 
-    #lista-veiculos { flex: 1; overflow-y: auto; }
+    /* ── Resultados de busca ── */
+    #lista-resultados-busca {
+      border-bottom: 1px solid #eee;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .dark-theme #lista-resultados-busca { border-color: #333; }
 
+    /* ── Card do dispositivo ── */
+    #device-detail-card {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .dcard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 10px 12px 6px;
+      border-bottom: 1px solid #eee;
+    }
+    .dark-theme .dcard-header { border-color: #333; }
+    .dcard-fechar {
+      background: none;
+      border: none;
+      font-size: 18px;
+      line-height: 1;
+      color: #999;
+      cursor: pointer;
+      padding: 0 2px;
+      flex-shrink: 0;
+    }
+    .dcard-fechar:hover { color: #e74c3c; }
+    .dcard-body { padding: 10px 12px 14px; }
+
+    /* ── Itens da lista de busca ── */
     .veiculo-item {
       padding: 9px 12px;
       border-bottom: 1px solid #f0f0f0;
@@ -75,7 +108,6 @@
 
     /* ── Mapa ── */
     #mapa { flex: 1; }
-    /* Cursor sempre visível no mapa (evita cursor branco invisível) */
     .leaflet-grab { cursor: crosshair !important; }
     .leaflet-drag-target { cursor: grabbing !important; }
 
@@ -90,12 +122,11 @@
     #ws-status.desconectado { background: #e74c3c; color: #fff; }
     #ws-status.reconectando { background: #f39c12; color: #fff; }
 
-    /* ── Popup de veículo ── */
+    /* ── Popup de veículo (simplificado) ── */
     .popup-veiculo .leaflet-popup-content-wrapper {
       padding: 0 !important;
-      border-radius: 10px !important;
+      border-radius: 8px !important;
       overflow: hidden !important;
-      min-width: 230px !important;
     }
     .popup-veiculo .leaflet-popup-content {
       margin: 0 !important;
@@ -114,7 +145,18 @@
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
       <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
-      <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+      <li class="sidebar-dropdown open">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+        </ul>
+      </li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
       <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
       <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
@@ -151,11 +193,10 @@
                  placeholder="Buscar veículo ou placa...">
           <div id="sidebar-counters">Carregando...</div>
         </div>
-        <div id="lista-veiculos">
-          <div style="padding:20px;text-align:center;color:#aaa;font-size:12px">
-            <i class="fa fa-spin fa-spinner"></i> Carregando veículos...
-          </div>
-        </div>
+        <!-- Resultados de busca (visível só ao digitar) -->
+        <div id="lista-resultados-busca" style="display:none"></div>
+        <!-- Card do dispositivo selecionado -->
+        <div id="device-detail-card" style="display:none"></div>
       </div>
 
       <!-- Mapa -->

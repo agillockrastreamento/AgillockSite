@@ -9,14 +9,14 @@ let ws = null;
 let wsReconectando = false;
 let wsReconectTimer = null;
 let ativoId = null;
-const marcadoresIconeKey = {}; // cache do estado visual de cada marcador
+const marcadoresIconeKey = {};
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function () {
   inicializarMapa();
   carregarPosicoes();
-  document.getElementById('filtro').addEventListener('input', () => renderSidebar());
+  document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
 });
 
 function inicializarMapa() {
@@ -44,15 +44,6 @@ function inicializarMapa() {
   ).addTo(map);
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
-
-  // Auto-geocodifica o endereço quando o popup abre
-  map.on('popupopen', function (e) {
-    const container = e.popup.getElement();
-    if (!container) return;
-    const el = container.querySelector('[id^="addr-"]');
-    if (!el || !el.dataset.lat) return;
-    geocodificarCoordenadas(parseFloat(el.dataset.lat), parseFloat(el.dataset.lng), el.id);
-  });
 }
 
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
@@ -73,9 +64,8 @@ async function carregarPosicoes() {
     conectarWebSocket();
   } catch (err) {
     console.error('Erro ao carregar posições:', err);
-    document.getElementById('lista-veiculos').innerHTML =
-      '<div style="padding:20px;text-align:center;color:#e74c3c">' +
-      '<i class="fa fa-exclamation-triangle"></i> Erro ao carregar veículos.</div>';
+    document.getElementById('sidebar-counters').innerHTML =
+      '<span style="color:#e74c3c"><i class="fa fa-exclamation-triangle"></i> Erro ao carregar</span>';
   }
 }
 
@@ -137,7 +127,7 @@ function processarMensagemWs(msg) {
       };
 
       atualizarMarcador(dispositivoId);
-      atualizarItemSidebar(dispositivoId);
+      atualizarCardAtivo(dispositivoId);
     });
   }
 
@@ -150,9 +140,11 @@ function processarMensagemWs(msg) {
       veiculosMap[dispositivoId].lastUpdate = d.lastUpdate;
 
       atualizarMarcador(dispositivoId);
-      atualizarItemSidebar(dispositivoId);
+      atualizarCardAtivo(dispositivoId);
     });
   }
+
+  renderSidebar(); // atualiza contadores
 }
 
 function setWsStatus(estado, texto) {
@@ -174,12 +166,11 @@ function renderMarcadores() {
     if (marcadores[id]) {
       marcadores[id].setLatLng([latitude, longitude]);
       marcadores[id].setIcon(icone);
-      marcadores[id].getPopup().setContent(criarPopup(v));
     } else {
       const marker = L.marker([latitude, longitude], { icon: icone })
-        .bindPopup(criarPopup(v), { autoPanPadding: L.point(10, 70), className: 'popup-veiculo' })
+        .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 })
         .addTo(map);
-      marker.on('click', () => destacar(id));
+      marker.on('click', () => focar(id));
       marcadores[id] = marker;
     }
   });
@@ -194,7 +185,6 @@ function atualizarMarcador(dispositivoId) {
   if (marcadores[dispositivoId]) {
     marcadores[dispositivoId].setLatLng([latitude, longitude]);
 
-    // Só recria o ícone se a cor ou categoria mudou (evita piscar)
     const iconKey = _iconeKey(v);
     if (marcadoresIconeKey[dispositivoId] !== iconKey) {
       marcadores[dispositivoId].setIcon(criarIcone(v));
@@ -202,15 +192,15 @@ function atualizarMarcador(dispositivoId) {
     }
 
     if (marcadores[dispositivoId].isPopupOpen()) {
-      marcadores[dispositivoId].getPopup().setContent(criarPopup(v));
+      marcadores[dispositivoId].getPopup().setContent(criarPopupSimples(v));
     }
   } else {
     const icone = criarIcone(v);
     marcadoresIconeKey[dispositivoId] = _iconeKey(v);
     const marker = L.marker([latitude, longitude], { icon: icone })
-      .bindPopup(criarPopup(v), { autoPanPadding: L.point(10, 70), className: 'popup-veiculo' })
+      .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 })
       .addTo(map);
-    marker.on('click', () => destacar(dispositivoId));
+    marker.on('click', () => focar(dispositivoId));
     marcadores[dispositivoId] = marker;
   }
 }
@@ -278,6 +268,25 @@ function criarIcone(v) {
   return L.divIcon({ html, className: '', iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 
+// ── Popup simplificado (só nome + placa + status) ─────────────────────────────
+
+function criarPopupSimples(v) {
+  const p = v.posicao;
+  const isOnline = v.status === 'online';
+  const isMoving = isOnline && p?.motion;
+  const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#95a5a6';
+  const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : 'Offline';
+
+  return `<div style="padding:8px 12px;font-size:12px;min-width:130px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:3px">${v.nome}</div>
+    ${v.placa ? `<div style="margin-bottom:4px"><span style="background:#333;color:#fff;padding:0 5px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span></div>` : ''}
+    <div style="color:${corStatus}"><i class="fa fa-circle" style="font-size:8px"></i> ${txtStatus}</div>
+    ${!isOnline && p?.fixTime ? `<div style="font-size:10px;color:#e67e22;margin-top:2px"><i class="fa fa-clock-o"></i> há ${fmtTempoDecorrido(p.fixTime)}</div>` : ''}
+  </div>`;
+}
+
+// ── Velocímetro SVG ───────────────────────────────────────────────────────────
+
 function svgVelocimetro(velocidade, limite) {
   if (velocidade == null) return '';
   const max = Math.max(limite || 120, 120);
@@ -305,21 +314,108 @@ function fmtGPSTime(iso) {
     d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-function criarPopup(v) {
+function fmtTempoDecorrido(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'agora';
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const dias = Math.floor(hrs / 24);
+  return `${dias} dia${dias > 1 ? 's' : ''}`;
+}
+
+// ── Sidebar — contadores ──────────────────────────────────────────────────────
+
+function renderSidebar() {
+  const todos = Object.values(veiculosMap);
+  const online  = todos.filter(v => v.status === 'online').length;
+  const offline = todos.filter(v => v.status !== 'online').length;
+  const semPos  = todos.filter(v => !v.posicao).length;
+
+  document.getElementById('sidebar-counters').innerHTML =
+    `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp;
+     <span class="dot-offline">●</span> ${offline} offline
+     ${semPos ? `&nbsp;·&nbsp; <span style="color:#e67e22">${semPos} sem posição</span>` : ''}`;
+}
+
+// ── Resultados de busca ───────────────────────────────────────────────────────
+
+function renderBuscaResultados() {
+  const filtro = (document.getElementById('filtro').value || '').toLowerCase().trim();
+  const el = document.getElementById('lista-resultados-busca');
+
+  if (!filtro) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+
+  const todos = Object.values(veiculosMap);
+  const filtrados = todos.filter(v =>
+    v.nome.toLowerCase().includes(filtro) ||
+    (v.placa && v.placa.toLowerCase().includes(filtro)) ||
+    (v.cliente?.nome.toLowerCase().includes(filtro))
+  ).slice(0, 8);
+
+  if (!filtrados.length) {
+    el.innerHTML = '<div style="padding:12px;text-align:center;color:#aaa;font-size:12px">Nenhum resultado.</div>';
+    el.style.display = 'block';
+    return;
+  }
+
+  filtrados.sort((a, b) => pesoStatus(a) - pesoStatus(b));
+
+  el.innerHTML = filtrados.map(v => {
+    const p = v.posicao;
+    let dotClass = 'dot-offline', txtStatus = 'Offline';
+    if (v.status === 'online' && p?.motion) { dotClass = 'dot-moving'; txtStatus = `Em movimento · ${p.velocidade} km/h`; }
+    else if (v.status === 'online') { dotClass = 'dot-online'; txtStatus = 'Parado'; }
+
+    return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" onclick="selecionarDaBusca('${v.dispositivoId}')">
+      <div class="v-nome">${v.nome}${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}</div>
+      <div class="v-status"><i class="fa fa-circle ${dotClass}"></i> ${txtStatus}</div>
+    </div>`;
+  }).join('');
+
+  el.style.display = 'block';
+}
+
+window.selecionarDaBusca = function (id) {
+  document.getElementById('filtro').value = '';
+  document.getElementById('lista-resultados-busca').style.display = 'none';
+  focar(id);
+};
+
+function pesoStatus(v) {
+  if (v.status !== 'online') return 2;
+  if (v.posicao?.motion) return 0;
+  return 1;
+}
+
+// ── Card do dispositivo selecionado ───────────────────────────────────────────
+
+function mostrarCardDispositivo(id) {
+  const v = veiculosMap[id];
+  if (!v) return;
+
+  ativoId = id;
   const p = v.posicao;
   const isOnline = v.status === 'online';
   const isMoving = isOnline && p?.motion;
-  const corHeader = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#95a5a6';
+
+  const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#95a5a6';
   const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : 'Offline';
 
-  const addrId = `addr-${v.dispositivoId}`;
   const apiBase = window.API_URL || '';
+  const addrId = `dcard-addr-${id}`;
 
-  const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
-  const coords = p ? `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})` : '';
-  const hasCached = cacheKey != null && cacheKey in _geocodeCache;
-  const cachedAddr = hasCached ? _geocodeCache[cacheKey] : null;
-  const addrTxt = hasCached ? (cachedAddr ? `${cachedAddr} ${coords}` : coords) : 'Buscando...';
+  // "há X tempo" para dispositivos offline com última posição
+  let tempoHtml = '';
+  if (!isOnline && p?.fixTime) {
+    tempoHtml = `<span style="color:#e67e22;font-size:11px;margin-left:6px"><i class="fa fa-clock-o"></i> há ${fmtTempoDecorrido(p.fixTime)}</span>`;
+  }
 
   const bat = p?.bateria != null ? p.bateria : null;
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
@@ -331,155 +427,111 @@ function criarPopup(v) {
     ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>`
     : '';
 
+  const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
+  const hasCached = cacheKey != null && cacheKey in _geocodeCache;
+  const cachedAddr = hasCached ? _geocodeCache[cacheKey] : null;
+  const coords = p ? `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})` : '';
+  const addrTxt = hasCached ? (cachedAddr ? `${cachedAddr} ${coords}` : coords) : (p ? 'Buscando...' : '—');
+
   const imgHtml = v.imagemUrl
-    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:140px;object-fit:cover;display:block"
-        onerror="this.style.display='none'" />`
+    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:130px;object-fit:cover;display:block" onerror="this.style.display='none'" />`
     : '';
 
-  return `<div style="font-size:13px;min-width:240px">
+  const card = document.getElementById('device-detail-card');
+  card.innerHTML = `
     ${imgHtml}
-    <div style="padding:10px 14px 0">
-      <strong style="font-size:14px;line-height:1.2;display:block">${v.nome}</strong>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
-        ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1.5px">${v.placa}</span>` : '<span></span>'}
-        <span style="font-size:11px;color:${corHeader}">● ${txtStatus}</span>
+    <div class="dcard-header">
+      <div>
+        <div class="v-nome">${v.nome}</div>
+        ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
       </div>
+      <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
     </div>
-    <div style="padding:0 14px 12px">
-      ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
-      ${ignHtml ? `<div style="font-size:11px;margin-bottom:4px">${ignHtml}</div>` : ''}
-      ${bat != null ? `<div style="font-size:11px;color:${batCor};margin-bottom:6px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
-      ${v.cliente ? `<div style="font-size:11px;color:#555;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
-      ${p?.fixTime ? `<div style="font-size:11px;color:#555;margin-bottom:4px"><i class="fa fa-clock-o" style="color:#e67e22;width:13px"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
-      ${p ? `<div style="font-size:11px;color:#555;line-height:1.4;border-top:1px solid #f0f0f0;padding-top:6px;margin-top:2px">
+    <div class="dcard-body">
+      <div style="margin-bottom:6px">
+        <span style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px"></i> ${txtStatus}</span>
+        ${tempoHtml}
+        ${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}
+      </div>
+      ${isMoving && p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
+      ${ignHtml ? `<div style="font-size:12px;margin-bottom:4px">${ignHtml}</div>` : ''}
+      ${bat != null ? `<div style="font-size:12px;color:${batCor};margin-bottom:4px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
+      ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
+      ${p?.fixTime ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-clock-o" style="color:#e67e22;width:13px"></i> ${fmtGPSTime(p.fixTime)}</div>` : ''}
+      ${p ? `<div style="font-size:11px;color:#888;line-height:1.4;border-top:1px solid #eee;padding-top:6px;margin-top:4px">
           <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
           <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
         </div>` : ''}
-      <div style="margin-top:8px">
-        <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="color:#fff;display:block;text-align:center">
-          <i class="fa fa-map-marker"></i> Ver detalhes
+      <div style="margin-top:10px;display:flex;gap:6px">
+        <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff">
+          <i class="fa fa-bar-chart"></i> Relatório
+        </a>
+        <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
+          <i class="fa fa-history"></i> Histórico
         </a>
       </div>
     </div>
-  </div>`;
-}
-
-// ── Sidebar de veículos ───────────────────────────────────────────────────────
-
-function renderSidebar() {
-  const filtro = (document.getElementById('filtro').value || '').toLowerCase();
-  const todos = Object.values(veiculosMap);
-
-  const filtrados = filtro
-    ? todos.filter(v =>
-        v.nome.toLowerCase().includes(filtro) ||
-        (v.placa && v.placa.toLowerCase().includes(filtro)) ||
-        (v.cliente?.nome.toLowerCase().includes(filtro))
-      )
-    : todos;
-
-  filtrados.sort((a, b) => pesoStatus(a) - pesoStatus(b));
-
-  const online  = todos.filter(v => v.status === 'online').length;
-  const offline = todos.filter(v => v.status !== 'online').length;
-  const semPos  = todos.filter(v => !v.posicao).length;
-
-  document.getElementById('sidebar-counters').innerHTML =
-    `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp;
-     <span class="dot-offline">●</span> ${offline} offline
-     ${semPos ? `&nbsp;·&nbsp; <span style="color:#e67e22">${semPos} sem posição</span>` : ''}`;
-
-  document.getElementById('lista-veiculos').innerHTML = filtrados.length
-    ? filtrados.map(v => itemSidebarHtml(v)).join('')
-    : '<div style="padding:20px;text-align:center;color:#aaa;font-size:12px">Nenhum veículo encontrado.</div>';
-}
-
-function atualizarItemSidebar(dispositivoId) {
-  const el = document.getElementById(`item-${dispositivoId}`);
-  if (!el) { renderSidebar(); return; }
-  // Atualiza apenas o conteúdo interno — preserva o elemento no DOM (evita piscar)
-  el.className = `veiculo-item${dispositivoId === ativoId ? ' ativo' : ''}`;
-  el.innerHTML = _itemSidebarInner(veiculosMap[dispositivoId]);
-}
-
-function itemSidebarHtml(v) {
-  return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" id="item-${v.dispositivoId}" onclick="focar('${v.dispositivoId}')">${_itemSidebarInner(v)}</div>`;
-}
-
-function _itemSidebarInner(v) {
-  const p = v.posicao;
-  let dotClass = 'dot-offline', txtStatus = 'Offline';
-  if (v.status === 'online' && p?.motion) {
-    dotClass = 'dot-moving'; txtStatus = `Em movimento · ${p.velocidade} km/h`;
-  } else if (v.status === 'online') {
-    dotClass = 'dot-online'; txtStatus = 'Parado';
-  }
-
-  let ignIcon = '';
-  if (p?.ignition === true) {
-    ignIcon = `<i class="fa fa-key" title="Ignição: Sim" style="color:#27ae60"></i>`;
-  } else if (p?.ignition === false) {
-    ignIcon = `<i class="fa fa-key" title="Ignição: Não" style="color:#bdc3c7"></i>`;
-  }
-
-  let batIcon = '';
-  if (p?.bateria != null) {
-    const pct = p.bateria;
-    const faClass = pct >= 80 ? 'fa-battery-full' : pct >= 60 ? 'fa-battery-3' : pct >= 40 ? 'fa-battery-2' : pct >= 20 ? 'fa-battery-1' : 'fa-battery-0';
-    const corBat = pct >= 40 ? '#27ae60' : pct >= 20 ? '#f39c12' : '#e74c3c';
-    batIcon = `<i class="fa ${faClass}" title="Bateria: ${pct}%" style="color:${corBat}"></i>`;
-  }
-
-  return `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div class="v-nome">${v.nome}
-        ${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}
-      </div>
-      ${(ignIcon || batIcon) ? `<div style="display:flex;gap:5px;font-size:12px;flex-shrink:0;padding-left:4px;padding-top:1px">${ignIcon}${batIcon}</div>` : ''}
-    </div>
-    <div class="v-status">
-      <i class="fa fa-circle ${dotClass}"></i> ${txtStatus}
-      ${!p ? '&nbsp;<span style="color:#e67e22">· Sem posição</span>' : ''}
-    </div>
-    ${v.cliente ? `<div class="v-cliente">${v.cliente.nome}</div>` : ''}
   `;
+
+  card.style.display = 'block';
+
+  // Auto-geocodifica se não estiver em cache
+  if (p && !hasCached) {
+    geocodificarCoordenadas(p.latitude, p.longitude, addrId);
+  }
 }
 
-function pesoStatus(v) {
-  if (v.status !== 'online') return 2;
-  if (v.posicao?.motion) return 0;
-  return 1;
+window.fecharCardDispositivo = function () {
+  document.getElementById('device-detail-card').style.display = 'none';
+  ativoId = null;
+  map.closePopup();
+};
+
+function atualizarCardAtivo(dispositivoId) {
+  if (dispositivoId !== ativoId) return;
+  const card = document.getElementById('device-detail-card');
+  if (card.style.display === 'none') return;
+  mostrarCardDispositivo(dispositivoId);
 }
 
 // ── Interações ────────────────────────────────────────────────────────────────
 
 window.focar = function (dispositivoId) {
   const v = veiculosMap[dispositivoId];
-  if (!v?.posicao) return;
-  const { latitude, longitude } = v.posicao;
-  map.once('moveend', () => marcadores[dispositivoId]?.openPopup());
-  map.setView([latitude, longitude], 16);
-  destacar(dispositivoId);
-};
 
-function destacar(dispositivoId) {
-  ativoId = dispositivoId;
-  document.querySelectorAll('.veiculo-item').forEach(el => el.classList.remove('ativo'));
-  const el = document.getElementById(`item-${dispositivoId}`);
-  if (el) { el.classList.add('ativo'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-}
+  if (!v?.posicao) {
+    // Sem posição: apenas abre o card
+    mostrarCardDispositivo(dispositivoId);
+    return;
+  }
+
+  const { latitude, longitude } = v.posicao;
+  map.setView([latitude, longitude], 16);
+  mostrarCardDispositivo(dispositivoId);
+
+  // Abre o popup simplificado no mapa
+  setTimeout(() => {
+    if (marcadores[dispositivoId]) marcadores[dispositivoId].openPopup();
+  }, 300);
+};
 
 function ajustarBounds() {
   const comPosicao = Object.values(veiculosMap).filter(v => v.posicao);
   if (!comPosicao.length) return;
 
+  if (comPosicao.length === 1) {
+    const { latitude, longitude } = comPosicao[0].posicao;
+    map.setView([latitude, longitude], 13);
+    return;
+  }
+
   const group = new L.FeatureGroup(
     comPosicao.map(v => L.marker([v.posicao.latitude, v.posicao.longitude]))
   );
-  map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 16 });
+  map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 14 });
 }
 
-// ── Geocodificação reversa (Nominatim) ───────────────────────────────────────
+// ── Geocodificação reversa (Nominatim) ────────────────────────────────────────
 
 const _geocodeCache = {};
 
@@ -501,7 +553,7 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const el = document.getElementById(elementId);
   if (!el) return;
   const coords = `(${lat.toFixed(5)}, ${lng.toFixed(5)})`;
-  const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`; // ~100 m de precisão
+  const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`;
 
   if (cacheKey in _geocodeCache) {
     const cached = _geocodeCache[cacheKey];

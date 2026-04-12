@@ -9,6 +9,11 @@ import {
   traccarGetPositions,
   traccarGetPositionHistory,
   traccarGetTrips,
+  traccarGetStops,
+  traccarGetEvents,
+  traccarGetSummary,
+  traccarSendCommand,
+  traccarGetCommandTypes,
 } from '../services/traccar.service';
 
 const router = Router();
@@ -157,6 +162,141 @@ router.get('/dispositivos/:id/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
     velocidadeMaxima: Math.round(v.maxSpeed * 1.852),
     duracao: Math.round(v.duration / 60000),
   })));
+});
+
+// ── GET /api/rastreamento/dispositivos/:id/paradas ────────────────────────────
+router.get('/dispositivos/:id/paradas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: { id: true, nome: true, identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado com o rastreador.' }); return; }
+
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to) : new Date();
+
+  const paradas = await traccarGetStops(traccarDevice.id, fromDate, toDate);
+
+  res.json(paradas.map(p => ({
+    inicio: p.startTime,
+    fim: p.endTime,
+    endereco: p.address,
+    latitude: p.lat,
+    longitude: p.lon,
+    duracao: Math.round(p.duration / 60000),
+    horasMotor: Math.round((p.engineHours || 0) / 3600000),
+  })));
+});
+
+// ── GET /api/rastreamento/dispositivos/:id/eventos ────────────────────────────
+router.get('/dispositivos/:id/eventos', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: { id: true, nome: true, identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado com o rastreador.' }); return; }
+
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to) : new Date();
+
+  const eventos = await traccarGetEvents(traccarDevice.id, fromDate, toDate);
+
+  res.json(eventos.map(e => ({
+    id: e.id,
+    tipo: e.type,
+    hora: e.eventTime,
+    atributos: e.attributes,
+  })));
+});
+
+// ── GET /api/rastreamento/dispositivos/:id/resumo ─────────────────────────────
+router.get('/dispositivos/:id/resumo', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: { id: true, nome: true, identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado com o rastreador.' }); return; }
+
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to) : new Date();
+
+  const resumos = await traccarGetSummary(traccarDevice.id, fromDate, toDate);
+
+  if (!resumos.length) { res.json(null); return; }
+  const r = resumos[0];
+  res.json({
+    distancia: Math.round(r.distance / 100) / 10,
+    velocidadeMedia: Math.round(r.averageSpeed * 1.852),
+    velocidadeMaxima: Math.round(r.maxSpeed * 1.852),
+    horasMotor: Math.round((r.engineHours || 0) / 3600000 * 10) / 10,
+  });
+});
+
+// ── GET /api/rastreamento/dispositivos/:id/tipos-comandos ─────────────────────
+router.get('/dispositivos/:id/tipos-comandos', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: { id: true, identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado.' }); return; }
+
+  try {
+    const tipos = await traccarGetCommandTypes(traccarDevice.id);
+    res.json(tipos);
+  } catch {
+    res.json([]); // retorna vazio se Traccar não suportar
+  }
+});
+
+// ── POST /api/rastreamento/dispositivos/:id/comandos ──────────────────────────
+router.post('/dispositivos/:id/comandos', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const { tipo, atributos } = req.body as { tipo: string; atributos?: Record<string, unknown> };
+
+  if (!tipo) { res.status(400).json({ error: 'Campo "tipo" é obrigatório.' }); return; }
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: { id: true, identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado.' }); return; }
+
+  try {
+    await traccarSendCommand(traccarDevice.id, tipo, atributos || {});
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao enviar comando: ${msg}` });
+  }
 });
 
 export default router;

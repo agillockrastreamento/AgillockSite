@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Relatório — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    .rel-toolbar {
+      background: #fff;
+      border-bottom: 1px solid #e8e8e8;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    html.dark-theme .rel-toolbar { background: #191e28; border-color: #2d3748; }
+
+    .rel-toolbar .form-control, .rel-toolbar .btn { margin: 0; }
+    #sel-dispositivo { min-width: 200px; max-width: 280px; }
+
+    .periodo-btn { padding: 5px 10px; }
+    .periodo-btn.active { background: var(--al-primary); border-color: var(--al-primary-hover); color: #222; }
+
+    .rel-tabs { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .rel-content { padding: 20px; flex: 1; overflow-y: auto; }
+
+    /* Rota */
+    #mapa-rota { height: 420px; border-radius: 8px; overflow: hidden; }
+    .leaflet-grab { cursor: crosshair !important; }
+
+    /* Tabelas */
+    .rel-table { width: 100%; font-size: 13px; }
+    .rel-table th { background: #f5f6fa; color: #555; font-weight: 600; padding: 8px 12px; border-bottom: 2px solid #e8e8e8; }
+    html.dark-theme .rel-table th { background: #1e2530; color: #adb5bd; border-color: #2d3748; }
+    .rel-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    html.dark-theme .rel-table td { border-color: #2a2a3e; }
+    .rel-table tr:hover td { background: #f9f9f9; }
+    html.dark-theme .rel-table tr:hover td { background: #232838; }
+
+    /* Cards de resumo */
+    .resumo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+    .resumo-card { background: #fff; border-radius: 10px; padding: 20px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.07); text-align: center; }
+    html.dark-theme .resumo-card { background: #1e2530; }
+    .resumo-card .rc-val { font-size: 28px; font-weight: 700; color: var(--al-primary); }
+    .resumo-card .rc-lbl { font-size: 12px; color: #888; margin-top: 4px; }
+
+    /* Gráfico */
+    #canvas-grafico { max-height: 380px; }
+
+    /* Eventos */
+    .ev-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .ev-online    { background:#d4edda;color:#155724; }
+    .ev-offline   { background:#f8d7da;color:#721c24; }
+    .ev-moving    { background:#cce5ff;color:#004085; }
+    .ev-stopped   { background:#fff3cd;color:#856404; }
+    .ev-overspeed { background:#f8d7da;color:#721c24; }
+    .ev-ignition  { background:#d1ecf1;color:#0c5460; }
+    .ev-alarm     { background:#f8d7da;color:#721c24; }
+    .ev-default   { background:#e2e3e5;color:#383d41; }
+
+    /* Paradas */
+    .parada-card {
+      background: #fff;
+      border-radius: 8px;
+      border-left: 4px solid #fab32c;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    html.dark-theme .parada-card { background: #1e2530; }
+
+    /* Loading / empty */
+    .rel-loading { padding: 40px; text-align: center; color: #aaa; font-size: 14px; }
+    .rel-empty   { padding: 40px; text-align: center; color: #aaa; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar admin -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown open">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li class="active"><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo -->
+  <div class="admin-content" style="padding:0;display:flex;flex-direction:column;height:100vh;overflow:hidden;">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Relatório</h2>
+      </div>
+    </div>
+
+    <!-- Toolbar de seleção -->
+    <div class="rel-toolbar" style="margin-top:56px">
+      <select id="sel-dispositivo" class="form-control input-sm">
+        <option value="">Selecionar dispositivo...</option>
+      </select>
+      <div class="btn-group">
+        <button class="btn btn-default btn-sm periodo-btn active" data-periodo="hoje">Hoje</button>
+        <button class="btn btn-default btn-sm periodo-btn" data-periodo="ontem">Ontem</button>
+        <button class="btn btn-default btn-sm periodo-btn" data-periodo="7dias">7 dias</button>
+        <button class="btn btn-default btn-sm periodo-btn" data-periodo="custom">Personalizado</button>
+      </div>
+      <div id="custom-datas" style="display:none;gap:6px;align-items:center" class="hidden-xs">
+        <input type="date" id="dt-de" class="form-control input-sm" style="width:130px" />
+        <span style="color:#888;font-size:12px">até</span>
+        <input type="date" id="dt-ate" class="form-control input-sm" style="width:130px" />
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-carregar">
+        <i class="fa fa-search"></i> Carregar
+      </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="rel-tabs" style="background:#fff;flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <ul class="nav nav-tabs" id="rel-nav" style="margin:0;padding:0 20px;border-bottom:2px solid #e8e8e8;background:#fff;">
+        <li class="active"><a href="#tab-rota"     data-toggle="tab"><i class="fa fa-road"></i> Rota</a></li>
+        <li><a href="#tab-eventos"   data-toggle="tab"><i class="fa fa-bell"></i> Eventos</a></li>
+        <li><a href="#tab-viagens"   data-toggle="tab"><i class="fa fa-car"></i> Viagens</a></li>
+        <li><a href="#tab-paradas"   data-toggle="tab"><i class="fa fa-pause-circle"></i> Paradas</a></li>
+        <li><a href="#tab-resumo"    data-toggle="tab"><i class="fa fa-list-alt"></i> Resumo</a></li>
+        <li><a href="#tab-grafico"   data-toggle="tab"><i class="fa fa-area-chart"></i> Gráfico</a></li>
+      </ul>
+
+      <div class="tab-content rel-content" style="flex:1;overflow-y:auto;background:#f5f6fa;">
+        <!-- Rota -->
+        <div class="tab-pane active" id="tab-rota">
+          <div id="mapa-rota"></div>
+          <div id="rota-stats" style="margin-top:12px;font-size:13px;color:#888"></div>
+        </div>
+
+        <!-- Eventos -->
+        <div class="tab-pane" id="tab-eventos">
+          <div id="eventos-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+        </div>
+
+        <!-- Viagens -->
+        <div class="tab-pane" id="tab-viagens">
+          <div id="viagens-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+        </div>
+
+        <!-- Paradas -->
+        <div class="tab-pane" id="tab-paradas">
+          <div id="paradas-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+        </div>
+
+        <!-- Resumo -->
+        <div class="tab-pane" id="tab-resumo">
+          <div id="resumo-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+        </div>
+
+        <!-- Gráfico -->
+        <div class="tab-pane" id="tab-grafico">
+          <div id="grafico-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+      if (!user) return;
+      document.getElementById('user-nome').textContent = user.nome || user.email || '—';
+      var badge = document.getElementById('user-badge');
+      badge.textContent = user.role;
+      badge.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+    })();
+  </script>
+  <script src="../js/relatorio.js"></script>
+
+</body>
+</html>
