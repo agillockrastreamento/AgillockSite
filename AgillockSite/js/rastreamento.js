@@ -3,7 +3,7 @@
 let map;
 const marcadores = {};      // dispositivoId → L.Marker individual
 const _clusterBadges = {};  // coordKey → L.Marker (badge com contador)
-const _clusterGrupos = {};  // coordKey → [dispositivoId, ...]
+const _clusterGrupos = {};  // coordKey → { ids: [...], lat, lng }
 let veiculosMap = {};
 let traccarIdParaDispositivoId = {};
 let boundsAjustados = false;
@@ -288,7 +288,7 @@ function _abrirSpider(chave, centroLatLng) {
   if (_spider.chave === chave) { _fecharSpider(); return; } // toggle
   _fecharSpider();
   _spider.chave = chave;
-  const ids = _clusterGrupos[chave] || [];
+  const ids = _clusterGrupos[chave]?.ids || [];
   const total = ids.length;
   ids.forEach((id, index) => {
     const v = veiculosMap[id];
