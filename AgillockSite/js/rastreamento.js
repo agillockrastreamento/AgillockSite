@@ -81,6 +81,13 @@ function inicializarMapa() {
     },
   });
   clusterGroup.on('clusterclick', function (e) { e.layer.spiderfy(); });
+
+  // Click em marcador individual (incluindo estado de spiderfy)
+  clusterGroup.on('click', function (e) {
+    const id = e.layer._dispositivoId;
+    if (id) focar(id);
+  });
+
   clusterGroup.addTo(map);
 
   // Fecha card/foco quando o popup do marcador ativo é fechado pelo X do Leaflet
@@ -257,7 +264,7 @@ function renderMarcadores() {
     } else {
       const marker = L.marker([latitude, longitude], { icon: icone })
         .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
-      marker.on('click', () => focar(id));
+      marker._dispositivoId = id; // referência para o handler centralizado no clusterGroup
       marcadores[id] = marker;
       if (deveEstarAtivo) {
         clusterGroup.addLayer(marker);
@@ -299,7 +306,7 @@ function atualizarMarcador(dispositivoId) {
     marcadoresIconeKey[dispositivoId] = _iconeKey(v);
     const marker = L.marker([latitude, longitude], { icon: icone })
       .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
-    marker.on('click', () => focar(dispositivoId));
+    marker._dispositivoId = dispositivoId;
     marcadores[dispositivoId] = marker;
     if (deveEstarAtivo) {
       clusterGroup.addLayer(marker);
