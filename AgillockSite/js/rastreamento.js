@@ -68,6 +68,12 @@ function inicializarMapa() {
 
   // Clique fora de marcador fecha spider
   map.on('click', function () { _fecharSpider(); });
+
+  // Re-agrupa por pixel ao mudar o zoom
+  map.on('zoomend', function () {
+    _fecharSpider();
+    if (!modoFoco) renderMarcadores();
+  });
 }
 
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
@@ -220,8 +226,41 @@ function setWsStatus(estado, texto) {
 
 // ── Cluster customizado ───────────────────────────────────────────────────────
 
-function _coordKey(lat, lng) {
-  return `${parseFloat(lat.toFixed(4))},${parseFloat(lng.toFixed(4))}`; // ~11m de precisão
+const CLUSTER_PX = 40; // pixels — adapta ao zoom automaticamente
+
+// Agrupa markers por proximidade visual (pixels na tela), não por distância geográfica fixa.
+// Resultado: { chave → { ids: [...], lat, lng } }
+function _agruparPorPixel() {
+  const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao);
+  const visitados = new Set();
+  const grupos = {};
+
+  ids.forEach(id => {
+    if (visitados.has(id)) return;
+    const v = veiculosMap[id];
+    const pt = map.latLngToContainerPoint([v.posicao.latitude, v.posicao.longitude]);
+
+    const grupo = [id];
+    visitados.add(id);
+
+    ids.forEach(id2 => {
+      if (visitados.has(id2)) return;
+      const v2 = veiculosMap[id2];
+      const pt2 = map.latLngToContainerPoint([v2.posicao.latitude, v2.posicao.longitude]);
+      if (Math.hypot(pt.x - pt2.x, pt.y - pt2.y) <= CLUSTER_PX) {
+        grupo.push(id2);
+        visitados.add(id2);
+      }
+    });
+
+    // Centróide do grupo
+    const lat = grupo.reduce((s, i) => s + veiculosMap[i].posicao.latitude,  0) / grupo.length;
+    const lng = grupo.reduce((s, i) => s + veiculosMap[i].posicao.longitude, 0) / grupo.length;
+    const chave = [...grupo].sort().join('|');
+    grupos[chave] = { ids: grupo, lat, lng };
+  });
+
+  return grupos;
 }
 
 function _criarIconeCluster(count) {
@@ -280,46 +319,36 @@ function _abrirSpider(chave, centroLatLng) {
 // ── Marcadores no mapa ────────────────────────────────────────────────────────
 
 function renderMarcadores() {
-  // Constrói grupos por coordenada
-  const grupos = {};
-  Object.keys(veiculosMap).forEach(id => {
-    const v = veiculosMap[id];
-    if (!v.posicao) return;
-    const chave = _coordKey(v.posicao.latitude, v.posicao.longitude);
-    if (!grupos[chave]) grupos[chave] = [];
-    grupos[chave].push(id);
-  });
+  const grupos = _agruparPorPixel(); // { chave → { ids, lat, lng } }
 
-  // Atualiza _clusterGrupos
+  // Atualiza estado global de grupos
   Object.keys(_clusterGrupos).forEach(k => delete _clusterGrupos[k]);
   Object.assign(_clusterGrupos, grupos);
 
-  // Remove badges de clusters que deixaram de existir ou viraram individuais
+  // Remove badges de clusters que deixaram de existir ou que se desfizeram
   Object.keys(_clusterBadges).forEach(chave => {
-    if (!grupos[chave] || grupos[chave].length < 2) {
+    if (!grupos[chave] || grupos[chave].ids.length < 2) {
       if (map.hasLayer(_clusterBadges[chave])) map.removeLayer(_clusterBadges[chave]);
       delete _clusterBadges[chave];
     }
   });
 
-  Object.entries(grupos).forEach(([chave, ids]) => {
+  Object.entries(grupos).forEach(([chave, { ids, lat, lng }]) => {
     const isCluster = ids.length > 1;
 
+    // Marcadores individuais
     ids.forEach(id => {
       const v = veiculosMap[id];
       const { latitude, longitude } = v.posicao;
+      // Visível no mapa quando: não está em cluster E (não está em modo foco OU é o ativo)
       const visivel = !isCluster && (!modoFoco || id === ativoId);
 
       if (!marcadores[id]) {
-        // Cria marcador individual
         const icone = criarIcone(v);
         marcadoresIconeKey[id] = _iconeKey(v);
         const marker = L.marker([latitude, longitude], { icon: icone })
           .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
-        marker.on('click', function (e) {
-          L.DomEvent.stopPropagation(e);
-          focar(id);
-        });
+        marker.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = marker;
         if (visivel) marker.addTo(map);
       } else {
@@ -334,25 +363,26 @@ function renderMarcadores() {
       }
     });
 
-    if (isCluster && !modoFoco) {
-      const v0 = veiculosMap[ids[0]];
-      const { latitude, longitude } = v0.posicao;
+    // Badge de cluster
+    if (isCluster) {
+      if (modoFoco) {
+        if (_clusterBadges[chave] && map.hasLayer(_clusterBadges[chave])) {
+          map.removeLayer(_clusterBadges[chave]);
+        }
+        return;
+      }
       if (_clusterBadges[chave]) {
-        _clusterBadges[chave].setLatLng([latitude, longitude]);
+        _clusterBadges[chave].setLatLng([lat, lng]);
         _clusterBadges[chave].setIcon(_criarIconeCluster(ids.length));
         if (!map.hasLayer(_clusterBadges[chave])) _clusterBadges[chave].addTo(map);
       } else {
-        const badge = L.marker([latitude, longitude], { icon: _criarIconeCluster(ids.length), zIndexOffset: 500 });
+        const badge = L.marker([lat, lng], { icon: _criarIconeCluster(ids.length), zIndexOffset: 500 });
         badge.on('click', function (e) {
           L.DomEvent.stopPropagation(e);
           _abrirSpider(chave, badge.getLatLng());
         });
         _clusterBadges[chave] = badge;
         badge.addTo(map);
-      }
-    } else if (isCluster && modoFoco) {
-      if (_clusterBadges[chave] && map.hasLayer(_clusterBadges[chave])) {
-        map.removeLayer(_clusterBadges[chave]);
       }
     }
   });
