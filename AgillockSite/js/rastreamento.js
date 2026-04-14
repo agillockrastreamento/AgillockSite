@@ -12,6 +12,7 @@ let ws = null;
 let wsReconectando = false;
 let wsReconectTimer = null;
 let ativoId = null;
+let modoFoco = false;
 const marcadoresIconeKey = {};
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
@@ -205,16 +206,22 @@ function renderMarcadores() {
 
     const icone = criarIcone(v);
     const { latitude, longitude } = v.posicao;
+    const visivelNoMapa = !modoFoco || id === ativoId;
 
     if (marcadores[id]) {
       marcadores[id].setLatLng([latitude, longitude]);
       marcadores[id].setIcon(icone);
+      if (visivelNoMapa && !map.hasLayer(marcadores[id])) {
+        marcadores[id].addTo(map);
+      } else if (!visivelNoMapa && map.hasLayer(marcadores[id])) {
+        map.removeLayer(marcadores[id]);
+      }
     } else {
       const marker = L.marker([latitude, longitude], { icon: icone })
-        .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 })
-        .addTo(map);
+        .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
       marker.on('click', () => focar(id));
       marcadores[id] = marker;
+      if (visivelNoMapa) marker.addTo(map);
     }
   });
 }
@@ -224,6 +231,7 @@ function atualizarMarcador(dispositivoId) {
   if (!v?.posicao) return;
 
   const { latitude, longitude } = v.posicao;
+  const visivelNoMapa = !modoFoco || dispositivoId === ativoId;
 
   if (marcadores[dispositivoId]) {
     marcadores[dispositivoId].setLatLng([latitude, longitude]);
@@ -237,22 +245,32 @@ function atualizarMarcador(dispositivoId) {
     if (marcadores[dispositivoId].isPopupOpen()) {
       marcadores[dispositivoId].getPopup().setContent(criarPopupSimples(v));
     }
+
+    if (visivelNoMapa && !map.hasLayer(marcadores[dispositivoId])) {
+      marcadores[dispositivoId].addTo(map);
+    } else if (!visivelNoMapa && map.hasLayer(marcadores[dispositivoId])) {
+      map.removeLayer(marcadores[dispositivoId]);
+    }
   } else {
     const icone = criarIcone(v);
     marcadoresIconeKey[dispositivoId] = _iconeKey(v);
     const marker = L.marker([latitude, longitude], { icon: icone })
-      .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 })
-      .addTo(map);
+      .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
     marker.on('click', () => focar(dispositivoId));
     marcadores[dispositivoId] = marker;
+    if (visivelNoMapa) marker.addTo(map);
   }
 }
 
+function _corMarcador(v) {
+  if (!v.posicao) return '#95a5a6';
+  if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c';
+  if (v.status === 'online') return v.posicao.motion ? '#2980b9' : '#27ae60';
+  return '#e67e22'; // offline com última posição conhecida
+}
+
 function _iconeKey(v) {
-  let cor = '#95a5a6';
-  if (v.status === 'online') cor = v.posicao?.motion ? '#2980b9' : '#27ae60';
-  if (v.limiteVelocidade && v.posicao?.velocidade > v.limiteVelocidade) cor = '#e74c3c';
-  return `${cor}|${v.categoria}`;
+  return `${_corMarcador(v)}|${v.categoria}`;
 }
 
 // ── Mapeamento categoria → ícone FontAwesome ──────────────────────────────────
@@ -288,14 +306,7 @@ function categoriaParaIcone(categoria) {
 }
 
 function criarIcone(v) {
-  let cor = '#95a5a6';
-  if (v.status === 'online') {
-    cor = v.posicao?.motion ? '#2980b9' : '#27ae60';
-  }
-  if (v.limiteVelocidade && v.posicao?.velocidade > v.limiteVelocidade) {
-    cor = '#e74c3c';
-  }
-
+  const cor = _corMarcador(v);
   const fa = categoriaParaIcone(v.categoria);
 
   const html = `<div style="
@@ -415,9 +426,11 @@ function renderBuscaResultados() {
 
   el.innerHTML = filtrados.map(v => {
     const p = v.posicao;
-    let dotClass = 'dot-offline', txtStatus = 'Offline';
-    if (v.status === 'online' && p?.motion) { dotClass = 'dot-moving'; txtStatus = `Em movimento · ${p.velocidade} km/h`; }
-    else if (v.status === 'online') { dotClass = 'dot-online'; txtStatus = 'Parado'; }
+    const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
+    const tempoStr = refTime ? ` · há ${fmtTempoDecorrido(refTime)}` : '';
+    let dotClass = p ? 'dot-lastpos' : 'dot-offline', txtStatus = `Offline${tempoStr}`;
+    if (v.status === 'online' && p?.motion) { dotClass = 'dot-moving'; txtStatus = `Em movimento · ${p.velocidade} km/h${tempoStr}`; }
+    else if (v.status === 'online') { dotClass = 'dot-online'; txtStatus = `Parado${tempoStr}`; }
 
     return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" onclick="selecionarDaBusca('${v.dispositivoId}')">
       <div class="v-nome">${v.nome}${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}</div>
@@ -451,16 +464,17 @@ function mostrarCardDispositivo(id) {
   const isOnline = v.status === 'online';
   const isMoving = isOnline && p?.motion;
 
-  const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#95a5a6';
-  const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : 'Offline';
+  const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
+  const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
 
   const apiBase = window.API_URL || '';
   const addrId = `dcard-addr-${id}`;
 
-  // "há X tempo" para dispositivos offline com última posição
+  // "há X tempo" em todos os status
+  const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
   let tempoHtml = '';
-  if (!isOnline && p?.fixTime) {
-    tempoHtml = `<span style="color:#e67e22;font-size:11px;margin-left:6px"><i class="fa fa-clock-o"></i> há ${fmtTempoDecorrido(p.fixTime)}</span>`;
+  if (refTime) {
+    tempoHtml = `<span style="color:${corStatus};font-size:11px;margin-left:6px"><i class="fa fa-clock-o"></i> há ${fmtTempoDecorrido(refTime)}</span>`;
   }
 
   const bat = p?.bateria != null ? p.bateria : null;
@@ -537,6 +551,7 @@ function mostrarCardDispositivo(id) {
 }
 
 window.fecharCardDispositivo = function () {
+  if (modoFoco) desativarFoco();
   document.getElementById('device-detail-card').style.display = 'none';
   ativoId = null;
   map.closePopup();
@@ -547,27 +562,52 @@ function atualizarCardAtivo(dispositivoId) {
   const card = document.getElementById('device-detail-card');
   if (card.style.display === 'none') return;
   mostrarCardDispositivo(dispositivoId);
+
+  // Acompanha o dispositivo no mapa quando está em foco
+  if (modoFoco) {
+    const v = veiculosMap[dispositivoId];
+    if (v?.posicao) {
+      map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
+    }
+  }
+}
+
+// ── Modo foco ─────────────────────────────────────────────────────────────────
+
+function ativarFoco(id) {
+  // Restaura todos antes de aplicar o novo foco (troca de dispositivo)
+  Object.keys(marcadores).forEach(mid => {
+    if (!map.hasLayer(marcadores[mid])) marcadores[mid].addTo(map);
+  });
+  modoFoco = true;
+  // Oculta tudo exceto o dispositivo em foco
+  Object.keys(marcadores).forEach(mid => {
+    if (mid !== id && map.hasLayer(marcadores[mid])) map.removeLayer(marcadores[mid]);
+  });
+}
+
+function desativarFoco() {
+  modoFoco = false;
+  Object.keys(marcadores).forEach(id => {
+    if (!map.hasLayer(marcadores[id])) marcadores[id].addTo(map);
+  });
 }
 
 // ── Interações ────────────────────────────────────────────────────────────────
 
 window.focar = function (dispositivoId) {
   const v = veiculosMap[dispositivoId];
-
-  if (!v?.posicao) {
-    // Sem posição: apenas abre o card
-    mostrarCardDispositivo(dispositivoId);
-    return;
-  }
-
-  const { latitude, longitude } = v.posicao;
-  map.setView([latitude, longitude], 16);
   mostrarCardDispositivo(dispositivoId);
 
-  // Abre o popup simplificado no mapa
+  if (!v?.posicao) return; // sem posição: abre card apenas
+
+  ativarFoco(dispositivoId);
+  const { latitude, longitude } = v.posicao;
+  map.flyTo([latitude, longitude], 16, { animate: true, duration: 0.8 });
+
   setTimeout(() => {
     if (marcadores[dispositivoId]) marcadores[dispositivoId].openPopup();
-  }, 300);
+  }, 900);
 };
 
 function ajustarBounds() {

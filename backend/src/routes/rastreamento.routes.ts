@@ -23,35 +23,38 @@ router.use(authMiddleware);
 // Snapshot inicial: todos os dispositivos ativos com última posição conhecida.
 // Após esse carregamento inicial, o frontend recebe atualizações via WebSocket.
 router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
-  const dispositivos = await prisma.dispositivo.findMany({
-    where: { ativo: true },
-    select: {
-      id: true, nome: true, identificador: true, placa: true,
-      categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true, imagemUrl: true,
-      cliente: { select: { id: true, nome: true } },
-    },
-  });
+  // Prisma e Traccar em paralelo — economiza uma viagem de rede
+  const [dispoResult, traccarResult] = await Promise.allSettled([
+    prisma.dispositivo.findMany({
+      where: { ativo: true },
+      select: {
+        id: true, nome: true, identificador: true, placa: true,
+        categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true, imagemUrl: true,
+        cliente: { select: { id: true, nome: true } },
+      },
+    }),
+    traccarGetDevices(),
+  ]);
 
+  if (dispoResult.status === 'rejected') {
+    res.status(500).json({ error: 'Erro ao buscar dispositivos.' });
+    return;
+  }
+  const dispositivos = dispoResult.value;
   if (!dispositivos.length) { res.json([]); return; }
 
-  let traccarDevices;
-  try {
-    traccarDevices = await traccarGetDevices();
-  } catch {
+  if (traccarResult.status === 'rejected') {
     res.status(502).json({ error: 'Servidor de rastreamento indisponível.' });
     return;
   }
+  const traccarDevices = traccarResult.value;
 
   const traccarByImei = new Map(traccarDevices.map(d => [d.uniqueId, d]));
 
-  const traccarIds = dispositivos
-    .map(d => traccarByImei.get(d.identificador)?.id)
-    .filter((id): id is number => id !== undefined);
-
+  // Busca TODAS as posições (sem filtro por deviceId) para capturar
+  // a última localização conhecida mesmo de dispositivos offline.
   let posicoes: Awaited<ReturnType<typeof traccarGetPositions>> = [];
-  if (traccarIds.length) {
-    try { posicoes = await traccarGetPositions(traccarIds); } catch { /* sem posições */ }
-  }
+  try { posicoes = await traccarGetPositions(); } catch { /* sem posições */ }
 
   const posicaoPorDeviceId = new Map(posicoes.map(p => [p.deviceId, p]));
 
