@@ -1,9 +1,9 @@
 'use strict';
 
 let map;
-let clusterGroup;
-const marcadores = {};
-const marcadoresAtivos = new Set(); // IDs atualmente no clusterGroup
+const marcadores = {};      // dispositivoId → L.Marker individual
+const _clusterBadges = {};  // coordKey → L.Marker (badge com contador)
+const _clusterGrupos = {};  // coordKey → [dispositivoId, ...]
 let veiculosMap = {};
 let traccarIdParaDispositivoId = {};
 let boundsAjustados = false;
@@ -16,7 +16,9 @@ let wsReconectTimer = null;
 let ativoId = null;
 let modoFoco = false;
 const marcadoresIconeKey = {};
-let _focarTs = 0; // debounce para evitar duplo disparo (handler individual + clusterGroup)
+
+// Spider state (expansão de cluster)
+const _spider = { markers: [], linhas: [], chave: null };
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -57,54 +59,15 @@ function inicializarMapa() {
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
-  // Cluster: agrupa marcadores próximos e spiderfy ao clicar
-  clusterGroup = L.markerClusterGroup({
-    maxClusterRadius: 30,
-    showCoverageOnHover: false,
-    zoomToBoundsOnClick: false,   // nunca faz zoom — sempre spiderfy
-    spiderfyOnMaxZoom: false,
-    iconCreateFunction: function (cluster) {
-      const count = cluster.getChildCount();
-      return L.divIcon({
-        html: `<div style="
-          width:38px;height:38px;
-          background:#8e44ad;
-          border-radius:50%;
-          border:3px solid #fff;
-          box-shadow:0 2px 8px rgba(0,0,0,.35);
-          display:flex;align-items:center;justify-content:center;
-          color:#fff;font-size:13px;font-weight:700;
-        ">${count}</div>`,
-        className: '',
-        iconSize: [38, 38],
-        iconAnchor: [19, 19],
-      });
-    },
-  });
-  clusterGroup.on('clusterclick', function (e) { e.layer.spiderfy(); });
-
-  // Handler centralizado — cobre spiderfied markers (onde marker.on('click') pode não disparar)
-  clusterGroup.on('click', function (e) {
-    const id = e.layer._dispositivoId;
-    if (id) _focarUnico(id);
-  });
-
-  clusterGroup.addTo(map);
-
-  // Fecha card/foco quando o popup do marcador ativo é fechado pelo X do Leaflet
+  // Fecha card quando popup do marcador ativo é fechado pelo X do Leaflet
   map.on('popupclose', function (e) {
     if (ativoId && marcadores[ativoId] && e.popup === marcadores[ativoId].getPopup()) {
       fecharCardDispositivo(true);
     }
   });
-}
 
-// Debounce: evita duplo disparo quando marker.on('click') e clusterGroup.on('click') ambos disparam
-function _focarUnico(id) {
-  const now = Date.now();
-  if (now - _focarTs < 80) return;
-  _focarTs = now;
-  focar(id);
+  // Clique fora de marcador fecha spider
+  map.on('click', function () { _fecharSpider(); });
 }
 
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
@@ -136,11 +99,17 @@ async function carregarPosicoes() {
     // Remove marcadores de dispositivos que não existem mais
     Object.keys(marcadores).forEach(id => {
       if (!lista.find(v => v.dispositivoId === id)) {
-        map.removeLayer(marcadores[id]);
+        if (map.hasLayer(marcadores[id])) map.removeLayer(marcadores[id]);
         delete marcadores[id];
         delete marcadoresIconeKey[id];
       }
     });
+    // Limpa todos os badges de cluster (serão recriados pelo renderMarcadores)
+    Object.keys(_clusterBadges).forEach(chave => {
+      if (map.hasLayer(_clusterBadges[chave])) map.removeLayer(_clusterBadges[chave]);
+      delete _clusterBadges[chave];
+    });
+    Object.keys(_clusterGrupos).forEach(k => delete _clusterGrupos[k]);
 
     veiculosMap = {};
     traccarIdParaDispositivoId = {};
@@ -249,36 +218,141 @@ function setWsStatus(estado, texto) {
   el.innerHTML = `<i class="fa fa-circle"></i> ${texto}`;
 }
 
+// ── Cluster customizado ───────────────────────────────────────────────────────
+
+function _coordKey(lat, lng) {
+  return `${parseFloat(lat.toFixed(4))},${parseFloat(lng.toFixed(4))}`; // ~11m de precisão
+}
+
+function _criarIconeCluster(count) {
+  return L.divIcon({
+    html: `<div style="
+      width:38px;height:38px;background:#8e44ad;
+      border-radius:50%;border:3px solid #fff;
+      box-shadow:0 2px 8px rgba(0,0,0,.35);
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-size:13px;font-weight:700;
+    ">${count}</div>`,
+    className: '', iconSize: [38, 38], iconAnchor: [19, 19],
+  });
+}
+
+function _fecharSpider() {
+  _spider.markers.forEach(m => { if (map.hasLayer(m)) map.removeLayer(m); });
+  _spider.linhas.forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+  _spider.markers.length = 0;
+  _spider.linhas.length = 0;
+  _spider.chave = null;
+}
+
+function _abrirSpider(chave, centroLatLng) {
+  if (_spider.chave === chave) { _fecharSpider(); return; } // toggle
+  _fecharSpider();
+  _spider.chave = chave;
+  const ids = _clusterGrupos[chave] || [];
+  const total = ids.length;
+  ids.forEach((id, index) => {
+    const v = veiculosMap[id];
+    if (!v?.posicao) return;
+    const centro = map.latLngToContainerPoint(centroLatLng);
+    const raio = 55;
+    const ang = (2 * Math.PI * index / total) - Math.PI / 2;
+    const spiderLatLng = map.containerPointToLatLng([
+      centro.x + raio * Math.cos(ang),
+      centro.y + raio * Math.sin(ang),
+    ]);
+    const linha = L.polyline([centroLatLng, spiderLatLng], {
+      color: '#666', weight: 1.5, opacity: 0.6, dashArray: '4,4',
+    }).addTo(map);
+    _spider.linhas.push(linha);
+    const sm = L.marker(spiderLatLng, { icon: criarIcone(v), zIndexOffset: 1000 })
+      .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
+    sm.on('click', function (e) {
+      L.DomEvent.stopPropagation(e); // evita fechar spider pelo map.on('click')
+      _fecharSpider();
+      focar(id);
+    });
+    sm.addTo(map);
+    _spider.markers.push(sm);
+  });
+}
+
 // ── Marcadores no mapa ────────────────────────────────────────────────────────
 
 function renderMarcadores() {
+  // Constrói grupos por coordenada
+  const grupos = {};
   Object.keys(veiculosMap).forEach(id => {
     const v = veiculosMap[id];
     if (!v.posicao) return;
+    const chave = _coordKey(v.posicao.latitude, v.posicao.longitude);
+    if (!grupos[chave]) grupos[chave] = [];
+    grupos[chave].push(id);
+  });
 
-    const icone = criarIcone(v);
-    const { latitude, longitude } = v.posicao;
-    const deveEstarAtivo = !modoFoco || id === ativoId;
+  // Atualiza _clusterGrupos
+  Object.keys(_clusterGrupos).forEach(k => delete _clusterGrupos[k]);
+  Object.assign(_clusterGrupos, grupos);
 
-    if (marcadores[id]) {
-      marcadores[id].setLatLng([latitude, longitude]);
-      marcadores[id].setIcon(icone);
-      if (deveEstarAtivo && !marcadoresAtivos.has(id)) {
-        clusterGroup.addLayer(marcadores[id]);
-        marcadoresAtivos.add(id);
-      } else if (!deveEstarAtivo && marcadoresAtivos.has(id)) {
-        clusterGroup.removeLayer(marcadores[id]);
-        marcadoresAtivos.delete(id);
+  // Remove badges de clusters que deixaram de existir ou viraram individuais
+  Object.keys(_clusterBadges).forEach(chave => {
+    if (!grupos[chave] || grupos[chave].length < 2) {
+      if (map.hasLayer(_clusterBadges[chave])) map.removeLayer(_clusterBadges[chave]);
+      delete _clusterBadges[chave];
+    }
+  });
+
+  Object.entries(grupos).forEach(([chave, ids]) => {
+    const isCluster = ids.length > 1;
+
+    ids.forEach(id => {
+      const v = veiculosMap[id];
+      const { latitude, longitude } = v.posicao;
+      const visivel = !isCluster && (!modoFoco || id === ativoId);
+
+      if (!marcadores[id]) {
+        // Cria marcador individual
+        const icone = criarIcone(v);
+        marcadoresIconeKey[id] = _iconeKey(v);
+        const marker = L.marker([latitude, longitude], { icon: icone })
+          .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
+        marker.on('click', function (e) {
+          L.DomEvent.stopPropagation(e);
+          focar(id);
+        });
+        marcadores[id] = marker;
+        if (visivel) marker.addTo(map);
+      } else {
+        marcadores[id].setLatLng([latitude, longitude]);
+        const iconKey = _iconeKey(v);
+        if (marcadoresIconeKey[id] !== iconKey) {
+          marcadores[id].setIcon(criarIcone(v));
+          marcadoresIconeKey[id] = iconKey;
+        }
+        if (visivel && !map.hasLayer(marcadores[id])) marcadores[id].addTo(map);
+        else if (!visivel && map.hasLayer(marcadores[id])) map.removeLayer(marcadores[id]);
       }
-    } else {
-      const marker = L.marker([latitude, longitude], { icon: icone })
-        .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
-      marker._dispositivoId = id;
-      marker.on('click', function () { _focarUnico(id); });
-      marcadores[id] = marker;
-      if (deveEstarAtivo) {
-        clusterGroup.addLayer(marker);
-        marcadoresAtivos.add(id);
+    });
+
+    if (isCluster && !modoFoco) {
+      const v0 = veiculosMap[ids[0]];
+      const { latitude, longitude } = v0.posicao;
+      if (_clusterBadges[chave]) {
+        _clusterBadges[chave].setLatLng([latitude, longitude]);
+        _clusterBadges[chave].setIcon(_criarIconeCluster(ids.length));
+        if (!map.hasLayer(_clusterBadges[chave])) _clusterBadges[chave].addTo(map);
+      } else {
+        const badge = L.marker([latitude, longitude], { icon: _criarIconeCluster(ids.length), zIndexOffset: 500 });
+        badge.on('click', function (e) {
+          L.DomEvent.stopPropagation(e);
+          _abrirSpider(chave, badge.getLatLng());
+        });
+        _clusterBadges[chave] = badge;
+        badge.addTo(map);
+      }
+    } else if (isCluster && modoFoco) {
+      if (_clusterBadges[chave] && map.hasLayer(_clusterBadges[chave])) {
+        map.removeLayer(_clusterBadges[chave]);
       }
     }
   });
@@ -289,40 +363,22 @@ function atualizarMarcador(dispositivoId) {
   if (!v?.posicao) return;
 
   const { latitude, longitude } = v.posicao;
-  const deveEstarAtivo = !modoFoco || dispositivoId === ativoId;
 
-  if (marcadores[dispositivoId]) {
-    marcadores[dispositivoId].setLatLng([latitude, longitude]);
+  if (!marcadores[dispositivoId]) {
+    renderMarcadores();
+    return;
+  }
 
-    const iconKey = _iconeKey(v);
-    if (marcadoresIconeKey[dispositivoId] !== iconKey) {
-      marcadores[dispositivoId].setIcon(criarIcone(v));
-      marcadoresIconeKey[dispositivoId] = iconKey;
-    }
+  marcadores[dispositivoId].setLatLng([latitude, longitude]);
 
-    if (marcadores[dispositivoId].isPopupOpen()) {
-      marcadores[dispositivoId].getPopup().setContent(criarPopupSimples(v));
-    }
+  const iconKey = _iconeKey(v);
+  if (marcadoresIconeKey[dispositivoId] !== iconKey) {
+    marcadores[dispositivoId].setIcon(criarIcone(v));
+    marcadoresIconeKey[dispositivoId] = iconKey;
+  }
 
-    if (deveEstarAtivo && !marcadoresAtivos.has(dispositivoId)) {
-      clusterGroup.addLayer(marcadores[dispositivoId]);
-      marcadoresAtivos.add(dispositivoId);
-    } else if (!deveEstarAtivo && marcadoresAtivos.has(dispositivoId)) {
-      clusterGroup.removeLayer(marcadores[dispositivoId]);
-      marcadoresAtivos.delete(dispositivoId);
-    }
-  } else {
-    const icone = criarIcone(v);
-    marcadoresIconeKey[dispositivoId] = _iconeKey(v);
-    const marker = L.marker([latitude, longitude], { icon: icone })
-      .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
-    marker._dispositivoId = dispositivoId;
-    marker.on('click', function () { _focarUnico(dispositivoId); });
-    marcadores[dispositivoId] = marker;
-    if (deveEstarAtivo) {
-      clusterGroup.addLayer(marker);
-      marcadoresAtivos.add(dispositivoId);
-    }
+  if (marcadores[dispositivoId].isPopupOpen()) {
+    marcadores[dispositivoId].getPopup().setContent(criarPopupSimples(v));
   }
 }
 
@@ -636,42 +692,40 @@ function atualizarCardAtivo(dispositivoId) {
 
 function ativarFoco(id) {
   modoFoco = true;
-  // Limpa tudo e adiciona só o dispositivo em foco — atômico e sem risco de dessincronização
-  clusterGroup.clearLayers();
-  marcadoresAtivos.clear();
-  if (marcadores[id]) {
-    clusterGroup.addLayer(marcadores[id]);
-    marcadoresAtivos.add(id);
-  }
+  _fecharSpider();
+  // Oculta todos os badges de cluster
+  Object.values(_clusterBadges).forEach(b => { if (map.hasLayer(b)) map.removeLayer(b); });
+  // Oculta todos os marcadores individuais exceto o ativo
+  Object.keys(marcadores).forEach(mid => {
+    if (mid !== id && map.hasLayer(marcadores[mid])) map.removeLayer(marcadores[mid]);
+  });
+  // Garante que o ativo está visível
+  if (marcadores[id] && !map.hasLayer(marcadores[id])) marcadores[id].addTo(map);
 }
 
 function desativarFoco() {
   modoFoco = false;
-  // Reconstrói o cluster com todos os dispositivos que têm posição
-  clusterGroup.clearLayers();
-  marcadoresAtivos.clear();
-  Object.keys(veiculosMap).forEach(id => {
-    if (veiculosMap[id]?.posicao && marcadores[id]) {
-      clusterGroup.addLayer(marcadores[id]);
-      marcadoresAtivos.add(id);
-    }
-  });
+  _fecharSpider();
+  renderMarcadores(); // reconstrói todos os marcadores e badges
 }
 
 // ── Interações ────────────────────────────────────────────────────────────────
 
 window.focar = function (dispositivoId) {
-  const v = veiculosMap[dispositivoId];
   mostrarCardDispositivo(dispositivoId);
 
+  const v = veiculosMap[dispositivoId];
   if (!v?.posicao) return; // sem posição: abre card apenas
 
   ativarFoco(dispositivoId);
   const { latitude, longitude } = v.posicao;
   map.flyTo([latitude, longitude], 16, { animate: true, duration: 0.8 });
 
+  // Abre popup no marcador após a animação (para navegação via busca)
   setTimeout(() => {
-    if (marcadores[dispositivoId]) marcadores[dispositivoId].openPopup();
+    if (marcadores[dispositivoId] && map.hasLayer(marcadores[dispositivoId])) {
+      marcadores[dispositivoId].openPopup();
+    }
   }, 900);
 };
 
