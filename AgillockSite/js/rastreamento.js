@@ -53,6 +53,11 @@ function inicializarMapa() {
   ).addTo(map);
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
+
+  // Fechar card e modo foco quando o popup do marcador é fechado pelo X do Leaflet
+  map.on('popupclose', function () {
+    if (ativoId) fecharCardDispositivo(true); // true = já está fechando o popup, não chamar closePopup novamente
+  });
 }
 
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
@@ -472,10 +477,7 @@ function mostrarCardDispositivo(id) {
 
   // "há X tempo" em todos os status
   const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
-  let tempoHtml = '';
-  if (refTime) {
-    tempoHtml = `<span style="color:${corStatus};font-size:11px;margin-left:6px"><i class="fa fa-clock-o"></i> há ${fmtTempoDecorrido(refTime)}</span>`;
-  }
+  const tempoSufixo = refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : '';
 
   const bat = p?.bateria != null ? p.bateria : null;
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
@@ -518,8 +520,7 @@ function mostrarCardDispositivo(id) {
     </div>
     <div class="dcard-body">
       <div style="margin-bottom:6px">
-        <span style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px"></i> ${txtStatus}</span>
-        ${tempoHtml}
+        <span style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}</span>
         ${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}
       </div>
       ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
@@ -550,11 +551,11 @@ function mostrarCardDispositivo(id) {
   }
 }
 
-window.fecharCardDispositivo = function () {
+window.fecharCardDispositivo = function (skipClosePopup) {
   if (modoFoco) desativarFoco();
   document.getElementById('device-detail-card').style.display = 'none';
   ativoId = null;
-  map.closePopup();
+  if (!skipClosePopup) map.closePopup();
 };
 
 function atualizarCardAtivo(dispositivoId) {
