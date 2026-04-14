@@ -16,6 +16,7 @@ let wsReconectTimer = null;
 let ativoId = null;
 let modoFoco = false;
 const marcadoresIconeKey = {};
+let _focarTs = 0; // debounce para evitar duplo disparo (handler individual + clusterGroup)
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -82,10 +83,10 @@ function inicializarMapa() {
   });
   clusterGroup.on('clusterclick', function (e) { e.layer.spiderfy(); });
 
-  // Click em marcador individual (incluindo estado de spiderfy)
+  // Handler centralizado — cobre spiderfied markers (onde marker.on('click') pode não disparar)
   clusterGroup.on('click', function (e) {
     const id = e.layer._dispositivoId;
-    if (id) focar(id);
+    if (id) _focarUnico(id);
   });
 
   clusterGroup.addTo(map);
@@ -96,6 +97,14 @@ function inicializarMapa() {
       fecharCardDispositivo(true);
     }
   });
+}
+
+// Debounce: evita duplo disparo quando marker.on('click') e clusterGroup.on('click') ambos disparam
+function _focarUnico(id) {
+  const now = Date.now();
+  if (now - _focarTs < 80) return;
+  _focarTs = now;
+  focar(id);
 }
 
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
@@ -264,7 +273,8 @@ function renderMarcadores() {
     } else {
       const marker = L.marker([latitude, longitude], { icon: icone })
         .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
-      marker._dispositivoId = id; // referência para o handler centralizado no clusterGroup
+      marker._dispositivoId = id;
+      marker.on('click', function () { _focarUnico(id); });
       marcadores[id] = marker;
       if (deveEstarAtivo) {
         clusterGroup.addLayer(marker);
@@ -307,6 +317,7 @@ function atualizarMarcador(dispositivoId) {
     const marker = L.marker([latitude, longitude], { icon: icone })
       .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
     marker._dispositivoId = dispositivoId;
+    marker.on('click', function () { _focarUnico(dispositivoId); });
     marcadores[dispositivoId] = marker;
     if (deveEstarAtivo) {
       clusterGroup.addLayer(marker);
@@ -624,27 +635,23 @@ function atualizarCardAtivo(dispositivoId) {
 // ── Modo foco ─────────────────────────────────────────────────────────────────
 
 function ativarFoco(id) {
-  // Restaura todos antes de aplicar o novo foco (caso troca de dispositivo)
-  Object.keys(marcadores).forEach(mid => {
-    if (!marcadoresAtivos.has(mid)) {
-      clusterGroup.addLayer(marcadores[mid]);
-      marcadoresAtivos.add(mid);
-    }
-  });
   modoFoco = true;
-  // Oculta tudo exceto o dispositivo em foco
-  Object.keys(marcadores).forEach(mid => {
-    if (mid !== id && marcadoresAtivos.has(mid)) {
-      clusterGroup.removeLayer(marcadores[mid]);
-      marcadoresAtivos.delete(mid);
-    }
-  });
+  // Limpa tudo e adiciona só o dispositivo em foco — atômico e sem risco de dessincronização
+  clusterGroup.clearLayers();
+  marcadoresAtivos.clear();
+  if (marcadores[id]) {
+    clusterGroup.addLayer(marcadores[id]);
+    marcadoresAtivos.add(id);
+  }
 }
 
 function desativarFoco() {
   modoFoco = false;
-  Object.keys(marcadores).forEach(id => {
-    if (!marcadoresAtivos.has(id)) {
+  // Reconstrói o cluster com todos os dispositivos que têm posição
+  clusterGroup.clearLayers();
+  marcadoresAtivos.clear();
+  Object.keys(veiculosMap).forEach(id => {
+    if (veiculosMap[id]?.posicao && marcadores[id]) {
       clusterGroup.addLayer(marcadores[id]);
       marcadoresAtivos.add(id);
     }
