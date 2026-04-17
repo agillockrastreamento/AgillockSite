@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
   },
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 const DISPOSITIVO_SELECT = {
   id: true, nome: true, identificador: true, categoria: true, grupo: true,

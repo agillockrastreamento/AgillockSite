@@ -7,9 +7,12 @@ import { query, param } from '../utils/params';
 import prisma from '../utils/prisma';
 import {
   traccarGetDevices,
+  traccarGetDeviceByImei,
   traccarGetPositions,
   traccarGetPositionHistory,
   traccarGetTrips,
+  traccarGetCommandTypes,
+  traccarSendCommand,
 } from '../services/traccar.service';
 
 const router = Router();
@@ -29,7 +32,7 @@ const uploadCliente = multer({
       cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
     },
   }),
-  limits: { fileSize: 2 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (/^image\/(jpeg|png|webp)$/.test(file.mimetype)) cb(null, true);
     else cb(new Error('Formato não suportado. Use JPG, PNG ou WEBP.'));
@@ -384,6 +387,59 @@ router.delete('/dispositivos/:dispositivoId/foto', async (req: ClienteRequest, r
   });
 
   res.status(204).send();
+});
+
+// ── GET /api/cliente/dispositivos/:dispositivoId/tipos-comandos ───────────────
+router.get('/dispositivos/:dispositivoId/tipos-comandos', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'dispositivoId');
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: {
+      id: dispositivoId,
+      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+    },
+    select: { identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado.' }); return; }
+
+  try {
+    const tipos = await traccarGetCommandTypes(traccarDevice.id);
+    res.json(tipos);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Erro ao buscar tipos de comando.' });
+  }
+});
+
+// ── POST /api/cliente/dispositivos/:dispositivoId/comandos ────────────────────
+router.post('/dispositivos/:dispositivoId/comandos', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'dispositivoId');
+  const { tipo, atributos } = req.body as { tipo: string; atributos?: Record<string, any> };
+
+  if (!tipo) { res.status(400).json({ error: 'Tipo de comando é obrigatório.' }); return; }
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: {
+      id: dispositivoId,
+      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+    },
+    select: { identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado.' }); return; }
+
+  try {
+    await traccarSendCommand(traccarDevice.id, tipo, atributos || {});
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Erro ao enviar comando.' });
+  }
 });
 
 export default router;

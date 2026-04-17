@@ -528,6 +528,8 @@ function bindUploadFoto(card) {
                 img.src = newSrc;
               }
             }
+            // Atualiza também o card lateral se estiver ativo
+            atualizarCardAtivo(did);
             AL_CLIENTE.showAlert('Foto atualizada!', 'success');
           };
           preload.src = newSrc;
@@ -595,6 +597,33 @@ function atualizarCardBarra(did) {
 
 // ── Card do dispositivo (sidebar) ─────────────────────────────────────────────
 
+const _CMD_CONFIG = {
+  engineStop:         { label: 'Bloquear motor',           icon: 'fa-lock',                style: 'block',   confirm: 'Bloquear o motor do veículo?' },
+  engineResume:       { label: 'Desbloquear motor',        icon: 'fa-unlock',              style: 'unlock' },
+  positionSingle:     { label: 'Solicitar posição',        icon: 'fa-map-marker',          style: 'info' },
+  positionPeriodic:   { label: 'Rastreamento periódico',   icon: 'fa-refresh',             style: 'info',    atributos: { frequency: 60 } },
+  positionStop:       { label: 'Parar rastreamento',       icon: 'fa-stop-circle',         style: 'neutral' },
+  alarmSos:           { label: 'Alarme SOS',               icon: 'fa-exclamation-triangle', style: 'warn' },
+  silenceAlarm:       { label: 'Silenciar alarme',         icon: 'fa-bell-slash',          style: 'neutral' },
+  rebootDevice:       { label: 'Reiniciar dispositivo',    icon: 'fa-power-off',           style: 'neutral', confirm: 'Reiniciar o dispositivo?' },
+  factoryReset:       { label: 'Reset de fábrica',         icon: 'fa-warning',             style: 'block',   confirm: 'ATENÇÃO: apagará todas as configurações do dispositivo. Continuar?' },
+  outputControl:      { label: 'Controle de saída',        icon: 'fa-toggle-on',           style: 'warn' },
+  setTimezone:        { label: 'Definir fuso horário',     icon: 'fa-clock-o',             style: 'info',    atributos: { timezone: 'America/Sao_Paulo' } },
+  setSpeed:           { label: 'Definir velocidade limite', icon: 'fa-tachometer',         style: 'warn',    atributos: { speed: 100 } },
+  sendSms:            { label: 'Enviar SMS',               icon: 'fa-comment',             style: 'info' },
+  voiceMonitoring:    { label: 'Monitoramento de voz',     icon: 'fa-microphone',          style: 'info' },
+  requestPhoto:       { label: 'Solicitar foto',           icon: 'fa-camera',              style: 'info' },
+  alarmArm:           { label: 'Armar alarme',             icon: 'fa-shield',              style: 'warn' },
+  alarmDisarm:        { label: 'Desarmar alarme',          icon: 'fa-shield',              style: 'neutral' },
+  alarmRemove:        { label: 'Remover alarme',           icon: 'fa-times-circle',        style: 'neutral' },
+  immobilize:         { label: 'Imobilizar veículo',       icon: 'fa-ban',                 style: 'block',   confirm: 'Imobilizar o veículo?' },
+  driverUnique:       { label: 'Identificação de motorista', icon: 'fa-id-card',           style: 'info' },
+  message:            { label: 'Enviar mensagem',          icon: 'fa-envelope',            style: 'info' },
+  configuration:      { label: 'Configurar dispositivo',   icon: 'fa-wrench',              style: 'neutral' },
+  getVersion:         { label: 'Versão do firmware',       icon: 'fa-code',                style: 'neutral' },
+  custom:             { label: 'Personalizado',            icon: 'fa-terminal',            style: 'neutral' },
+};
+
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id]; if (!v) return;
   ativoId = id;
@@ -614,8 +643,22 @@ function mostrarCardDispositivo(id) {
   const addrTxt = hasCached ? (_geocodeCache[cacheKey] || `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})`) : (p ? 'Buscando...' : '—');
   const coords = p ? `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})` : '';
 
+  const imgHtml = v.imagemUrlCliente
+    ? `<img src="${API_BASE}${v.imagemUrlCliente}" style="width:100%;height:140px;object-fit:cover;display:block;border-radius:12px 12px 0 0" onerror="this.style.display='none'" />`
+    : '';
+
+  // Horários detalhados
+  const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
+  const horasHtml = p ? `
+    <div class="dcard-section dcard-val" style="font-size:10px">
+      <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> ${fmtGPSTimeSec(p.serverTime)}</div>
+      <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> ${fmtGPSTimeSec(p.deviceTime)}</div>
+      <div><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> ${fmtGPSTimeSec(p.fixTime)}</div>
+    </div>` : '';
+
   const card = document.getElementById('device-detail-card');
   card.innerHTML = `
+    ${imgHtml}
     <div class="dcard-header">
       <div>
         <div class="v-nome">${v.nome}</div>
@@ -631,10 +674,17 @@ function mostrarCardDispositivo(id) {
       ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
       ${ignHtml ? `<div style="font-size:12px;margin-bottom:4px">${ignHtml}</div>` : ''}
       ${bat != null ? `<div style="font-size:12px;color:${batCor};margin-bottom:4px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
+      ${horasHtml}
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
         <span id="${addrId}">${addrTxt}</span>
       </div>` : ''}
+      
+      <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:10px">
+        <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:#888;text-transform:uppercase">Comandos</div>
+        <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+      </div>
+
       <div style="margin-top:10px;display:flex;gap:6px">
         <button onclick="abrirOverlay('${id}', 'relatorio')" class="btn btn-xs btn-primary" style="flex:1">
           <i class="fa fa-bar-chart"></i> Relatório
@@ -647,7 +697,48 @@ function mostrarCardDispositivo(id) {
   `;
   card.style.display = 'block';
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
+
+  // Carrega comandos do dispositivo (limitado a Bloquear/Desbloquear)
+  AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`).then(tipos => {
+    const permitidos = ['engineStop', 'engineResume'];
+    const suportados = Array.isArray(tipos) 
+      ? tipos.map(t => (typeof t === 'string' ? t : t.type)).filter(t => permitidos.includes(t))
+      : [];
+
+    if (suportados.length > 0) {
+      const grid = document.getElementById(`dcard-comandos-grid-${id}`);
+      if (!grid) return;
+      document.getElementById(`dcard-comandos-${id}`).style.display = 'block';
+      grid.innerHTML = suportados.map(t => {
+        const cfg = _CMD_CONFIG[t];
+        return `<button class="btn btn-xs btn-default cmd-btn" data-tipo="${t}" onclick="enviarComandoDaSidebar('${id}', '${t}')" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          <i class="fa ${cfg.icon}"></i> ${cfg.label}
+        </button>`;
+      }).join('');
+    }
+  }).catch(() => {});
 }
+
+window.enviarComandoDaSidebar = async function(did, tipo) {
+  const cfg = _CMD_CONFIG[tipo] || { label: tipo, icon: 'fa-terminal', style: 'neutral' };
+  if (cfg.confirm && !confirm(cfg.confirm)) return;
+
+  const btn = document.querySelector(`.cmd-btn[data-tipo="${tipo}"]`);
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; }
+
+  try {
+    await AL_CLIENTE.apiPost(`/api/cliente/dispositivos/${did}/comandos`, {
+      tipo,
+      atributos: cfg.atributos || {}
+    });
+    AL_CLIENTE.showAlert('Comando enviado com sucesso!', 'success');
+  } catch (err) {
+    AL_CLIENTE.showAlert('Erro ao enviar comando: ' + err.message, 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+  }
+};
 
 window.fecharCardDispositivo = function (skipClosePopup) {
   if (modoFoco) desativarFoco();
@@ -689,6 +780,13 @@ function svgVelocimetro(vel, limite) {
     <text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="${nc}">${vel}</text>
     <text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="${lc}">km/h</text>
   </svg>`;
+}
+
+function fmtGPSTimeSec(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' +
+    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function fmtTempoDecorrido(iso) {
