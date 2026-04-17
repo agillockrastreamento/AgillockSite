@@ -598,8 +598,8 @@ function atualizarCardBarra(did) {
 // ── Card do dispositivo (sidebar) ─────────────────────────────────────────────
 
 const _CMD_CONFIG = {
-  engineStop:         { label: 'Bloquear motor',           icon: 'fa-lock',                style: 'block',   confirm: 'Bloquear o motor do veículo?' },
-  engineResume:       { label: 'Desbloquear motor',        icon: 'fa-unlock',              style: 'unlock' },
+  engineStop:         { label: 'Bloquear',           icon: 'fa-lock',                style: 'danger',  confirm: 'Bloquear o motor do veículo?' },
+  engineResume:       { label: 'Desbloquear',        icon: 'fa-unlock',              style: 'success' },
   positionSingle:     { label: 'Solicitar posição',        icon: 'fa-map-marker',          style: 'info' },
   positionPeriodic:   { label: 'Rastreamento periódico',   icon: 'fa-refresh',             style: 'info',    atributos: { frequency: 60 } },
   positionStop:       { label: 'Parar rastreamento',       icon: 'fa-stop-circle',         style: 'neutral' },
@@ -680,12 +680,11 @@ function mostrarCardDispositivo(id) {
         <span id="${addrId}">${addrTxt}</span>
       </div>` : ''}
       
-      <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:10px">
-        <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:#888;text-transform:uppercase">Comandos</div>
-        <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+      <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:12px;border-top:1px solid rgba(128,128,128,0.1)">
+        <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
       </div>
 
-      <div style="margin-top:10px;display:flex;gap:6px">
+      <div style="margin-top:12px;display:flex;gap:6px">
         <button onclick="abrirOverlay('${id}', 'relatorio')" class="btn btn-xs btn-primary" style="flex:1">
           <i class="fa fa-bar-chart"></i> Relatório
         </button>
@@ -711,7 +710,8 @@ function mostrarCardDispositivo(id) {
       document.getElementById(`dcard-comandos-${id}`).style.display = 'block';
       grid.innerHTML = suportados.map(t => {
         const cfg = _CMD_CONFIG[t];
-        return `<button class="btn btn-xs btn-default cmd-btn" data-tipo="${t}" onclick="enviarComandoDaSidebar('${id}', '${t}')" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        const btnClass = t === 'engineStop' ? 'btn-danger' : 'btn-success';
+        return `<button class="btn btn-xs ${btnClass} cmd-btn" data-tipo="${t}" onclick="enviarComandoDaSidebar('${id}', '${t}')" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;">
           <i class="fa ${cfg.icon}"></i> ${cfg.label}
         </button>`;
       }).join('');
@@ -725,16 +725,19 @@ window.enviarComandoDaSidebar = async function(did, tipo) {
 
   const btn = document.querySelector(`.cmd-btn[data-tipo="${tipo}"]`);
   const originalHtml = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; }
+  if (btn) { 
+    btn.disabled = true; 
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Aguarde...'; 
+  }
 
   try {
     await AL_CLIENTE.apiPost(`/api/cliente/dispositivos/${did}/comandos`, {
       tipo,
       atributos: cfg.atributos || {}
     });
-    AL_CLIENTE.showAlert('Comando enviado com sucesso!', 'success');
+    AL_CLIENTE.showAlert('Comando enviado!', 'success');
   } catch (err) {
-    AL_CLIENTE.showAlert('Erro ao enviar comando: ' + err.message, 'danger');
+    AL_CLIENTE.showAlert('Erro: ' + err.message, 'danger');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
   }
