@@ -505,6 +505,13 @@ function bindUploadFoto(card) {
       AL_CLIENTE.uploadFoto(`/api/cliente/dispositivos/${did}/foto`, file)
         .then(function (data) {
           veiculosMap[did].imagemUrlCliente = data.imagemUrlCliente;
+          
+          // Atualiza cache local para persistir ao navegar
+          try {
+            const lista = Object.values(veiculosMap);
+            localStorage.setItem(CACHE_KEY, JSON.stringify(lista));
+          } catch (e) {}
+
           const newSrc = `${API_BASE}${data.imagemUrlCliente}`;
           // Pré-carrega a imagem antes de trocar no DOM (evita flicker de branco)
           const preload = new Image();
@@ -685,10 +692,10 @@ function mostrarCardDispositivo(id) {
       </div>
 
       <div style="margin-top:12px;display:flex;gap:6px">
-        <button onclick="abrirOverlay('${id}', 'relatorio')" class="btn btn-xs btn-primary" style="flex:1">
+        <button onclick="abrirOverlay('${id}', 'relatorio')" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1">
           <i class="fa fa-bar-chart"></i> Relatório
         </button>
-        <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-default" style="flex:1">
+        <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1">
           <i class="fa fa-history"></i> Histórico
         </button>
       </div>
