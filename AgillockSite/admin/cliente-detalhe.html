@@ -280,11 +280,13 @@
         <button class="active" data-tab="dados"><i class="fa fa-id-card-o"></i> Dados</button>
         <button data-tab="dispositivos"><i class="fa fa-microchip"></i> Dispositivos</button>
         <button data-tab="cobrancas"><i class="fa fa-money"></i> Cobranças</button>
+        <button data-tab="login"><i class="fa fa-key"></i> Login</button>
       </div>
 
       <div id="tab-dados" class="tab-pane active"></div>
       <div id="tab-dispositivos" class="tab-pane"></div>
       <div id="tab-cobrancas" class="tab-pane"></div>
+      <div id="tab-login" class="tab-pane"></div>
     </div>
   </div>
 
@@ -396,6 +398,7 @@
         document.getElementById('tab-' + tab).classList.add('active');
         if (tab === 'cobrancas') carregarCobrancas();
         if (tab === 'dispositivos') renderDispositivos();
+        if (tab === 'login') carregarLogin();
       });
     });
 
@@ -1134,6 +1137,152 @@
         document.getElementById('modal-unif-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
       });
     });
+
+    // ── Aba Login ─────────────────────────────────────────────────────────
+    var loginData = null;
+
+    function carregarLogin() {
+      var div = document.getElementById('tab-login');
+      div.innerHTML = '<div class="card-section"><div class="text-center" style="padding:40px;color:#999;"><i class="fa fa-spinner fa-spin fa-2x"></i></div></div>';
+      AL.apiGet('/api/clientes/' + clienteId + '/login')
+        .then(function (data) {
+          loginData = data;
+          renderLogin();
+        })
+        .catch(function (err) {
+          div.innerHTML = '<div class="card-section"><div class="text-danger" style="padding:24px;">' + err.message + '</div></div>';
+        });
+    }
+
+    function renderLogin() {
+      var div = document.getElementById('tab-login');
+
+      if (!loginData) {
+        // Sem login cadastrado
+        div.innerHTML = '<div class="card-section">' +
+          '<h5 style="margin:0 0 16px;font-weight:700;"><i class="fa fa-key"></i> Login do Cliente no Portal</h5>' +
+          '<p class="text-muted" style="margin-bottom:20px;">Este cliente não possui acesso ao portal. Crie um login para que ele possa acessar o rastreamento e pagamentos.</p>' +
+          '<div id="login-alert"></div>' +
+          '<form id="form-criar-login">' +
+            '<div class="row">' +
+              '<div class="col-sm-6"><div class="form-group"><label>E-mail *</label><input type="email" class="form-control" id="login-email" placeholder="email@cliente.com" required /></div></div>' +
+              '<div class="col-sm-6"><div class="form-group"><label>Senha *</label>' +
+                '<div style="position:relative;"><input type="password" class="form-control" id="login-senha" placeholder="Mínimo 6 caracteres" required />' +
+                '<button type="button" id="toggle-login-senha" style="position:absolute;right:8px;top:8px;background:none;border:none;color:#888;cursor:pointer;"><i class="fa fa-eye"></i></button></div>' +
+              '</div></div>' +
+            '</div>' +
+            '<button type="submit" class="btn btn-primary-al"><i class="fa fa-plus"></i> Criar Login</button>' +
+          '</form>' +
+          '</div>';
+
+        document.getElementById('toggle-login-senha').addEventListener('click', function () {
+          var inp = document.getElementById('login-senha');
+          var ic = this.querySelector('i');
+          inp.type = inp.type === 'password' ? 'text' : 'password';
+          ic.className = inp.type === 'password' ? 'fa fa-eye' : 'fa fa-eye-slash';
+        });
+
+        document.getElementById('form-criar-login').addEventListener('submit', function (e) {
+          e.preventDefault();
+          var email = document.getElementById('login-email').value.trim();
+          var senha = document.getElementById('login-senha').value;
+          var btn = this.querySelector('[type=submit]');
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Criando…';
+          document.getElementById('login-alert').innerHTML = '';
+          AL.apiPost('/api/clientes/' + clienteId + '/login', { email: email, senha: senha })
+            .then(function () { AL.showAlert('Login criado com sucesso!', 'success'); carregarLogin(); })
+            .catch(function (err) {
+              btn.disabled = false; btn.innerHTML = '<i class="fa fa-plus"></i> Criar Login';
+              document.getElementById('login-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
+            });
+        });
+        return;
+      }
+
+      // Login existente
+      div.innerHTML = '<div class="card-section">' +
+        '<h5 style="margin:0 0 16px;font-weight:700;"><i class="fa fa-key"></i> Login do Cliente no Portal</h5>' +
+        '<div id="login-alert"></div>' +
+        '<div style="background:#f8f9fa;border-radius:8px;padding:16px 20px;margin-bottom:20px;">' +
+          '<div class="row">' +
+            '<div class="col-sm-8"><div style="font-size:11px;text-transform:uppercase;color:#999;letter-spacing:.5px;margin-bottom:4px;">E-mail</div>' +
+              '<div style="font-weight:600;">' + esc(loginData.email) + '</div></div>' +
+            '<div class="col-sm-4 text-right">' +
+              AL.badgeStatus(loginData.ativo ? 'ATIVO' : 'INATIVO') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button class="btn btn-sm btn-default" id="btn-login-editar"><i class="fa fa-pencil"></i> Editar</button>' +
+          '<button class="btn btn-sm btn-' + (loginData.ativo ? 'warning' : 'success') + '" id="btn-login-toggle">' +
+            '<i class="fa fa-power-off"></i> ' + (loginData.ativo ? 'Inativar' : 'Ativar') + '</button>' +
+          '<button class="btn btn-sm btn-danger" id="btn-login-excluir"><i class="fa fa-trash"></i> Excluir</button>' +
+        '</div>' +
+        '<div id="form-editar-wrap" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px;">' +
+          '<form id="form-editar-login">' +
+            '<div class="row">' +
+              '<div class="col-sm-6"><div class="form-group"><label>Novo E-mail</label><input type="email" class="form-control" id="edit-login-email" value="' + esc(loginData.email) + '" /></div></div>' +
+              '<div class="col-sm-6"><div class="form-group"><label>Nova Senha <small class="text-muted">(deixe vazio para manter)</small></label>' +
+                '<input type="password" class="form-control" id="edit-login-senha" placeholder="Nova senha..." /></div></div>' +
+            '</div>' +
+            '<button type="submit" class="btn btn-primary-al btn-sm"><i class="fa fa-save"></i> Salvar</button>' +
+            '<button type="button" class="btn btn-default btn-sm" id="btn-cancelar-editar" style="margin-left:6px;">Cancelar</button>' +
+          '</form>' +
+        '</div>' +
+        '</div>';
+
+      document.getElementById('btn-login-editar').addEventListener('click', function () {
+        var wrap = document.getElementById('form-editar-wrap');
+        wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+      });
+      document.getElementById('btn-cancelar-editar').addEventListener('click', function () {
+        document.getElementById('form-editar-wrap').style.display = 'none';
+      });
+
+      document.getElementById('form-editar-login').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var email = document.getElementById('edit-login-email').value.trim();
+        var senha = document.getElementById('edit-login-senha').value;
+        var body = {};
+        if (email) body.email = email;
+        if (senha) body.senha = senha;
+        var btn = this.querySelector('[type=submit]');
+        btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+        document.getElementById('login-alert').innerHTML = '';
+        AL.apiPut('/api/clientes/' + clienteId + '/login', body)
+          .then(function () { AL.showAlert('Login atualizado.', 'success'); carregarLogin(); })
+          .catch(function (err) {
+            btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Salvar';
+            document.getElementById('login-alert').innerHTML = '<div class="alert alert-danger">' + err.message + '</div>';
+          });
+      });
+
+      document.getElementById('btn-login-toggle').addEventListener('click', function () {
+        var acao = loginData.ativo ? 'Inativar' : 'Ativar';
+        AL.confirmar({ titulo: acao + ' Login', mensagem: 'Deseja ' + acao.toLowerCase() + ' o login deste cliente?' })
+          .then(function (ok) {
+            if (!ok) return;
+            AL.apiPatch('/api/clientes/' + clienteId + '/login/status', {})
+              .then(function () { AL.showAlert('Login ' + (loginData.ativo ? 'inativado' : 'ativado') + '.', 'success'); carregarLogin(); })
+              .catch(function (err) { AL.showAlert(err.message); });
+          });
+      });
+
+      document.getElementById('btn-login-excluir').addEventListener('click', function () {
+        AL.confirmar({
+          titulo: 'Excluir Login',
+          mensagem: 'Deseja excluir permanentemente o login deste cliente?',
+          consequencias: 'O cliente perderá o acesso ao portal imediatamente.',
+          btnTexto: '<i class="fa fa-trash"></i> Excluir',
+        }).then(function (ok) {
+          if (!ok) return;
+          AL.apiDelete('/api/clientes/' + clienteId + '/login')
+            .then(function () { AL.showAlert('Login excluído.', 'success'); carregarLogin(); })
+            .catch(function (err) { AL.showAlert(err.message); });
+        });
+      });
+    }
 
     function esc(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

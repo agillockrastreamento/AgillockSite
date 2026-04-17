@@ -218,10 +218,33 @@
         .navbar-nav > li > a::after { content: ''; position: absolute; bottom: 6px; left: 50%; right: 50%; height: 2px; background: #f6bf01; transition: left var(--al-transition), right var(--al-transition); }
         .navbar-nav > li > a:hover::after { left: 15%; right: 15%; }
 
-        /* Nav active — fundo amarelo com borda arredondada */
+        /* Botão Acessar — pílula âmbar, mesmo alinhamento dos outros links */
+        .navbar-default .nav li a.nav-acessar {
+            background-color: #fab32c;
+            color: #fff !important;
+            border-radius: 18px;
+            padding: 5px 18px !important;
+            font-weight: 700;
+            margin-top: 10px;
+        }
+        .navbar-default .nav li a.nav-acessar:hover,
+        .navbar-default .nav li a.nav-acessar:focus {
+            background-color: #e09520;
+            color: #fff !important;
+        }
+        /* Sublinhado do Acessar — branco, descolado do texto */
+        .navbar-nav > li > a.nav-acessar::after { background: #fff; }
+
+        /* Nav active (scrollspy) — apenas sublinhado, sem fundo */
         .navbar-default .navbar-nav > .active > a,
         .navbar-default .navbar-nav > .active > a:hover,
-        .navbar-default .navbar-nav > .active > a:focus { border-radius: 18px !important; }
+        .navbar-default .navbar-nav > .active > a:focus {
+            background-color: transparent !important;
+            color: #fab32c !important;
+            border-radius: 0 !important;
+        }
+        /* Expande o sublinhado no item ativo */
+        .navbar-nav > li.active > a::after { left: 15%; right: 15%; }
 
         /* Logo menor no mobile */
         @media (max-width: 767px) {
@@ -342,21 +365,11 @@
                     <li><a class="page-scroll" href="#about">Sobre nós</a></li>
                     <li><a class="page-scroll" href="#contact">Contato</a></li>
 
-                    <!-- Dropdown de acesso -->
-                    <li class="nav-item dropdown dropdown-access">
-                        <button class="btn btn-secondary dropdown-toggle" role="button"
-                                id="navbarDropdown" data-toggle="dropdown"
-                                aria-haspopup="true" aria-expanded="false">
-                            Acessar <span class="caret"></span>
-                        </button>
-                        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                            <a class="dropdown-item access-admin" href="https://agillock.monitorando.me/admin">
-                                <i class="fa fa-map-marker"></i> Acesso ao Rastreador
-                            </a>
-                            <a class="dropdown-item access-admin" href="admin/login.html">
-                                <i class="fa fa-lock"></i> Acesso Administrativo
-                            </a>
-                        </div>
+                    <!-- Botão de acesso -->
+                    <li>
+                        <a class="nav-acessar" href="login.html">
+                            <i class="fa fa-lock"></i> Acessar
+                        </a>
                     </li>
 
                     <!-- Toggle tema — DESKTOP: dentro do collapse, ao lado de "Acessar" -->

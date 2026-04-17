@@ -34,14 +34,11 @@ body.admin-body {
     flex-direction: column;
     z-index: 1030;
     transition: transform 0.3s ease;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #3a4555 #1e2530;
+    overflow: hidden; /* scroll isolado no .sidebar-nav */
 }
-.admin-sidebar::-webkit-scrollbar { width: 5px; }
-.admin-sidebar::-webkit-scrollbar-track { background: #1e2530; }
-.admin-sidebar::-webkit-scrollbar-thumb { background: #3a4555; border-radius: 3px; }
-.admin-sidebar::-webkit-scrollbar-thumb:hover { background: #4a5a70; }
+
+/* Anti-FOUC: pré-colapsa antes do JS carregar (classe posta no <html> pela IIFE) */
+html.al-sb-collapsed .admin-sidebar { width: 64px !important; }
 
 .sidebar-brand {
     display: flex;
@@ -50,6 +47,7 @@ body.admin-body {
     padding: 18px 20px;
     border-bottom: 1px solid #2d3748;
     text-decoration: none;
+    flex-shrink: 0; /* nunca entra no scroll */
 }
 .sidebar-brand img { height: 32px; }
 .sidebar-brand span {
@@ -59,12 +57,21 @@ body.admin-body {
     letter-spacing: 0.5px;
 }
 
+/* Scroll apenas nos itens de navegação */
 .sidebar-nav {
     list-style: none;
     padding: 10px 0;
     margin: 0;
     flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #3a4555 #1e2530;
 }
+.sidebar-nav::-webkit-scrollbar { width: 5px; }
+.sidebar-nav::-webkit-scrollbar-track { background: #1e2530; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: #3a4555; border-radius: 3px; }
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background: #4a5a70; }
 .sidebar-nav li a {
     display: flex;
     align-items: center;
@@ -139,6 +146,7 @@ body.admin-body {
 .sidebar-footer {
     padding: 16px 20px;
     border-top: 1px solid #2d3748;
+    flex-shrink: 0; /* nunca entra no scroll */
 }
 .btn-logout {
     display: flex;
@@ -956,6 +964,288 @@ input:focus, select:focus, textarea:focus {
 .btn-tema-login:hover { border-color: #fab32c; color: #b8860b; }
 html.dark-theme .btn-tema-login { border-color: #3d4a5c; color: #adb5bd; }
 html.dark-theme .btn-tema-login:hover { border-color: #fab32c; color: #fab32c; }
+
+/* ─── Sidebar minimizável ──────────────────────────────────────────────── */
+
+/* Transição só ativa após carregamento (evita flash na navegação) */
+.admin-sidebar {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.admin-sidebar.sidebar-animate {
+    transition: width 0.25s cubic-bezier(.4,0,.2,1);
+}
+
+/* Brand: push botão para a direita */
+.sidebar-brand { justify-content: space-between; }
+
+/* ── Botão de toggle (injetado pelo JS no topo do brand) ── */
+.btn-sidebar-collapse {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #6c7a8d;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0;
+    margin-left: auto;
+    transition: color 0.2s, background 0.2s, border-color 0.2s;
+    font-family: inherit;
+}
+.btn-sidebar-collapse:hover {
+    color: #fab32c;
+    background: rgba(250,179,44,0.1);
+    border-color: rgba(250,179,44,0.35);
+}
+
+/* ════════════════════════════════════════════════════════════
+   COLLAPSED STATE
+════════════════════════════════════════════════════════════ */
+.admin-sidebar.collapsed { width: 64px !important; }
+
+/* Brand: favicon + botão em coluna, centrados */
+.admin-sidebar.collapsed .sidebar-brand {
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 0 10px;
+    gap: 10px;
+}
+.admin-sidebar.collapsed .sidebar-brand img {
+    height: 26px;
+    width: 26px;
+    object-fit: contain;
+}
+/* Botão de abrir — destacado em âmbar */
+.admin-sidebar.collapsed .btn-sidebar-collapse {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 15px;
+    background: rgba(250,179,44,0.12);
+    border-color: rgba(250,179,44,0.3);
+    color: #fab32c;
+    margin: 0;
+}
+.admin-sidebar.collapsed .btn-sidebar-collapse:hover {
+    background: rgba(250,179,44,0.24);
+    border-color: rgba(250,179,44,0.6);
+}
+
+/* Links: font-size 0 esconde texto puro e spans; ícones restaurados */
+.admin-sidebar.collapsed .sidebar-nav li > a {
+    justify-content: center;
+    padding: 14px 0;
+    gap: 0;
+    font-size: 0 !important;
+}
+.admin-sidebar.collapsed .sidebar-nav li > a .fa {
+    font-size: 19px !important;
+    width: auto !important;
+    margin: 0;
+}
+/* Ativo — linha âmbar à esquerda + ícone colorido */
+.admin-sidebar.collapsed .sidebar-nav li.active > a {
+    border-left-width: 3px;
+}
+.admin-sidebar.collapsed .sidebar-nav li.active > a .fa { color: #fab32c; }
+
+/* ── Dropdown (Área de Controle) em collapsed ── */
+/* Link principal: ícone + chevron pequeno abaixo */
+.admin-sidebar.collapsed .sidebar-dropdown > .dropdown-toggle-link {
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0 8px;
+    gap: 3px;
+}
+/* Esconde o span de texto mas mantém o .fa principal e o .sidebar-arrow */
+.admin-sidebar.collapsed .sidebar-dropdown > .dropdown-toggle-link .fa:not(.sidebar-arrow) {
+    font-size: 19px !important;
+    margin: 0;
+}
+.admin-sidebar.collapsed .sidebar-dropdown > .dropdown-toggle-link .sidebar-arrow {
+    display: block !important;
+    font-size: 9px !important;
+    width: auto !important;
+    opacity: 0.5;
+    transform: none !important;
+    transition: transform 0.22s, opacity 0.2s;
+    margin: 0;
+}
+.admin-sidebar.collapsed .sidebar-dropdown.open > .dropdown-toggle-link .sidebar-arrow {
+    transform: rotate(180deg) !important;
+    opacity: 0.9;
+    color: #fab32c;
+}
+
+/* Submenu no collapsed: inline, apenas ícones */
+.admin-sidebar.collapsed .sidebar-submenu {
+    max-height: 0 !important;
+    overflow: hidden !important;
+    position: static !important;
+    background: rgba(0,0,0,0.18);
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0;
+    transition: max-height 0.22s ease;
+}
+.admin-sidebar.collapsed .sidebar-dropdown.open .sidebar-submenu {
+    max-height: 240px !important;
+    padding: 4px 0 8px;
+}
+.admin-sidebar.collapsed .sidebar-submenu li a {
+    justify-content: center !important;
+    padding: 11px 0 !important;
+    font-size: 0 !important;
+    border-left: 3px solid transparent;
+    transition: background 0.15s;
+}
+.admin-sidebar.collapsed .sidebar-submenu li a .fa {
+    font-size: 15px !important;
+    width: auto !important;
+    margin: 0;
+}
+.admin-sidebar.collapsed .sidebar-submenu li.active a,
+.admin-sidebar.collapsed .sidebar-submenu li a:hover {
+    border-left-color: #fab32c;
+}
+
+/* Footer collapsed */
+.admin-sidebar.collapsed .sidebar-footer {
+    padding: 10px 0;
+    align-items: center;
+}
+.admin-sidebar.collapsed .sidebar-user { display: none; }
+.admin-sidebar.collapsed .btn-tema-sidebar,
+.admin-sidebar.collapsed .btn-logout {
+    justify-content: center;
+    padding: 10px 0;
+    width: 100%;
+    font-size: 0 !important;
+}
+.admin-sidebar.collapsed .btn-tema-sidebar .fa,
+.admin-sidebar.collapsed .btn-logout .fa { font-size: 17px !important; }
+
+/* Content e topbar */
+.admin-sidebar.collapsed ~ .admin-content { margin-left: 64px; }
+.admin-sidebar.collapsed ~ * .admin-topbar,
+.admin-sidebar.collapsed ~ .admin-content .admin-topbar { left: 64px; }
+
+/* ── Tooltip JS (elemento appended ao body) ── */
+.sidebar-tooltip {
+    display: none;
+    position: fixed;
+    background: #1e2530;
+    color: #e0e6f0;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 9999;
+    box-shadow: 3px 4px 14px rgba(0,0,0,.45);
+    border: 1px solid #2d3748;
+    pointer-events: none;
+    transform: translateY(-50%);
+    font-family: 'Montserrat', sans-serif;
+    letter-spacing: 0.2px;
+}
+/* Setinha à esquerda do tooltip */
+.sidebar-tooltip::before {
+    content: '';
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-right-color: #1e2530;
+}
+
+/* Tema escuro — collapsed */
+html.dark-theme .admin-sidebar.collapsed ~ .admin-content { background: #141820; }
+.admin-sidebar.collapsed .btn-tema-sidebar,
+.admin-sidebar.collapsed .btn-logout {
+    justify-content: center;
+    padding: 10px 0;
+    width: 100%;
+    font-size: 0 !important;
+}
+.admin-sidebar.collapsed .btn-tema-sidebar .fa,
+.admin-sidebar.collapsed .btn-logout .fa {
+    font-size: 17px !important;
+}
+
+/* ── Tooltip: texto ao hover no item de nav ── */
+.admin-sidebar.collapsed .sidebar-nav > li {
+    position: relative;
+}
+.admin-sidebar.collapsed .sidebar-nav > li[data-label]:hover::after {
+    content: attr(data-label);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #1e2530;
+    color: #e0e6f0;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 1050;
+    box-shadow: 3px 4px 14px rgba(0,0,0,.4);
+    border: 1px solid #2d3748;
+    pointer-events: none;
+    font-family: 'Montserrat', sans-serif;
+}
+/* Setinha do tooltip */
+.admin-sidebar.collapsed .sidebar-nav > li[data-label]:hover::before {
+    content: '';
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-right-color: #1e2530;
+    z-index: 1051;
+    pointer-events: none;
+}
+
+/* Content e topbar acompanham a largura */
+.admin-sidebar.collapsed ~ .admin-content { margin-left: 64px; }
+.admin-sidebar.collapsed ~ * .admin-topbar,
+.admin-sidebar.collapsed ~ .admin-content .admin-topbar { left: 64px; }
+
+/* Tema escuro — collapsed */
+html.dark-theme .admin-sidebar.collapsed ~ .admin-content { background: #141820; }
+
+/* Fade-in suave ao navegar entre páginas (reduz o efeito de reload) */
+.admin-content { animation: al-pagein 0.14s ease both; }
+@keyframes al-pagein { from { opacity: 0; } to { opacity: 1; } }
+
+/* Botão de localização do usuário no mapa */
+/* Usa estrutura <div.leaflet-bar><a.leaflet-loc-btn> → alinha automaticamente com zoom */
+.leaflet-loc-btn {
+    width: 35px !important;
+    height: 35px !important;
+    background: #fff !important;
+    border-radius: 50% !important;
+    border: 2px solid #c2c1c1 !important;
+    cursor: pointer;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    line-height: 26px !important;
+    text-align: center;
+    text-decoration: none;
+}
+.leaflet-loc-btn:hover { background: #f4f4f4 !important; }
 
 /* ─── Tema Escuro ───────────────────────────────────────────────────────── */
 html.dark-theme body,

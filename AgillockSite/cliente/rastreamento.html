@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Rastreamento — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+
+  <style>
+    body { overflow: hidden; }
+
+    .admin-content { height: 100vh; display: flex; flex-direction: column; }
+
+    #rastreamento-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Sidebar de veículos ── */
+    #sidebar-rastr {
+      width: 280px; min-width: 280px;
+      display: flex; flex-direction: column;
+      border-right: 1px solid #ddd;
+      background: #fff; z-index: 10;
+    }
+    .dark-theme #sidebar-rastr { background: #1e1e2e; border-color: #333; }
+    #sidebar-header-rastr { padding: 10px 12px; border-bottom: 1px solid #eee; }
+    .dark-theme #sidebar-header-rastr { border-color: #333; }
+    #sidebar-counters { font-size: 11px; color: #888; margin-top: 6px; }
+    #lista-resultados-busca { border-bottom: 1px solid #eee; max-height: 220px; overflow-y: auto; }
+    .dark-theme #lista-resultados-busca { border-color: #333; }
+    #device-detail-card { flex: 1; overflow-y: auto; scrollbar-width: thin; }
+
+    /* Card de detalhe */
+    .dcard-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 12px 6px; border-bottom: 1px solid #eee; }
+    .dark-theme .dcard-header { border-color: #333; }
+    .dcard-fechar { background: none; border: none; font-size: 18px; color: #999; cursor: pointer; padding: 0 2px; }
+    .dcard-fechar:hover { color: #e74c3c; }
+    .dcard-body { padding: 10px 12px 14px; }
+    .dcard-val { color: #333; }
+    html.dark-theme .dcard-val { color: #f0f2f5; }
+    .dcard-lbl { font-weight: 600; color: #333; }
+    html.dark-theme .dcard-lbl { color: #adb5bd; }
+    .dcard-section { font-size: 11px; border-top: 1px solid rgba(128,128,128,.18); padding-top: 6px; margin-top: 4px; line-height: 1.7; }
+
+    /* Itens de busca */
+    .veiculo-item { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background .12s; }
+    .dark-theme .veiculo-item { border-color: #2a2a3e; }
+    .veiculo-item:hover { background: #f7f7f7; }
+    .dark-theme .veiculo-item:hover { background: #252535; }
+    .v-nome { font-weight: 600; font-size: 13px; }
+    .v-placa { display: inline-block; background: #333; color: #fff; padding: 0 5px; border-radius: 3px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+    .v-status { font-size: 11px; margin-top: 3px; }
+    .dot-online { color: #27ae60; }
+    .dot-moving { color: #2980b9; }
+    .dot-offline { color: #bdc3c7; }
+    .dot-lastpos { color: #e67e22; }
+
+    /* ── Mapa + barra ── */
+    #mapa-wrap { flex: 1; display: flex; flex-direction: column; }
+    #mapa { flex: 1; }
+    .leaflet-grab { cursor: crosshair !important; }
+    .leaflet-drag-target { cursor: grabbing !important; }
+
+    /* ── Barra de veículos (rodapé do mapa) ── */
+    #barra-veiculos {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;          /* sempre wrap — evita overflow horizontal */
+      align-content: flex-start;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 12px;
+      max-height: 140px;        /* 1 linha: cards(~100px) + padding(16px) + folga(8px) */
+      overflow: hidden;
+      overflow-y: scroll;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      scrollbar-width: thin;
+    }
+    .dark-theme #barra-veiculos { background: #1e1e2e; border-top-color: #333; }
+
+    /* Modo expandido — mostra 1ª linha completa + peek da 2ª → scrollbar sempre aparece */
+    #barra-veiculos.expandida {
+      max-height: 170px;   /* ~1 linha(116px) + 54px da próxima → força overflow+scrollbar */
+      overflow-y: scroll;  /* scrollbar sempre visível como indicador */
+    }
+    /* Scrollbar sempre visível no modo expandido (Chrome/Edge) */
+    #barra-veiculos.expandida::-webkit-scrollbar { width: 6px; }
+    #barra-veiculos.expandida::-webkit-scrollbar-track { background: transparent; }
+    #barra-veiculos.expandida::-webkit-scrollbar-thumb {
+      background: rgba(128,128,128,0.45);
+      border-radius: 3px;
+    }
+    #barra-veiculos.expandida::-webkit-scrollbar-thumb:hover {
+      background: rgba(128,128,128,0.75);
+    }
+
+    /* fotoWrap com tamanho fixo — mudanças internas não propagam layout shift */
+    .card-veiculo .btn-foto-wrap {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+    }
+
+    .card-veiculo {
+      flex-shrink: 0;
+      width: 110px;
+      min-height: 100px;
+      border: 2px solid #e8e8e8;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 4px;
+      padding: 8px 6px 7px;
+      transition: border-color .15s, background .15s;
+      background: #fff;
+      text-align: center;
+      overflow: hidden;
+    }
+    .dark-theme .card-veiculo { background: #252535; border-color: #333; }
+    .card-veiculo:hover { border-color: #fab32c; }
+    .card-veiculo.ativo { border-color: #2980b9; background: #eaf4fd; }
+    .dark-theme .card-veiculo.ativo { background: #1a3a5c; border-color: #2980b9; }
+    .card-veiculo .cv-foto { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .card-veiculo .cv-icone { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #fff; flex-shrink: 0; }
+    .card-veiculo .cv-placa { font-size: 11px; font-weight: 700; letter-spacing: .5px; color: #333; line-height: 1.2; }
+    .dark-theme .card-veiculo .cv-placa { color: #f0f2f5; }
+    .card-veiculo .cv-modelo { font-size: 10px; color: #888; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+    .card-veiculo .cv-status { font-size: 9px; line-height: 1.2; }
+
+    /* Botão de foto */
+    .card-veiculo .btn-foto-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .btn-upload-foto {
+      position: absolute;
+      bottom: -4px; right: -4px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #fab32c;
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; color: #fff;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .card-veiculo:hover .btn-upload-foto { opacity: 1; }
+
+    /* ── Badge WS ── */
+    #ws-status {
+      position: fixed; bottom: 14px; right: 14px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+      z-index: 1000; opacity: 0.9;
+    }
+    #ws-status.conectado { background: #27ae60; color: #fff; }
+    #ws-status.desconectado { background: #e74c3c; color: #fff; }
+    #ws-status.reconectando { background: #f39c12; color: #fff; }
+
+    /* ── Overlay de histórico/relatório ── */
+    #overlay-historico {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: #fff;
+      flex-direction: column;
+    }
+    html.dark-theme #overlay-historico { background: #141820; }
+    #overlay-historico.ativo { display: flex; }
+    #overlay-topbar {
+      height: 56px;
+      background: #1e2530;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    #overlay-titulo { color: #fff; font-size: 15px; font-weight: 700; }
+    #overlay-conteudo { flex: 1; overflow: hidden; position: relative; }
+    /* Iframe para reutilizar a tela de detalhe */
+    #overlay-iframe { width: 100%; height: 100%; border: none; }
+
+    /* ── Popup simplificado ── */
+    .popup-veiculo .leaflet-popup-content-wrapper { padding: 0 !important; border-radius: 8px !important; overflow: hidden !important; }
+    .popup-veiculo .leaflet-popup-content { margin: 0 !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Rastreamento</span></a></li>
+      <li id="li-pagamentos" style="display:none;"><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span class="al-badge badge-ativo" style="margin-top:4px;">CLIENTE</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Rastreamento</h2>
+      </div>
+    </div>
+
+    <div id="rastreamento-layout">
+      <!-- Sidebar de veículos -->
+      <div id="sidebar-rastr">
+        <div id="sidebar-header-rastr">
+          <input type="text" id="filtro" class="form-control input-sm" placeholder="Buscar veículo ou placa...">
+          <div id="sidebar-counters">Carregando...</div>
+        </div>
+        <div id="lista-resultados-busca" style="display:none"></div>
+        <div id="device-detail-card" style="display:none"></div>
+      </div>
+
+      <!-- Mapa + barra -->
+      <div id="mapa-wrap">
+        <div id="mapa"></div>
+        <div id="barra-veiculos"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Badge WS -->
+  <div id="ws-status" class="reconectando"><i class="fa fa-circle"></i> Conectando...</div>
+
+  <!-- Overlay histórico/relatório -->
+  <div id="overlay-historico">
+    <div id="overlay-topbar">
+      <button id="btn-overlay-voltar" class="btn btn-default btn-sm" title="Voltar" style="min-width:36px;padding:6px 10px;">
+        <i class="fa fa-arrow-left"></i>
+      </button>
+      <span id="overlay-titulo" style="font-size:14px;font-weight:600;"></span>
+    </div>
+    <div id="overlay-conteudo">
+      <iframe id="overlay-iframe" src=""></iframe>
+    </div>
+  </div>
+
+  <!-- Modal de bloqueio por inadimplência -->
+  <div class="modal fade" id="modal-bloqueio" tabindex="-1" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#e74c3c;">
+          <h4 class="modal-title" style="color:#fff;"><i class="fa fa-lock"></i> Acesso Suspenso</h4>
+        </div>
+        <div class="modal-body text-center" style="padding:30px 24px;">
+          <i class="fa fa-exclamation-triangle" style="font-size:48px;color:#e74c3c;margin-bottom:16px;display:block;"></i>
+          <h5 id="bloqueio-titulo" style="font-weight:700;">Acesso ao Rastreamento Suspenso</h5>
+          <p id="bloqueio-msg" class="text-muted" style="margin-top:10px;">Existe um boleto em atraso. Regularize o pagamento para voltar a acessar.</p>
+        </div>
+        <div class="modal-footer text-center" style="border-top:1px solid #eee;">
+          <a href="pagamentos.html" id="btn-bloqueio-boletos" class="btn btn-danger" style="display:none;">
+            <i class="fa fa-money"></i> Ver Boletos
+          </a>
+          <a href="#" id="btn-bloqueio-contato" class="btn btn-default" style="display:none;" target="_blank">
+            <i class="fa fa-whatsapp"></i> Falar com a empresa
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var user = AL_CLIENTE.requireAuth();
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      if (user.tipo === 'responsavel') {
+        document.getElementById('li-pagamentos').style.display = 'block';
+        document.getElementById('btn-bloqueio-boletos').style.display = 'inline-block';
+      } else {
+        document.getElementById('btn-bloqueio-contato').style.display = 'inline-block';
+        document.getElementById('btn-bloqueio-contato').href =
+          'https://wa.me/558541010103?text=Ol%C3%A1!%20Preciso%20regularizar%20meu%20acesso%20ao%20rastreamento.';
+      }
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
+      AL_CLIENTE.initThemeToggle('btn-tema');
+
+      // Overlay — botão voltar
+      document.getElementById('btn-overlay-voltar').addEventListener('click', function () {
+        fecharOverlay();
+      });
+    })();
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="../js/rastreamento-cliente.js"></script>
+
+</body>
+</html>

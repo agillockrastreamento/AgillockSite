@@ -1,0 +1,155 @@
+import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { requireRoles } from '../middleware/roles.middleware';
+import { param } from '../utils/params';
+import prisma from '../utils/prisma';
+
+const router = Router();
+router.use(authMiddleware);
+router.use(requireRoles('ADMIN', 'COLABORADOR'));
+
+// ── GET /api/clientes/:id/login ───────────────────────────────────────────────
+router.get('/:id/login', async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+
+  const login = await prisma.clienteLogin.findUnique({
+    where: { clienteId: id },
+    select: { id: true, email: true, ativo: true, createdAt: true, updatedAt: true },
+  });
+
+  res.json(login || null);
+});
+
+// ── POST /api/clientes/:id/login ──────────────────────────────────────────────
+router.post('/:id/login', async (req: AuthRequest, res: Response): Promise<void> => {
+  // Colaborador precisa da permissão
+  if (req.user!.role === 'COLABORADOR' && req.user!.podeCriarLoginCliente === false) {
+    res.status(403).json({ error: 'Sem permissão para criar login de cliente.' });
+    return;
+  }
+
+  const id = param(req, 'id');
+  const { email, senha } = req.body as { email: string; senha: string };
+
+  if (!email || !senha) {
+    res.status(400).json({ error: 'Email e senha são obrigatórios.' });
+    return;
+  }
+  if (senha.length < 6) {
+    res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
+    return;
+  }
+
+  const cliente = await prisma.cliente.findUnique({ where: { id }, select: { id: true } });
+  if (!cliente) {
+    res.status(404).json({ error: 'Cliente não encontrado.' });
+    return;
+  }
+
+  const existente = await prisma.clienteLogin.findUnique({ where: { clienteId: id } });
+  if (existente) {
+    res.status(409).json({ error: 'Este cliente já possui login cadastrado.' });
+    return;
+  }
+
+  const emailEmUso = await prisma.clienteLogin.findUnique({ where: { email } });
+  if (emailEmUso) {
+    res.status(409).json({ error: 'Este email já está em uso por outro cliente.' });
+    return;
+  }
+
+  const senhaHash = await bcrypt.hash(senha, 10);
+  const login = await prisma.clienteLogin.create({
+    data: { clienteId: id, email, senhaHash },
+    select: { id: true, email: true, ativo: true, createdAt: true },
+  });
+
+  res.status(201).json(login);
+});
+
+// ── PUT /api/clientes/:id/login ───────────────────────────────────────────────
+router.put('/:id/login', async (req: AuthRequest, res: Response): Promise<void> => {
+  if (req.user!.role === 'COLABORADOR' && req.user!.podeEditarLoginCliente === false) {
+    res.status(403).json({ error: 'Sem permissão para editar login de cliente.' });
+    return;
+  }
+
+  const id = param(req, 'id');
+  const { email, senha } = req.body as { email?: string; senha?: string };
+
+  const login = await prisma.clienteLogin.findUnique({ where: { clienteId: id } });
+  if (!login) {
+    res.status(404).json({ error: 'Login não encontrado para este cliente.' });
+    return;
+  }
+
+  if (email && email !== login.email) {
+    const emailEmUso = await prisma.clienteLogin.findFirst({
+      where: { email, clienteId: { not: id } },
+    });
+    if (emailEmUso) {
+      res.status(409).json({ error: 'Este email já está em uso por outro cliente.' });
+      return;
+    }
+  }
+  if (senha && senha.length < 6) {
+    res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
+    return;
+  }
+
+  const data: Record<string, unknown> = {};
+  if (email) data.email = email;
+  if (senha) data.senhaHash = await bcrypt.hash(senha, 10);
+
+  const updated = await prisma.clienteLogin.update({
+    where: { clienteId: id },
+    data,
+    select: { id: true, email: true, ativo: true, updatedAt: true },
+  });
+
+  res.json(updated);
+});
+
+// ── PATCH /api/clientes/:id/login/status ─────────────────────────────────────
+router.patch('/:id/login/status', async (req: AuthRequest, res: Response): Promise<void> => {
+  if (req.user!.role === 'COLABORADOR' && req.user!.podeInativarLoginCliente === false) {
+    res.status(403).json({ error: 'Sem permissão para ativar/inativar login de cliente.' });
+    return;
+  }
+
+  const id = param(req, 'id');
+  const login = await prisma.clienteLogin.findUnique({ where: { clienteId: id } });
+  if (!login) {
+    res.status(404).json({ error: 'Login não encontrado.' });
+    return;
+  }
+
+  const updated = await prisma.clienteLogin.update({
+    where: { clienteId: id },
+    data: { ativo: !login.ativo },
+    select: { id: true, email: true, ativo: true },
+  });
+
+  res.json(updated);
+});
+
+// ── DELETE /api/clientes/:id/login ────────────────────────────────────────────
+router.delete('/:id/login', async (req: AuthRequest, res: Response): Promise<void> => {
+  if (req.user!.role === 'COLABORADOR' && req.user!.podeExcluirLoginCliente === false) {
+    res.status(403).json({ error: 'Sem permissão para excluir login de cliente.' });
+    return;
+  }
+
+  const id = param(req, 'id');
+  const login = await prisma.clienteLogin.findUnique({ where: { clienteId: id } });
+  if (!login) {
+    res.status(404).json({ error: 'Login não encontrado.' });
+    return;
+  }
+
+  await prisma.clienteLogin.delete({ where: { clienteId: id } });
+  res.status(204).send();
+});
+
+export default router;

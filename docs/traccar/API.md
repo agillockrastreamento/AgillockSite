@@ -1,277 +1,237 @@
-# API REST do Traccar
+# API de Rastreamento — AgilLock
 
-## Base URL
-
-```
-http://localhost:8082/api
-```
-
-Em produção:
-```
-https://rastreamento.agillock.com.br/api
-```
+Este documento cobre dois níveis de API:
+1. **API do Backend AgilLock** (`/api/rastreamento/*`) — consumida pelo frontend
+2. **API REST do Traccar** — consumida internamente pelo backend
 
 ---
 
-## Autenticação
+## 1. API do Backend AgilLock
 
-### Opção 1 — Basic Auth (recomendada para server-to-server)
+Base URL: `https://api.agillock.com.br/api/rastreamento`
 
-Enviar header `Authorization` com credenciais em base64:
-
-```
-Authorization: Basic base64(email:senha)
-```
-
-Exemplo em Node.js:
-```javascript
-const credentials = Buffer.from('admin@agillock.com.br:senha123').toString('base64');
-// → resultado: "YWRtaW5AYWdpbGxvY2suY29tLmJyOnNlbmhhMTIz"
-
-fetch('http://localhost:8082/api/devices', {
-  headers: {
-    'Authorization': `Basic ${credentials}`
-  }
-});
-```
-
-### Opção 2 — Session via Cookie
-
-```javascript
-// 1. Fazer login
-const session = await fetch('http://localhost:8082/api/session', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: 'email=admin@agillock.com.br&password=senha123'
-});
-// Retorna cookie JSESSIONID — necessário para WebSocket
-
-// 2. Usar o cookie nas próximas requisições
-const cookie = session.headers.get('set-cookie');
-```
-
-### Opção 3 — Token Bearer
-
-```javascript
-// Gerar token via API
-const tokenResp = await fetch('http://localhost:8082/api/users/1/token', {
-  method: 'POST',
-  headers: { 'Authorization': `Basic ${credentials}` }
-});
-const { token } = await tokenResp.json();
-
-// Usar token
-fetch('http://localhost:8082/api/devices', {
-  headers: { 'Authorization': `Bearer ${token}` }
-});
-
-// Ou via query string
-fetch(`http://localhost:8082/api/session?token=${token}`);
-```
-
-> Para o backend Node.js do AgilLock, usar **Basic Auth** é a forma mais simples — não precisa gerenciar sessão ou token.
+Todas as rotas requerem autenticação JWT (`Authorization: Bearer <token>`) e papel `ADMIN` ou `COLABORADOR`.
 
 ---
 
-## Endpoints — Dispositivos
+### GET /api/rastreamento/posicoes
 
-### GET /api/devices
-Lista todos os dispositivos acessíveis pelo usuário autenticado.
+Snapshot inicial: todos os dispositivos ativos com última posição conhecida. O frontend chama isso uma vez ao abrir a tela; atualizações subsequentes chegam via WebSocket.
+
+Paralela internamente: busca dispositivos no Prisma e posições no Traccar simultaneamente.
 
 **Response:**
 ```json
 [
   {
-    "id": 1,
-    "name": "Fiat Uno - João Silva",
-    "uniqueId": "123456789012345",
+    "dispositivoId": "clxxx...",
+    "nome": "Fiat Uno — João Silva",
+    "placa": "ABC-1234",
+    "categoria": "carro",
+    "imagemUrl": "/uploads/...",
+    "marca": "Fiat",
+    "modeloVeiculo": "Uno",
+    "cor": "Branco",
+    "limiteVelocidade": 80,
+    "cliente": { "id": "clyyy...", "nome": "João Silva" },
+    "traccarId": 1,
     "status": "online",
-    "lastUpdate": "2026-03-28T10:00:00.000+0000",
-    "positionId": 42,
-    "groupId": 0,
-    "model": "",
-    "contact": "",
-    "phone": "",
-    "category": "car",
-    "disabled": false,
-    "geofenceIds": [],
-    "attributes": {}
-  }
-]
-```
-
-**Query params:**
-- `?id=1` — buscar por ID
-- `?uniqueId=IMEI` — buscar por IMEI
-- `?all=true` — (admin) retorna todos os dispositivos do sistema
-
----
-
-### POST /api/devices
-Cadastra um novo dispositivo.
-
-**Body:**
-```json
-{
-  "name": "Fiat Uno - João Silva",
-  "uniqueId": "123456789012345",
-  "category": "car"
-}
-```
-
-**Response:** objeto Device com `id` gerado.
-
----
-
-### PUT /api/devices/{id}
-Atualiza um dispositivo (enviar objeto completo).
-
----
-
-### DELETE /api/devices/{id}
-Remove um dispositivo e todo seu histórico.
-
----
-
-## Endpoints — Posições
-
-### GET /api/positions
-Retorna **última posição** de cada dispositivo do usuário.
-
-**Response:**
-```json
-[
-  {
-    "id": 42,
-    "deviceId": 1,
-    "deviceTime": "2026-03-28T10:00:00.000+0000",
-    "fixTime": "2026-03-28T10:00:00.000+0000",
-    "serverTime": "2026-03-28T10:00:01.000+0000",
-    "outdated": false,
-    "valid": true,
-    "latitude": -23.5505,
-    "longitude": -46.6333,
-    "altitude": 760.0,
-    "speed": 22.87,
-    "course": 180.0,
-    "address": "Av. Paulista, 1000, São Paulo",
-    "accuracy": 0.0,
-    "network": null,
-    "attributes": {
+    "lastUpdate": "2026-04-17T10:00:00.000Z",
+    "posicao": {
+      "latitude": -23.5505,
+      "longitude": -46.6333,
+      "velocidade": 42,
+      "curso": 180,
+      "altitude": 760,
+      "fixTime": "2026-04-17T10:00:00.000Z",
+      "deviceTime": "2026-04-17T10:00:00.000Z",
+      "serverTime": "2026-04-17T10:00:01.000Z",
+      "valida": true,
       "ignition": true,
       "motion": true,
-      "rssi": -85,
+      "endereco": "Av. Paulista, 1000, São Paulo",
       "sat": 8,
-      "distance": 1200.5,
-      "totalDistance": 45000.0,
-      "hours": 72000,
-      "power": 12.4
+      "bateria": 85
     }
   }
 ]
 ```
 
+> `posicao` é `null` quando o dispositivo nunca enviou uma posição.
+> `velocidade` já está em **km/h** (convertido de knots: `speed * 1.852`).
+> `status`: `"online"` | `"offline"` | `"unknown"` — vindo do Traccar.
+
+---
+
+### GET /api/rastreamento/dispositivos/:id/historico
+
+Histórico de posições de um dispositivo no período. Usado pela tela de detalhe para desenhar o polyline do rastro.
+
 **Query params:**
-- `?deviceId=1` — posição de um dispositivo específico
-- `?id=42` — uma posição específica pelo ID
+- `from` — ISO 8601 com fuso (ex: `2026-04-17T00:00:00-03:00`)
+- `to` — ISO 8601 com fuso (ex: `2026-04-17T23:59:59-03:00`)
+
+**Response:**
+```json
+{
+  "dispositivo": { "id": "clxxx...", "nome": "Fiat Uno", "placa": "ABC-1234" },
+  "total": 1440,
+  "posicoes": [
+    {
+      "latitude": -23.5505,
+      "longitude": -46.6333,
+      "velocidade": 42,
+      "curso": 180,
+      "fixTime": "2026-04-17T08:00:00.000Z",
+      "valida": true,
+      "ignition": true
+    }
+  ]
+}
+```
 
 ---
 
-### GET /api/positions (histórico)
+### GET /api/rastreamento/dispositivos/:id/viagens
 
-Para buscar histórico, usar os parâmetros de data:
+Relatório de viagens do período. Calcula início/fim de cada viagem, distância, duração e velocidades.
 
-```
-GET /api/positions?deviceId=1&from=2026-03-28T00:00:00Z&to=2026-03-28T23:59:59Z
-```
-
-- `from` e `to` no formato ISO 8601 UTC
-- Retorna array de posições no período
-
----
-
-## Endpoints — Relatórios
-
-### GET /api/reports/trips
-Relatório de viagens (quando saiu, quando chegou, distância, duração).
-
-```
-GET /api/reports/trips?deviceId=1&from=2026-03-01T00:00:00Z&to=2026-03-28T23:59:59Z
-```
+**Query params:** `from`, `to` (mesmo formato acima)
 
 **Response:**
 ```json
 [
   {
-    "deviceId": 1,
-    "deviceName": "Fiat Uno - João Silva",
-    "startTime": "2026-03-28T08:00:00.000+0000",
-    "startAddress": "Rua A, 100, São Paulo",
-    "startLat": -23.5505,
-    "startLon": -46.6333,
-    "endTime": "2026-03-28T09:30:00.000+0000",
-    "endAddress": "Rua B, 200, São Paulo",
-    "endLat": -23.5600,
-    "endLon": -46.6400,
-    "distance": 15000.0,
-    "averageSpeed": 40.5,
-    "maxSpeed": 80.2,
-    "duration": 5400000,
-    "spentFuel": 0.0,
-    "driverName": ""
+    "inicio": "2026-04-17T08:00:00.000Z",
+    "fim": "2026-04-17T09:30:00.000Z",
+    "origem": "Rua A, 100, São Paulo",
+    "destino": "Rua B, 200, São Paulo",
+    "origemLat": -23.5505,
+    "origemLng": -46.6333,
+    "destinoLat": -23.5600,
+    "destinoLng": -46.6400,
+    "distancia": 15.2,
+    "velocidadeMedia": 38,
+    "velocidadeMaxima": 80,
+    "duracao": 90
+  }
+]
+```
+
+> `distancia` em **km**, `velocidade*` em **km/h**, `duracao` em **minutos**.
+
+---
+
+### GET /api/rastreamento/dispositivos/:id/paradas
+
+Paradas do período (veículo ligado mas parado, ou ignição desligada).
+
+**Response:**
+```json
+[
+  {
+    "inicio": "2026-04-17T09:30:00.000Z",
+    "fim": "2026-04-17T10:00:00.000Z",
+    "endereco": "Rua B, 200, São Paulo",
+    "latitude": -23.5600,
+    "longitude": -46.6400,
+    "duracao": 30,
+    "horasMotor": 0
   }
 ]
 ```
 
 ---
 
-### GET /api/reports/stops
-Relatório de paradas.
+### GET /api/rastreamento/dispositivos/:id/eventos
 
+Eventos do período (ignição ligada/desligada, alarmes, geofences, etc.).
+
+**Response:**
+```json
+[
+  {
+    "id": 11,
+    "tipo": "ignitionOff",
+    "hora": "2026-04-17T10:00:00.000Z",
+    "atributos": {}
+  }
+]
 ```
-GET /api/reports/stops?deviceId=1&from=2026-03-28T00:00:00Z&to=2026-03-28T23:59:59Z
-```
+
+Tipos comuns de evento Traccar: `ignitionOn`, `ignitionOff`, `alarm`, `geofenceEnter`, `geofenceExit`, `deviceOnline`, `deviceOffline`, `deviceMoving`, `deviceStopped`.
 
 ---
 
-### GET /api/reports/summary
-Resumo do período (distância total, velocidade máxima, tempo em movimento).
+### GET /api/rastreamento/dispositivos/:id/resumo
 
+Resumo agregado do período (distância total, velocidade máxima, horas motor).
+
+**Response:**
+```json
+{
+  "distancia": 120.5,
+  "velocidadeMedia": 45,
+  "velocidadeMaxima": 110,
+  "horasMotor": 3.5
+}
 ```
-GET /api/reports/summary?deviceId=1&from=2026-03-28T00:00:00Z&to=2026-03-28T23:59:59Z
-```
+
+Retorna `null` quando não há dados no período.
 
 ---
 
-### GET /api/reports/events
-Eventos do período.
+### GET /api/rastreamento/dispositivos/:id/tipos-comandos
 
-```
-GET /api/reports/events?deviceId=1&from=2026-03-28T00:00:00Z&to=2026-03-28T23:59:59Z&type=ignitionOn&type=ignitionOff
-```
+Lista os tipos de comandos suportados pelo dispositivo. Retorna `[]` se o Traccar não souber quais tipos o dispositivo aceita.
 
 ---
 
-## WebSocket — Posições em tempo real
+### POST /api/rastreamento/dispositivos/:id/comandos
 
-O WebSocket permite receber atualizações de posição assim que o servidor recebe do dispositivo, sem precisar fazer polling.
+Envia um comando para o dispositivo via Traccar.
 
-**Endpoint:** `ws://localhost:8082/api/socket`
+**Body:**
+```json
+{
+  "tipo": "engineStop",
+  "atributos": {}
+}
+```
 
-**Autenticação:** Requer **cookie de sessão** (não aceita Basic Auth). É preciso fazer login via `/api/session` primeiro.
+Tipos comuns: `positionSingle`, `positionPeriodic`, `positionStop`, `engineStop`, `engineResume`, `alarmArm`, `alarmDisarm`.
 
-**Formato das mensagens recebidas:**
+---
+
+## 2. WebSocket — Atualizações em tempo real
+
+**Endpoint:** `ws://api.agillock.com.br/ws/rastreamento`
+
+Autenticação via query param: `?token=<jwt>`
+
+O backend mantém uma conexão com o WebSocket do Traccar e repassa as mensagens transformadas para todos os clientes frontend conectados.
+
+**Formato das mensagens (frontend recebe):**
+
 ```json
 {
   "positions": [
     {
-      "id": 43,
       "deviceId": 1,
       "latitude": -23.5510,
       "longitude": -46.6340,
-      "speed": 30.5,
-      "fixTime": "2026-03-28T10:01:00.000+0000",
-      "attributes": { "ignition": true, "motion": true }
+      "velocidade": 45,
+      "curso": 90,
+      "altitude": 760,
+      "fixTime": "2026-04-17T10:01:00.000Z",
+      "deviceTime": "2026-04-17T10:01:00.000Z",
+      "serverTime": "2026-04-17T10:01:01.000Z",
+      "valida": true,
+      "ignition": true,
+      "motion": true,
+      "sat": 8,
+      "bateria": 84,
+      "endereco": null
     }
   ]
 }
@@ -281,9 +241,10 @@ O WebSocket permite receber atualizações de posição assim que o servidor rec
 {
   "devices": [
     {
-      "id": 1,
-      "status": "online",
-      "lastUpdate": "2026-03-28T10:01:00.000+0000"
+      "traccarId": 1,
+      "imei": "123456789012345",
+      "status": "offline",
+      "lastUpdate": "2026-04-17T10:01:00.000Z"
     }
   ]
 }
@@ -293,109 +254,57 @@ O WebSocket permite receber atualizações de posição assim que o servidor rec
 {
   "events": [
     {
-      "id": 11,
       "deviceId": 1,
       "type": "ignitionOff",
-      "serverTime": "2026-03-28T10:01:00.000+0000"
+      "serverTime": "2026-04-17T10:01:00.000Z",
+      "positionId": 43
     }
   ]
 }
 ```
 
-- Cada mensagem pode conter qualquer combinação de `positions`, `devices` e `events`
-- Keepalive enviado pelo servidor a cada 55 segundos (objeto vazio `{}`)
-
-**Exemplo no backend Node.js:**
-```javascript
-const WebSocket = require('ws');
-
-// 1. Fazer login para obter cookie
-const loginResp = await fetch('http://localhost:8082/api/session', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: 'email=admin@agillock.com.br&password=senha123',
-  redirect: 'manual'
-});
-const cookie = loginResp.headers.get('set-cookie');
-
-// 2. Conectar ao WebSocket com o cookie
-const ws = new WebSocket('ws://localhost:8082/api/socket', {
-  headers: { Cookie: cookie }
-});
-
-ws.on('message', (data) => {
-  const msg = JSON.parse(data);
-  if (msg.positions) {
-    // Processar novas posições
-    msg.positions.forEach(pos => {
-      console.log(`Dispositivo ${pos.deviceId}: ${pos.latitude}, ${pos.longitude}`);
-    });
-  }
-});
-```
+- `deviceId` no WebSocket é o **`traccarId`** (ID interno do Traccar), **não** o `dispositivoId` do AgilLock. O frontend usa o mapa `traccarIdParaDispositivoId` para relacionar.
+- Mensagens vazias `{}` (keepalive do Traccar a cada 55s) são descartadas pelo backend antes de repassar.
 
 ---
 
-## Endpoints — Geofences (cercas virtuais)
+## 3. API REST do Traccar (interna ao backend)
 
-### GET /api/geofences
-Lista as cercas virtuais.
+Usada apenas pelo `traccar.service.ts`. O frontend nunca acessa o Traccar diretamente.
 
-### POST /api/geofences
-Cria uma cerca virtual.
+**Base URL (interno):** `http://traccar:8082/api` (Docker network)
+**Autenticação:** Basic Auth (`TRACCAR_USER` + `TRACCAR_PASSWORD` do `.env`)
 
-**Body (círculo):**
-```json
-{
-  "name": "Pátio Central",
-  "area": "CIRCLE (-23.5505 -46.6333, 500)",
-  "attributes": {}
-}
+### Endpoints usados pelo backend
+
+| Método | Endpoint | Uso |
+|---|---|---|
+| GET | `/api/devices` | Lista todos os dispositivos |
+| GET | `/api/devices?uniqueId=IMEI` | Busca dispositivo pelo IMEI |
+| POST | `/api/devices` | Cadastra novo dispositivo |
+| PUT | `/api/devices/:id` | Atualiza dispositivo |
+| DELETE | `/api/devices/:id` | Remove dispositivo |
+| GET | `/api/positions` | Última posição de todos |
+| GET | `/api/positions?deviceId=&from=&to=` | Histórico de posições |
+| GET | `/api/reports/trips?deviceId=&from=&to=` | Viagens |
+| GET | `/api/reports/stops?deviceId=&from=&to=` | Paradas |
+| GET | `/api/reports/events?deviceId=&from=&to=` | Eventos |
+| GET | `/api/reports/summary?deviceId=&from=&to=` | Resumo |
+| GET | `/api/commands/types?deviceId=` | Tipos de comandos suportados |
+| POST | `/api/commands/send` | Enviar comando |
+| POST | `/api/session` | Login (para obter cookie do WS) |
+| GET | `/api/socket` (WS) | WebSocket de posições em tempo real |
+
+> Velocidade no Traccar é em **knots**. Conversão: `km/h = speed * 1.852`
+> Duração em viagens: **milissegundos**. Conversão: `min = duration / 60000`
+> Distância: **metros**. Conversão: `km = distance / 1000`
+
+### Explorar a API do Traccar
+
 ```
-
-**Body (polígono):**
-```json
-{
-  "name": "Zona de Entrega SP",
-  "area": "POLYGON ((-23.55 -46.63, -23.56 -46.63, -23.56 -46.64, -23.55 -46.64, -23.55 -46.63))",
-  "attributes": {}
-}
+http://localhost:8082/api/swagger   (Swagger UI)
+http://localhost:8082/api/spec.json (OpenAPI spec)
 ```
-
----
-
-## Endpoints — Usuários
-
-### GET /api/users
-Lista usuários (admin only).
-
-### POST /api/users
-Cria novo usuário.
-
-### GET /api/session
-Verifica sessão atual / retorna usuário logado.
-
----
-
-## Endpoints — Comandos
-
-Enviar comandos para dispositivos (ex: desligar motor, solicitar posição).
-
-### GET /api/commands/types?deviceId=1
-Lista os tipos de comandos disponíveis para o dispositivo.
-
-### POST /api/commands/send
-Envia comando para o dispositivo.
-
-```json
-{
-  "deviceId": 1,
-  "type": "engineStop",
-  "attributes": {}
-}
-```
-
-Tipos comuns: `positionSingle`, `positionPeriodic`, `positionStop`, `engineStop`, `engineResume`, `alarmArm`, `alarmDisarm`
 
 ---
 
@@ -405,20 +314,8 @@ Tipos comuns: `positionSingle`, `positionPeriodic`, `positionStop`, `engineStop`
 |---|---|
 | 200 | Sucesso |
 | 400 | Bad Request — parâmetros inválidos |
-| 401 | Unauthorized — credenciais inválidas |
-| 403 | Forbidden — sem permissão para o recurso |
-| 404 | Not Found — recurso não existe |
-| 500 | Internal Server Error |
-
----
-
-## Postman / Insomnia
-
-Para explorar a API, usar a especificação OpenAPI disponível em:
-```
-http://localhost:8082/api/swagger
-```
-ou importar o arquivo JSON da especificação que fica em:
-```
-http://localhost:8082/api/spec.json
-```
+| 401 | Unauthorized — JWT inválido ou expirado |
+| 403 | Forbidden — papel insuficiente |
+| 404 | Not Found — dispositivo não encontrado ou não sincronizado com o Traccar |
+| 502 | Bad Gateway — Traccar indisponível |
+| 500 | Erro interno do backend |

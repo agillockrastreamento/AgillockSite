@@ -429,3 +429,113 @@ Ao criar/editar um colaborador (ADMIN), é possível configurar 8 permissões bo
 | Método | Rota | Descrição | Roles |
 |---|---|---|---|
 | GET | `/vendedor/carteira/exportar` | Exportar dados da carteira em CSV | VENDEDOR, ADMIN |
+
+---
+
+## Portal do Cliente — Auth
+
+Não existe endpoint separado para o cliente. O `POST /api/auth/login` é o único ponto de entrada para **todos os perfis**.
+
+**Fluxo do backend:**
+1. Tenta encontrar na tabela `User` (ADMIN / COLABORADOR / VENDEDOR) → retorna JWT padrão
+2. Se não encontrado, tenta na tabela `ClienteLogin` → retorna JWT de cliente
+3. Retorna 401 apenas se não encontrado em nenhuma das duas tabelas
+
+**Response quando login é de cliente:**
+```json
+{
+  "token": "eyJ...",
+  "user": { "id": "clxxx...", "nome": "João Silva", "email": "...", "role": "CLIENTE", "tipo": "responsavel" }
+}
+```
+
+JWT de cliente: payload `{ sub, clienteId, role: "CLIENTE", tipo: "responsavel" | "vinculado" }`, expiração 7 dias.
+
+O frontend `login.html` detecta `data.user.role === 'CLIENTE'`, armazena o token em `localStorage('al_cliente_token')` e redireciona para `../cliente/rastreamento.html`.
+
+> `POST /api/auth/cliente` ainda existe como alias por compatibilidade.
+
+---
+
+## Portal do Cliente — Gerenciamento de Login (admin/colaborador)
+
+Rotas para admin/colaborador criarem e gerenciarem o acesso do cliente ao portal.
+
+| Método | Rota | Descrição | Roles |
+|---|---|---|---|
+| GET | `/clientes/:id/login` | Verifica se tem login (status, email, ativo) | ADMIN, COLABORADOR |
+| POST | `/clientes/:id/login` | Cria login | ADMIN; COLABORADOR (requer `podeCriarLoginCliente`) |
+| PUT | `/clientes/:id/login` | Edita email ou redefine senha | ADMIN; COLABORADOR (requer `podeEditarLoginCliente`) |
+| PATCH | `/clientes/:id/login/status` | Toggle ativo/inativo (sem body) | ADMIN; COLABORADOR (requer `podeInativarLoginCliente`) |
+| DELETE | `/clientes/:id/login` | Exclui o login permanentemente | ADMIN; COLABORADOR (requer `podeExcluirLoginCliente`) |
+
+**Body POST/PUT:**
+```json
+{ "email": "cliente@email.com", "senha": "SenhaSegura123" }
+```
+
+---
+
+## Portal do Cliente — Rastreamento
+
+Rotas consumidas pelo frontend do portal do cliente (JWT com `role: "CLIENTE"`).
+
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| GET | `/cliente/rastreamento/status-acesso` | Verifica bloqueio por inadimplência | CLIENTE |
+| GET | `/cliente/rastreamento/posicoes` | Snapshot de posições (filtrado pelo clienteId) | CLIENTE |
+
+### GET /cliente/rastreamento/status-acesso
+```json
+{ "bloqueado": false }
+// ou
+{ "bloqueado": true, "diasAtraso": 15 }
+```
+
+Regra: `bloqueado = true` se existe boleto com `status = ATRASADO` e `(hoje - vencimento) > 10 dias` do cliente.
+
+> As rotas de posição também retornam `403 { error: "acesso_bloqueado" }` enquanto houver inadimplência — o bloqueio não pode ser burlado pelo frontend.
+
+### GET /cliente/rastreamento/posicoes
+Mesma estrutura de `/rastreamento/posicoes` (admin), mas filtrada para retornar apenas dispositivos vinculados ao `clienteId` do JWT.
+
+---
+
+## Portal do Cliente — Pagamentos
+
+Rotas consumidas pela tela de pagamentos (apenas `tipo: "responsavel"`).
+
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| GET | `/cliente/boletos` | Listar boletos do cliente logado | CLIENTE (responsavel) |
+
+**Query params:** `?status=PENDENTE|PAGO|ATRASADO|CANCELADO&dataVencDe=YYYY-MM-DD&dataVencAte=YYYY-MM-DD&placaId=uuid`
+
+**Response:** lista de boletos com `valor`, `vencimento`, `status`, `placa`, `linkBoleto` (segunda via).
+
+---
+
+## Portal do Cliente — Foto do veículo
+
+Foto enviada pelo cliente, separada da foto cadastrada pelo admin.
+
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| POST | `/cliente/dispositivos/:dispositivoId/foto` | Upload da foto | CLIENTE |
+| DELETE | `/cliente/dispositivos/:dispositivoId/foto` | Remover foto | CLIENTE |
+
+`POST` recebe `multipart/form-data`, campo `foto`, máx 2MB, JPG/PNG/WEBP.
+Response: `{ imagemUrlCliente: "/uploads/cliente/uuid.webp" }`.
+
+---
+
+## Permissões Granulares de Colaborador (v2 — adicionais)
+
+Novas permissões referentes ao login do cliente (adicionadas na v2, `default: false` para segurança):
+
+| Campo | Descrição |
+|---|---|
+| `podeCriarLoginCliente` | Pode criar login para o cliente (`default: true`) |
+| `podeEditarLoginCliente` | Pode editar email/senha do login (`default: true`) |
+| `podeInativarLoginCliente` | Pode ativar/inativar o login (`default: false`) |
+| `podeExcluirLoginCliente` | Pode excluir o login permanentemente (`default: false`) |

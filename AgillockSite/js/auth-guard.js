@@ -3,6 +3,15 @@
  * Inclua APÓS config.js em todas as páginas do admin.
  */
 
+// ── Anti-FOUC do sidebar ────────────────────────────────────────────────────
+// Roda IMEDIATAMENTE (não espera DOMContentLoaded): pré-colapsa o sidebar via
+// classe no <html> antes de qualquer render, igual ao anti-FOUC do tema escuro.
+(function () {
+  if (localStorage.getItem('al-sidebar-state') === 'collapsed') {
+    document.documentElement.classList.add('al-sb-collapsed');
+  }
+})();
+
 (function () {
   'use strict';
 
@@ -61,12 +70,12 @@
    */
   function requireAuth(roles) {
     if (!isAuthenticated()) {
-      window.location.href = _adminBase + '/admin/login.html';
+      window.location.href = _adminBase + '/login.html';
       return null;
     }
     var user = getUser();
     if (roles && roles.length > 0 && roles.indexOf(user.role) === -1) {
-      window.location.href = _adminBase + '/admin/login.html';
+      window.location.href = _adminBase + '/login.html';
       return null;
     }
     return user;
@@ -74,7 +83,7 @@
 
   function logout() {
     removeToken();
-    window.location.href = _adminBase + '/admin/login.html';
+    window.location.href = _adminBase + '/login.html';
   }
 
   // ─── API wrappers ────────────────────────────────────────────────────────
@@ -99,7 +108,7 @@
     return fetch(BASE + endpoint, opts).then(function (res) {
       if (res.status === 401) {
         removeToken();
-        window.location.href = _adminBase + '/admin/login.html';
+        window.location.href = _adminBase + '/login.html';
         return Promise.reject(new Error('Sessão expirada.'));
       }
       if (res.status === 204) return null; // No Content — sem body para parsear
@@ -352,12 +361,113 @@
 
   // ─── Sidebar dropdown toggle ─────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
+    // ─── Dropdown do sidebar ─────────────────────────────────────────────────
     document.querySelectorAll('.dropdown-toggle-link').forEach(function (a) {
       a.addEventListener('click', function (e) {
         e.preventDefault();
         var li = this.closest('.sidebar-dropdown');
         if (li) li.classList.toggle('open');
       });
+    });
+
+    // ─── Sidebar collapse (minimizar) ──────────────────────────────────────
+    var sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+
+    var LOGO_FULL = '../img/logo_agillock_white_new.png';
+    var LOGO_ICON = '../favicon.ico';
+    var logoImg   = sidebar.querySelector('.sidebar-brand img');
+    var brand     = sidebar.querySelector('.sidebar-brand');
+
+    // ── Botão de toggle (topo do brand) ──────────────────────────────────────
+    var collapseBtn = document.createElement('button');
+    collapseBtn.id        = 'btn-sidebar-collapse';
+    collapseBtn.className = 'btn-sidebar-collapse';
+    collapseBtn.title     = 'Recolher/Expandir';
+    collapseBtn.innerHTML = '<i id="icon-sidebar-collapse" class="fa fa-chevron-left"></i>';
+    if (brand) brand.appendChild(collapseBtn);
+
+    // ── Labels para tooltip ──────────────────────────────────────────────────
+    // Nav principal
+    sidebar.querySelectorAll('.sidebar-nav > li').forEach(function (li) {
+      var a = li.querySelector(':scope > a');
+      if (!a) return;
+      var clone = a.cloneNode(true);
+      clone.querySelectorAll('i').forEach(function (el) { el.remove(); });
+      var label = clone.textContent.replace(/\s+/g, ' ').trim();
+      if (label) li.setAttribute('data-nav-label', label);
+    });
+    // Sub-itens
+    sidebar.querySelectorAll('.sidebar-submenu li').forEach(function (li) {
+      var a = li.querySelector('a');
+      if (!a) return;
+      var clone = a.cloneNode(true);
+      clone.querySelectorAll('i').forEach(function (el) { el.remove(); });
+      var label = clone.textContent.replace(/\s+/g, ' ').trim();
+      if (label) li.setAttribute('data-nav-label', label);
+    });
+
+    // ── Tooltip (element fixo no body, evita clipping do overflow) ───────────
+    var sidebarTooltip = document.createElement('div');
+    sidebarTooltip.className = 'sidebar-tooltip';
+    document.body.appendChild(sidebarTooltip);
+
+    function showTooltip(el, label) {
+      if (!sidebar.classList.contains('collapsed')) return;
+      var rect = el.getBoundingClientRect();
+      sidebarTooltip.textContent = label;
+      sidebarTooltip.style.display = 'block';
+      sidebarTooltip.style.top  = Math.round(rect.top + rect.height / 2) + 'px';
+      sidebarTooltip.style.left = Math.round(rect.right + 12) + 'px';
+    }
+    function hideTooltip() { sidebarTooltip.style.display = 'none'; }
+
+    sidebar.querySelectorAll('.sidebar-nav > li[data-nav-label], .sidebar-submenu li[data-nav-label]')
+      .forEach(function (li) {
+        li.addEventListener('mouseenter', function () { showTooltip(li, li.getAttribute('data-nav-label')); });
+        li.addEventListener('mouseleave', hideTooltip);
+      });
+    // Oculta tooltip ao clicar
+    sidebar.addEventListener('click', hideTooltip);
+
+    // ── applyCollapsed ────────────────────────────────────────────────────────
+    function applyCollapsed(collapsed, animate) {
+      if (!animate) {
+        // Desativa transição para aplicação inicial (sem flash)
+        sidebar.classList.remove('sidebar-animate');
+        sidebar.offsetWidth; // força reflow
+      }
+      sidebar.classList.toggle('collapsed', collapsed);
+      // Remove classe anti-FOUC (já foi útil, sidebar.collapsed a substitui)
+      document.documentElement.classList.remove('al-sb-collapsed');
+      if (logoImg) logoImg.src = collapsed ? LOGO_ICON : LOGO_FULL;
+      var icon = document.getElementById('icon-sidebar-collapse');
+      if (icon) icon.className = collapsed ? 'fa fa-chevron-right' : 'fa fa-chevron-left';
+      var topbar  = document.querySelector('.admin-topbar');
+      var content = document.querySelector('.admin-content');
+      var px = collapsed ? '64px' : '';
+      if (topbar)  topbar.style.left        = px;
+      if (content) content.style.marginLeft = px;
+      if (!animate) {
+        // Reativa transição depois do próximo frame (garante que o estado
+        // inicial foi pintado antes de qualquer transição ser possível)
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            sidebar.classList.add('sidebar-animate');
+          });
+        });
+      }
+    }
+
+    // Carregamento inicial: sem animação
+    applyCollapsed(localStorage.getItem('al-sidebar-state') === 'collapsed', false);
+
+    // Clique do usuário: com animação
+    collapseBtn.addEventListener('click', function () {
+      var nowCollapsed = !sidebar.classList.contains('collapsed');
+      localStorage.setItem('al-sidebar-state', nowCollapsed ? 'collapsed' : 'expanded');
+      applyCollapsed(nowCollapsed, true);
+      hideTooltip();
     });
   });
 

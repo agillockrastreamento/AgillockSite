@@ -24,7 +24,7 @@ const API_URL = 'https://api.agillock.com.br/api';
 **Depois:**
 ```html
 <li>
-  <a href="admin/login.html">Acesso Administrativo</a>
+  <a href="login.html">Acesso Administrativo</a>
 </li>
 <li>
   <a href="https://agillock.monitorando.me/admin">Acesso ao Rastreador</a>
@@ -49,7 +49,7 @@ Substituir o link do Banco do Brasil por um campo de busca simples:
 
 ---
 
-## 2. Página de Login — admin/login.html
+## 2. Página de Login — login.html
 
 **Campos:**
 - Email
@@ -291,31 +291,115 @@ AL.logout()                // remove token e redireciona para login
 
 ```
 AgillockSite/
-├── index.html
+├── index.html                  ← botão "Acessar" → login.html (dropdown removido)
 ├── favicon.ico
 ├── admin/
 │   ├── login.html
-│   ├── dashboard.html          ← cards métricas + botões EFI (Etapa 10)
-│   ├── clientes.html           ← autocomplete vendedor (× inline)
-│   ├── cliente-detalhe.html    ← tabs Dados/Placas/Cobranças; autocomplete vendedor
-│   ├── gerar-cobranca.html     ← wizard 4 steps; sugestão unificação automática
-│   ├── cobrancas.html          ← tabela plana de todos boletos; filtros; PDF/baixa/WA
-│   ├── colaboradores.html      ← 8 checkboxes de permissão por colaborador
-│   ├── vendedores.html         ← expansão inline de clientes; link para carteira
-│   └── configuracoes.html      ← alterar senha + parâmetros de comissão e encargos
+│   ├── dashboard.html
+│   ├── clientes.html
+│   ├── cliente-detalhe.html    ← tabs Dados/Dispositivos/Cobranças/Login
+│   ├── gerar-cobranca.html
+│   ├── cobrancas.html
+│   ├── colaboradores.html      ← inclui novas permissões de login do cliente
+│   ├── vendedores.html
+│   ├── configuracoes.html      ← inclui seção de permissões de login do cliente
+│   ├── rastreamento.html
+│   ├── rastreamento-detalhe.html
+│   ├── relatorio.html
+│   └── comandos.html
 ├── colaborador/
-│   ├── clientes.html           ← autocomplete vendedor; botões condicionais por permissão
-│   ├── cliente-detalhe.html    ← autocomplete vendedor; botões condicionais por permissão
-│   ├── gerar-cobranca.html     ← autocomplete vendedor (× inline)
-│   └── cobrancas.html          ← igual admin, sem ações de admin
+│   ├── clientes.html
+│   ├── cliente-detalhe.html    ← tabs Dados/Dispositivos/Cobranças/Login (com permissões)
+│   ├── gerar-cobranca.html
+│   └── cobrancas.html
 ├── vendedor/
-│   ├── carteira.html           ← 3 toggles (atrasado/garantido/futuro) + seletor de mês
-│   └── carteira-detalhes.html  ← tabela por percentual; WhatsApp com link do boleto; CSV
+│   ├── carteira.html
+│   └── carteira-detalhes.html
+├── cliente/                    ← nova área (portal do cliente)
+│   ├── login.html              ← login próprio do cliente
+│   ├── rastreamento.html       ← mapa ao vivo + barra de veículos no rodapé
+│   └── pagamentos.html         ← boletos (somente Cliente Responsável)
 └── js/
-    ├── auth-guard.js           ← window.AL (ver seção 5)
-    ├── config.js               ← window.API_URL ('http://localhost:3000' em dev)
+    ├── auth-guard.js           ← window.AL (admin/colaborador/vendedor)
+    ├── auth-guard-cliente.js   ← window.AL_CLIENTE (portal do cliente)
+    ├── config.js               ← window.API_URL
+    ├── rastreamento.js         ← mapa ao vivo (admin/colaborador)
+    ├── rastreamento-detalhe.js ← histórico (admin/colaborador)
+    ├── rastreamento-cliente.js ← mapa ao vivo (cliente) — adapta rastreamento.js
     ├── jquery.js
-    ├── bootstrap.min.js
+    └── bootstrap.min.js
 └── css/
-    └── admin.css               ← estilos compartilhados: sidebar, cards, tabelas, wizard
+    └── admin.css               ← estilos compartilhados + sidebar collapsed (v2)
 ```
+
+---
+
+## 7. Portal do Cliente — `cliente/`
+
+### 7.1 `cliente/login.html`
+
+Apenas um redirect para `login.html`. Não existe tela de login separada para o cliente.
+
+O cliente faz login pela **mesma tela de todos os perfis** (`login.html`). O frontend detecta `role === 'CLIENTE'` na resposta e redireciona para `../cliente/rastreamento.html`, armazenando o token em `localStorage('al_cliente_token')`.
+
+### 7.2 `cliente/rastreamento.html`
+
+Baseado em `admin/rastreamento.html`. Diferenças principais:
+
+- **Barra de veículos** no rodapé do mapa: cards horizontais com foto (do cliente), placa e marca/modelo; scroll horizontal; expande ao rolar; recolhe ao selecionar
+- **Botões no card do dispositivo**: "Relatório" e "Histórico" abrem overlay dentro da página (não navegam para outra URL)
+- **Bloqueio por inadimplência**: ao entrar, chama `/cliente/rastreamento/status-acesso`; se bloqueado exibe modal não-dispensável
+- **Foto do veículo**: ícone de câmera na barra permite upload; `POST /api/cliente/dispositivos/:id/foto`
+- Autentica via `auth-guard-cliente.js` (aceita qualquer `tipo`)
+
+Ver especificação técnica detalhada: `docs/traccar/PORTAL_CLIENTE.md`
+
+### 7.3 `cliente/pagamentos.html`
+
+Disponível apenas para `tipo === 'responsavel'`. Se um cliente vinculado acessar → redireciona.
+
+- Lista de boletos com filtros (status, período, placa)
+- Cards de resumo: total pendente, quantidade em aberto, total pago no período
+- Link de segunda via para cada boleto (via `linkBoleto`)
+
+---
+
+## 8. Sidebar minimizável (todos os perfis)
+
+A partir da v2, todas as sidebars (admin, colaborador, vendedor, cliente) suportam minimização.
+
+**Comportamento:**
+- Expandida (padrão): `width: 220px` — logo completa + texto dos itens
+- Collapsed: `width: 58px` — favicon como logo + só ícones, sem texto
+- Estado salvo em `localStorage('al-sidebar-state')`
+- Transição CSS `0.2s ease`
+- Submenus viram tooltip lateral flutuante no modo collapsed (hover no ícone)
+
+**Botão de toggle:** adicionado no rodapé de cada sidebar, ícone `fa-chevron-left` / `fa-chevron-right`.
+
+CSS adicionado em `admin.css`:
+```css
+.admin-sidebar { transition: width 0.2s ease; }
+.admin-sidebar.collapsed { width: 58px; overflow: hidden; }
+.admin-sidebar.collapsed .sidebar-nav li > a span,
+.admin-sidebar.collapsed .sidebar-user-nome { display: none; }
+.admin-sidebar.collapsed .sidebar-nav li > a { justify-content: center; padding: 12px 0; }
+/* Submenus como tooltip lateral */
+.admin-sidebar.collapsed .sidebar-dropdown:hover .sidebar-submenu {
+  display: block !important;
+  position: absolute; left: 58px;
+  background: #1e2530; min-width: 180px; z-index: 1000;
+}
+```
+
+Ver CSS e JS completos: `docs/projeto/PORTAL_CLIENTE.md` — Seção 10.
+
+---
+
+## 9. index.html — Simplificação do botão "Acessar"
+
+O dropdown com dois itens ("Admin" + "Rastreamento") é removido. O botão "Acessar" vira um link direto para `login.html`.
+
+O portal do cliente (`cliente/login.html`) não aparece no site institucional — é comunicado diretamente ao cliente.
+
+Ver código exato: `docs/projeto/PORTAL_CLIENTE.md` — Seção 11.

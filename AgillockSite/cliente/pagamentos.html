@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Pagamentos — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    /* Efeito app: filtro fixo, lista rola */
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
+    #al-alert-container { flex-shrink: 0; }
+
+    /* Filtro centralizado verticalmente */
+    .filter-bar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center; /* centraliza horizontalmente */
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px 16px;
+    }
+    .filter-bar .form-control,
+    .filter-bar .btn { height: 34px; }
+
+    /* Área com scroll: resumo + lista */
+    #scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0 24px 24px;
+      /* scrollbar colada na direita */
+      scrollbar-gutter: stable;
+    }
+    #scroll-area::-webkit-scrollbar { width: 7px; }
+    #scroll-area::-webkit-scrollbar-track { background: transparent; }
+    #scroll-area::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    html.dark-theme #scroll-area::-webkit-scrollbar-thumb { background: #3a4555; }
+
+    /* Cards de resumo */
+    .resumo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+    .resumo-card { background: #fff; border-radius: 10px; padding: 18px 14px; box-shadow: 0 2px 10px rgba(0,0,0,.06); text-align: center; border-top: 4px solid #ccc; }
+    html.dark-theme .resumo-card { background: #1e2530; }
+    .resumo-card.orange { border-top-color: #e67e22; }
+    .resumo-card.red    { border-top-color: #e74c3c; }
+    .resumo-card.green  { border-top-color: #27ae60; }
+    .resumo-valor { font-size: 20px; font-weight: 700; color: #1e2530; }
+    html.dark-theme .resumo-valor { color: #e0e6f0; }
+    .resumo-label { font-size: 11px; color: #888; margin-top: 4px; }
+
+    /* Lista de boletos */
+    #boletos-lista { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.05); overflow: hidden; }
+    html.dark-theme #boletos-lista { background: #1e2530; }
+    .boleto-linha { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f0f0f0; }
+    html.dark-theme .boleto-linha { border-color: #2d3748; }
+    .boleto-linha:last-child { border-bottom: none; }
+    .boleto-linha:hover { background: #f9f9f9; }
+    html.dark-theme .boleto-linha:hover { background: #252d3d; }
+
+    .boleto-placa { font-weight: 700; font-size: 12px; background: #333; color: #fff; padding: 1px 7px; border-radius: 3px; letter-spacing: 1px; }
+    .boleto-venc  { font-size: 11px; color: #888; }
+    .boleto-valor { font-weight: 700; font-size: 14px; }
+
+    .boleto-badge { padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; color: #fff; }
+    .boleto-badge.em-aberto  { background: #e67e22; }
+    .boleto-badge.atrasado   { background: #e74c3c; }
+    .boleto-badge.pago       { background: #27ae60; }
+    .boleto-badge.cancelado  { background: #95a5a6; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Rastreamento</span></a></li>
+      <li class="active"><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span class="al-badge badge-ativo" style="margin-top:4px;">CLIENTE</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Pagamentos</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros (fixos, sem scroll) -->
+    <div class="filter-bar">
+      <select id="filtro-status" class="form-control input-sm" style="width:160px;">
+        <option value="">Todos os status</option>
+        <option value="aberto">Em Aberto</option>
+        <option value="ATRASADO">Atrasado</option>
+        <option value="PAGO">Pago</option>
+        <option value="CANCELADO">Cancelado</option>
+      </select>
+      <input type="date" id="filtro-de"  class="form-control input-sm" style="width:140px;" title="Vencimento de" />
+      <input type="date" id="filtro-ate" class="form-control input-sm" style="width:140px;" title="Vencimento até" />
+      <button id="btn-limpar" class="btn btn-sm btn-default">Limpar</button>
+    </div>
+
+    <!-- Área com scroll: cards + lista -->
+    <div id="scroll-area">
+
+      <!-- Cards de resumo -->
+      <div class="resumo-grid" id="resumo-cards">
+        <div class="resumo-card orange">
+          <div class="resumo-valor" id="res-vl-aberto">—</div>
+          <div class="resumo-label">Em Aberto</div>
+        </div>
+        <div class="resumo-card orange">
+          <div class="resumo-valor" id="res-qtd-aberto">—</div>
+          <div class="resumo-label">Qtd. em Aberto</div>
+        </div>
+        <!-- Cards de atraso — exibidos só se houver -->
+        <div class="resumo-card red" id="card-vl-atraso" style="display:none;">
+          <div class="resumo-valor" id="res-vl-atraso">—</div>
+          <div class="resumo-label">Em Atraso</div>
+        </div>
+        <div class="resumo-card red" id="card-qtd-atraso" style="display:none;">
+          <div class="resumo-valor" id="res-qtd-atraso">—</div>
+          <div class="resumo-label">Qtd. em Atraso</div>
+        </div>
+        <div class="resumo-card green">
+          <div class="resumo-valor" id="res-pago">—</div>
+          <div class="resumo-label">Pago no período</div>
+        </div>
+      </div>
+
+      <!-- Lista -->
+      <div id="loading-state" class="text-center" style="padding:40px;color:#999;">
+        <i class="fa fa-spinner fa-spin fa-2x"></i>
+        <p style="margin-top:12px;">Carregando...</p>
+      </div>
+      <div id="boletos-lista" style="display:none;"></div>
+
+    </div><!-- /scroll-area -->
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var user = AL_CLIENTE.requireAuth(['responsavel']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
+      AL_CLIENTE.initThemeToggle('btn-tema');
+
+      // ── Auto-busca ao mudar filtros ───────────────────────────────────────
+      document.getElementById('filtro-status').addEventListener('change', carregarBoletos);
+      document.getElementById('filtro-de').addEventListener('change', carregarBoletos);
+      document.getElementById('filtro-ate').addEventListener('change', carregarBoletos);
+
+      document.getElementById('btn-limpar').addEventListener('click', function () {
+        document.getElementById('filtro-status').value = '';
+        document.getElementById('filtro-de').value = '';
+        document.getElementById('filtro-ate').value = '';
+        carregarBoletos();
+      });
+
+      // ── Carga ─────────────────────────────────────────────────────────────
+      function carregarBoletos() {
+        var params = new URLSearchParams();
+        var status = document.getElementById('filtro-status').value;
+        var de     = document.getElementById('filtro-de').value;
+        var ate    = document.getElementById('filtro-ate').value;
+        if (status) params.set('status', status);
+        if (de)     params.set('dataVencDe', de);
+        if (ate)    params.set('dataVencAte', ate);
+
+        document.getElementById('loading-state').style.display = 'block';
+        document.getElementById('boletos-lista').style.display = 'none';
+
+        AL_CLIENTE.apiGet('/api/cliente/boletos?' + params.toString())
+          .then(function (boletos) {
+            renderResumo(boletos || []);
+            renderBoletos(boletos || []);
+          })
+          .catch(function (err) {
+            document.getElementById('loading-state').innerHTML =
+              '<div class="text-danger" style="padding:24px;"><i class="fa fa-exclamation-triangle"></i> ' + err.message + '</div>';
+          });
+      }
+
+      // ── Resumo ────────────────────────────────────────────────────────────
+      function renderResumo(boletos) {
+        var aberto   = boletos.filter(function (b) { return b.status === 'PENDENTE' || b.status === 'ATRASADO'; });
+        var atraso   = boletos.filter(function (b) { return b.status === 'ATRASADO'; });
+        var pago     = boletos.filter(function (b) { return b.status === 'PAGO'; });
+
+        var vlAberto = aberto.reduce(function (s, b) { return s + Number(b.valor); }, 0);
+        var vlAtraso = atraso.reduce(function (s, b) { return s + Number(b.valor); }, 0);
+        var vlPago   = pago.reduce(function (s, b) { return s + Number(b.valorPago || b.valor); }, 0);
+
+        document.getElementById('res-vl-aberto').textContent   = AL_CLIENTE.fmtMoney(vlAberto);
+        document.getElementById('res-qtd-aberto').textContent  = aberto.length;
+        document.getElementById('res-pago').textContent        = AL_CLIENTE.fmtMoney(vlPago);
+
+        // Cards de atraso só aparecem se houver boletos atrasados
+        var temAtraso = atraso.length > 0;
+        document.getElementById('card-vl-atraso').style.display  = temAtraso ? '' : 'none';
+        document.getElementById('card-qtd-atraso').style.display = temAtraso ? '' : 'none';
+        if (temAtraso) {
+          document.getElementById('res-vl-atraso').textContent  = AL_CLIENTE.fmtMoney(vlAtraso);
+          document.getElementById('res-qtd-atraso').textContent = atraso.length;
+        }
+      }
+
+      // ── Lista ─────────────────────────────────────────────────────────────
+      function badgeHtml(status) {
+        var cls = { PENDENTE: 'em-aberto', ATRASADO: 'atrasado', PAGO: 'pago', CANCELADO: 'cancelado' };
+        var label = { PENDENTE: 'Em Aberto', ATRASADO: 'Atrasado', PAGO: 'Pago', CANCELADO: 'Cancelado' };
+        return '<span class="boleto-badge ' + (cls[status] || '') + '">' + (label[status] || status) + '</span>';
+      }
+
+      function renderBoletos(boletos) {
+        document.getElementById('loading-state').style.display = 'none';
+        var lista = document.getElementById('boletos-lista');
+        lista.style.display = 'block';
+
+        if (!boletos.length) {
+          lista.innerHTML = '<div class="empty-state"><i class="fa fa-inbox"></i><p>Nenhum boleto encontrado.</p></div>';
+          return;
+        }
+
+        lista.innerHTML = boletos.map(function (b) {
+          var placa = (b.dispositivo && (b.dispositivo.placa || b.dispositivo.nome)) || (b.placa && b.placa.placa) || '—';
+          var venc  = AL_CLIENTE.fmtDate(b.vencimento);
+          var pgto  = b.dataPagamento ? (' &nbsp;·&nbsp; Pago em ' + AL_CLIENTE.fmtDate(b.dataPagamento)) : '';
+          var pdf   = b.linkBoleto
+            ? '<a href="' + b.linkBoleto + '" target="_blank" class="btn btn-xs btn-info"><i class="fa fa-file-pdf-o"></i> 2ª Via</a>'
+            : '<span class="text-muted" style="font-size:11px;">Sem link</span>';
+
+          return '<div class="boleto-linha">' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' +
+                '<span class="boleto-placa">' + placa + '</span>' +
+                badgeHtml(b.status) +
+              '</div>' +
+              '<div class="boleto-venc">Venc.: ' + venc + ' &nbsp;·&nbsp; Parc. ' + (b.numeroParcela || '—') + pgto + '</div>' +
+            '</div>' +
+            '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;margin-left:12px;">' +
+              '<span class="boleto-valor">' + AL_CLIENTE.fmtMoney(b.valor) + '</span>' +
+              pdf +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+
+      carregarBoletos();
+    })();
+  </script>
+</body>
+</html>

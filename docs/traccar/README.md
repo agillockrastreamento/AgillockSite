@@ -56,6 +56,7 @@ O backend Node.js atua como **intermediário**: consulta o Traccar, une os dados
 | [API.md](./API.md) | REST API completa: endpoints, autenticação, exemplos, WebSocket |
 | [INTEGRACAO_BACKEND.md](./INTEGRACAO_BACKEND.md) | `traccar.service.ts`, `traccar.ws.ts`, rotas REST — código completo |
 | [FRONTEND_RASTREAMENTO.md](./FRONTEND_RASTREAMENTO.md) | HTML + JS completo da tela rastreamento.html com WebSocket e Leaflet |
+| [PORTAL_CLIENTE.md](./PORTAL_CLIENTE.md) | Tela de rastreamento do portal do cliente: barra de veículos, overlays, bloqueio por inadimplência |
 
 ---
 
@@ -63,11 +64,14 @@ O backend Node.js atua como **intermediário**: consulta o Traccar, une os dados
 
 | Etapa | Status |
 |---|---|
-| 1 — Deploy Traccar (Docker + PostgreSQL) | ⬜ Pendente |
-| 2 — Conectar dispositivo GT06 | ⬜ Pendente |
-| 3 — Backend: `traccar.service.ts` + WebSocket bridge + rotas | ⬜ Pendente |
-| 4 — Frontend: `rastreamento.html` com mapa e WebSocket | ⬜ Pendente |
-| 5 — Tela de detalhes do veículo (histórico + viagens) | ⬜ Pendente |
-| 6 — Funcionalidades avançadas (geofences, alertas, etc.) | ⬜ Futuro |
+| 1 — Deploy Traccar (Docker + PostgreSQL) | ✅ Concluído |
+| 2 — Conectar dispositivo GT06 | ✅ Concluído |
+| 3 — Backend: `traccar.service.ts` + WebSocket bridge + rotas | ✅ Concluído |
+| 4 — Frontend: `rastreamento.html` com mapa e WebSocket | ✅ Concluído |
+| 5 — Tela de detalhes do veículo (histórico + viagens) | ✅ Concluído |
+| 6 — Estabilidade em produção | ✅ Concluído |
+| 7 — Portal do cliente (login, rastreamento, pagamentos) | ⬜ Próxima fase |
+| 8 — Funcionalidades avançadas (geofences, alertas, etc.) | ⬜ Futuro |
 
 Ver detalhes completos de cada etapa em [ROADMAP.md](./ROADMAP.md).
+Especificação v2 em [PORTAL_CLIENTE.md](./PORTAL_CLIENTE.md).

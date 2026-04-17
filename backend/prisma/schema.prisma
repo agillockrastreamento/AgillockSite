@@ -57,6 +57,11 @@ model User {
   podeCriarContrato   Boolean @default(true)
   podeEditarContrato  Boolean @default(true)
   podeExcluirContrato Boolean @default(true)
+  // Permissões de login do cliente (padrão conservador para inativar/excluir)
+  podeCriarLoginCliente    Boolean @default(true)
+  podeEditarLoginCliente   Boolean @default(true)
+  podeInativarLoginCliente Boolean @default(false)
+  podeExcluirLoginCliente  Boolean @default(false)
 
   clientesCriados      Cliente[]          @relation("ClienteCriador")
   clientesVendidos     Cliente[]          @relation("ClienteVendedor")
@@ -107,6 +112,7 @@ model Cliente {
   dispositivosVinculados DispositivoCliente[]
   carnes                 Carne[]
   contratos              Contrato[]
+  login                  ClienteLogin?
 }
 
 model Placa {
@@ -228,7 +234,8 @@ model Dispositivo {
   ignorarOdometro  Boolean  @default(false)
 
   // Imagem
-  imagemUrl   String?
+  imagemUrl        String?
+  imagemUrlCliente String?
 
   // Billing (equivalente a Placa)
   valorPadrao Decimal? @db.Decimal(10, 2)
@@ -298,6 +305,18 @@ model Configuracoes {
   representanteTelefone String?
   representanteCpf      String?
   updatedAt       DateTime @updatedAt
+}
+
+model ClienteLogin {
+  id        String   @id @default(cuid())
+  clienteId String   @unique
+  email     String   @unique
+  senhaHash String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 }
 
 model Contrato {

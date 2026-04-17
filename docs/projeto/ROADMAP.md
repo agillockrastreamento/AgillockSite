@@ -459,4 +459,59 @@ Etapa 8  → Painel Vendedor/Carteira (frontend)
 Etapa 9  → Deploy em Produção
 Ajustes 1–5  → E-mail opcional, endereço obrigatório/no boleto, data correta, pagamento comissão
 Ajustes 6–11 → Contratos condicionais PDF, telefone nos sócios, auto-fill fiadores, toggle switches, permissões por grupo
+Etapa 10 → Portal do Cliente (login, rastreamento, pagamentos)
+Etapa 11 → Sidebar minimizável + simplificação index.html
 ```
+
+---
+
+## Etapa 10 — Portal do Cliente ⬜ Próxima
+
+**Objetivo:** Cliente acessa o sistema por login próprio, visualiza seus veículos em tempo real e acompanha seus boletos.
+
+**Especificação completa:** `docs/projeto/PORTAL_CLIENTE.md`
+
+### 10.1 — Backend: login do cliente
+
+- [ ] Migration: adicionar model `ClienteLogin` + campo `login` em `Cliente` + `imagemUrlCliente` em `Dispositivo` + permissões de login em `User`
+- [ ] `POST /api/auth/cliente` — autenticação com JWT separado (role `CLIENTE`, tipo `responsavel`|`vinculado`)
+- [ ] Rotas CRUD `GET|POST|PUT|PATCH|DELETE /api/clientes/:id/login`
+- [ ] Permissões de colaborador para essas rotas (`podeCriarLoginCliente`, etc.)
+
+### 10.2 — Tab "Login" em cliente-detalhe.html
+
+- [ ] `admin/cliente-detalhe.html` — nova tab Login (criar/editar/inativar/excluir)
+- [ ] `colaborador/cliente-detalhe.html` — mesma tab com permissões condicionais
+- [ ] `admin/configuracoes.html` — seção "Permissões de login do cliente" para configurar o que colaborador pode fazer
+- [ ] `admin/colaboradores.html` — badges e checkboxes das novas permissões
+
+### 10.3 — Portal: auth e login
+
+- [ ] `AgillockSite/js/auth-guard-cliente.js` — guard do portal do cliente
+- [ ] `AgillockSite/cliente/login.html` — formulário de login
+
+### 10.4 — Portal: rastreamento
+
+- [ ] `AgillockSite/cliente/rastreamento.html` — mapa ao vivo (base, sem barra inferior)
+- [ ] `AgillockSite/js/rastreamento-cliente.js` — adapta rastreamento.js
+- [ ] Bloqueio por inadimplência (`GET /api/cliente/rastreamento/status-acesso` + modal)
+- [ ] Backend: `GET /api/cliente/rastreamento/posicoes` (filtrado por cliente)
+- [ ] Barra de veículos no rodapé (foto/placa/modelo, scroll expansível)
+- [ ] Upload de foto pelo cliente (`POST /api/cliente/dispositivos/:id/foto`)
+- [ ] Overlays de histórico e relatório (reutiliza `rastreamento-detalhe.js`)
+
+### 10.5 — Portal: pagamentos
+
+- [ ] `AgillockSite/cliente/pagamentos.html` — boletos do cliente
+- [ ] Backend: `GET /api/cliente/boletos` (filtrado por clienteId do JWT)
+
+---
+
+## Etapa 11 — Melhorias globais de UI ⬜ Próxima
+
+**Objetivo:** Refinamentos visuais aplicados a todos os perfis.
+
+- [ ] **Sidebar minimizável** — `admin.css` + JS global em todas as sidebars (admin, colaborador, vendedor, cliente); favicon como logo no modo collapsed; submenus como tooltip lateral
+- [ ] **index.html** — remover dropdown "Acessar", botão único → `admin/login.html`
+
+> Estas duas melhorias podem ser feitas antes ou em paralelo com a Etapa 10 — são independentes do portal do cliente.

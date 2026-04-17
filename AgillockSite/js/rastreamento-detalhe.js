@@ -49,6 +49,37 @@ function inicializarMapa() {
   ).addTo(map);
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
+
+  // ── Botão de localização do usuário ───────────────────────────────────────
+  let _marcadorUserDet = null;
+  const BtnLocDet = L.Control.extend({
+    onAdd() {
+      const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control leaflet-loc-btn');
+      btn.title = 'Minha localização';
+      btn.innerHTML = '<i class="fa fa-map-marker" style="font-size:13px;color:#2980b9;"></i>';
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, 'click', function () {
+        if (!navigator.geolocation) return;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin" style="font-size:11px;color:#2980b9;"></i>';
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            const latlng = [pos.coords.latitude, pos.coords.longitude];
+            if (_marcadorUserDet) map.removeLayer(_marcadorUserDet);
+            _marcadorUserDet = L.marker(latlng, { icon: L.divIcon({
+              html: '<div style="width:14px;height:14px;background:#2980b9;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 0 5px rgba(41,128,185,0.25);"></div>',
+              className: '', iconSize: [14,14], iconAnchor: [7,7],
+            }) }).addTo(map).bindTooltip('Sua localização');
+            map.setView(latlng, 16);
+            btn.innerHTML = '<i class="fa fa-map-marker" style="font-size:13px;color:#2980b9;"></i>';
+          },
+          function () { btn.innerHTML = '<i class="fa fa-map-marker" style="font-size:13px;color:#2980b9;"></i>'; }
+        );
+      });
+      return btn;
+    },
+    onRemove() {},
+  });
+  new BtnLocDet({ position: 'topleft' }).addTo(map);
 }
 
 // ── Seletor de período ────────────────────────────────────────────────────────

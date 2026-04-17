@@ -12,11 +12,13 @@ User (ADMIN | COLABORADOR | VENDEDOR)
   ├── cria → Cliente
   │             │
   │             ├── possui → Placa (1..N)
-  │             └── possui → Carne (1..N)
-  │                           │
-  │                           └── possui → Boleto (1..N parcelas)
-  │                                         │
-  │                                         └── gera → ComissaoVendedor
+  │             │              └── imagemUrl (foto do admin)
+  │             │              └── imagemUrlCliente (foto do cliente)
+  │             ├── possui → Carne (1..N)
+  │             │              └── possui → Boleto (1..N parcelas)
+  │             │                           └── gera → ComissaoVendedor
+  │             └── possui → ClienteLogin (0..1)
+  │                           └── JWT portal do cliente
   │
   ├── responsável vendas → Cliente (vendedor_id)
   └── recebe → PagamentoComissao (por mês)
@@ -83,6 +85,11 @@ model User {
   podeBaixaManual       Boolean @default(true)
   podeCancelarCarne     Boolean @default(true)
   podeAlterarVencimento Boolean @default(true)
+  // Permissões de login do cliente (adicionadas na v2)
+  podeCriarLoginCliente    Boolean @default(true)
+  podeEditarLoginCliente   Boolean @default(true)
+  podeInativarLoginCliente Boolean @default(false)
+  podeExcluirLoginCliente  Boolean @default(false)
 
   // Relacionamentos
   clientesCriados  Cliente[]           @relation("ClienteCriador")
@@ -98,6 +105,8 @@ model Cliente {
   id          String        @id @default(uuid())
   nome        String
   cpfCnpj     String?
+  // ... campos existentes ...
+  login       ClienteLogin?  // portal do cliente
   telefone    String?
   email       String?
   notas       String?
@@ -233,6 +242,19 @@ model PagamentoComissao {
   @@unique([vendedorId, mes])
 }
 
+// Login do portal do cliente (separado de User, que é para colaboradores/admin/vendedor)
+model ClienteLogin {
+  id        String   @id @default(cuid())
+  clienteId String   @unique
+  email     String   @unique
+  senhaHash String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+}
+
 // Singleton de configurações (sempre ID = "1")
 model Configuracoes {
   id                String  @id @default("1")
@@ -243,6 +265,17 @@ model Configuracoes {
   jurosDiarios      Decimal @db.Decimal(5,2) @default(0.33)   // juros por atraso (% ao dia)
   updatedAt         DateTime @updatedAt
 }
+```
+
+---
+
+---
+
+## Novos campos em modelos existentes (v2)
+
+```prisma
+// model Dispositivo — adicionar:
+imagemUrlCliente String?   // foto enviada pelo cliente (separada da imagemUrl do admin)
 ```
 
 ---

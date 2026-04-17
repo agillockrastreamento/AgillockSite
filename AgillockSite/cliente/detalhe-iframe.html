@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <title>Histórico — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { margin: 0; overflow: hidden; font-family: 'Montserrat', sans-serif; }
+
+    #detalhe-layout { display: flex; height: 100vh; overflow: hidden; }
+
+    #sidebar-detalhe { width: 300px; min-width: 300px; display: flex; flex-direction: column; border-right: 1px solid #ddd; background: #fff; overflow: hidden; }
+    .dark-theme #sidebar-detalhe { background: #1e2530; border-color: #333; }
+
+    .detalhe-section { padding: 10px 12px; border-bottom: 1px solid #eee; flex-shrink: 0; }
+    .dark-theme .detalhe-section { border-color: #2a2a3e; }
+    .detalhe-section-titulo { font-size: 10px; text-transform: uppercase; color: #aaa; letter-spacing: .5px; margin-bottom: 6px; font-weight: 700; }
+
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .stat-card { background: #f7f7f7; border-radius: 6px; padding: 7px 8px; text-align: center; }
+    .dark-theme .stat-card { background: #252535; }
+    .stat-valor { font-size: 17px; font-weight: 700; color: #2980b9; }
+    .stat-label { font-size: 10px; color: #aaa; margin-top: 1px; }
+
+    #viagens-lista { flex: 1; overflow-y: auto; }
+    .viagem-card { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background .12s; }
+    .dark-theme .viagem-card { border-color: #2a2a3e; }
+    .viagem-card:hover { background: #f7f7f7; }
+    .dark-theme .viagem-card:hover { background: #252535; }
+    .viagem-card.ativo { background: #e8f4fd; }
+    .dark-theme .viagem-card.ativo { background: #1a3a5c; }
+    .viagem-hora { font-size: 12px; font-weight: 600; }
+    .viagem-info { font-size: 11px; color: #888; margin-top: 2px; }
+
+    #periodo-selector { display: flex; flex-direction: column; gap: 6px; }
+    #periodo-selector .btn-group { width: 100%; }
+    #periodo-selector .btn-group .btn { flex: 1; font-size: 11px; }
+    #btn-hoje.active, #btn-ontem.active, #btn-7dias.active { background: #2980b9; color: #fff; border-color: #2980b9; }
+
+    #mapa-wrap { flex: 1; position: relative; }
+    #mapa-detalhe { width: 100%; height: 100%; }
+    #mapa-sem-dados { display: none; position: absolute; inset: 0; background: rgba(255,255,255,.85); z-index: 500; align-items: center; justify-content: center; flex-direction: column; gap: 8px; font-size: 14px; color: #888; }
+    .dark-theme #mapa-sem-dados { background: rgba(20,24,32,.85); }
+    #loading-overlay { display: none; position: absolute; inset: 0; background: rgba(255,255,255,.7); z-index: 600; align-items: center; justify-content: center; }
+    .dark-theme #loading-overlay { background: rgba(20,24,32,.7); }
+    .leaflet-grab { cursor: crosshair !important; }
+  </style>
+</head>
+<body>
+
+  <div id="detalhe-layout">
+    <div id="sidebar-detalhe">
+      <div class="detalhe-section">
+        <div class="detalhe-section-titulo">Veículo</div>
+        <div id="info-veiculo"><div style="color:#aaa;font-size:12px"><i class="fa fa-spinner fa-spin"></i> Carregando...</div></div>
+      </div>
+      <div class="detalhe-section">
+        <div class="detalhe-section-titulo">Período</div>
+        <div id="periodo-selector">
+          <div class="btn-group">
+            <button id="btn-hoje" class="btn btn-default btn-sm active">Hoje</button>
+            <button id="btn-ontem" class="btn btn-default btn-sm">Ontem</button>
+            <button id="btn-7dias" class="btn btn-default btn-sm">7 dias</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:2px">
+            <input type="date" id="input-from" class="form-control input-sm" />
+            <input type="date" id="input-to" class="form-control input-sm" />
+          </div>
+          <button id="btn-buscar" class="btn btn-sm btn-primary-al" style="width:100%;margin-top:4px">
+            <i class="fa fa-search"></i> Buscar
+          </button>
+        </div>
+      </div>
+      <div class="detalhe-section">
+        <div class="detalhe-section-titulo">Resumo do período</div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-valor" id="stat-km">—</div><div class="stat-label">Distância</div></div>
+          <div class="stat-card"><div class="stat-valor" id="stat-velmax">—</div><div class="stat-label">Vel. Máxima</div></div>
+          <div class="stat-card"><div class="stat-valor" id="stat-tempo">—</div><div class="stat-label">Em Movimento</div></div>
+          <div class="stat-card"><div class="stat-valor" id="stat-viagens">—</div><div class="stat-label">Viagens</div></div>
+        </div>
+      </div>
+      <div class="detalhe-section" style="padding-bottom:6px;">
+        <div class="detalhe-section-titulo">Viagens</div>
+      </div>
+      <div id="viagens-lista">
+        <div id="viagens-carregando" style="padding:16px;text-align:center;color:#aaa;font-size:12px"><i class="fa fa-spinner fa-spin"></i></div>
+        <div id="viagens-sem-dados" style="display:none;padding:16px;text-align:center;color:#aaa;font-size:12px">Nenhuma viagem neste período.</div>
+      </div>
+    </div>
+
+    <div id="mapa-wrap">
+      <div id="mapa-detalhe"></div>
+      <div id="mapa-sem-dados"><i class="fa fa-map-o" style="font-size:36px;color:#ddd"></i><span>Nenhuma posição registrada.</span></div>
+      <div id="loading-overlay"><i class="fa fa-spinner fa-spin fa-2x" style="color:#2980b9"></i></div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="../js/rastreamento-detalhe-cliente.js"></script>
+</body>
+</html>
