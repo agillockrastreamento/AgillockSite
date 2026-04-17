@@ -38,9 +38,10 @@ async function criarUsuario(
     res.status(400).json({ error: 'nome, email e senha são obrigatórios.' });
     return;
   }
-  const existe = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  if (existe) {
-    res.status(400).json({ error: 'E-mail já cadastrado.' });
+  const existeUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  const existeCliente = await prisma.clienteLogin.findUnique({ where: { email }, select: { id: true } });
+  if (existeUser || existeCliente) {
+    res.status(400).json({ error: 'E-mail já cadastrado no sistema.' });
     return;
   }
   const senhaHash = await bcrypt.hash(senha, 10);
@@ -81,9 +82,10 @@ async function editarUsuario(
     return;
   }
   if (email) {
-    const emUso = await prisma.user.findFirst({ where: { email, NOT: { id } }, select: { id: true } });
-    if (emUso) {
-      res.status(400).json({ error: 'E-mail já cadastrado por outro usuário.' });
+    const emUsoUser = await prisma.user.findFirst({ where: { email, NOT: { id } }, select: { id: true } });
+    const emUsoCliente = await prisma.clienteLogin.findUnique({ where: { email }, select: { id: true } });
+    if (emUsoUser || emUsoCliente) {
+      res.status(400).json({ error: 'E-mail já cadastrado no sistema.' });
       return;
     }
   }

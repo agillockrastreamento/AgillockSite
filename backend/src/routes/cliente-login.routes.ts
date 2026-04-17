@@ -53,9 +53,10 @@ router.post('/:id/login', async (req: AuthRequest, res: Response): Promise<void>
     return;
   }
 
-  const emailEmUso = await prisma.clienteLogin.findUnique({ where: { email } });
-  if (emailEmUso) {
-    res.status(409).json({ error: 'Este email já está em uso por outro cliente.' });
+  const emailEmUsoCliente = await prisma.clienteLogin.findUnique({ where: { email } });
+  const emailEmUsoUser = await prisma.user.findUnique({ where: { email } });
+  if (emailEmUsoCliente || emailEmUsoUser) {
+    res.status(409).json({ error: 'Este email já está em uso no sistema.' });
     return;
   }
 
@@ -85,11 +86,12 @@ router.put('/:id/login', async (req: AuthRequest, res: Response): Promise<void> 
   }
 
   if (email && email !== login.email) {
-    const emailEmUso = await prisma.clienteLogin.findFirst({
+    const emailEmUsoCliente = await prisma.clienteLogin.findFirst({
       where: { email, clienteId: { not: id } },
     });
-    if (emailEmUso) {
-      res.status(409).json({ error: 'Este email já está em uso por outro cliente.' });
+    const emailEmUsoUser = await prisma.user.findUnique({ where: { email } });
+    if (emailEmUsoCliente || emailEmUsoUser) {
+      res.status(409).json({ error: 'Este email já está em uso no sistema.' });
       return;
     }
   }

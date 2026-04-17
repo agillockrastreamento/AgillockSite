@@ -1163,11 +1163,11 @@
           '<h5 style="margin:0 0 16px;font-weight:700;"><i class="fa fa-key"></i> Login do Cliente no Portal</h5>' +
           '<p class="text-muted" style="margin-bottom:20px;">Este cliente não possui acesso ao portal. Crie um login para que ele possa acessar o rastreamento e pagamentos.</p>' +
           '<div id="login-alert"></div>' +
-          '<form id="form-criar-login">' +
+          '<form id="form-criar-login" autocomplete="off">' +
             '<div class="row">' +
-              '<div class="col-sm-6"><div class="form-group"><label>E-mail *</label><input type="email" class="form-control" id="login-email" placeholder="email@cliente.com" required /></div></div>' +
+              '<div class="col-sm-6"><div class="form-group"><label>E-mail *</label><input type="email" class="form-control" id="login-email" placeholder="email@cliente.com" required autocomplete="new-password" /></div></div>' +
               '<div class="col-sm-6"><div class="form-group"><label>Senha *</label>' +
-                '<div style="position:relative;"><input type="password" class="form-control" id="login-senha" placeholder="Mínimo 6 caracteres" required />' +
+                '<div style="position:relative;"><input type="password" class="form-control" id="login-senha" placeholder="Mínimo 6 caracteres" required autocomplete="new-password" />' +
                 '<button type="button" id="toggle-login-senha" style="position:absolute;right:8px;top:8px;background:none;border:none;color:#888;cursor:pointer;"><i class="fa fa-eye"></i></button></div>' +
               '</div></div>' +
             '</div>' +
@@ -1220,11 +1220,11 @@
           '<button class="btn btn-sm btn-danger" id="btn-login-excluir"><i class="fa fa-trash"></i> Excluir</button>' +
         '</div>' +
         '<div id="form-editar-wrap" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px;">' +
-          '<form id="form-editar-login">' +
+          '<form id="form-editar-login" autocomplete="off">' +
             '<div class="row">' +
-              '<div class="col-sm-6"><div class="form-group"><label>Novo E-mail</label><input type="email" class="form-control" id="edit-login-email" value="' + esc(loginData.email) + '" /></div></div>' +
+              '<div class="col-sm-6"><div class="form-group"><label>Novo E-mail</label><input type="email" class="form-control" id="edit-login-email" value="' + esc(loginData.email) + '" autocomplete="new-password" /></div></div>' +
               '<div class="col-sm-6"><div class="form-group"><label>Nova Senha <small class="text-muted">(deixe vazio para manter)</small></label>' +
-                '<input type="password" class="form-control" id="edit-login-senha" placeholder="Nova senha..." /></div></div>' +
+                '<input type="password" class="form-control" id="edit-login-senha" placeholder="Nova senha..." autocomplete="new-password" /></div></div>' +
             '</div>' +
             '<button type="submit" class="btn btn-primary-al btn-sm"><i class="fa fa-save"></i> Salvar</button>' +
             '<button type="button" class="btn btn-default btn-sm" id="btn-cancelar-editar" style="margin-left:6px;">Cancelar</button>' +

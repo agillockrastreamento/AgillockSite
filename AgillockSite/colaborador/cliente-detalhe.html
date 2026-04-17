@@ -1275,10 +1275,10 @@
 
         if (!loginData) {
           var formHtml = podeCriar
-            ? '<div id="login-alert"></div><form id="form-criar-login">' +
+            ? '<div id="login-alert"></div><form id="form-criar-login" autocomplete="off">' +
                 '<div class="row">' +
-                  '<div class="col-sm-6"><div class="form-group"><label>E-mail *</label><input type="email" class="form-control" id="login-email" required /></div></div>' +
-                  '<div class="col-sm-6"><div class="form-group"><label>Senha *</label><input type="password" class="form-control" id="login-senha" placeholder="Mínimo 6 caracteres" required /></div></div>' +
+                  '<div class="col-sm-6"><div class="form-group"><label>E-mail *</label><input type="email" class="form-control" id="login-email" required autocomplete="new-password" /></div></div>' +
+                  '<div class="col-sm-6"><div class="form-group"><label>Senha *</label><input type="password" class="form-control" id="login-senha" placeholder="Mínimo 6 caracteres" required autocomplete="new-password" /></div></div>' +
                 '</div>' +
                 '<button type="submit" class="btn btn-primary-al"><i class="fa fa-plus"></i> Criar Login</button>' +
               '</form>'
@@ -1323,10 +1323,10 @@
           '</div>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' + btnEditar + btnToggle + btnExcluir + '</div>' +
           '<div id="form-editar-wrap" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px;">' +
-            '<form id="form-editar-login">' +
+            '<form id="form-editar-login" autocomplete="off">' +
               '<div class="row">' +
-                '<div class="col-sm-6"><div class="form-group"><label>E-mail</label><input type="email" class="form-control" id="edit-login-email" value="' + esc(loginData.email) + '" /></div></div>' +
-                '<div class="col-sm-6"><div class="form-group"><label>Nova Senha <small class="text-muted">(deixe vazio para manter)</small></label><input type="password" class="form-control" id="edit-login-senha" /></div></div>' +
+                '<div class="col-sm-6"><div class="form-group"><label>E-mail</label><input type="email" class="form-control" id="edit-login-email" value="' + esc(loginData.email) + '" autocomplete="new-password" /></div></div>' +
+                '<div class="col-sm-6"><div class="form-group"><label>Nova Senha <small class="text-muted">(deixe vazio para manter)</small></label><input type="password" class="form-control" id="edit-login-senha" autocomplete="new-password" /></div></div>' +
               '</div>' +
               '<button type="submit" class="btn btn-primary-al btn-sm"><i class="fa fa-save"></i> Salvar</button>' +
               '<button type="button" class="btn btn-default btn-sm" id="btn-cancelar-editar" style="margin-left:6px;">Cancelar</button>' +
