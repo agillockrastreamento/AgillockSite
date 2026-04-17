@@ -486,8 +486,15 @@
         dropdown.innerHTML = '<div style="padding:10px;color:#999;font-size:13px;">Nenhuma categoria encontrada.</div>';
       } else {
         dropdown.innerHTML = filtradas.map(function(c) {
-          return '<div class="cat-item' + (selectedCategoria === c.value ? ' selected' : '') + '" data-value="' + c.value + '" data-label="' + c.label + '">' +
-            '<i class="fa ' + c.icon + '"></i> ' + c.label + '</div>';
+          // Usa o ícone 3D em vez do FontAwesome
+          var svgHtml = window.AL_ICONS_3D ? window.AL_ICONS_3D.getSvgHtml(c.value, '#c8870a', 0) : '<i class="fa ' + c.icon + '"></i>';
+          // Ajusta tamanho para o dropdown (aumentado para 32px para melhor visibilidade dos detalhes 3D)
+          if (window.AL_ICONS_3D) {
+             svgHtml = svgHtml.replace('width="42"', 'width="32"').replace('height="42"', 'height="32"');
+          }
+          
+          return '<div class="cat-item' + (selectedCategoria === c.value ? ' selected' : '') + '" data-value="' + c.value + '" data-label="' + c.label + '" style="height:46px;">' +
+            '<div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:8px;">' + svgHtml + '</div> ' + c.label + '</div>';
         }).join('');
         dropdown.querySelectorAll('.cat-item').forEach(function(item) {
           item.addEventListener('click', function() {

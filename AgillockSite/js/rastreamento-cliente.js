@@ -321,24 +321,7 @@ function atualizarMarcador(did) {
   if (marcadores[did].isPopupOpen()) marcadores[did].getPopup().setContent(criarPopupSimples(v));
 }
 
-const _ICONE_CAT = {
-  ambulancia:'fa-ambulance', aviao_passageiros:'fa-plane', helicoptero:'fa-plane', drone:'fa-rocket',
-  bicicleta:'fa-bicycle', pedicalo:'fa-bicycle', motocicleta:'fa-motorcycle', motocicleta_cruzada:'fa-motorcycle',
-  taxi:'fa-taxi', onibus:'fa-bus', van:'fa-bus', van_campista:'fa-bus', caravana:'fa-bus',
-  caixa_estacionaria:'fa-cube', container_20:'fa-cube', container_40:'fa-cube', container_tanque:'fa-cube',
-  caminhao:'fa-truck', caminhao_trator:'fa-truck', caminhao_bau:'fa-truck', caminhao_bomba_concreto:'fa-truck',
-  caminhao_betoneira:'fa-truck', caminhao_reboque:'fa-truck', caminhao_reboque_estrado:'fa-truck',
-  caminhao_tanque_combustivel:'fa-truck', caminhao_pipa:'fa-truck', caminhao_vacuo:'fa-truck',
-  caminhao_bombeiros:'fa-truck', caminhao_esgoto:'fa-truck', caminhao_recuperacao:'fa-truck',
-  caminhao_transporte:'fa-truck', pickup:'fa-truck', pickup_reboque:'fa-truck', plataforma_reboque:'fa-truck',
-  reboque_reefer:'fa-truck', reboque_tanque:'fa-truck', reboque_residuos:'fa-truck', reboque_caixa:'fa-truck',
-  reboque_carro:'fa-truck', reboque_container_gerador:'fa-truck', reboque_gerador:'fa-truck',
-  retroescavadeira:'fa-truck', escavadeira:'fa-truck', escavadora:'fa-truck', empilhadeira:'fa-truck',
-  trator:'fa-truck', aclo_compressor:'fa-truck',
-  carro:'fa-car', carro_executivo:'fa-car', carro_hatchback:'fa-car', carro_assistencia:'fa-car', carro_luxo:'fa-car', viatura:'fa-car',
-};
-
-function categoriaParaIcone(cat) { return _ICONE_CAT[cat] || 'fa-car'; }
+function categoriaParaIcone(cat) { return AL_ICONS_3D.mapCategoria(cat); }
 
 function _corMarcador(v) {
   if (!v.posicao) return '#95a5a6';
@@ -346,13 +329,16 @@ function _corMarcador(v) {
   if (v.status === 'online') return v.posicao.motion ? '#2980b9' : '#27ae60';
   return '#e67e22';
 }
-function _iconeKey(v) { return `${_corMarcador(v)}|${v.categoria}`; }
+function _iconeKey(v) { 
+  const course = v.posicao ? Math.round(v.posicao.curso / 5) * 5 : 0;
+  return `${_corMarcador(v)}|${v.categoria}|${course}`; 
+}
 
 function criarIcone(v) {
   const cor = _corMarcador(v);
-  const fa = categoriaParaIcone(v.categoria);
-  const html = `<div style="width:34px;height:34px;background:${cor};border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;"><i class="fa ${fa}"></i></div>`;
-  return L.divIcon({ html, className: '', iconSize: [34, 34], iconAnchor: [17, 17] });
+  const course = v.posicao ? v.posicao.curso : 0;
+  const html = AL_ICONS_3D.getSvgHtml(v.categoria, cor, course);
+  return L.divIcon({ html, className: '', iconSize: [42, 42], iconAnchor: [21, 21] });
 }
 
 function criarPopupSimples(v) {
@@ -658,9 +644,9 @@ function mostrarCardDispositivo(id) {
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
   const horasHtml = p ? `
     <div class="dcard-section dcard-val" style="font-size:10px">
-      <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> ${fmtGPSTimeSec(p.serverTime)}</div>
-      <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> ${fmtGPSTimeSec(p.deviceTime)}</div>
-      <div><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> ${fmtGPSTimeSec(p.fixTime)}</div>
+      <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> <span id="dcard-ts-srv">${fmtGPSTimeSec(p.serverTime)}</span></div>
+      <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
+      <div><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> <span id="dcard-ts-gps">${fmtGPSTimeSec(p.fixTime)}</span></div>
     </div>` : '';
 
   const card = document.getElementById('device-detail-card');
@@ -675,13 +661,13 @@ function mostrarCardDispositivo(id) {
     </div>
     <div class="dcard-body">
       <div style="margin-bottom:6px">
-        <span style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}</span>
-        ${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}
+        <span id="dcard-status-text" style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}</span>
+        <span id="dcard-status-warning">${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}</span>
       </div>
-      ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
-      ${ignHtml ? `<div style="font-size:12px;margin-bottom:4px">${ignHtml}</div>` : ''}
-      ${bat != null ? `<div style="font-size:12px;color:${batCor};margin-bottom:4px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
-      ${horasHtml}
+      <div id="dcard-velocimetro">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
+      <div id="dcard-ignicao" style="font-size:12px;margin-bottom:4px">${ignHtml}</div>
+      <div id="dcard-bateria" style="font-size:12px;color:${batCor};margin-bottom:4px">${bat != null ? `<i class="fa ${batFa}"></i> Bateria: ${bat}%` : ''}</div>
+      <div id="dcard-horas">${horasHtml}</div>
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
         <span id="${addrId}">${addrTxt}</span>
@@ -762,10 +748,45 @@ function atualizarCardAtivo(did) {
   if (did !== ativoId) return;
   const card = document.getElementById('device-detail-card');
   if (card.style.display === 'none') return;
-  mostrarCardDispositivo(did);
-  if (modoFoco) {
-    const v = veiculosMap[did];
-    if (v?.posicao) map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
+  
+  const v = veiculosMap[did]; if (!v) return;
+  const p = v.posicao;
+
+  // Atualização cirúrgica para evitar o "piscar"
+  const elStatus = document.getElementById('dcard-status-text');
+  if (elStatus) {
+    const isOnline = v.status === 'online', isMoving = isOnline && p?.motion;
+    const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
+    const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
+    const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
+    const tempoSufixo = refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : '';
+    elStatus.style.color = corStatus;
+    elStatus.innerHTML = `<i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}`;
+  }
+
+  const elVel = document.getElementById('dcard-velocimetro');
+  if (elVel) elVel.innerHTML = p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : '';
+
+  const elIgn = document.getElementById('dcard-ignicao');
+  if (elIgn) elIgn.innerHTML = p?.ignition === true ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>` : p?.ignition === false ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>` : '';
+
+  const elBat = document.getElementById('dcard-bateria');
+  if (elBat) {
+    const bat = p?.bateria != null ? p.bateria : null;
+    const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
+    const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
+    elBat.style.color = batCor;
+    elBat.innerHTML = bat != null ? `<i class="fa ${batFa}"></i> Bateria: ${bat}%` : '';
+  }
+
+  // Timestamps
+  const tsSrv = document.getElementById('dcard-ts-srv'), tsDev = document.getElementById('dcard-ts-dev'), tsGps = document.getElementById('dcard-ts-gps');
+  if (tsSrv && p) tsSrv.textContent = fmtGPSTimeSec(p.serverTime);
+  if (tsDev && p) tsDev.textContent = fmtGPSTimeSec(p.deviceTime);
+  if (tsGps && p) tsGps.textContent = fmtGPSTimeSec(p.fixTime);
+
+  if (modoFoco && v?.posicao) {
+    map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
   }
 }
 
