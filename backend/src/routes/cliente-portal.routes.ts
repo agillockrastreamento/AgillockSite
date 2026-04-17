@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { clienteAuthMiddleware, requireResponsavel, ClienteRequest } from '../middleware/cliente-auth.middleware';
-import { query } from '../utils/params';
+import { query, param } from '../utils/params';
 import prisma from '../utils/prisma';
 import {
   traccarGetDevices,
@@ -166,7 +166,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
 // ── GET /api/cliente/rastreamento/dispositivos/:id/historico ─────────────────
 router.get('/rastreamento/dispositivos/:id/historico', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
-  const dispositivoId = req.params.id;
+  const dispositivoId = param(req, 'id');
   const from = query(req.query.from);
   const to = query(req.query.to);
 
@@ -221,7 +221,7 @@ router.get('/rastreamento/dispositivos/:id/historico', async (req: ClienteReques
 // ── GET /api/cliente/rastreamento/dispositivos/:id/viagens ───────────────────
 router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
-  const dispositivoId = req.params.id;
+  const dispositivoId = param(req, 'id');
   const from = query(req.query.from);
   const to = query(req.query.to);
 
@@ -273,7 +273,10 @@ router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest,
 // ── GET /api/cliente/boletos ──────────────────────────────────────────────────
 router.get('/boletos', requireResponsavel, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
-  const { status, dataVencDe, dataVencAte, placaId } = req.query as Record<string, string>;
+  const status = query(req.query.status);
+  const dataVencDe = query(req.query.dataVencDe);
+  const dataVencAte = query(req.query.dataVencAte);
+  const placaId = query(req.query.placaId);
 
   const where: Record<string, unknown> = {
     carne: { clienteId },
@@ -319,7 +322,7 @@ router.post(
   uploadCliente.single('foto'),
   async (req: ClienteRequest, res: Response): Promise<void> => {
     const clienteId = req.cliente!.clienteId;
-    const { dispositivoId } = req.params;
+    const dispositivoId = param(req, 'dispositivoId');
 
     if (!req.file) {
       res.status(400).json({ error: 'Arquivo não enviado.' });
@@ -358,7 +361,7 @@ router.post(
 // ── DELETE /api/cliente/dispositivos/:id/foto ─────────────────────────────────
 router.delete('/dispositivos/:dispositivoId/foto', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
-  const { dispositivoId } = req.params;
+  const dispositivoId = param(req, 'dispositivoId');
 
   const dispositivo = await prisma.dispositivo.findFirst({
     where: {
