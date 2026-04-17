@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
     carregarPosicoes();
     document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
     new MutationObserver(function () {
-      if (ativoId) mostrarCardDispositivo(ativoId);
+      if (ativoId) atualizarCardAtivo(ativoId);
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
   });
 });
@@ -76,7 +76,6 @@ function inicializarMapa() {
   ).addTo(map);
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
-  // ── Botão de localização do usuário (esquerda, abaixo do zoom) ───────────
   _adicionarBotaoLocalizacao(map);
 
   map.on('popupclose', function (e) {
@@ -85,8 +84,6 @@ function inicializarMapa() {
   map.on('click', function () { _fecharSpider(); });
   map.on('zoomend', function () { _fecharSpider(); if (!modoFoco) renderMarcadores(); });
 }
-
-// ── Botão de localização do usuário (esquerda, abaixo do zoom, ponto azul) ───
 
 function _adicionarBotaoLocalizacao(mapInst) {
   let _marcadorUser = null;
@@ -126,12 +123,13 @@ async function carregarPosicoes() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (raw) {
-      JSON.parse(raw).forEach(v => {
+      const lista = JSON.parse(raw);
+      lista.forEach(v => {
         veiculosMap[v.dispositivoId] = v;
         if (v.traccarId) traccarIdParaDispositivoId[v.traccarId] = v.dispositivoId;
       });
-      renderMarcadores(); renderSidebar(); renderBarraVeiculos(); ajustarBounds();
-      boundsAjustados = true;
+      renderMarcadores(); renderSidebar(); renderBarraVeiculos(); 
+      if (ajustarBounds()) boundsAjustados = true;
     }
   } catch {}
 
@@ -157,11 +155,14 @@ async function carregarPosicoes() {
 
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(lista)); } catch {}
     renderMarcadores(); renderSidebar(); renderBarraVeiculos();
-    if (!boundsAjustados) { ajustarBounds(); boundsAjustados = true; }
+    if (!boundsAjustados) {
+      if (ajustarBounds()) boundsAjustados = true;
+    }
   } catch (err) {
     if (err.message === 'acesso_bloqueado') { verificarAcesso(); return; }
     if (!Object.keys(veiculosMap).length) {
-      document.getElementById('sidebar-counters').innerHTML = '<span style="color:#e74c3c"><i class="fa fa-exclamation-triangle"></i> Erro ao carregar</span>';
+      const counters = document.getElementById('sidebar-counters');
+      if (counters) counters.innerHTML = '<span style="color:#e74c3c"><i class="fa fa-exclamation-triangle"></i> Erro ao carregar</span>';
     }
   }
 }
@@ -215,11 +216,13 @@ function processarMensagemWs(msg) {
 
 function setWsStatus(estado, texto) {
   const el = document.getElementById('ws-status');
-  el.className = estado;
-  el.innerHTML = `<i class="fa fa-circle"></i> ${texto}`;
+  if (el) {
+    el.className = estado;
+    el.innerHTML = `<i class="fa fa-circle"></i> ${texto}`;
+  }
 }
 
-// ── Cluster / Spider (idêntico ao rastreamento.js do admin) ───────────────────
+// ── Cluster / Spider ─────────────────────────────────────────────────────────
 
 function _agruparPorPixel() {
   const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao);
@@ -289,11 +292,11 @@ function renderMarcadores() {
       if (!marcadores[id]) {
         const m = L.marker([latitude, longitude], { icon: criarIcone(v) }).bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
         m.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
-        marcadores[id] = m; marcadoresIconeKey[id] = _iconeKey(v);
+        marcadores[id] = m; marcadoresIconeKey[id] = _iconeKey(id);
         if (visivel) m.addTo(map);
       } else {
         marcadores[id].setLatLng([latitude, longitude]);
-        const ik = _iconeKey(v);
+        const ik = _iconeKey(id);
         if (marcadoresIconeKey[id] !== ik) { marcadores[id].setIcon(criarIcone(v)); marcadoresIconeKey[id] = ik; }
         if (visivel && !map.hasLayer(marcadores[id])) marcadores[id].addTo(map);
         else if (!visivel && map.hasLayer(marcadores[id])) map.removeLayer(marcadores[id]);
@@ -316,12 +319,10 @@ function atualizarMarcador(did) {
   if (!marcadores[did]) { renderMarcadores(); return; }
   const { latitude, longitude } = v.posicao;
   marcadores[did].setLatLng([latitude, longitude]);
-  const ik = _iconeKey(v);
+  const ik = _iconeKey(did);
   if (marcadoresIconeKey[did] !== ik) { marcadores[did].setIcon(criarIcone(v)); marcadoresIconeKey[did] = ik; }
   if (marcadores[did].isPopupOpen()) marcadores[did].getPopup().setContent(criarPopupSimples(v));
 }
-
-function categoriaParaIcone(cat) { return AL_ICONS_3D.mapCategoria(cat); }
 
 function _corMarcador(v) {
   if (!v.posicao) return '#95a5a6';
@@ -329,7 +330,9 @@ function _corMarcador(v) {
   if (v.status === 'online') return v.posicao.motion ? '#2980b9' : '#27ae60';
   return '#e67e22';
 }
-function _iconeKey(v) { 
+
+function _iconeKey(did) {
+  const v = veiculosMap[did]; if (!v) return '';
   const course = v.posicao ? Math.round(v.posicao.curso / 5) * 5 : 0;
   return `${_corMarcador(v)}|${v.categoria}|${course}`; 
 }
@@ -351,19 +354,20 @@ function renderSidebar() {
   const todos = Object.values(veiculosMap);
   const online = todos.filter(v => v.status === 'online').length;
   const offline = todos.length - online;
-  document.getElementById('sidebar-counters').innerHTML =
-    `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp; <span class="dot-offline">●</span> ${offline} offline`;
+  const el = document.getElementById('sidebar-counters');
+  if (el) el.innerHTML = `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp; <span class="dot-offline">●</span> ${offline} offline`;
 }
 
 function renderBuscaResultados() {
   const filtro = (document.getElementById('filtro').value || '').toLowerCase().trim();
   const el = document.getElementById('lista-resultados-busca');
+  if (!el) return;
   if (!filtro) { el.style.display = 'none'; el.innerHTML = ''; return; }
 
   const filtrados = Object.values(veiculosMap).filter(v =>
     v.nome.toLowerCase().includes(filtro) ||
     (v.placa && v.placa.toLowerCase().includes(filtro)) ||
-    (v.cliente?.nome.toLowerCase().includes(filtro))
+    (v.cliente?.nome?.toLowerCase().includes(filtro))
   ).slice(0, 8);
 
   if (!filtrados.length) { el.innerHTML = '<div style="padding:12px;text-align:center;color:#aaa;font-size:12px">Nenhum resultado.</div>'; el.style.display = 'block'; return; }
@@ -396,6 +400,7 @@ const API_BASE = window.API_URL || 'http://localhost:3000';
 
 function renderBarraVeiculos() {
   const barra = document.getElementById('barra-veiculos');
+  if (!barra) return;
   const veiculos = Object.values(veiculosMap);
 
   if (!veiculos.length) { barra.innerHTML = ''; return; }
@@ -407,7 +412,6 @@ function renderBarraVeiculos() {
   _bindBarraScroll(barra);
   bindCardsBarra();
 
-  // Detecta overflow automaticamente após o layout ser calculado
   requestAnimationFrame(function () {
     if (barra.scrollHeight > barra.clientHeight) {
       barra.classList.add('expandida');
@@ -428,7 +432,6 @@ function _bindBarraScroll(barra) {
   };
 
   barra._onScroll = function () {
-    // Recolhe automaticamente ao voltar ao topo via scroll
     if (barra.classList.contains('expandida') && barra.scrollTop === 0) {
       barra.classList.remove('expandida');
     }
@@ -440,20 +443,18 @@ function _bindBarraScroll(barra) {
 
 function bindCardsBarra() {
   const barra = document.getElementById('barra-veiculos');
-
+  if (!barra) return;
   barra.querySelectorAll('.card-veiculo').forEach(function (el) {
     el.addEventListener('click', function (e) {
       if (e.target.closest('.btn-upload-foto')) return;
       focarCliente(this.dataset.did);
     });
   });
-
   barra.querySelectorAll('.btn-upload-foto').forEach(function (btn) {
     bindUploadFoto(btn.closest('.card-veiculo'));
   });
 }
 
-// Upload de foto: atualiza APENAS a img no fotoWrap — sem re-render do card ou da barra
 function bindUploadFoto(card) {
   if (!card) return;
   const did = card.dataset.did;
@@ -465,63 +466,43 @@ function bindUploadFoto(card) {
     e.stopPropagation();
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp';
-
     inp.onchange = function () {
       if (!this.files[0]) return;
       const file = this.files[0];
-
-      // Encontra o card atual no DOM (pode ter mudado por WS update)
       const cardAtual = document.querySelector(`.card-veiculo[data-did="${did}"]`);
       if (!cardAtual) return;
       const fotoWrap = cardAtual.querySelector('.btn-foto-wrap');
-
-      // Spinner de loading sobreposto ao fotoWrap
-      let spinner = null;
       if (fotoWrap) {
-        spinner = document.createElement('div');
+        let spinner = document.createElement('div');
         spinner.className = 'cv-spinner';
-        spinner.style.cssText =
-          'position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.45);' +
-          'display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;pointer-events:none;z-index:5;';
+        spinner.style.cssText = 'position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;pointer-events:none;z-index:5;';
         spinner.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
         fotoWrap.style.position = 'relative';
         fotoWrap.appendChild(spinner);
       }
-
       AL_CLIENTE.uploadFoto(`/api/cliente/dispositivos/${did}/foto`, file)
         .then(function (data) {
           veiculosMap[did].imagemUrlCliente = data.imagemUrlCliente;
-          
-          // Atualiza cache local para persistir ao navegar
-          try {
-            const lista = Object.values(veiculosMap);
-            localStorage.setItem(CACHE_KEY, JSON.stringify(lista));
-          } catch (e) {}
-
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify(Object.values(veiculosMap))); } catch (e) {}
           const newSrc = `${API_BASE}${data.imagemUrlCliente}`;
-          // Pré-carrega a imagem antes de trocar no DOM (evita flicker de branco)
           const preload = new Image();
           preload.onload = preload.onerror = function () {
             const cc = document.querySelector(`.card-veiculo[data-did="${did}"]`);
             if (!cc) return;
             const fw = cc.querySelector('.btn-foto-wrap');
             if (fw) {
-              const sp = fw.querySelector('.cv-spinner');
-              if (sp) sp.remove();
+              const sp = fw.querySelector('.cv-spinner'); if (sp) sp.remove();
               let img = fw.querySelector('img.cv-foto');
-              if (img) {
-                img.src = newSrc;
-              } else {
+              if (img) img.src = newSrc;
+              else {
                 const icone = fw.querySelector('.cv-icone');
                 img = document.createElement('img');
                 img.className = 'cv-foto';
                 img.style.cssText = 'width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;';
-                if (icone) fw.replaceChild(img, icone);
-                else fw.prepend(img);
+                if (icone) fw.replaceChild(img, icone); else fw.prepend(img);
                 img.src = newSrc;
               }
             }
-            // Atualiza também o card lateral se estiver ativo
             atualizarCardAtivo(did);
             AL_CLIENTE.showAlert('Foto atualizada!', 'success');
           };
@@ -539,11 +520,16 @@ function bindUploadFoto(card) {
 
 function cardVeiculoHtml(v) {
   const cor = _corMarcador(v);
-  const fa = categoriaParaIcone(v.categoria);
   const fotoSrc = v.imagemUrlCliente ? `${API_BASE}${v.imagemUrlCliente}` : null;
-  const fotoEl = fotoSrc
-    ? `<img src="${fotoSrc}" class="cv-foto" onerror="this.style.display='none'" />`
-    : `<div class="cv-icone" style="background:${cor};"><i class="fa ${fa}"></i></div>`;
+  
+  let iconeHtml;
+  if (fotoSrc) {
+    iconeHtml = `<img src="${fotoSrc}" class="cv-foto" onerror="this.style.display='none'" />`;
+  } else {
+    let svg = AL_ICONS_3D.getSvgHtml(v.categoria, cor, 0);
+    svg = svg.replace('width="42"', 'width="28"').replace('height="42"', 'height="28"');
+    iconeHtml = `<div class="cv-icone" style="background:#f0f2f5;display:flex;align-items:center;justify-content:center;">${svg}</div>`;
+  }
 
   const isOnline = v.status === 'online';
   const isMoving = isOnline && v.posicao?.motion;
@@ -553,7 +539,7 @@ function cardVeiculoHtml(v) {
 
   return `<div class="card-veiculo${v.dispositivoId === ativoId ? ' ativo' : ''}" data-did="${v.dispositivoId}">
     <div class="btn-foto-wrap">
-      ${fotoEl}
+      ${iconeHtml}
       <button class="btn-upload-foto" title="Alterar foto"><i class="fa fa-camera"></i></button>
     </div>
     ${v.placa ? `<span class="cv-placa">${v.placa}</span>` : ''}
@@ -562,29 +548,25 @@ function cardVeiculoHtml(v) {
   </div>`;
 }
 
-// Atualização cirúrgica: nunca substitui o card, só atualiza os campos que mudam
 function atualizarCardBarra(did) {
   const card = document.querySelector(`.card-veiculo[data-did="${did}"]`);
   if (!card) return;
   const v = veiculosMap[did];
-
-  // Status text + cor do dot
   const statusEl = card.querySelector('.cv-status');
   if (statusEl) {
-    const isOnline = v.status === 'online';
-    const isMoving = isOnline && v.posicao?.motion;
+    const isOnline = v.status === 'online', isMoving = isOnline && v.posicao?.motion;
     const txt = isMoving ? `${v.posicao?.velocidade ?? 0} km/h` : isOnline ? 'Parado' : 'Offline';
     statusEl.className = `cv-status ${isMoving ? 'dot-moving' : isOnline ? 'dot-online' : 'dot-offline'}`;
     statusEl.textContent = `● ${txt}`;
   }
-
-  // Cor do ícone (só quando não tem foto personalizada)
   if (!v.imagemUrlCliente) {
     const icone = card.querySelector('.cv-icone');
-    if (icone) icone.style.background = _corMarcador(v);
+    if (icone) {
+      let svg = AL_ICONS_3D.getSvgHtml(v.categoria, _corMarcador(v), 0);
+      svg = svg.replace('width="42"', 'width="28"').replace('height="42"', 'height="28"');
+      icone.innerHTML = svg;
+    }
   }
-
-  // Classe ativo
   card.classList.toggle('ativo', did === ativoId);
 }
 
@@ -634,13 +616,11 @@ function mostrarCardDispositivo(id) {
   const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
   const hasCached = cacheKey != null && cacheKey in _geocodeCache;
   const addrTxt = hasCached ? (_geocodeCache[cacheKey] || `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})`) : (p ? 'Buscando...' : '—');
-  const coords = p ? `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})` : '';
 
   const imgHtml = v.imagemUrlCliente
     ? `<img src="${API_BASE}${v.imagemUrlCliente}" style="width:100%;height:140px;object-fit:cover;display:block;border-radius:12px 12px 0 0" onerror="this.style.display='none'" />`
     : '';
 
-  // Horários detalhados
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
   const horasHtml = p ? `
     <div class="dcard-section dcard-val" style="font-size:10px">
@@ -672,31 +652,21 @@ function mostrarCardDispositivo(id) {
         <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
         <span id="${addrId}">${addrTxt}</span>
       </div>` : ''}
-      
       <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:12px;border-top:1px solid rgba(128,128,128,0.1)">
         <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
       </div>
-
       <div style="margin-top:12px;display:flex;gap:6px">
-        <button onclick="abrirOverlay('${id}', 'relatorio')" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1">
-          <i class="fa fa-bar-chart"></i> Relatório
-        </button>
-        <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1">
-          <i class="fa fa-history"></i> Histórico
-        </button>
+        <button onclick="abrirOverlay('${id}', 'relatorio')" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-bar-chart"></i> Relatório</button>
+        <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-history"></i> Histórico</button>
       </div>
     </div>
   `;
   card.style.display = 'block';
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
 
-  // Carrega comandos do dispositivo (limitado a Bloquear/Desbloquear)
   AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`).then(tipos => {
     const permitidos = ['engineStop', 'engineResume'];
-    const suportados = Array.isArray(tipos) 
-      ? tipos.map(t => (typeof t === 'string' ? t : t.type)).filter(t => permitidos.includes(t))
-      : [];
-
+    const suportados = Array.isArray(tipos) ? tipos.map(t => (typeof t === 'string' ? t : t.type)).filter(t => permitidos.includes(t)) : [];
     if (suportados.length > 0) {
       const grid = document.getElementById(`dcard-comandos-grid-${id}`);
       if (!grid) return;
@@ -704,9 +674,7 @@ function mostrarCardDispositivo(id) {
       grid.innerHTML = suportados.map(t => {
         const cfg = _CMD_CONFIG[t];
         const btnClass = t === 'engineStop' ? 'btn-danger' : 'btn-success';
-        return `<button class="btn btn-xs ${btnClass} cmd-btn" data-tipo="${t}" onclick="enviarComandoDaSidebar('${id}', '${t}')" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;">
-          <i class="fa ${cfg.icon}"></i> ${cfg.label}
-        </button>`;
+        return `<button class="btn btn-xs ${btnClass} cmd-btn" data-tipo="${t}" onclick="enviarComandoDaSidebar('${id}', '${t}')" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;"><i class="fa ${cfg.icon}"></i> ${cfg.label}</button>`;
       }).join('');
     }
   }).catch(() => {});
@@ -715,25 +683,14 @@ function mostrarCardDispositivo(id) {
 window.enviarComandoDaSidebar = async function(did, tipo) {
   const cfg = _CMD_CONFIG[tipo] || { label: tipo, icon: 'fa-terminal', style: 'neutral' };
   if (cfg.confirm && !confirm(cfg.confirm)) return;
-
   const btn = document.querySelector(`.cmd-btn[data-tipo="${tipo}"]`);
   const originalHtml = btn ? btn.innerHTML : '';
-  if (btn) { 
-    btn.disabled = true; 
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Aguarde...'; 
-  }
-
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Aguarde...'; }
   try {
-    await AL_CLIENTE.apiPost(`/api/cliente/dispositivos/${did}/comandos`, {
-      tipo,
-      atributos: cfg.atributos || {}
-    });
+    await AL_CLIENTE.apiPost(`/api/cliente/dispositivos/${did}/comandos`, { tipo, atributos: cfg.atributos || {} });
     AL_CLIENTE.showAlert('Comando enviado!', 'success');
-  } catch (err) {
-    AL_CLIENTE.showAlert('Erro: ' + err.message, 'danger');
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
-  }
+  } catch (err) { AL_CLIENTE.showAlert('Erro: ' + err.message, 'danger'); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; } }
 };
 
 window.fecharCardDispositivo = function (skipClosePopup) {
@@ -747,50 +704,38 @@ window.fecharCardDispositivo = function (skipClosePopup) {
 function atualizarCardAtivo(did) {
   if (did !== ativoId) return;
   const card = document.getElementById('device-detail-card');
-  if (card.style.display === 'none') return;
-  
+  if (card && card.style.display === 'none') return;
   const v = veiculosMap[did]; if (!v) return;
   const p = v.posicao;
 
-  // Atualização cirúrgica para evitar o "piscar"
   const elStatus = document.getElementById('dcard-status-text');
   if (elStatus) {
     const isOnline = v.status === 'online', isMoving = isOnline && p?.motion;
     const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
     const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
     const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
-    const tempoSufixo = refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : '';
     elStatus.style.color = corStatus;
-    elStatus.innerHTML = `<i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}`;
+    elStatus.innerHTML = `<i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : ''}`;
   }
-
   const elVel = document.getElementById('dcard-velocimetro');
   if (elVel) elVel.innerHTML = p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : '';
-
   const elIgn = document.getElementById('dcard-ignicao');
   if (elIgn) elIgn.innerHTML = p?.ignition === true ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>` : p?.ignition === false ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>` : '';
-
   const elBat = document.getElementById('dcard-bateria');
   if (elBat) {
     const bat = p?.bateria != null ? p.bateria : null;
-    const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
     const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
+    const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
     elBat.style.color = batCor;
     elBat.innerHTML = bat != null ? `<i class="fa ${batFa}"></i> Bateria: ${bat}%` : '';
   }
-
-  // Timestamps
   const tsSrv = document.getElementById('dcard-ts-srv'), tsDev = document.getElementById('dcard-ts-dev'), tsGps = document.getElementById('dcard-ts-gps');
   if (tsSrv && p) tsSrv.textContent = fmtGPSTimeSec(p.serverTime);
   if (tsDev && p) tsDev.textContent = fmtGPSTimeSec(p.deviceTime);
   if (tsGps && p) tsGps.textContent = fmtGPSTimeSec(p.fixTime);
 
-  if (modoFoco && v?.posicao) {
-    map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
-  }
+  if (modoFoco && v?.posicao) map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
 }
-
-// ── Velocímetro SVG ───────────────────────────────────────────────────────────
 
 function svgVelocimetro(vel, limite) {
   if (vel == null) return '';
@@ -799,25 +744,16 @@ function svgVelocimetro(vel, limite) {
   const f = Math.min(vel / max, 1);
   const ang = Math.PI * (1 - f);
   const ex = (40 + 30 * Math.cos(ang)).toFixed(1), ey = (45 - 30 * Math.sin(ang)).toFixed(1);
-  const la = f > 0.5 ? 1 : 0;
   const cor = limite && vel > limite ? '#e74c3c' : vel > 80 ? '#f39c12' : '#27ae60';
-  const tr = isDark ? '#2d3748' : '#e9ecef';
-  const nc = isDark ? '#f0f2f5' : '#333';
-  const lc = isDark ? '#adb5bd' : '#555';
-  const arc = f > 0.01 ? `<path d="M 10 45 A 30 30 0 ${la} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>` : '';
-  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:4px auto 8px">
-    <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="${tr}" stroke-width="7" stroke-linecap="round"/>
-    ${arc}
-    <text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="${nc}">${vel}</text>
-    <text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="${lc}">km/h</text>
-  </svg>`;
+  const tr = isDark ? '#2d3748' : '#e9ecef', nc = isDark ? '#f0f2f5' : '#333', lc = isDark ? '#adb5bd' : '#555';
+  const arc = f > 0.01 ? `<path d="M 10 45 A 30 30 0 ${f>0.5?1:0} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>` : '';
+  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:4px auto 8px"><path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="${tr}" stroke-width="7" stroke-linecap="round"/>${arc}<text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="${nc}">${vel}</text><text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="${lc}">km/h</text></svg>`;
 }
 
 function fmtGPSTimeSec(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR') + ' ' +
-    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function fmtTempoDecorrido(iso) {
@@ -826,11 +762,8 @@ function fmtTempoDecorrido(iso) {
   if (mins < 1) return 'agora';
   if (mins < 60) return `${mins} min`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)} dia(s)`;
+  return hrs < 24 ? `${hrs}h` : `${Math.floor(hrs / 24)} dia(s)`;
 }
-
-// ── Geocodificação reversa ────────────────────────────────────────────────────
 
 window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const el = document.getElementById(elementId); if (!el) return;
@@ -853,8 +786,6 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   } catch { el.textContent = coords; }
 };
 
-// ── Modo foco ─────────────────────────────────────────────────────────────────
-
 function ativarFoco(id) {
   modoFoco = true; _fecharSpider();
   Object.values(_clusterBadges).forEach(b => { if (map.hasLayer(b)) map.removeLayer(b); });
@@ -866,20 +797,16 @@ function desativarFoco() { modoFoco = false; _fecharSpider(); renderMarcadores()
 
 function moverCardParaInicio(did) {
   const barra = document.getElementById('barra-veiculos');
-  if (!barra) return;
-  // Só move se estiver em modo expandido (> 1 linha) E o card estiver na 2ª linha ou além
-  if (!barra.classList.contains('expandida')) return;
-  const card = barra.querySelector(`.card-veiculo[data-did="${did}"]`);
-  const primeiro = barra.firstElementChild;
+  if (!barra || !barra.classList.contains('expandida')) return;
+  const card = barra.querySelector(`.card-veiculo[data-did="${did}"]`), primeiro = barra.firstElementChild;
   if (!card || !primeiro || card === primeiro) return;
-  if (card.offsetTop <= primeiro.offsetTop) return; // card já está na 1ª linha
+  if (card.offsetTop <= primeiro.offsetTop) return;
   barra.insertBefore(card, primeiro);
   barra.scrollTop = 0;
 }
 
 window.focar = function (did) {
-  mostrarCardDispositivo(did);
-  moverCardParaInicio(did);
+  mostrarCardDispositivo(did); moverCardParaInicio(did);
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.toggle('ativo', el.dataset.did === did));
   const v = veiculosMap[did]; if (!v?.posicao) return;
   ativarFoco(did);
@@ -889,47 +816,36 @@ window.focar = function (did) {
 
 window.focarCliente = function (did) {
   const barra = document.getElementById('barra-veiculos');
-  // Mede e move ANTES de colapsar (offsetTop só é preciso com expandida ativo)
   moverCardParaInicio(did);
-  barra.classList.remove('expandida');
-  barra.scrollTop = 0;
+  if (barra) { barra.classList.remove('expandida'); barra.scrollTop = 0; }
   focar(did);
 };
 
 function ajustarBounds() {
+  if (map) map.invalidateSize();
   const comPos = Object.values(veiculosMap).filter(v => v.posicao);
-  if (!comPos.length) return;
-  if (comPos.length === 1) { map.setView([comPos[0].posicao.latitude, comPos[0].posicao.longitude], 13); return; }
+  if (!comPos.length) return false;
+  if (comPos.length === 1) { 
+    map.setView([comPos[0].posicao.latitude, comPos[0].posicao.longitude], 13); 
+    return true; 
+  }
   const group = new L.FeatureGroup(comPos.map(v => L.marker([v.posicao.latitude, v.posicao.longitude])));
   map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 14 });
+  return true;
 }
-
-// ── Overlay histórico/relatório ───────────────────────────────────────────────
 
 window.abrirOverlay = function (did, tipo) {
   const v = veiculosMap[did]; if (!v) return;
   document.getElementById('overlay-titulo').textContent = `${v.nome}${v.placa ? ` — ${v.placa}` : ''}`;
-
   const base = window.location.href.replace(/\/cliente\/rastreamento\.html.*/, '');
   const token = AL_CLIENTE.getToken();
-  let iframeSrc;
-  if (tipo === 'relatorio') {
-    iframeSrc = `${base}/cliente/relatorio-iframe.html?id=${did}&token=${encodeURIComponent(token)}`;
-  } else {
-    const params = new URLSearchParams({ id: did, token, modo: 'historico' });
-    iframeSrc = `${base}/cliente/detalhe-iframe.html?${params}`;
-  }
+  let iframeSrc = tipo === 'relatorio' ? `${base}/cliente/relatorio-iframe.html?id=${did}&token=${encodeURIComponent(token)}` : `${base}/cliente/detalhe-iframe.html?id=${did}&token=${token}&modo=historico`;
   document.getElementById('overlay-iframe').src = iframeSrc;
-
-  const overlay = document.getElementById('overlay-historico');
-  overlay.classList.add('ativo');
+  document.getElementById('overlay-historico').classList.add('ativo');
   history.pushState({ overlay: true }, '');
 };
 
-// ── Verificação de sessão (força logout se admin inativar o cliente) ──────────
-setInterval(function () {
-  AL_CLIENTE.apiGet('/api/cliente/rastreamento/status-acesso').catch(function () {});
-}, 60000);
+setInterval(() => { AL_CLIENTE.apiGet('/api/cliente/rastreamento/status-acesso').catch(() => {}); }, 60000);
 
 window.fecharOverlay = function () {
   document.getElementById('overlay-historico').classList.remove('ativo');
@@ -937,8 +853,7 @@ window.fecharOverlay = function () {
   if (history.state?.overlay) history.back();
 };
 
-// Botão voltar do browser fecha o overlay
-window.addEventListener('popstate', function (e) {
+window.addEventListener('popstate', (e) => {
   const overlay = document.getElementById('overlay-historico');
-  if (overlay.classList.contains('ativo')) overlay.classList.remove('ativo');
+  if (overlay && overlay.classList.contains('ativo')) overlay.classList.remove('ativo');
 });

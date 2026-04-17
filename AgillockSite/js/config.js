@@ -44,6 +44,7 @@ window.AL_ICONS_3D = {
   },
 
   mapCategoria: function(c) {
+    if (!c) return 'carro';
     c = c.toLowerCase();
     if (/caminhao_bau|reboque_caixa/i.test(c)) return 'caminhao_bau';
     if (/tanque|pipa|vacuo/i.test(c)) return 'caminhao_tanque';

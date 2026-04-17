@@ -11,6 +11,9 @@ import {
   traccarGetPositions,
   traccarGetPositionHistory,
   traccarGetTrips,
+  traccarGetStops,
+  traccarGetEvents,
+  traccarGetSummary,
   traccarGetCommandTypes,
   traccarSendCommand,
 } from '../services/traccar.service';
@@ -271,6 +274,151 @@ router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest,
     velocidadeMaxima: Math.round(v.maxSpeed * 1.852),
     duracao: Math.round(v.duration / 60000),
   })));
+});
+
+// ── GET /api/cliente/rastreamento/dispositivos/:id/paradas ───────────────────
+router.get('/rastreamento/dispositivos/:id/paradas', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+
+  if (await verificarBloqueio(clienteId)) {
+    res.status(403).json({ error: 'acesso_bloqueado' });
+    return;
+  }
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: {
+      id: dispositivoId,
+      ativo: true,
+      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+    },
+    select: { id: true, identificador: true },
+  });
+  if (!dispositivo) {
+    res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
+    return;
+  }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) {
+    res.status(404).json({ error: 'Dispositivo não sincronizado.' });
+    return;
+  }
+
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to) : new Date();
+  const paradas = await traccarGetStops(traccarDevice.id, fromDate, toDate);
+
+  res.json(paradas.map(p => ({
+    inicio: p.startTime,
+    fim: p.endTime,
+    duracao: Math.round(p.duration / 60000),
+    latitude: p.lat,
+    longitude: p.lon,
+    endereco: p.address,
+  })));
+});
+
+// ── GET /api/cliente/rastreamento/dispositivos/:id/eventos ───────────────────
+router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+
+  if (await verificarBloqueio(clienteId)) {
+    res.status(403).json({ error: 'acesso_bloqueado' });
+    return;
+  }
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: {
+      id: dispositivoId,
+      ativo: true,
+      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+    },
+    select: { id: true, identificador: true },
+  });
+  if (!dispositivo) {
+    res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
+    return;
+  }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) {
+    res.status(404).json({ error: 'Dispositivo não sincronizado.' });
+    return;
+  }
+
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to) : new Date();
+  const eventos = await traccarGetEvents(traccarDevice.id, fromDate, toDate);
+
+  res.json(eventos.map(e => ({
+    id: e.id,
+    tipo: e.type,
+    hora: e.eventTime,
+    posicaoId: e.positionId,
+    atributos: e.attributes,
+  })));
+});
+
+// ── GET /api/cliente/rastreamento/dispositivos/:id/resumo ────────────────────
+router.get('/rastreamento/dispositivos/:id/resumo', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+
+  if (await verificarBloqueio(clienteId)) {
+    res.status(403).json({ error: 'acesso_bloqueado' });
+    return;
+  }
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: {
+      id: dispositivoId,
+      ativo: true,
+      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+    },
+    select: { id: true, identificador: true },
+  });
+  if (!dispositivo) {
+    res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
+    return;
+  }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) {
+    res.status(404).json({ error: 'Dispositivo não sincronizado.' });
+    return;
+  }
+
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to) : new Date();
+  const resumos = await traccarGetSummary(traccarDevice.id, fromDate, toDate);
+
+  if (!resumos.length) {
+    res.json({
+      distancia: 0,
+      velocidadeMedia: 0,
+      velocidadeMaxima: 0,
+      consumoCombustivel: 0,
+      horasMotor: 0,
+    });
+    return;
+  }
+
+  const r = resumos[0];
+  res.json({
+    distancia: Math.round(r.distance / 100) / 10,
+    velocidadeMedia: Math.round(r.averageSpeed * 1.852),
+    velocidadeMaxima: Math.round(r.maxSpeed * 1.852),
+    consumoCombustivel: r.spentFuel,
+    horasMotor: Math.round(r.engineHours / 360000) / 10, // ms para horas com 1 decimal
+  });
 });
 
 // ── GET /api/cliente/boletos ──────────────────────────────────────────────────
