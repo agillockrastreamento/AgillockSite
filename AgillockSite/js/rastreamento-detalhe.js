@@ -231,7 +231,7 @@ function renderInfoVeiculo(veiculo, dispositivo) {
 
   const corStatus = veiculo.status === 'online' ? '#27ae60' : '#bdc3c7';
   const txtStatus = veiculo.status === 'online'
-    ? (veiculo.posicao?.motion ? `Em movimento · ${veiculo.posicao.velocidade} km/h` : 'Parado')
+    ? (veiculo.posicao?.emMovimento ? `Em movimento · ${veiculo.posicao.velocidade} km/h` : 'Parado')
     : 'Offline';
 
   el.innerHTML = `
@@ -282,7 +282,7 @@ function renderMapa(posicoes, posicaoAtual) {
   if (posicaoAtual?.latitude) {
     const veiculo = window._veiculoDetalhe || {};
     const fa = categoriaParaIconeDetalhe(veiculo.categoria);
-    const cor = posicaoAtual.motion ? '#2980b9' : '#27ae60';
+    const cor = posicaoAtual.emMovimento ? '#2980b9' : '#27ae60';
     const html = `<div style="
       width:34px;height:34px;background:${cor};border-radius:50%;
       border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);

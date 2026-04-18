@@ -198,7 +198,10 @@ function processarMensagemWs(msg) {
         latitude: pos.latitude, longitude: pos.longitude, velocidade: pos.velocidade,
         curso: pos.curso, altitude: pos.altitude, fixTime: pos.fixTime,
         deviceTime: pos.deviceTime, serverTime: pos.serverTime, valida: pos.valida,
-        ignition: pos.ignition, motion: pos.motion, sat: pos.sat, bateria: pos.bateria, endereco: pos.endereco,
+        ignicao: pos.ignicao, emMovimento: pos.emMovimento, satelites: pos.satelites,
+        bateria_nivel: pos.bateria_nivel, alarme: pos.alarme, alarme_codigo: pos.alarme_codigo,
+        tensao: pos.tensao, sinal: pos.sinal, odometro: pos.odometro,
+        horas_motor: pos.horas_motor, bloqueado: pos.bloqueado, endereco: pos.endereco,
       };
       atualizarMarcador(did); atualizarCardAtivo(did); atualizarCardBarra(did);
     });
@@ -327,7 +330,7 @@ function atualizarMarcador(did) {
 function _corMarcador(v) {
   if (!v.posicao) return '#95a5a6';
   if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c';
-  if (v.status === 'online') return v.posicao.motion ? '#2980b9' : '#27ae60';
+  if (v.status === 'online') return v.posicao.emMovimento ? '#2980b9' : '#27ae60';
   return '#e67e22';
 }
 
@@ -376,7 +379,7 @@ function renderBuscaResultados() {
   el.innerHTML = filtrados.map(v => {
     const p = v.posicao;
     let dot = 'dot-offline', txt = 'Offline';
-    if (v.status === 'online' && p?.motion) { dot = 'dot-moving'; txt = `Em movimento · ${p.velocidade} km/h`; }
+    if (v.status === 'online' && p?.emMovimento) { dot = 'dot-moving'; txt = `Em movimento · ${p.velocidade} km/h`; }
     else if (v.status === 'online') { dot = 'dot-online'; txt = 'Parado'; }
     return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" onclick="selecionarDaBusca('${v.dispositivoId}')">
       <div class="v-nome">${v.nome}${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}</div>
@@ -392,7 +395,7 @@ window.selecionarDaBusca = function (id) {
   focar(id);
 };
 
-function pesoStatus(v) { if (v.status !== 'online') return 2; if (v.posicao?.motion) return 0; return 1; }
+function pesoStatus(v) { if (v.status !== 'online') return 2; if (v.posicao?.emMovimento) return 0; return 1; }
 
 // ── Barra de veículos ─────────────────────────────────────────────────────────
 
@@ -532,7 +535,7 @@ function cardVeiculoHtml(v) {
   }
 
   const isOnline = v.status === 'online';
-  const isMoving = isOnline && v.posicao?.motion;
+  const isMoving = isOnline && v.posicao?.emMovimento;
   const statusTxt = isMoving ? `${v.posicao?.velocidade ?? 0} km/h` : isOnline ? 'Parado' : 'Offline';
   const dotCls = isMoving ? 'dot-moving' : isOnline ? 'dot-online' : 'dot-offline';
   const marcaModelo = [v.marca, v.modeloVeiculo].filter(Boolean).join(' ');
@@ -554,7 +557,7 @@ function atualizarCardBarra(did) {
   const v = veiculosMap[did];
   const statusEl = card.querySelector('.cv-status');
   if (statusEl) {
-    const isOnline = v.status === 'online', isMoving = isOnline && v.posicao?.motion;
+    const isOnline = v.status === 'online', isMoving = isOnline && v.posicao?.emMovimento;
     const txt = isMoving ? `${v.posicao?.velocidade ?? 0} km/h` : isOnline ? 'Parado' : 'Offline';
     statusEl.className = `cv-status ${isMoving ? 'dot-moving' : isOnline ? 'dot-online' : 'dot-offline'}`;
     statusEl.textContent = `● ${txt}`;
@@ -603,15 +606,15 @@ function mostrarCardDispositivo(id) {
   const v = veiculosMap[id]; if (!v) return;
   ativoId = id;
   const p = v.posicao;
-  const isOnline = v.status === 'online', isMoving = isOnline && p?.motion;
+  const isOnline = v.status === 'online', isMoving = isOnline && p?.emMovimento;
   const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
   const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
   const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
   const tempoSufixo = refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : '';
-  const bat = p?.bateria != null ? p.bateria : null;
+  const bat = p?.bateria_nivel != null ? p.bateria_nivel : null;
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
   const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
-  const ignHtml = p?.ignition === true ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>` : p?.ignition === false ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>` : '';
+  const ignHtml = p?.ignicao === true ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>` : p?.ignicao === false ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>` : '';
   const addrId = `dcard-addr-${id}`;
   const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
   const hasCached = cacheKey != null && cacheKey in _geocodeCache;
@@ -710,7 +713,7 @@ function atualizarCardAtivo(did) {
 
   const elStatus = document.getElementById('dcard-status-text');
   if (elStatus) {
-    const isOnline = v.status === 'online', isMoving = isOnline && p?.motion;
+    const isOnline = v.status === 'online', isMoving = isOnline && p?.emMovimento;
     const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
     const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
     const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
@@ -720,10 +723,10 @@ function atualizarCardAtivo(did) {
   const elVel = document.getElementById('dcard-velocimetro');
   if (elVel) elVel.innerHTML = p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : '';
   const elIgn = document.getElementById('dcard-ignicao');
-  if (elIgn) elIgn.innerHTML = p?.ignition === true ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>` : p?.ignition === false ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>` : '';
+  if (elIgn) elIgn.innerHTML = p?.ignicao === true ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>` : p?.ignicao === false ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>` : '';
   const elBat = document.getElementById('dcard-bateria');
   if (elBat) {
-    const bat = p?.bateria != null ? p.bateria : null;
+    const bat = p?.bateria_nivel != null ? p.bateria_nivel : null;
     const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
     const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
     elBat.style.color = batCor;

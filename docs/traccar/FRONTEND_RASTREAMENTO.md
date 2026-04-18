@@ -141,7 +141,7 @@ Foco é desativado ao fechar o card (botão ×) ou fechar o popup pelo X do Leaf
 **Card do dispositivo** (`#device-detail-card`):
 - Foto do veículo (se `imagemUrl` preenchido)
 - Velocímetro SVG animado (verde ≤80, laranja ≤limite, vermelho > limite)
-- Ignição com `fa-key`, bateria com `fa-battery-*` adaptado ao nível
+- Ignição (`p.ignicao`) com `fa-key`, bateria (`p.bateria_nivel`) com `fa-battery-*` adaptado ao nível
 - 3 timestamps com segundos: Servidor / Dispositivo / GPS
 - Geocodificação reversa via Nominatim com cache em memória (`_geocodeCache`)
 - Botões: "Relatório" → `relatorio.html?id=` e "Histórico" → `rastreamento-detalhe.html?id=`
@@ -156,6 +156,55 @@ function svgVelocimetro(velocidade, limite) {
 ```
 
 Tema escuro é suportado: o velocímetro e o card detectam `document.documentElement.classList.contains('dark-theme')` e ajustam cores. O `MutationObserver` re-renderiza o card quando o tema muda.
+
+### Campos de posição — contrato entre backend e frontend
+
+Todos os campos abaixo estão disponíveis tanto no snapshot REST (`/posicoes`) quanto nas mensagens WebSocket (`positions[]`). Gerados pela função `normalizeAttributes()` em `traccar.service.ts` — funcionam para qualquer protocolo suportado pelo Traccar.
+
+| Campo | Tipo | Descrição | Fonte no dispositivo |
+|---|---|---|---|
+| `latitude` | number | Latitude WGS-84 | GPS |
+| `longitude` | number | Longitude WGS-84 | GPS |
+| `velocidade` | number | Velocidade em km/h (convertido de knots) | GPS |
+| `curso` | number | Direção em graus (0–360) | GPS |
+| `altitude` | number | Altitude em metros | GPS |
+| `fixTime` | string | Timestamp do fix GPS | GPS |
+| `deviceTime` | string | Timestamp do dispositivo | Dispositivo |
+| `serverTime` | string | Timestamp de chegada ao servidor | Traccar |
+| `valida` | boolean | Posição GPS válida | GPS |
+| `endereco` | string\|null | Endereço geocodificado | Traccar |
+| `ignicao` | boolean\|null | Ignição ligada/desligada | `attributes.ignition` |
+| `emMovimento` | boolean\|null | Veículo em movimento | `attributes.motion` |
+| `alarme_codigo` | string\|null | Código bruto do alarme (ex: `sos`, `powerCut`) | `attributes.alarm` |
+| `alarme` | string\|null | Alarme em português (ex: `"SOS / Pânico"`) | `ALARM_LABELS[alarm]` |
+| `sinal` | number\|null | Intensidade do sinal GSM/4G (RSSI) | `attributes.rssi` |
+| `satelites` | number\|null | Número de satélites GPS | `attributes.sat` |
+| `tensao` | number\|null | Tensão do veículo/fonte externa (V) | `attributes.power` |
+| `bateria_nivel` | number\|null | Nível da bateria interna (0–100 %) | `attributes.batteryLevel` |
+| `bateria_tensao` | number\|null | Tensão da bateria interna (V) | `attributes.battery` |
+| `carregando` | boolean\|null | Dispositivo carregando | `attributes.charge` |
+| `odometro` | number\|null | Odômetro total (metros) | `attributes.totalDistance` |
+| `distancia_segmento` | number\|null | Distância percorrida neste ponto (metros) | `attributes.distance` |
+| `horas_motor` | number\|null | Horas de motor (h, com 1 decimal) | `attributes.hours` (ms → h) |
+| `combustivel` | number\|null | Nível de combustível | `attributes.fuel` |
+| `bloqueado` | boolean\|null | Veículo bloqueado/imobilizado | `attributes.blocked` |
+| `entrada_digital` | number\|null | Bitmask de entradas digitais | `attributes.input` |
+| `saida_digital` | number\|null | Bitmask de saídas digitais | `attributes.output` |
+| `motorista_id` | string\|null | ID único do motorista | `attributes.driverUniqueId` |
+
+> Campos `null` significam que o dispositivo não enviou aquele dado — comportamento normal para protocolos que não suportam o atributo.
+
+### Eventos WebSocket — campo `tipoLabel`
+
+As mensagens de evento (`events[]`) agora incluem `tipoLabel` com a descrição em português:
+```javascript
+// Antes: só tinha e.type = "ignitionOn"
+// Agora também tem:
+e.tipoLabel // → "Ignição ligada"
+```
+O frontend pode usar `e.tipoLabel` diretamente no lugar de manter sua própria tabela de tradução.
+
+---
 
 ### WebSocket — reconexão automática
 

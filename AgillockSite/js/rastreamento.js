@@ -221,10 +221,17 @@ function processarMensagemWs(msg) {
         deviceTime: pos.deviceTime,
         serverTime: pos.serverTime,
         valida: pos.valida,
-        ignition: pos.ignition,
-        motion: pos.motion,
-        sat: pos.sat,
-        bateria: pos.bateria,
+        ignicao: pos.ignicao,
+        emMovimento: pos.emMovimento,
+        satelites: pos.satelites,
+        bateria_nivel: pos.bateria_nivel,
+        alarme: pos.alarme,
+        alarme_codigo: pos.alarme_codigo,
+        tensao: pos.tensao,
+        sinal: pos.sinal,
+        odometro: pos.odometro,
+        horas_motor: pos.horas_motor,
+        bloqueado: pos.bloqueado,
         endereco: pos.endereco,
       };
 
@@ -446,7 +453,7 @@ function atualizarMarcador(dispositivoId) {
 function _corMarcador(v) {
   if (!v.posicao) return '#95a5a6';
   if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c';
-  if (v.status === 'online') return v.posicao.motion ? '#2980b9' : '#27ae60';
+  if (v.status === 'online') return v.posicao.emMovimento ? '#2980b9' : '#27ae60';
   return '#e67e22'; // offline com última posição conhecida
 }
 
@@ -571,7 +578,7 @@ function renderBuscaResultados() {
     const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
     const tempoStr = refTime ? ` · há ${fmtTempoDecorrido(refTime)}` : '';
     let dotClass = p ? 'dot-lastpos' : 'dot-offline', txtStatus = `Offline${tempoStr}`;
-    if (v.status === 'online' && p?.motion) { dotClass = 'dot-moving'; txtStatus = `Em movimento · ${p.velocidade} km/h${tempoStr}`; }
+    if (v.status === 'online' && p?.emMovimento) { dotClass = 'dot-moving'; txtStatus = `Em movimento · ${p.velocidade} km/h${tempoStr}`; }
     else if (v.status === 'online') { dotClass = 'dot-online'; txtStatus = `Parado${tempoStr}`; }
 
     return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" onclick="selecionarDaBusca('${v.dispositivoId}')">
@@ -604,7 +611,7 @@ function mostrarCardDispositivo(id) {
   ativoId = id;
   const p = v.posicao;
   const isOnline = v.status === 'online';
-  const isMoving = isOnline && p?.motion;
+  const isMoving = isOnline && p?.emMovimento;
 
   const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
   const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
@@ -616,13 +623,13 @@ function mostrarCardDispositivo(id) {
   const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
   const tempoSufixo = refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : '';
 
-  const bat = p?.bateria != null ? p.bateria : null;
+  const bat = p?.bateria_nivel != null ? p.bateria_nivel : null;
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
   const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
 
-  const ignHtml = p?.ignition === true
+  const ignHtml = p?.ignicao === true
     ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>`
-    : p?.ignition === false
+    : p?.ignicao === false
     ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>`
     : '';
 
