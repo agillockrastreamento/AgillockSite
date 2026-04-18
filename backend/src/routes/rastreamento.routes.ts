@@ -68,6 +68,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       dispositivoId: d.id,
       nome: d.nome,
       placa: d.placa,
+      identificador: d.identificador,
       categoria: d.categoria,
       imagemUrl: d.imagemUrl,
       marca: d.marca,

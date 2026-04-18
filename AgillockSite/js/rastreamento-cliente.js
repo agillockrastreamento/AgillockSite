@@ -76,6 +76,26 @@ function inicializarMapa() {
   ).addTo(map);
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
+  // ── Botão toggle: mostrar/ocultar placa nos ícones ────────────────────────
+  const BtnPopupToggle = L.Control.extend({
+    onAdd() {
+      const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+      btn.title = 'Mostrar/ocultar placa nos ícones';
+      btn.style.cssText = 'width:30px;height:30px;cursor:pointer;background:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:14px;color:#333;';
+      btn.innerHTML = '<i class="fa fa-tag"></i>';
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, 'click', function () {
+        _mostrarPopup = !_mostrarPopup;
+        btn.style.background = _mostrarPopup ? '#fff' : '#e8f4fd';
+        btn.querySelector('i').style.color = _mostrarPopup ? '#333' : '#2980b9';
+        _atualizarBindingsPopup();
+      });
+      return btn;
+    },
+    onRemove() {},
+  });
+  new BtnPopupToggle({ position: 'topright' }).addTo(map);
+
   _adicionarBotaoLocalizacao(map);
 
   map.on('popupclose', function (e) {
@@ -250,7 +270,7 @@ function _agruparPorPixel() {
 }
 
 function _criarIconeCluster(count) {
-  return L.divIcon({ html: `<div style="width:38px;height:38px;background:#8e44ad;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;">${count}</div>`, className: '', iconSize: [38, 38], iconAnchor: [19, 19] });
+  return L.divIcon({ html: `<div style="width:42px;height:42px;background:#8e44ad;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;">${count}</div>`, className: '', iconSize: [42, 42], iconAnchor: [21, 21] });
 }
 
 function _fecharSpider() {
@@ -270,7 +290,8 @@ function _abrirSpider(chave, centroLatLng) {
     const sp = map.containerPointToLatLng([centro.x + 55 * Math.cos(ang), centro.y + 55 * Math.sin(ang)]);
     const linha = L.polyline([centroLatLng, sp], { color: '#666', weight: 1.5, opacity: 0.6, dashArray: '4,4' }).addTo(map);
     _spider.linhas.push(linha);
-    const sm = L.marker(sp, { icon: criarIcone(v), zIndexOffset: 1000 }).bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
+    const sm = L.marker(sp, { icon: criarIcone(v), zIndexOffset: 1000 });
+    if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
     sm.on('click', function (e) { L.DomEvent.stopPropagation(e); _fecharSpider(); focar(id); });
     sm.addTo(map); _spider.markers.push(sm);
   });
@@ -293,7 +314,8 @@ function renderMarcadores() {
       const v = veiculosMap[id]; const { latitude, longitude } = v.posicao;
       const visivel = !isCluster && (!modoFoco || id === ativoId);
       if (!marcadores[id]) {
-        const m = L.marker([latitude, longitude], { icon: criarIcone(v) }).bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
+        const m = L.marker([latitude, longitude], { icon: criarIcone(v) });
+        if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
         m.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = m; marcadoresIconeKey[id] = _iconeKey(id);
         if (visivel) m.addTo(map);
@@ -324,14 +346,14 @@ function atualizarMarcador(did) {
   marcadores[did].setLatLng([latitude, longitude]);
   const ik = _iconeKey(did);
   if (marcadoresIconeKey[did] !== ik) { marcadores[did].setIcon(criarIcone(v)); marcadoresIconeKey[did] = ik; }
-  if (marcadores[did].isPopupOpen()) marcadores[did].getPopup().setContent(criarPopupSimples(v));
+  if (_mostrarPopup && marcadores[did].getPopup()?.isOpen()) marcadores[did].getPopup().setContent(criarPopupSimples(v));
 }
 
 function _corMarcador(v) {
-  if (!v.posicao) return '#95a5a6';
-  if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c';
-  if (v.status === 'online') return v.posicao.emMovimento ? '#2980b9' : '#27ae60';
-  return '#e67e22';
+  if (!v.posicao || v.status !== 'online') return '#95a5a6'; // cinza: offline ou sem dados
+  if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c'; // vermelho: excesso
+  if (v.posicao.emMovimento || v.posicao.ignicao === true) return '#2980b9'; // azul: em movimento ou ignição ligada
+  return '#27ae60'; // verde: parado / ignição desligada
 }
 
 function _iconeKey(did) {
@@ -344,11 +366,26 @@ function criarIcone(v) {
   const cor = _corMarcador(v);
   const course = v.posicao ? v.posicao.curso : 0;
   const html = AL_ICONS_3D.getSvgHtml(v.categoria, cor, course);
-  return L.divIcon({ html, className: '', iconSize: [42, 42], iconAnchor: [21, 21] });
+  return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24] });
 }
 
+let _mostrarPopup = true;
+
 function criarPopupSimples(v) {
-  return `<div style="padding:8px 12px;font-size:12px"><div style="font-weight:600;font-size:13px;margin-bottom:4px">${v.nome}</div>${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}</div>`;
+  if (!v.placa) return `<div style="padding:3px 7px;font-size:11px;font-weight:600">${v.nome}</div>`;
+  return `<div style="padding:2px 6px"><span style="background:#222;color:#fff;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:700;letter-spacing:1.5px">${v.placa}</span></div>`;
+}
+
+function _atualizarBindingsPopup() {
+  Object.entries(marcadores).forEach(([id, m]) => {
+    if (_mostrarPopup) {
+      const v = veiculosMap[id];
+      if (v) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
+    } else {
+      m.closePopup();
+      m.unbindPopup();
+    }
+  });
 }
 
 // ── Sidebar: contadores + busca ───────────────────────────────────────────────

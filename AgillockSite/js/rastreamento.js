@@ -59,6 +59,26 @@ function inicializarMapa() {
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
+  // ── Botão toggle: mostrar/ocultar placa nos ícones ────────────────────────
+  const BtnPopupToggle = L.Control.extend({
+    onAdd() {
+      const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+      btn.title = 'Mostrar/ocultar placa nos ícones';
+      btn.style.cssText = 'width:30px;height:30px;cursor:pointer;background:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:14px;color:#333;';
+      btn.innerHTML = '<i class="fa fa-tag"></i>';
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, 'click', function () {
+        _mostrarPopup = !_mostrarPopup;
+        btn.style.background = _mostrarPopup ? '#fff' : '#e8f4fd';
+        btn.querySelector('i').style.color = _mostrarPopup ? '#333' : '#2980b9';
+        _atualizarBindingsPopup();
+      });
+      return btn;
+    },
+    onRemove() {},
+  });
+  new BtnPopupToggle({ position: 'topright' }).addTo(map);
+
   // ── Botão de localização do usuário (esquerda, abaixo do zoom) ─────────────
   let _marcadorUser = null;
   const BtnLoc = L.Control.extend({
@@ -310,7 +330,7 @@ function _criarIconeCluster(count) {
       display:flex;align-items:center;justify-content:center;
       color:#fff;font-size:13px;font-weight:700;
     ">${count}</div>`,
-    className: '', iconSize: [38, 38], iconAnchor: [19, 19],
+    className: '', iconSize: [42, 42], iconAnchor: [21, 21],
   });
 }
 
@@ -342,8 +362,8 @@ function _abrirSpider(chave, centroLatLng) {
       color: '#666', weight: 1.5, opacity: 0.6, dashArray: '4,4',
     }).addTo(map);
     _spider.linhas.push(linha);
-    const sm = L.marker(spiderLatLng, { icon: criarIcone(v), zIndexOffset: 1000 })
-      .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
+    const sm = L.marker(spiderLatLng, { icon: criarIcone(v), zIndexOffset: 1000 });
+    if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
     sm.on('click', function (e) {
       L.DomEvent.stopPropagation(e); // evita fechar spider pelo map.on('click')
       _fecharSpider();
@@ -384,8 +404,8 @@ function renderMarcadores() {
       if (!marcadores[id]) {
         const icone = criarIcone(v);
         marcadoresIconeKey[id] = _iconeKey(v);
-        const marker = L.marker([latitude, longitude], { icon: icone })
-          .bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 200 });
+        const marker = L.marker([latitude, longitude], { icon: icone });
+        if (_mostrarPopup) marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
         marker.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = marker;
         if (visivel) marker.addTo(map);
@@ -445,16 +465,16 @@ function atualizarMarcador(dispositivoId) {
     marcadoresIconeKey[dispositivoId] = iconKey;
   }
 
-  if (marcadores[dispositivoId].isPopupOpen()) {
+  if (_mostrarPopup && marcadores[dispositivoId].getPopup()?.isOpen()) {
     marcadores[dispositivoId].getPopup().setContent(criarPopupSimples(v));
   }
 }
 
 function _corMarcador(v) {
-  if (!v.posicao) return '#95a5a6';
-  if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c';
-  if (v.status === 'online') return v.posicao.emMovimento ? '#2980b9' : '#27ae60';
-  return '#e67e22'; // offline com última posição conhecida
+  if (!v.posicao || v.status !== 'online') return '#95a5a6'; // cinza: offline ou sem dados
+  if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c'; // vermelho: excesso
+  if (v.posicao.emMovimento || v.posicao.ignicao === true) return '#2980b9'; // azul: em movimento ou ignição ligada
+  return '#27ae60'; // verde: parado / ignição desligada
 }
 
 function _iconeKey(v) {
@@ -468,16 +488,28 @@ function criarIcone(v) {
   const cor = _corMarcador(v);
   const course = v.posicao ? v.posicao.curso : 0;
   const html = AL_ICONS_3D.getSvgHtml(v.categoria, cor, course);
-  return L.divIcon({ html, className: '', iconSize: [42, 42], iconAnchor: [21, 21] });
+  return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24] });
 }
 
-// ── Popup simplificado (só nome + placa + status) ─────────────────────────────
+// ── Popup simplificado (apenas placa) ────────────────────────────────────────
+
+let _mostrarPopup = true;
 
 function criarPopupSimples(v) {
-  return `<div style="padding:8px 12px;font-size:12px">
-    <div style="font-weight:600;font-size:13px;margin-bottom:4px">${v.nome}</div>
-    ${v.placa ? `<span style="background:#333;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px">${v.placa}</span>` : ''}
-  </div>`;
+  if (!v.placa) return `<div style="padding:3px 7px;font-size:11px;font-weight:600">${v.nome}</div>`;
+  return `<div style="padding:2px 6px"><span style="background:#222;color:#fff;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:700;letter-spacing:1.5px">${v.placa}</span></div>`;
+}
+
+function _atualizarBindingsPopup() {
+  Object.entries(marcadores).forEach(([id, m]) => {
+    if (_mostrarPopup) {
+      const v = veiculosMap[id];
+      if (v) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
+    } else {
+      m.closePopup();
+      m.unbindPopup();
+    }
+  });
 }
 
 // ── Velocímetro SVG ───────────────────────────────────────────────────────────
@@ -665,11 +697,14 @@ function mostrarCardDispositivo(id) {
   card.innerHTML = `
     ${imgHtml}
     <div class="dcard-header">
-      <div>
+      <div style="flex:1;min-width:0">
         <div class="v-nome">${v.nome}</div>
-        ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
+          ${v.placa ? `<span class="v-placa">${v.placa}</span>` : '<span></span>'}
+          ${v.identificador ? `<span style="font-size:10px;color:#95a5a6;font-family:monospace;letter-spacing:0.5px">${v.identificador}</span>` : ''}
+        </div>
       </div>
-      <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
+      <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar" style="margin-left:6px;flex-shrink:0">×</button>
     </div>
     <div class="dcard-body">
       ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}

@@ -11,7 +11,7 @@ window.API_URL = 'https://api.agillock.com.br';
  * Vista superior com efeitos de profundidade, gradientes e sombras.
  */
 window.AL_ICONS_3D = {
-  SIZE: 42,
+  SIZE: 48,
 
   getSvgHtml: function(categoria, cor, course) {
     const angle = course || 0;
@@ -64,10 +64,39 @@ window.AL_ICONS_3D = {
 
   shapes: {
     carro: (cor, grad) => `
-      <path d="M-14,-35 Q-16,-40 0,-40 Q16,-40 14,-35 L16,28 Q16,36 0,36 Q-16,36 -16,28 Z" fill="${cor}" />
-      <path d="M-14,-35 Q-16,-40 0,-40 Q16,-40 14,-35 L16,28 Q16,36 0,36 Q-16,36 -16,28 Z" fill="${grad}" opacity="0.5" />
-      <path d="M-11,-22 L11,-22 L13,8 L-13,8 Z" fill="url(#grad-glass)" />
-      <rect x="-10" y="-32" width="20" height="5" rx="1" fill="white" opacity="0.2" />
+      <!-- Carroceria -->
+      <path d="M-13,-38 C-14,-42 -8,-45 0,-45 C8,-45 14,-42 13,-38 L15,10 C15,20 13,32 12,38 C10,42 6,44 0,44 C-6,44 -10,42 -12,38 C-13,32 -15,20 -15,10 Z" fill="${cor}" />
+      <path d="M-13,-38 C-14,-42 -8,-45 0,-45 C8,-45 14,-42 13,-38 L15,10 C15,20 13,32 12,38 C10,42 6,44 0,44 C-6,44 -10,42 -12,38 C-13,32 -15,20 -15,10 Z" fill="${grad}" opacity="0.45" />
+      <!-- Para-brisa dianteiro -->
+      <path d="M-9,-24 L9,-24 L10,-8 L-10,-8 Z" fill="url(#grad-glass)" />
+      <!-- Vidro traseiro -->
+      <path d="M-8,12 L8,12 L7,26 L-7,26 Z" fill="url(#grad-glass)" opacity="0.75" />
+      <!-- Teto -->
+      <path d="M-9,-8 L9,-8 L8,12 L-8,12 Z" fill="rgba(255,255,255,0.08)" />
+      <!-- Divisória capô/parabrisa -->
+      <path d="M-12,-26 L12,-26" stroke="rgba(0,0,0,0.18)" stroke-width="1" fill="none" />
+      <!-- Divisória porta dianteira/traseira -->
+      <path d="M-14,-4 L-14,10" stroke="rgba(0,0,0,0.18)" stroke-width="0.9" fill="none" />
+      <path d="M14,-4 L14,10" stroke="rgba(0,0,0,0.18)" stroke-width="0.9" fill="none" />
+      <!-- Retrovisores -->
+      <ellipse cx="-17" cy="-18" rx="3.5" ry="2" fill="${cor}" stroke="rgba(0,0,0,0.25)" stroke-width="0.6" />
+      <ellipse cx="17" cy="-18" rx="3.5" ry="2" fill="${cor}" stroke="rgba(0,0,0,0.25)" stroke-width="0.6" />
+      <!-- Rodas dianteiras -->
+      <ellipse cx="-15" cy="-27" rx="5" ry="7" fill="#1a1a1a" />
+      <ellipse cx="-15" cy="-27" rx="2.5" ry="3.5" fill="#555" />
+      <ellipse cx="15" cy="-27" rx="5" ry="7" fill="#1a1a1a" />
+      <ellipse cx="15" cy="-27" rx="2.5" ry="3.5" fill="#555" />
+      <!-- Rodas traseiras -->
+      <ellipse cx="-15" cy="28" rx="5" ry="7" fill="#1a1a1a" />
+      <ellipse cx="-15" cy="28" rx="2.5" ry="3.5" fill="#555" />
+      <ellipse cx="15" cy="28" rx="5" ry="7" fill="#1a1a1a" />
+      <ellipse cx="15" cy="28" rx="2.5" ry="3.5" fill="#555" />
+      <!-- Faróis dianteiros -->
+      <ellipse cx="-7" cy="-43" rx="4.5" ry="1.8" fill="#fffde7" opacity="0.95" />
+      <ellipse cx="7" cy="-43" rx="4.5" ry="1.8" fill="#fffde7" opacity="0.95" />
+      <!-- Lanternas traseiras -->
+      <ellipse cx="-7" cy="42" rx="4.5" ry="1.8" fill="#e74c3c" opacity="0.9" />
+      <ellipse cx="7" cy="42" rx="4.5" ry="1.8" fill="#e74c3c" opacity="0.9" />
     `,
     pickup: (cor, grad) => `
       <path d="M-15,-35 Q-17,-40 0,-40 Q17,-40 15,-35 L17,32 L-17,32 Z" fill="${cor}" />
@@ -95,11 +124,33 @@ window.AL_ICONS_3D = {
       <rect x="-5" y="-15" width="10" height="55" fill="white" opacity="0.2" />
     `,
     moto: (cor, grad) => `
-      <rect x="-3" y="-35" width="6" height="18" rx="3" fill="#222" /> <!-- Pneu F -->
-      <rect x="-3" y="15" width="6" height="22" rx="3" fill="#222" /> <!-- Pneu T -->
-      <path d="M-6,-15 L6,-15 Q10,0 6,20 L-6,20 Q-10,0 -6,-15" fill="${cor}" />
-      <path d="M-6,-15 L6,-15 Q10,0 6,20 L-6,20 Q-10,0 -6,-15" fill="${grad}" opacity="0.5" />
-      <rect x="-15" y="-12" width="30" height="3" rx="1" fill="#7f8c8d" /> <!-- Guidão -->
+      <!-- Roda dianteira -->
+      <ellipse cx="0" cy="-32" rx="5.5" ry="7.5" fill="#1a1a1a" />
+      <ellipse cx="0" cy="-32" rx="2.5" ry="3.5" fill="#555" />
+      <!-- Garfo dianteiro -->
+      <path d="M-2.5,-25 L-3,-13 M2.5,-25 L3,-13" stroke="#95a5a6" stroke-width="2" fill="none" />
+      <!-- Guidão T -->
+      <rect x="-19" y="-14" width="38" height="3.5" rx="1.8" fill="#555" />
+      <rect x="-19" y="-14" width="6" height="3.5" rx="1.8" fill="#2980b9" />
+      <rect x="13" y="-14" width="6" height="3.5" rx="1.8" fill="#2980b9" />
+      <!-- Tanque de combustível -->
+      <path d="M-7,-11 L7,-11 L8,2 L-8,2 Z" fill="${cor}" />
+      <path d="M-7,-11 L7,-11 L8,2 L-8,2 Z" fill="${grad}" opacity="0.5" />
+      <!-- Motor (bloco visível) -->
+      <rect x="-9" y="-4" width="18" height="11" rx="2.5" fill="#555" />
+      <rect x="-7" y="-2" width="6" height="7" rx="1" fill="#777" opacity="0.6" />
+      <rect x="1" y="-2" width="6" height="7" rx="1" fill="#777" opacity="0.6" />
+      <!-- Banco -->
+      <rect x="-5.5" y="2" width="11" height="14" rx="3" fill="#111" />
+      <!-- Quadro / balança -->
+      <path d="M-4,16 Q-5,28 0,33 Q5,28 4,16" stroke="#7f8c8d" stroke-width="2" fill="none" />
+      <!-- Escapamento -->
+      <path d="M8,3 Q13,12 11,29" stroke="#aaa" stroke-width="2.5" fill="none" stroke-linecap="round" />
+      <!-- Roda traseira -->
+      <ellipse cx="0" cy="35" rx="5.5" ry="7.5" fill="#1a1a1a" />
+      <ellipse cx="0" cy="35" rx="2.5" ry="3.5" fill="#555" />
+      <!-- Corrente -->
+      <path d="M-3,16 Q-4,28 0,35" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="2,2" />
     `,
     bike: (cor) => `
       <rect x="-1.5" y="-30" width="3" height="60" fill="#333" />
