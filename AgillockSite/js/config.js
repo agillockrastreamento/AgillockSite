@@ -64,39 +64,10 @@ window.AL_ICONS_3D = {
 
   shapes: {
     carro: (cor, grad) => `
-      <!-- Carroceria -->
-      <path d="M-13,-38 C-14,-42 -8,-45 0,-45 C8,-45 14,-42 13,-38 L15,10 C15,20 13,32 12,38 C10,42 6,44 0,44 C-6,44 -10,42 -12,38 C-13,32 -15,20 -15,10 Z" fill="${cor}" />
-      <path d="M-13,-38 C-14,-42 -8,-45 0,-45 C8,-45 14,-42 13,-38 L15,10 C15,20 13,32 12,38 C10,42 6,44 0,44 C-6,44 -10,42 -12,38 C-13,32 -15,20 -15,10 Z" fill="${grad}" opacity="0.45" />
-      <!-- Para-brisa dianteiro -->
-      <path d="M-9,-24 L9,-24 L10,-8 L-10,-8 Z" fill="url(#grad-glass)" />
-      <!-- Vidro traseiro -->
-      <path d="M-8,12 L8,12 L7,26 L-7,26 Z" fill="url(#grad-glass)" opacity="0.75" />
-      <!-- Teto -->
-      <path d="M-9,-8 L9,-8 L8,12 L-8,12 Z" fill="rgba(255,255,255,0.08)" />
-      <!-- Divisória capô/parabrisa -->
-      <path d="M-12,-26 L12,-26" stroke="rgba(0,0,0,0.18)" stroke-width="1" fill="none" />
-      <!-- Divisória porta dianteira/traseira -->
-      <path d="M-14,-4 L-14,10" stroke="rgba(0,0,0,0.18)" stroke-width="0.9" fill="none" />
-      <path d="M14,-4 L14,10" stroke="rgba(0,0,0,0.18)" stroke-width="0.9" fill="none" />
-      <!-- Retrovisores -->
-      <ellipse cx="-17" cy="-18" rx="3.5" ry="2" fill="${cor}" stroke="rgba(0,0,0,0.25)" stroke-width="0.6" />
-      <ellipse cx="17" cy="-18" rx="3.5" ry="2" fill="${cor}" stroke="rgba(0,0,0,0.25)" stroke-width="0.6" />
-      <!-- Rodas dianteiras -->
-      <ellipse cx="-15" cy="-27" rx="5" ry="7" fill="#1a1a1a" />
-      <ellipse cx="-15" cy="-27" rx="2.5" ry="3.5" fill="#555" />
-      <ellipse cx="15" cy="-27" rx="5" ry="7" fill="#1a1a1a" />
-      <ellipse cx="15" cy="-27" rx="2.5" ry="3.5" fill="#555" />
-      <!-- Rodas traseiras -->
-      <ellipse cx="-15" cy="28" rx="5" ry="7" fill="#1a1a1a" />
-      <ellipse cx="-15" cy="28" rx="2.5" ry="3.5" fill="#555" />
-      <ellipse cx="15" cy="28" rx="5" ry="7" fill="#1a1a1a" />
-      <ellipse cx="15" cy="28" rx="2.5" ry="3.5" fill="#555" />
-      <!-- Faróis dianteiros -->
-      <ellipse cx="-7" cy="-43" rx="4.5" ry="1.8" fill="#fffde7" opacity="0.95" />
-      <ellipse cx="7" cy="-43" rx="4.5" ry="1.8" fill="#fffde7" opacity="0.95" />
-      <!-- Lanternas traseiras -->
-      <ellipse cx="-7" cy="42" rx="4.5" ry="1.8" fill="#e74c3c" opacity="0.9" />
-      <ellipse cx="7" cy="42" rx="4.5" ry="1.8" fill="#e74c3c" opacity="0.9" />
+      <path d="M-14,-35 Q-16,-40 0,-40 Q16,-40 14,-35 L16,28 Q16,36 0,36 Q-16,36 -16,28 Z" fill="${cor}" />
+      <path d="M-14,-35 Q-16,-40 0,-40 Q16,-40 14,-35 L16,28 Q16,36 0,36 Q-16,36 -16,28 Z" fill="${grad}" opacity="0.5" />
+      <path d="M-11,-22 L11,-22 L13,8 L-13,8 Z" fill="url(#grad-glass)" />
+      <rect x="-10" y="-32" width="20" height="5" rx="1" fill="white" opacity="0.2" />
     `,
     pickup: (cor, grad) => `
       <path d="M-15,-35 Q-17,-40 0,-40 Q17,-40 15,-35 L17,32 L-17,32 Z" fill="${cor}" />

@@ -76,21 +76,56 @@ function inicializarMapa() {
   ).addTo(map);
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
-  // ── Botão toggle: mostrar/ocultar placa nos ícones ────────────────────────
+  // ── CSS + controle toggle hover ───────────────────────────────────────────
+  (function () {
+    if (document.getElementById('popup-toggle-css')) return;
+    const s = document.createElement('style');
+    s.id = 'popup-toggle-css';
+    s.textContent = `
+      .popup-toggle-ctrl { position: relative; }
+      .popup-toggle-ctrl .pt-header { width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:default;background:#fff; }
+      .popup-toggle-ctrl .pt-panel { display:none;position:absolute;right:0;top:0;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,0.4);padding:6px 0;min-width:130px;z-index:10; }
+      .popup-toggle-ctrl:hover .pt-panel { display:block; }
+      .dark-theme .popup-toggle-ctrl .pt-header { background:#2d3748;color:#e2e8f0; }
+      .dark-theme .popup-toggle-ctrl .pt-panel { background:#2d3748;color:#e2e8f0; }
+      .pt-option { display:flex;align-items:center;gap:7px;padding:5px 12px;cursor:pointer;font-size:12px;white-space:nowrap; }
+      .pt-option:hover { background:rgba(41,128,185,0.1); }
+      .pt-radio { width:10px;height:10px;border:2px solid #aaa;border-radius:50%;flex-shrink:0; }
+      .pt-radio.active { border-color:#2980b9;background:#2980b9; }
+    `;
+    document.head.appendChild(s);
+  })();
+
+  let _popupToggleEl = null;
+  function _sincRadiosPopup() {
+    if (!_popupToggleEl) return;
+    _popupToggleEl.querySelectorAll('.pt-option').forEach(function (el) {
+      const ok = (el.dataset.val === '1') === _mostrarPopup;
+      el.querySelector('.pt-radio').className = 'pt-radio' + (ok ? ' active' : '');
+    });
+  }
+
   const BtnPopupToggle = L.Control.extend({
     onAdd() {
-      const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
-      btn.title = 'Mostrar/ocultar placa nos ícones';
-      btn.style.cssText = 'width:30px;height:30px;cursor:pointer;background:#fff;border:none;display:flex;align-items:center;justify-content:center;font-size:14px;color:#333;';
-      btn.innerHTML = '<i class="fa fa-tag"></i>';
-      L.DomEvent.disableClickPropagation(btn);
-      L.DomEvent.on(btn, 'click', function () {
-        _mostrarPopup = !_mostrarPopup;
-        btn.style.background = _mostrarPopup ? '#fff' : '#e8f4fd';
-        btn.querySelector('i').style.color = _mostrarPopup ? '#333' : '#2980b9';
-        _atualizarBindingsPopup();
+      const c = L.DomUtil.create('div', 'leaflet-bar leaflet-control popup-toggle-ctrl');
+      c.innerHTML = `
+        <div class="pt-header"><i class="fa fa-tag" style="font-size:14px"></i></div>
+        <div class="pt-panel">
+          <div class="pt-option" data-val="1"><span class="pt-radio active"></span> Mostrar placa</div>
+          <div class="pt-option" data-val="0"><span class="pt-radio"></span> Ocultar placa</div>
+        </div>`;
+      L.DomEvent.disableClickPropagation(c);
+      _popupToggleEl = c;
+      c.querySelectorAll('.pt-option').forEach(function (el) {
+        L.DomEvent.on(el, 'click', function () {
+          const novo = el.dataset.val === '1';
+          if (novo === _mostrarPopup) return;
+          _mostrarPopup = novo;
+          _atualizarBindingsPopup();
+          _sincRadiosPopup();
+        });
       });
-      return btn;
+      return c;
     },
     onRemove() {},
   });
@@ -99,6 +134,7 @@ function inicializarMapa() {
   _adicionarBotaoLocalizacao(map);
 
   map.on('popupclose', function (e) {
+    if (_togglingPopup) return;
     if (ativoId && marcadores[ativoId] && e.popup === marcadores[ativoId].getPopup()) fecharCardDispositivo(true);
   });
   map.on('click', function () { _fecharSpider(); });
@@ -291,7 +327,7 @@ function _abrirSpider(chave, centroLatLng) {
     const linha = L.polyline([centroLatLng, sp], { color: '#666', weight: 1.5, opacity: 0.6, dashArray: '4,4' }).addTo(map);
     _spider.linhas.push(linha);
     const sm = L.marker(sp, { icon: criarIcone(v), zIndexOffset: 1000 });
-    if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
+    if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
     sm.on('click', function (e) { L.DomEvent.stopPropagation(e); _fecharSpider(); focar(id); });
     sm.addTo(map); _spider.markers.push(sm);
   });
@@ -315,7 +351,7 @@ function renderMarcadores() {
       const visivel = !isCluster && (!modoFoco || id === ativoId);
       if (!marcadores[id]) {
         const m = L.marker([latitude, longitude], { icon: criarIcone(v) });
-        if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
+        if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
         m.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = m; marcadoresIconeKey[id] = _iconeKey(id);
         if (visivel) m.addTo(map);
@@ -366,26 +402,32 @@ function criarIcone(v) {
   const cor = _corMarcador(v);
   const course = v.posicao ? v.posicao.curso : 0;
   const html = AL_ICONS_3D.getSvgHtml(v.categoria, cor, course);
-  return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24] });
+  return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24], popupAnchor: [0, -28] });
 }
 
 let _mostrarPopup = true;
+let _togglingPopup = false;
 
 function criarPopupSimples(v) {
-  if (!v.placa) return `<div style="padding:3px 7px;font-size:11px;font-weight:600">${v.nome}</div>`;
-  return `<div style="padding:2px 6px"><span style="background:#222;color:#fff;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:700;letter-spacing:1.5px">${v.placa}</span></div>`;
+  const txt = v.placa || v.nome;
+  return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px">${txt}</div>`;
 }
 
 function _atualizarBindingsPopup() {
+  _togglingPopup = true;
   Object.entries(marcadores).forEach(([id, m]) => {
     if (_mostrarPopup) {
       const v = veiculosMap[id];
-      if (v) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', maxWidth: 180 });
+      if (v) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
     } else {
       m.closePopup();
       m.unbindPopup();
     }
   });
+  _togglingPopup = false;
+  if (_mostrarPopup && ativoId && marcadores[ativoId] && map.hasLayer(marcadores[ativoId])) {
+    marcadores[ativoId].openPopup();
+  }
 }
 
 // ── Sidebar: contadores + busca ───────────────────────────────────────────────
@@ -695,8 +737,8 @@ function mostrarCardDispositivo(id) {
         <span id="dcard-status-warning">${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}</span>
       </div>
       <div id="dcard-velocimetro">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
+      ${p?.velocidade != null ? `<hr style="margin:2px 0 6px;border:none;border-top:1px solid rgba(128,128,128,0.15)">` : ''}
       <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:4px">${buildStatusHtmlCliente(p, bat, batFa, batCor)}</div>
-      <hr id="dcard-divider" style="margin:6px 0 8px;border:none;border-top:1px solid rgba(128,128,128,0.15)${p ? '' : ';display:none'}">
       <div id="dcard-horas">${horasHtml}</div>
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
@@ -858,7 +900,7 @@ window.focar = function (did) {
   const v = veiculosMap[did]; if (!v?.posicao) return;
   ativarFoco(did);
   map.flyTo([v.posicao.latitude, v.posicao.longitude], 16, { animate: true, duration: 0.8 });
-  setTimeout(() => { if (marcadores[did] && map.hasLayer(marcadores[did])) marcadores[did].openPopup(); }, 900);
+  setTimeout(() => { if (_mostrarPopup && marcadores[did] && map.hasLayer(marcadores[did])) marcadores[did].openPopup(); }, 900);
 };
 
 window.focarCliente = function (did) {
