@@ -14,6 +14,8 @@ import {
   traccarGetSummary,
   traccarSendCommand,
   traccarGetCommandTypes,
+  normalizeAttributes,
+  EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
 
 const router = Router();
@@ -86,11 +88,8 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
         deviceTime: posicao.deviceTime,
         serverTime: posicao.serverTime,
         valida: posicao.valid,
-        ignition: posicao.attributes.ignition ?? null,
-        motion: posicao.attributes.motion ?? null,
         endereco: posicao.address,
-        sat: posicao.attributes.sat ?? null,
-        bateria: posicao.attributes.batteryLevel ?? null,
+        ...normalizeAttributes(posicao.attributes),
       } : null,
     };
   });
@@ -126,9 +125,10 @@ router.get('/dispositivos/:id/historico', requireRoles('ADMIN', 'COLABORADOR'), 
       longitude: p.longitude,
       velocidade: Math.round(p.speed * 1.852),
       curso: p.course,
+      altitude: p.altitude,
       fixTime: p.fixTime,
       valida: p.valid,
-      ignition: p.attributes.ignition ?? null,
+      ...normalizeAttributes(p.attributes),
     })),
   });
 });
@@ -223,6 +223,7 @@ router.get('/dispositivos/:id/eventos', requireRoles('ADMIN', 'COLABORADOR'), as
   res.json(eventos.map(e => ({
     id: e.id,
     tipo: e.type,
+    tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
     hora: e.eventTime,
     atributos: e.attributes,
   })));

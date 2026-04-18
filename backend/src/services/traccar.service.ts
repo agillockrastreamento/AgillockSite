@@ -216,16 +216,115 @@ export interface TraccarPosition {
   address: string | null;
   accuracy: number;
   attributes: {
+    // Estado básico (presente na maioria dos protocolos)
     ignition?: boolean;
     motion?: boolean;
+    alarm?: string;
+    blocked?: boolean;
+    charge?: boolean;
+    // Sinal e GPS
     rssi?: number;
     sat?: number;
-    distance?: number;
-    totalDistance?: number;
-    hours?: number;
-    power?: number;
-    alarm?: string;
+    // Energia
+    power?: number;         // tensão externa/veículo (V)
+    battery?: number;       // tensão bateria interna (V)
+    batteryLevel?: number;  // nível de bateria (0–100 %)
+    // Odômetro e motor
+    distance?: number;      // distância deste segmento (metros)
+    totalDistance?: number; // odômetro total (metros)
+    hours?: number;         // horas de motor (ms)
+    // Combustível
+    fuel?: number;
+    fuelUsed?: number;
+    // I/O digitais
+    input?: number;
+    output?: number;
+    // Motorista
+    driverUniqueId?: string;
     [key: string]: unknown;
+  };
+}
+
+// Rótulos em português para tipos de alarme enviados pelos dispositivos.
+// Universais — funcionam para qualquer protocolo suportado pelo Traccar.
+export const ALARM_LABELS: Record<string, string> = {
+  sos: 'SOS / Pânico',
+  powerCut: 'Corte de energia',
+  vibration: 'Vibração',
+  movement: 'Movimento detectado',
+  overspeed: 'Excesso de velocidade',
+  fallDown: 'Queda detectada',
+  lowPower: 'Bateria baixa',
+  lowBattery: 'Bateria interna baixa',
+  fault: 'Falha no dispositivo',
+  powerOff: 'Alimentação cortada',
+  powerOn: 'Alimentação restaurada',
+  door: 'Porta aberta',
+  lock: 'Travado',
+  unlock: 'Destravado',
+  geofenceEnter: 'Entrou na cerca',
+  geofenceExit: 'Saiu da cerca',
+  gpsAntennaCut: 'Antena GPS cortada',
+  hardAcceleration: 'Aceleração brusca',
+  hardBraking: 'Freada brusca',
+  hardCornering: 'Curva brusca',
+  laneChange: 'Mudança de faixa',
+  fatigueDriving: 'Fadiga ao volante',
+  riskDriving: 'Direção de risco',
+  temperature: 'Temperatura anormal',
+  parking: 'Estacionamento detectado',
+  bonnet: 'Capô aberto',
+  fuelLeak: 'Vazamento de combustível',
+  tampering: 'Adulteração detectada',
+  removing: 'Dispositivo removido',
+};
+
+// Rótulos em português para tipos de evento do Traccar.
+export const EVENT_TYPE_LABELS: Record<string, string> = {
+  deviceOnline: 'Dispositivo online',
+  deviceOffline: 'Dispositivo offline',
+  deviceUnknown: 'Status desconhecido',
+  deviceMoving: 'Em movimento',
+  deviceStopped: 'Parado',
+  deviceOverspeed: 'Excesso de velocidade',
+  deviceFuelDrop: 'Queda de combustível',
+  commandResult: 'Resultado de comando',
+  geofenceEnter: 'Entrou na cerca',
+  geofenceExit: 'Saiu da cerca',
+  alarm: 'Alarme',
+  ignitionOn: 'Ignição ligada',
+  ignitionOff: 'Ignição desligada',
+  maintenance: 'Manutenção pendente',
+  textMessage: 'Mensagem recebida',
+  driverChanged: 'Motorista alterado',
+  media: 'Mídia recebida',
+};
+
+// Normaliza os attributes de uma posição para um formato consistente,
+// independente do protocolo/fabricante do dispositivo.
+export function normalizeAttributes(attr: TraccarPosition['attributes']) {
+  const alarme_codigo = attr.alarm ?? null;
+  const horas_ms = attr.hours ?? null;
+  return {
+    ignicao: attr.ignition ?? null,
+    emMovimento: attr.motion ?? null,
+    alarme_codigo,
+    alarme: alarme_codigo ? (ALARM_LABELS[alarme_codigo] ?? alarme_codigo) : null,
+    sinal: attr.rssi ?? null,
+    satelites: attr.sat ?? null,
+    tensao: attr.power ?? null,
+    bateria_tensao: attr.battery ?? null,
+    bateria_nivel: attr.batteryLevel ?? null,
+    carregando: attr.charge ?? null,
+    odometro: attr.totalDistance ?? null,
+    distancia_segmento: attr.distance ?? null,
+    horas_motor: horas_ms !== null ? Math.round(horas_ms / 3_600_000 * 10) / 10 : null,
+    combustivel: attr.fuel ?? null,
+    combustivel_gasto: attr.fuelUsed ?? null,
+    bloqueado: attr.blocked ?? null,
+    entrada_digital: attr.input ?? null,
+    saida_digital: attr.output ?? null,
+    motorista_id: attr.driverUniqueId ?? null,
   };
 }
 

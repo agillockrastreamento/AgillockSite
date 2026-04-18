@@ -1,6 +1,6 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { IncomingMessage, Server } from 'http';
-import { traccarGetSessionCookie } from './traccar.service';
+import { traccarGetSessionCookie, normalizeAttributes, EVENT_TYPE_LABELS } from './traccar.service';
 
 const TRACCAR_URL = process.env.TRACCAR_URL || 'http://traccar:8082';
 const WS_TRACCAR_URL = TRACCAR_URL.replace('http://', 'ws://').replace('https://', 'wss://');
@@ -111,11 +111,8 @@ function transformTraccarMessage(msg: TraccarWsMessage): object | null {
       deviceTime: p.deviceTime,
       serverTime: p.serverTime,
       valida: p.valid,
-      ignition: p.attributes?.ignition ?? null,
-      motion: p.attributes?.motion ?? null,
-      sat: p.attributes?.sat ?? null,
-      bateria: p.attributes?.batteryLevel ?? null,
       endereco: p.address,
+      ...normalizeAttributes(p.attributes ?? {}),
     }));
   }
 
@@ -132,6 +129,7 @@ function transformTraccarMessage(msg: TraccarWsMessage): object | null {
     result.events = msg.events.map(e => ({
       deviceId: e.deviceId,
       type: e.type,
+      tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
       serverTime: e.serverTime,
       positionId: e.positionId,
     }));
