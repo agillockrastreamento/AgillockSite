@@ -7,6 +7,7 @@ const marcadores  = {};
 const _clusterBadges = {};
 const _clusterGrupos = {};
 const marcadoresIconeKey = {};
+const _estadoSince = {};
 let veiculosMap = {};
 let traccarIdParaDispositivoId = {};
 let boundsAjustados = false;
@@ -83,15 +84,15 @@ function inicializarMapa() {
     s.id = 'popup-toggle-css';
     s.textContent = `
       .popup-toggle-ctrl { position: relative; }
-      .popup-toggle-ctrl .pt-header { width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:default;background:#fff; }
+      .popup-toggle-ctrl .pt-header { width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:default; }
       .popup-toggle-ctrl .pt-panel { display:none;position:absolute;right:0;top:0;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,0.4);padding:6px 0;min-width:130px;z-index:10; }
       .popup-toggle-ctrl:hover .pt-panel { display:block; }
-      .dark-theme .popup-toggle-ctrl .pt-header { background:#2d3748;color:#e2e8f0; }
       .dark-theme .popup-toggle-ctrl .pt-panel { background:#2d3748;color:#e2e8f0; }
       .pt-option { display:flex;align-items:center;gap:7px;padding:5px 12px;cursor:pointer;font-size:12px;white-space:nowrap; }
       .pt-option:hover { background:rgba(41,128,185,0.1); }
       .pt-radio { width:10px;height:10px;border:2px solid #aaa;border-radius:50%;flex-shrink:0; }
       .pt-radio.active { border-color:#2980b9;background:#2980b9; }
+      .leaflet-control-layers-list { min-width:130px !important; }
     `;
     document.head.appendChild(s);
   })();
@@ -207,6 +208,12 @@ async function carregarPosicoes() {
     lista.forEach(v => {
       veiculosMap[v.dispositivoId] = v;
       if (v.traccarId) traccarIdParaDispositivoId[v.traccarId] = v.dispositivoId;
+      if (v.posicao && !_estadoSince[v.dispositivoId]) {
+        _estadoSince[v.dispositivoId] = {
+          emMovimento: v.posicao.emMovimento ?? null,
+          desde: v.posicao.fixTime ? new Date(v.posicao.fixTime).getTime() : Date.now(),
+        };
+      }
     });
 
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(lista)); } catch {}
@@ -250,6 +257,11 @@ function processarMensagemWs(msg) {
     msg.positions.forEach(pos => {
       const did = traccarIdParaDispositivoId[pos.deviceId];
       if (!did || !veiculosMap[did]) return;
+      const _emMov = pos.emMovimento ?? null;
+      const _est = _estadoSince[did];
+      if (!_est || _est.emMovimento !== _emMov) {
+        _estadoSince[did] = { emMovimento: _emMov, desde: Date.now() };
+      }
       veiculosMap[did].posicao = {
         latitude: pos.latitude, longitude: pos.longitude, velocidade: pos.velocidade,
         curso: pos.curso, altitude: pos.altitude, fixTime: pos.fixTime,
@@ -402,7 +414,7 @@ function criarIcone(v) {
   const cor = _corMarcador(v);
   const course = v.posicao ? v.posicao.curso : 0;
   const html = AL_ICONS_3D.getSvgHtml(v.categoria, cor, course);
-  return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24], popupAnchor: [0, -28] });
+  return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24], popupAnchor: [0, -14] });
 }
 
 let _mostrarPopup = true;
@@ -699,8 +711,10 @@ function mostrarCardDispositivo(id) {
   const isOnline = v.status === 'online', isMoving = isOnline && p?.emMovimento;
   const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
   const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
-  const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
-  const tempoSufixo = refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : '';
+  const estadoDesde = _estadoSince[id]?.desde
+    || (p?.fixTime ? new Date(p.fixTime).getTime() : null)
+    || (v.lastUpdate ? new Date(v.lastUpdate).getTime() : null);
+  const tempoSufixo = estadoDesde ? ` — há ${fmtTempoDecorridoMs(estadoDesde)}` : '';
   const bat = p?.bateria_nivel != null ? p.bateria_nivel : null;
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
   const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
@@ -805,9 +819,9 @@ function atualizarCardAtivo(did) {
     const isOnline = v.status === 'online', isMoving = isOnline && p?.emMovimento;
     const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
     const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
-    const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
+    const desde = _estadoSince[did]?.desde || null;
     elStatus.style.color = corStatus;
-    elStatus.innerHTML = `<i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : ''}`;
+    elStatus.innerHTML = `<i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${desde ? ` — há ${fmtTempoDecorridoMs(desde)}` : ''}`;
   }
   const elVel = document.getElementById('dcard-velocimetro');
   if (elVel) elVel.innerHTML = p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : '';
@@ -845,13 +859,18 @@ function fmtGPSTimeSec(iso) {
   return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-function fmtTempoDecorrido(iso) {
-  if (!iso) return '';
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+function fmtTempoDecorridoMs(ms) {
+  if (!ms) return '';
+  const mins = Math.floor((Date.now() - ms) / 60000);
   if (mins < 1) return 'agora';
   if (mins < 60) return `${mins} min`;
   const hrs = Math.floor(mins / 60);
   return hrs < 24 ? `${hrs}h` : `${Math.floor(hrs / 24)} dia(s)`;
+}
+
+function fmtTempoDecorrido(iso) {
+  if (!iso) return '';
+  return fmtTempoDecorridoMs(new Date(iso).getTime());
 }
 
 window.geocodificarCoordenadas = async function (lat, lng, elementId) {

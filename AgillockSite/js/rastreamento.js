@@ -16,6 +16,7 @@ let wsReconectTimer = null;
 let ativoId = null;
 let modoFoco = false;
 const marcadoresIconeKey = {};
+const _estadoSince = {}; // dispositivoId → { emMovimento, desde (ms) }
 
 // Spider state (expansão de cluster)
 const _spider = { markers: [], linhas: [], chave: null };
@@ -64,15 +65,15 @@ function inicializarMapa() {
     const s = document.createElement('style');
     s.textContent = `
       .popup-toggle-ctrl { position: relative; }
-      .popup-toggle-ctrl .pt-header { width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:default;background:#fff; }
+      .popup-toggle-ctrl .pt-header { width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:default; }
       .popup-toggle-ctrl .pt-panel { display:none;position:absolute;right:0;top:0;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,0.4);padding:6px 0;min-width:130px;z-index:10; }
       .popup-toggle-ctrl:hover .pt-panel { display:block; }
-      .dark-theme .popup-toggle-ctrl .pt-header { background:#2d3748;color:#e2e8f0; }
       .dark-theme .popup-toggle-ctrl .pt-panel { background:#2d3748;color:#e2e8f0; }
       .pt-option { display:flex;align-items:center;gap:7px;padding:5px 12px;cursor:pointer;font-size:12px;white-space:nowrap; }
       .pt-option:hover { background:rgba(41,128,185,0.1); }
       .pt-radio { width:10px;height:10px;border:2px solid #aaa;border-radius:50%;flex-shrink:0; }
       .pt-radio.active { border-color:#2980b9;background:#2980b9; }
+      .leaflet-control-layers-list { min-width:130px !important; }
     `;
     document.head.appendChild(s);
   })();
@@ -207,6 +208,12 @@ async function carregarPosicoes() {
     lista.forEach(v => {
       veiculosMap[v.dispositivoId] = v;
       if (v.traccarId) traccarIdParaDispositivoId[v.traccarId] = v.dispositivoId;
+      if (v.posicao && !_estadoSince[v.dispositivoId]) {
+        _estadoSince[v.dispositivoId] = {
+          emMovimento: v.posicao.emMovimento ?? null,
+          desde: v.posicao.fixTime ? new Date(v.posicao.fixTime).getTime() : Date.now(),
+        };
+      }
     });
 
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(lista)); } catch {}
@@ -264,6 +271,12 @@ function processarMensagemWs(msg) {
     msg.positions.forEach(pos => {
       const dispositivoId = traccarIdParaDispositivoId[pos.deviceId];
       if (!dispositivoId || !veiculosMap[dispositivoId]) return;
+
+      const _emMov = pos.emMovimento ?? null;
+      const _est = _estadoSince[dispositivoId];
+      if (!_est || _est.emMovimento !== _emMov) {
+        _estadoSince[dispositivoId] = { emMovimento: _emMov, desde: Date.now() };
+      }
 
       veiculosMap[dispositivoId].posicao = {
         latitude: pos.latitude,
@@ -522,7 +535,7 @@ function criarIcone(v) {
   const cor = _corMarcador(v);
   const course = v.posicao ? v.posicao.curso : 0;
   const html = AL_ICONS_3D.getSvgHtml(v.categoria, cor, course);
-  return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24], popupAnchor: [0, -28] });
+  return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24], popupAnchor: [0, -14] });
 }
 
 // ── Popup simplificado (apenas placa) ────────────────────────────────────────
@@ -594,8 +607,12 @@ function fmtGPSTimeSec(iso) {
 
 function fmtTempoDecorrido(iso) {
   if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
+  return fmtTempoDecorridoMs(new Date(iso).getTime());
+}
+
+function fmtTempoDecorridoMs(ms) {
+  if (!ms) return '';
+  const mins = Math.floor((Date.now() - ms) / 60000);
   if (mins < 1) return 'agora';
   if (mins < 60) return `${mins} min`;
   const hrs = Math.floor(mins / 60);
@@ -691,9 +708,10 @@ function mostrarCardDispositivo(id) {
   const apiBase = window.API_URL || '';
   const addrId = `dcard-addr-${id}`;
 
-  // "há X tempo" em todos os status
-  const refTime = p?.fixTime || p?.serverTime || v.lastUpdate;
-  const tempoSufixo = refTime ? ` — há ${fmtTempoDecorrido(refTime)}` : '';
+  const estadoDesde = _estadoSince[id]?.desde
+    || (p?.fixTime ? new Date(p.fixTime).getTime() : null)
+    || (v.lastUpdate ? new Date(v.lastUpdate).getTime() : null);
+  const tempoSufixo = estadoDesde ? ` — há ${fmtTempoDecorridoMs(estadoDesde)}` : '';
 
   const bat = p?.bateria_nivel != null ? p.bateria_nivel : null;
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
@@ -720,17 +738,13 @@ function mostrarCardDispositivo(id) {
   if (p?.motorista_id)      si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${p.motorista_id}</span>`);
   if (p?.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
 
-  const statusHtml = si.length
-    ? `<div style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:8px">${si.join('')}</div>`
-    : '';
-
   // Três horários com data + hora + segundos
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
   const horasHtml = p ? `
     <div class="dcard-section dcard-val">
-      <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> ${fmtGPSTimeSec(p.serverTime)}</div>
-      <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> ${fmtGPSTimeSec(p.deviceTime)}</div>
-      <div><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> ${fmtGPSTimeSec(p.fixTime)}</div>
+      <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> <span id="dcard-ts-srv">${fmtGPSTimeSec(p.serverTime)}</span></div>
+      <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
+      <div><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> <span id="dcard-ts-gps">${fmtGPSTimeSec(p.fixTime)}</span></div>
     </div>` : '';
 
   const card = document.getElementById('device-detail-card');
@@ -749,12 +763,12 @@ function mostrarCardDispositivo(id) {
     <div class="dcard-body">
       ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
       <div style="margin-bottom:6px">
-        <span style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}</span>
+        <span id="dcard-status-line" style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}</span>
         ${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}
       </div>
-      ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
-      ${p?.velocidade != null ? `<hr style="margin:2px 0 6px;border:none;border-top:1px solid rgba(128,128,128,0.15)">` : ''}
-      ${statusHtml}
+      <div id="dcard-velocimetro">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
+      <hr id="dcard-divider-speed" style="margin:2px 0 6px;border:none;border-top:1px solid rgba(128,128,128,0.15)${p?.velocidade != null ? '' : ';display:none'}">
+      <div id="dcard-status-items" style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:8px">${si.join('')}</div>
       ${horasHtml}
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
           <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
@@ -789,15 +803,55 @@ window.fecharCardDispositivo = function (skipClosePopup) {
 function atualizarCardAtivo(dispositivoId) {
   if (dispositivoId !== ativoId) return;
   const card = document.getElementById('device-detail-card');
-  if (card.style.display === 'none') return;
-  mostrarCardDispositivo(dispositivoId);
+  if (!card || card.style.display === 'none') return;
 
-  // Acompanha o dispositivo no mapa quando está em foco
-  if (modoFoco) {
-    const v = veiculosMap[dispositivoId];
-    if (v?.posicao) {
-      map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
-    }
+  const v = veiculosMap[dispositivoId];
+  if (!v) return;
+  const p = v.posicao;
+
+  const elSt = document.getElementById('dcard-status-line');
+  if (elSt) {
+    const isOnline = v.status === 'online', isMoving = isOnline && p?.emMovimento;
+    const cor = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
+    const txt = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
+    const desde = _estadoSince[dispositivoId]?.desde || null;
+    const sufixo = desde ? ` — há ${fmtTempoDecorridoMs(desde)}` : '';
+    elSt.style.color = cor;
+    elSt.innerHTML = `<i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txt}${sufixo}`;
+  }
+
+  const elVel = document.getElementById('dcard-velocimetro');
+  if (elVel) elVel.innerHTML = p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : '';
+
+  const elDiv = document.getElementById('dcard-divider-speed');
+  if (elDiv) elDiv.style.display = p?.velocidade != null ? '' : 'none';
+
+  const elSI = document.getElementById('dcard-status-items');
+  if (elSI) {
+    const bat = p?.bateria_nivel != null ? p.bateria_nivel : null;
+    const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
+    const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
+    const si = [];
+    if (p?.ignicao === true)  si.push(`<span style="color:#27ae60"><i class="fa fa-key"></i> Ignição: Ligado</span>`);
+    if (p?.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
+    if (bat != null)          si.push(`<span style="color:${batCor}"><i class="fa ${batFa}"></i> Bateria: ${bat}%</span>`);
+    if (p?.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
+    if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km</span>`);
+    if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
+    if (p?.motorista_id)      si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${p.motorista_id}</span>`);
+    if (p?.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
+    elSI.innerHTML = si.join('');
+  }
+
+  const tsSrv = document.getElementById('dcard-ts-srv');
+  const tsDev = document.getElementById('dcard-ts-dev');
+  const tsGps = document.getElementById('dcard-ts-gps');
+  if (tsSrv && p) tsSrv.textContent = fmtGPSTimeSec(p.serverTime);
+  if (tsDev && p) tsDev.textContent = fmtGPSTimeSec(p.deviceTime);
+  if (tsGps && p) tsGps.textContent = fmtGPSTimeSec(p.fixTime);
+
+  if (modoFoco && v?.posicao) {
+    map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
   }
 }
 
