@@ -42,6 +42,7 @@ services:
         condition: service_healthy
     ports:
       - "5023:5023"   # Protocolo GT06 — exposto publicamente para os dispositivos GPS
+      - "5011:5011"   # Protocolo Suntech (ST300, ST310, etc.)
       # Porta 8082 NÃO exposta — backend acessa via rede interna Docker
     environment:
       - CONFIG_USE_ENVIRONMENT_VARIABLES=true
@@ -51,6 +52,7 @@ services:
       - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
       - WEB_PORT=8082
       - GT06_PORT=5023
+      - SUNTECH_PORT=5011
       - TIME_ZONE=America/Sao_Paulo
       - FILTER_ENABLE=true
       - FILTER_INVALID=true
