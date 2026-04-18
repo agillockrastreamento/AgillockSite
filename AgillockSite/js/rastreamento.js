@@ -627,12 +627,6 @@ function mostrarCardDispositivo(id) {
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
   const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
 
-  const ignHtml = p?.ignicao === true
-    ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>`
-    : p?.ignicao === false
-    ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>`
-    : '';
-
   const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
   const hasCached = cacheKey != null && cacheKey in _geocodeCache;
   const cachedAddr = hasCached ? _geocodeCache[cacheKey] : null;
@@ -641,6 +635,21 @@ function mostrarCardDispositivo(id) {
 
   const imgHtml = v.imagemUrl
     ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none'" />`
+    : '';
+
+  // Monta itens de status — exibe apenas os que o dispositivo enviou
+  const si = [];
+  if (p?.ignicao === true)  si.push(`<span style="color:#27ae60"><i class="fa fa-key"></i> Ignição: Ligado</span>`);
+  if (p?.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
+  if (bat != null)          si.push(`<span style="color:${batCor}"><i class="fa ${batFa}"></i> Bateria: ${bat}%</span>`);
+  if (p?.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
+  if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km</span>`);
+  if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
+  if (p?.motorista_id)      si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${p.motorista_id}</span>`);
+  if (p?.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
+
+  const statusHtml = si.length
+    ? `<div style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:8px">${si.join('')}</div>`
     : '';
 
   // Três horários com data + hora + segundos
@@ -663,14 +672,14 @@ function mostrarCardDispositivo(id) {
       <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
     </div>
     <div class="dcard-body">
+      ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
       <div style="margin-bottom:6px">
         <span style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}</span>
         ${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}
       </div>
       ${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}
-      ${ignHtml ? `<div style="font-size:12px;margin-bottom:4px">${ignHtml}</div>` : ''}
-      ${bat != null ? `<div style="font-size:12px;color:${batCor};margin-bottom:4px"><i class="fa ${batFa}"></i> Bateria: ${bat}%</div>` : ''}
-      ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
+      ${statusHtml}
+      ${statusHtml || p?.velocidade != null ? `<hr style="margin:6px 0 8px;border:none;border-top:1px solid rgba(128,128,128,0.15)">` : ''}
       ${horasHtml}
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
           <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>

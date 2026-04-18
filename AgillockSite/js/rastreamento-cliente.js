@@ -602,6 +602,17 @@ const _CMD_CONFIG = {
   custom:             { label: 'Personalizado',            icon: 'fa-terminal',            style: 'neutral' },
 };
 
+function buildStatusHtmlCliente(p, bat, batFa, batCor) {
+  if (!p) return '';
+  const si = [];
+  if (p.ignicao === true)  si.push(`<span style="color:#27ae60"><i class="fa fa-key"></i> Ignição: Ligado</span>`);
+  if (p.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
+  if (bat != null)         si.push(`<span style="color:${batCor}"><i class="fa ${batFa}"></i> Bateria: ${bat}%</span>`);
+  if (p.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
+  if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
+  return si.join('');
+}
+
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id]; if (!v) return;
   ativoId = id;
@@ -614,7 +625,6 @@ function mostrarCardDispositivo(id) {
   const bat = p?.bateria_nivel != null ? p.bateria_nivel : null;
   const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
   const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
-  const ignHtml = p?.ignicao === true ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>` : p?.ignicao === false ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>` : '';
   const addrId = `dcard-addr-${id}`;
   const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
   const hasCached = cacheKey != null && cacheKey in _geocodeCache;
@@ -648,8 +658,8 @@ function mostrarCardDispositivo(id) {
         <span id="dcard-status-warning">${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}</span>
       </div>
       <div id="dcard-velocimetro">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
-      <div id="dcard-ignicao" style="font-size:12px;margin-bottom:4px">${ignHtml}</div>
-      <div id="dcard-bateria" style="font-size:12px;color:${batCor};margin-bottom:4px">${bat != null ? `<i class="fa ${batFa}"></i> Bateria: ${bat}%` : ''}</div>
+      <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:4px">${buildStatusHtmlCliente(p, bat, batFa, batCor)}</div>
+      <hr id="dcard-divider" style="margin:6px 0 8px;border:none;border-top:1px solid rgba(128,128,128,0.15)${p ? '' : ';display:none'}">
       <div id="dcard-horas">${horasHtml}</div>
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
@@ -722,15 +732,12 @@ function atualizarCardAtivo(did) {
   }
   const elVel = document.getElementById('dcard-velocimetro');
   if (elVel) elVel.innerHTML = p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : '';
-  const elIgn = document.getElementById('dcard-ignicao');
-  if (elIgn) elIgn.innerHTML = p?.ignicao === true ? `<span style="color:#27ae60"><i class="fa fa-key"></i> Ligado</span>` : p?.ignicao === false ? `<span style="color:#bdc3c7"><i class="fa fa-key"></i> Desligado</span>` : '';
-  const elBat = document.getElementById('dcard-bateria');
-  if (elBat) {
-    const bat = p?.bateria_nivel != null ? p.bateria_nivel : null;
-    const batCor = bat >= 40 ? '#27ae60' : bat >= 20 ? '#f39c12' : '#e74c3c';
-    const batFa = bat >= 80 ? 'fa-battery-full' : bat >= 60 ? 'fa-battery-3' : bat >= 40 ? 'fa-battery-2' : bat >= 20 ? 'fa-battery-1' : 'fa-battery-0';
-    elBat.style.color = batCor;
-    elBat.innerHTML = bat != null ? `<i class="fa ${batFa}"></i> Bateria: ${bat}%` : '';
+  const elStatus = document.getElementById('dcard-status');
+  if (elStatus) {
+    const bat2 = p?.bateria_nivel != null ? p.bateria_nivel : null;
+    const batCor2 = bat2 >= 40 ? '#27ae60' : bat2 >= 20 ? '#f39c12' : '#e74c3c';
+    const batFa2 = bat2 >= 80 ? 'fa-battery-full' : bat2 >= 60 ? 'fa-battery-3' : bat2 >= 40 ? 'fa-battery-2' : bat2 >= 20 ? 'fa-battery-1' : 'fa-battery-0';
+    elStatus.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2);
   }
   const tsSrv = document.getElementById('dcard-ts-srv'), tsDev = document.getElementById('dcard-ts-dev'), tsGps = document.getElementById('dcard-ts-gps');
   if (tsSrv && p) tsSrv.textContent = fmtGPSTimeSec(p.serverTime);
