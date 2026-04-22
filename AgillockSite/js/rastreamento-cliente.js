@@ -851,24 +851,39 @@ function bindUploadFoto(card) {
           try { localStorage.setItem(CACHE_KEY, JSON.stringify(Object.values(veiculosMap))); } catch (e) {}
           const newSrc = `${API_BASE}${data.imagemUrlCliente}`;
           const preload = new Image();
-          preload.onload = preload.onerror = function () {
+            preload.onload = preload.onerror = function () {
             const cc = document.querySelector(`.card-veiculo[data-did="${did}"]`);
-            if (!cc) return;
-            const fw = cc.querySelector('.btn-foto-wrap');
-            if (fw) {
-              const sp = fw.querySelector('.cv-spinner'); if (sp) sp.remove();
-              let img = fw.querySelector('img.cv-foto');
-              if (img) img.src = newSrc;
-              else {
-                const icone = fw.querySelector('.cv-icone');
-                img = document.createElement('img');
-                img.className = 'cv-foto';
-                img.style.cssText = 'width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;';
-                if (icone) fw.replaceChild(img, icone); else fw.prepend(img);
-                img.src = newSrc;
+            if (cc) {
+              const fw = cc.querySelector('.btn-foto-wrap');
+              if (fw) {
+                const sp = fw.querySelector('.cv-spinner'); if (sp) sp.remove();
+                let img = fw.querySelector('img.cv-foto');
+                if (img) {
+                  img.src = newSrc;
+                  img.style.display = 'block';
+                  const ico = fw.querySelector('.cv-icone');
+                  if (ico) ico.style.display = 'none';
+                } else {
+                  const icone = fw.querySelector('.cv-icone');
+                  img = document.createElement('img');
+                  img.className = 'cv-foto';
+                  img.src = newSrc;
+                  if (icone) {
+                    icone.style.display = 'none';
+                    fw.insertBefore(img, icone);
+                  } else fw.prepend(img);
+                }
               }
             }
-            atualizarCardAtivo(did);
+            
+            // ATUALIZAÇÃO CRUCIAL:
+            if (veiculosMap[did]) {
+              veiculosMap[did].imagemUrlCliente = data.imagemUrlCliente;
+            }
+            if (ativoId === did) {
+              mostrarCardDispositivo(did); // Redesenha o card flutuante com a nova foto
+            }
+            
             AL_CLIENTE.showAlert('Foto atualizada!', 'success');
           };
           preload.src = newSrc;
@@ -887,13 +902,12 @@ function cardVeiculoHtml(v) {
   const cor = _corMarcador(v);
   const fotoSrc = v.imagemUrlCliente ? `${API_BASE}${v.imagemUrlCliente}` : null;
   
-  let iconeHtml;
+  let mediaHtml;
   if (fotoSrc) {
-    iconeHtml = `<img src="${fotoSrc}" class="cv-foto" onerror="this.style.display='none'" />`;
+    mediaHtml = `<img src="${fotoSrc}" class="cv-foto" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                 <div class="cv-icone" style="display:none;background:#f0f2f5;align-items:center;justify-content:center;">${_getSvgPlaceholder(v.categoria, cor)}</div>`;
   } else {
-    let svg = AL_ICONS_3D.getSvgHtml(v.categoria, cor, 0);
-    svg = svg.replace('width="42"', 'width="28"').replace('height="42"', 'height="28"');
-    iconeHtml = `<div class="cv-icone" style="background:#f0f2f5;display:flex;align-items:center;justify-content:center;">${svg}</div>`;
+    mediaHtml = `<div class="cv-icone" style="display:flex;background:#f0f2f5;align-items:center;justify-content:center;">${_getSvgPlaceholder(v.categoria, cor)}</div>`;
   }
 
   const isOnline = v.status === 'online';
@@ -902,15 +916,20 @@ function cardVeiculoHtml(v) {
   const dotCls = isMoving ? 'dot-moving' : isOnline ? 'dot-online' : 'dot-offline';
   const marcaModelo = [v.marca, v.modeloVeiculo].filter(Boolean).join(' ');
 
-  return `<div class="card-veiculo${v.dispositivoId === ativoId ? ' ativo' : ''}" data-did="${v.dispositivoId}">
-    <div class="btn-foto-wrap">
-      ${iconeHtml}
-      <button class="btn-upload-foto" title="Alterar foto"><i class="fa fa-camera"></i></button>
+  return `<div class="card-veiculo${v.dispositivoId === ativoId ? ' ativo' : ''}" data-did="${v.dispositivoId}" onclick="focarCliente('${v.dispositivoId}')">
+    <div class="btn-foto-wrap" onclick="event.stopPropagation()">
+      ${mediaHtml}
+      <button class="btn-upload-foto" onclick="handleUploadFoto('${v.dispositivoId}')" title="Alterar foto"><i class="fa fa-camera"></i></button>
     </div>
     ${v.placa ? `<span class="cv-placa">${v.placa}</span>` : ''}
-    ${marcaModelo ? `<span class="cv-modelo">${marcaModelo}</span>` : `<span class="cv-modelo">${v.nome}</span>`}
-    <span class="cv-status ${dotCls}" style="font-size:9px;">● ${statusTxt}</span>
+    <span class="cv-modelo" title="${marcaModelo || v.nome}">${marcaModelo || v.nome}</span>
+    <span class="cv-status ${dotCls}">● ${statusTxt}</span>
   </div>`;
+}
+
+function _getSvgPlaceholder(cat, cor) {
+  let svg = AL_ICONS_3D.getSvgHtml(cat, cor, 0);
+  return svg.replace('width="42"', 'width="28"').replace('height="42"', 'height="28"');
 }
 
 function atualizarCardBarra(did) {
@@ -971,6 +990,15 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor) {
   if (p.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
   if (bat != null)         si.push(`<span style="color:${batCor}"><i class="fa ${batFa}"></i> Bateria: ${bat}%</span>`);
   if (p.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
+  
+  if (p.odometro != null) {
+    const km = Math.round(p.odometro).toLocaleString('pt-BR');
+    si.push(`<span><i class="fa fa-dashboard" style="color:#7f8c8d"></i> Odômetro: ${km} km</span>`);
+  }
+  if (p.horas_motor != null) {
+    si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
+  }
+  
   if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
   return si.join('');
 }
