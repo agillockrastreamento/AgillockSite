@@ -272,35 +272,103 @@ function renderParadas(lista) {
 function renderResumoBatch(lista) {
   const el = document.getElementById('resumo-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty">Sem dados de resumo.</div>'; return; }
-  el.innerHTML = `<div class="resumo-grid">${lista.map(r => {
+
+  if (lista.length === 1) {
+    // Estilo clássico para um único veículo
+    const r = lista[0];
     const d = dispositivosMap[r.deviceId] || { nome: '—' };
-    return `<div class="resumo-card">
-      <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-transform:uppercase">${d.nome}</div>
-      <div class="rc-val">${(r.distance / 1000).toFixed(1)} <small style="font-size:12px">km</small></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px;font-size:11px;color:#666">
-        <div>Média: <strong>${Math.round(r.averageSpeed * 1.852)}</strong></div><div>Máxima: <strong>${Math.round(r.maxSpeed * 1.852)}</strong></div>
-        <div>Motor: <strong>${(r.engineHours / 3600000).toFixed(1)}h</strong></div><div>Gasto: <strong>${r.spentFuel || 0}L</strong></div>
+    el.innerHTML = `
+      <div style="margin-bottom:15px; font-weight:700; color:#888; text-align:center; text-transform:uppercase; letter-spacing:1px;">
+        Resumo Geral — ${d.nome}
       </div>
-    </div>`;
-  }).join('')}</div>`;
+      <div class="resumo-grid">
+        <div class="resumo-card">
+          <div class="rc-val">${(r.distance / 1000).toFixed(1)}</div>
+          <div class="rc-lbl"><i class="fa fa-road"></i> Distância Percorrida (km)</div>
+        </div>
+        <div class="resumo-card">
+          <div class="rc-val">${Math.round(r.averageSpeed * 1.852)}</div>
+          <div class="rc-lbl"><i class="fa fa-dashboard"></i> Velocidade Média (km/h)</div>
+        </div>
+        <div class="resumo-card">
+          <div class="rc-val">${Math.round(r.maxSpeed * 1.852)}</div>
+          <div class="rc-lbl"><i class="fa fa-bolt"></i> Velocidade Máxima (km/h)</div>
+        </div>
+        <div class="resumo-card">
+          <div class="rc-val">${(r.engineHours / 3600000).toFixed(1)}</div>
+          <div class="rc-lbl"><i class="fa fa-clock-o"></i> Horas de Motor (h)</div>
+        </div>
+      </div>`;
+  } else {
+    // Estilo grade comparativa para múltiplos veículos
+    el.innerHTML = `<div class="resumo-grid">${lista.map(r => {
+      const d = dispositivosMap[r.deviceId] || { nome: '—' };
+      return `<div class="resumo-card">
+        <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-transform:uppercase">${d.nome}</div>
+        <div class="rc-val" style="font-size:22px">${(r.distance / 1000).toFixed(1)} <small style="font-size:12px">km</small></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px;font-size:11px;color:#666">
+          <div>Média: <strong>${Math.round(r.averageSpeed * 1.852)}</strong></div><div>Máxima: <strong>${Math.round(r.maxSpeed * 1.852)}</strong></div>
+          <div>Motor: <strong>${(r.engineHours / 3600000).toFixed(1)}h</strong></div><div>Gasto: <strong>${r.spentFuel || 0}L</strong></div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
 }
 
 function renderGraficoBatch(data) {
   const el = document.getElementById('grafico-content');
   if (!data || !data.posicoes || !data.posicoes.length) { el.innerHTML = '<div class="rel-empty">Sem dados para o gráfico.</div>'; return; }
-  const datasets = [], porDispositivo = {};
-  data.posicoes.forEach(p => { if (!porDispositivo[p.deviceId]) porDispositivo[p.deviceId] = []; porDispositivo[p.deviceId].push({ x: new Date(p.fixTime), y: p.velocidade }); });
+  
+  const datasets = [];
+  const porDispositivo = {};
+  data.posicoes.forEach(p => { 
+    if (!porDispositivo[p.deviceId]) porDispositivo[p.deviceId] = []; 
+    porDispositivo[p.deviceId].push({ x: new Date(p.fixTime), y: p.velocidade }); 
+  });
+
+  const ids = Object.keys(porDispositivo);
+  const isSingle = ids.length === 1;
+
   let idx = 0;
   for (const did in porDispositivo) {
     const d = dispositivosMap[did] || { nome: did }, cor = _COLORS[idx % _COLORS.length];
-    datasets.push({ label: d.nome, data: porDispositivo[did], borderColor: cor, backgroundColor: cor + '22', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true });
+    datasets.push({ 
+      label: d.nome, 
+      data: porDispositivo[did], 
+      borderColor: cor, 
+      backgroundColor: cor + (isSingle ? '33' : '15'),
+      borderWidth: isSingle ? 3 : 2,
+      pointRadius: 0, 
+      tension: 0.3, 
+      fill: true 
+    });
     idx++;
   }
-  el.innerHTML = '<canvas id="canvas-grafico"></canvas>';
+
+  el.innerHTML = '<div style="height:350px"><canvas id="canvas-grafico"></canvas></div>';
   if (chartVelocidade) chartVelocidade.destroy();
+  
   chartVelocidade = new Chart(document.getElementById('canvas-grafico').getContext('2d'), {
-    type: 'line', data: { datasets },
-    options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'minute', displayFormats: { hour: 'HH:mm' } } }, y: { beginAtZero: true, title: { display: true, text: 'km/h' } } } }
+    type: 'line', 
+    data: { datasets },
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: false, 
+      scales: { 
+        x: { 
+          type: 'time', 
+          time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+          ticks: { color: '#888' }
+        }, 
+        y: { 
+          beginAtZero: true, 
+          title: { display: true, text: 'km/h' } 
+        } 
+      },
+      plugins: {
+        legend: { display: !isSingle }
+      }
+    }
   });
 }
 
@@ -312,15 +380,31 @@ async function exportarRelatorio() {
   const tipo = document.getElementById('export-tipo').value, { from, to } = calcularIntervalo();
   const btn = document.getElementById('btn-confirmar-exportar'), old = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando...';
+  
   try {
+    const token = localStorage.getItem('al-token') || localStorage.getItem('al_token');
     let url = `${window.API_URL}/api/rastreamento/relatorios/exportar?from=${from.toISOString()}&to=${to.toISOString()}&type=${tipo}`;
     selecionados.forEach(id => url += `&deviceId=${id}`);
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${localStorage.getItem('al-token')}` } });
-    if (!res.ok) throw new Error('Servidor não gerou o arquivo.');
+    
+    const res = await fetch(url, { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    });
+    
+    if (res.status === 401) throw new Error('Sessão expirada. Faça login novamente.');
+    if (!res.ok) throw new Error('Erro ao gerar arquivo no servidor.');
+    
     const blob = await res.blob(), a = document.createElement('a');
-    a.href = window.URL.createObjectURL(blob); a.download = `relatorio_${tipo}_${Date.now()}.xlsx`; a.click();
-    $('#modal-exportar').modal('hide'); AL.showAlert('Download concluído!', 'success');
-  } catch (err) { AL.showAlert(err.message, 'danger'); } finally { btn.disabled = false; btn.innerHTML = old; }
+    a.href = window.URL.createObjectURL(blob); 
+    a.download = `relatorio_${tipo}_${Date.now()}.xlsx`; 
+    a.click();
+    $('#modal-exportar').modal('hide'); 
+    AL.showAlert('Download concluído!', 'success');
+  } catch (err) { 
+    AL.showAlert(err.message, 'danger'); 
+  } finally { 
+    btn.disabled = false; 
+    btn.innerHTML = old; 
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
