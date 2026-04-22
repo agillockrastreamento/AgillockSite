@@ -1014,9 +1014,6 @@ function mostrarCardDispositivo(id) {
         <div class="v-nome">${v.nome}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
           ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
-          <a href="dispositivo-detalhe.html?id=${v.dispositivoId}" title="Mais detalhes" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#e8f4fd;border-radius:50%;color:#2980b9;font-size:11px;text-decoration:none;" class="btn-dcard-gear">
-            <i class="fa fa-cog"></i>
-          </a>
         </div>
       </div>
       <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>

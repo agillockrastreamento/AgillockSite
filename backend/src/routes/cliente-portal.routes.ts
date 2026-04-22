@@ -604,7 +604,13 @@ router.get('/rastreamento/cercas', async (req: ClienteRequest, res: Response): P
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
   const dispositivos = await prisma.dispositivo.findMany({
-    where: { clienteId, ativo: true },
+    where: {
+      ativo: true,
+      OR: [
+        { clienteId: clienteId },
+        { clientesVinculados: { some: { clienteId: clienteId } } }
+      ]
+    },
     select: { identificador: true },
   });
 
@@ -635,10 +641,17 @@ router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): 
   const { nome, area, dispositivoId } = req.body as { nome: string; area: string; dispositivoId?: string };
   if (!nome || !area) { res.status(400).json({ error: 'Campos "nome" e "area" são obrigatórios.' }); return; }
 
-  // Verifica que o dispositivo pertence ao cliente
+  // Verifica que o dispositivo pertence ao cliente (direta ou indiretamente)
   if (dispositivoId) {
     const dispositivo = await prisma.dispositivo.findFirst({
-      where: { id: dispositivoId, clienteId, ativo: true },
+      where: {
+        id: dispositivoId,
+        ativo: true,
+        OR: [
+          { clienteId: clienteId },
+          { clientesVinculados: { some: { clienteId: clienteId } } }
+        ]
+      },
       select: { identificador: true },
     });
     if (!dispositivo) { res.status(403).json({ error: 'Dispositivo não autorizado.' }); return; }
