@@ -650,20 +650,13 @@ function inicializarModalMedidores() {
   if (document.getElementById('modal-medidores-overlay')) return;
   const wrap = document.createElement('div');
   wrap.id = 'modal-medidores-overlay';
-  wrap.style.display = 'none';
-  wrap.style.position = 'fixed';
-  wrap.style.inset = '0';
-  wrap.style.background = 'rgba(0,0,0,0.45)';
-  wrap.style.zIndex = '4000';
-  wrap.style.alignItems = 'center';
-  wrap.style.justifyContent = 'center';
   wrap.innerHTML = `
-    <div style="width:min(92vw,420px);background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden">
-      <div style="padding:16px 18px;border-bottom:1px solid #e9ecef;display:flex;align-items:center;justify-content:space-between">
-        <strong id="modal-medidores-titulo" style="font-size:16px;color:#2c3e50">Editar medidores</strong>
-        <button type="button" id="btn-fechar-modal-medidores" style="border:none;background:none;font-size:22px;line-height:1;color:#7f8c8d">&times;</button>
+    <div id="modal-medidores">
+      <div id="modal-medidores-header">
+        <span id="modal-medidores-titulo"><i class="fa fa-pencil-square-o" style="margin-right:6px"></i> Editar medidores</span>
+        <button type="button" id="btn-fechar-modal-medidores" title="Fechar">&times;</button>
       </div>
-      <div style="padding:18px">
+      <div id="modal-medidores-body">
         <div class="form-group">
           <label for="medidores-odometro">Odômetro (km)</label>
           <input type="number" class="form-control" id="medidores-odometro" min="0" step="0.1" />
@@ -672,11 +665,11 @@ function inicializarModalMedidores() {
           <label for="medidores-horimetro">Motor (h)</label>
           <input type="number" class="form-control" id="medidores-horimetro" min="0" step="0.1" />
         </div>
-        <div id="medidores-resultado" style="margin-top:12px;font-size:12px;"></div>
+        <div id="medidores-resultado"></div>
       </div>
-      <div style="padding:14px 18px;border-top:1px solid #e9ecef;display:flex;justify-content:flex-end;gap:8px">
+      <div id="modal-medidores-footer">
         <button type="button" class="btn btn-default btn-sm" id="btn-cancelar-modal-medidores">Cancelar</button>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-salvar-medidores"><i class="fa fa-save"></i> Salvar</button>
+        <button type="button" id="btn-salvar-medidores"><i class="fa fa-save"></i> Salvar</button>
       </div>
     </div>
   `;
