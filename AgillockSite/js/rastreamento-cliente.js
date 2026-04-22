@@ -1049,26 +1049,51 @@ function mostrarCardDispositivo(id) {
   card.style.display = 'block';
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
 
-  // Verifica se tem cerca para ativar o botão visualmente
-  AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
-    const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
-    if (btn && cercas.length > 0) btn.classList.add('ativo');
-  }).catch(() => {});
+  // Busca cercas e comandos em paralelo para montar as ações corretamente
+  Promise.all([
+    AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`),
+    AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`)
+  ]).then(([cercas, tipos]) => {
+    // 1. Atualiza botões de ação (Rota + Cerca)
+    const temCerca = cercas && cercas.length > 0;
+    const acoesDivCli = document.createElement('div');
+    acoesDivCli.style.cssText = 'padding:10px 12px 14px;border-top:1px solid rgba(128,128,128,0.15);display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
+    
+    const rotaAtiva = !!_rotasIndividuais[id];
+    acoesDivCli.innerHTML = `
+      <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivoCliente('rota','${id}')" title="Rota">
+        <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
+        <span>Rota</span>
+      </button>
+      <button class="dcard-acao${temCerca ? ' ativo' : ''}" data-acao="cerca" onclick="acaoDispositivoCliente('cerca','${id}')" title="Criar Cerca">
+        <span class="dcard-acao-icon"><i class="fa fa-circle-o"></i></span>
+        <span>Cerca</span>
+      </button>
+    `;
+    card.appendChild(acoesDivCli);
 
-  AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`).then(tipos => {
+    // 2. Atualiza comandos de bloqueio/desbloqueio
     const permitidos = ['engineStop', 'engineResume'];
     const suportados = Array.isArray(tipos) ? tipos.map(t => (typeof t === 'string' ? t : t.type)).filter(t => permitidos.includes(t)) : [];
     if (suportados.length > 0) {
       const grid = document.getElementById(`dcard-comandos-grid-${id}`);
-      if (!grid) return;
-      document.getElementById(`dcard-comandos-${id}`).style.display = 'block';
-      grid.innerHTML = suportados.map(t => {
-        const cfg = _CMD_CONFIG[t];
-        const btnClass = t === 'engineStop' ? 'btn-danger' : 'btn-success';
-        return `<button class="btn btn-xs ${btnClass} cmd-btn" data-tipo="${t}" onclick="enviarComandoDaSidebar('${id}', '${t}')" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;"><i class="fa ${cfg.icon}"></i> ${cfg.label}</button>`;
-      }).join('');
+      if (grid) {
+        document.getElementById(`dcard-comandos-${id}`).style.display = 'block';
+        grid.innerHTML = suportados.map(t => {
+          const cfg = _CMD_CONFIG[t];
+          const btnClass = t === 'engineStop' ? 'btn-danger' : 'btn-success';
+          return `<button class="btn btn-xs ${btnClass} cmd-btn" data-tipo="${t}" onclick="enviarComandoDaSidebar('${id}', '${t}')" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;"><i class="fa ${cfg.icon}"></i> ${cfg.label}</button>`;
+        }).join('');
+      }
     }
-  }).catch(() => {});
+  }).catch(err => {
+    console.error('Erro ao carregar extras do card:', err);
+    // Fallback: mostra ações básicas mesmo em caso de erro na API
+    const acoesDivCli = document.createElement('div');
+    acoesDivCli.style.cssText = 'padding:10px 12px 14px;border-top:1px solid rgba(128,128,128,0.15);display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
+    acoesDivCli.innerHTML = _htmlAcoesCard(id);
+    card.appendChild(acoesDivCli);
+  });
 }
 
 window.enviarComandoDaSidebar = async function(did, tipo) {
@@ -1442,7 +1467,19 @@ function _mostrarDialogoCerca() {
         await AL_CLIENTE.apiPost('/api/cliente/rastreamento/cercas', { nome, area, dispositivoId: devId });
         _cancelarDesenhoCirculo();
         AL_CLIENTE.showAlert('Cerca criada!', 'success');
-        if (_overlay.cercas) mostrarCercas();
+        
+        // Ativa a visualização de cercas globalmente se estiver desligada
+        if (!_overlay.cercas) {
+          _overlay.cercas = true;
+          const btnCercas = document.getElementById('ml-cercas');
+          if (btnCercas) btnCercas.classList.add('ativo');
+        }
+        
+        // Garante que o botão do card fique ativo
+        const btnCard = document.querySelector('.dcard-acao[data-acao="cerca"]');
+        if (btnCard) btnCard.classList.add('ativo');
+
+        mostrarCercas();
       } catch (err) {
         AL_CLIENTE.showAlert('Erro ao criar cerca: ' + err.message);
       } finally {
