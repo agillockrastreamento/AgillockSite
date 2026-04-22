@@ -478,7 +478,6 @@ async function ativarRota(dispositivoId) {
     if (r.linha && map.hasLayer(r.linha)) map.removeLayer(r.linha);
     (r.setas || []).forEach(s => { if (map.hasLayer(s)) map.removeLayer(s); });
     delete _rotasIndividuais[dispositivoId];
-    // Atualiza botão no card
     const btn = document.querySelector('.dcard-acao[data-acao="rota"]');
     if (btn) btn.classList.remove('ativo');
     return;
@@ -489,7 +488,7 @@ async function ativarRota(dispositivoId) {
 
   try {
     const now = new Date();
-    const from = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const from = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const hist = await window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/historico?from=${from}&to=${now.toISOString()}`);
     const pontos = (hist.posicoes || []).map(p => [p.latitude, p.longitude]);
 
@@ -498,13 +497,17 @@ async function ativarRota(dispositivoId) {
       const linha = L.polyline(pontos, { color: cor, weight: 4, opacity: 0.85 }).addTo(map);
       const setas = _criarSetasNoRastro(pontos, cor);
       _rotasIndividuais[dispositivoId] = { linha, setas };
-      map.fitBounds(linha.getBounds().pad(0.1));
+      
+      const bounds = linha.getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds.pad(0.1));
+
       if (btn) { btn.classList.remove('carregando'); btn.classList.add('ativo'); btn.querySelector('i').className = 'fa fa-road'; }
     } else {
-      AL.showAlert('Sem histórico de posição na última hora.', 'warning');
+      AL.showAlert('Sem histórico de posição nas últimas 24h.', 'warning');
       if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-road'; }
     }
-  } catch {
+  } catch (err) {
+    console.error('Erro rota:', err);
     AL.showAlert('Erro ao carregar rota.', 'danger');
     if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-road'; }
   }
@@ -711,15 +714,12 @@ function iniciarDesenhoCirculo(dispositivoId) {
     banner.style.display = 'block';
   }
 
-  // Desativa temporariamente a interatividade dos marcadores para o clique ir para o mapa
-  Object.values(marcadores).forEach(m => { if (m.getElement()) m.getElement().style.pointerEvents = 'none'; });
+  // Remove temporariamente o evento de clique do mapa que desativa o foco
+  map.off('click', fecharCardDispositivo);
 
   map.once('click', function (e) {
     if (!_modoDesenho) return;
     
-    // Reativa interatividade
-    Object.values(marcadores).forEach(m => { if (m.getElement()) m.getElement().style.pointerEvents = 'auto'; });
-
     _modoDesenho.center = e.latlng;
     _modoDesenho.etapa = 'raio';
 
@@ -802,8 +802,8 @@ function _cancelarDesenhoCirculo() {
   const dlg = document.getElementById('dlg-cerca');
   if (dlg) dlg.style.display = 'none';
 
-  // Reativa cliques nos marcadores
-  Object.values(marcadores).forEach(m => { if (m.getElement()) m.getElement().style.pointerEvents = 'auto'; });
+  // Reativa o evento de clique do mapa para fechar card
+  map.on('click', fecharCardDispositivo);
 }
 
 // ── Badges de alarme sobre marcadores ────────────────────────────────────────
