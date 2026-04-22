@@ -1,3 +1,5 @@
+import fs from 'fs';
+
 const TRACCAR_URL = process.env.TRACCAR_URL || 'http://traccar:8082';
 const TRACCAR_USER = process.env.TRACCAR_USER!;
 const TRACCAR_PASSWORD = process.env.TRACCAR_PASSWORD!;
@@ -168,6 +170,26 @@ export async function traccarGetStops(
 // ── Logs do servidor ──────────────────────────────────────────────────────────
 
 export async function traccarGetServerLog(): Promise<string> {
+  // Tenta ler o arquivo diretamente se o volume estiver montado (mais confiável)
+  const localLogPath = '/opt/traccar/logs/tracker-server.log';
+  if (fs.existsSync(localLogPath)) {
+    try {
+      const stats = fs.statSync(localLogPath);
+      const start = Math.max(0, stats.size - 100 * 1024); // Pega os últimos 100KB
+      const stream = fs.createReadStream(localLogPath, { start });
+      
+      return new Promise((resolve, reject) => {
+        let data = '';
+        stream.on('data', chunk => data += chunk);
+        stream.on('end', () => resolve(data));
+        stream.on('error', err => reject(err));
+      });
+    } catch (err) {
+      console.warn('[Logs] Falha ao ler arquivo local, tentando API...', err);
+    }
+  }
+
+  // Fallback para API do Traccar
   const res = await fetch(`${TRACCAR_URL}/api/server/log`, { headers: defaultHeaders });
   if (!res.ok) throw new Error(`Traccar ${res.status}`);
   return res.text();
