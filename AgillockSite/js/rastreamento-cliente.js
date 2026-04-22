@@ -1038,43 +1038,21 @@ function mostrarCardDispositivo(id) {
         <button onclick="abrirOverlay('${id}', 'relatorio')" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-bar-chart"></i> Relatório</button>
         <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-history"></i> Histórico</button>
       </div>
+      ${_htmlAcoesCard(id)}
     </div>
   `;
   
   card.style.display = 'block';
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
 
-  // Busca cercas e comandos em paralelo para montar as ações corretamente
-  Promise.all([
-    AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`),
-    AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`)
-  ]).then(([cercas, tipos]) => {
-    // 1. Injeta botões de ação (Rota + Cerca) SEM DUPLICIDADE
-    const temCerca = cercas && cercas.length > 0;
-    const rotaAtiva = !!_rotasIndividuais[id];
-    
-    const acoesDivCli = document.createElement('div');
-    acoesDivCli.id = 'dcard-acoes-container';
-    acoesDivCli.style.cssText = 'padding:10px 12px 14px;border-top:1px solid rgba(128,128,128,0.15);display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
-    
-    acoesDivCli.innerHTML = `
-      <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivoCliente('rota','${id}')" title="Rota">
-        <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
-        <span>Rota</span>
-      </button>
-      <button class="dcard-acao${temCerca ? ' ativo' : ''}" data-acao="cerca" onclick="acaoDispositivoCliente('cerca','${id}')" title="Criar Cerca">
-        <span class="dcard-acao-icon"><i class="fa fa-circle-o"></i></span>
-        <span>Cerca</span>
-      </button>
-    `;
-    
-    // Remove container antigo se existir (prevenção extra)
-    const antigo = document.getElementById('dcard-acoes-container');
-    if (antigo) antigo.remove();
-    
-    card.appendChild(acoesDivCli);
+  // Verifica cercas para ativar o botão visualmente
+  AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
+    const btnCerca = card.querySelector('.dcard-acao[data-acao="cerca"]');
+    if (btnCerca && cercas && cercas.length > 0) btnCerca.classList.add('ativo');
+  }).catch(() => {});
 
-    // 2. Atualiza comandos de bloqueio/desbloqueio
+  // Carrega tipos de comandos (Bloqueio/Desbloqueio)
+  AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`).then(tipos => {
     const permitidos = ['engineStop', 'engineResume'];
     const suportados = Array.isArray(tipos) ? tipos.map(t => (typeof t === 'string' ? t : t.type)).filter(t => permitidos.includes(t)) : [];
     if (suportados.length > 0) {
@@ -1088,9 +1066,7 @@ function mostrarCardDispositivo(id) {
         }).join('');
       }
     }
-  }).catch(err => {
-    console.error('Erro ao carregar extras do card:', err);
-  });
+  }).catch(() => {});
 }
 
 window.enviarComandoDaSidebar = async function(did, tipo) {
@@ -1530,15 +1506,19 @@ window.acaoDispositivoCliente = async function(acao, dispositivoId) {
 function _htmlAcoesCard(dispositivoId) {
   const rotaAtiva = !!_rotasIndividuais[dispositivoId];
   return `
-    <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivoCliente('rota','${dispositivoId}')" title="Rota">
-      <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
-      <span>Rota</span>
-    </button>
-    <button class="dcard-acao" data-acao="cerca" onclick="acaoDispositivoCliente('cerca','${dispositivoId}')" title="Criar Cerca">
-      <span class="dcard-acao-icon"><i class="fa fa-circle-o"></i></span>
-      <span>Cerca</span>
-    </button>
-  `;
+    <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
+      <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">AÇÕES</div>
+      <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
+        <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivoCliente('rota','${dispositivoId}')" title="Rota">
+          <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
+          <span>Rota</span>
+        </button>
+        <button class="dcard-acao" data-acao="cerca" onclick="acaoDispositivoCliente('cerca','${dispositivoId}')" title="Criar Cerca">
+          <span class="dcard-acao-icon"><i class="fa fa-circle-o"></i></span>
+          <span>Cerca</span>
+        </button>
+      </div>
+    </div>`;
 }
 
 setInterval(() => { AL_CLIENTE.apiGet('/api/cliente/rastreamento/status-acesso').catch(() => {}); }, 60000);
