@@ -298,13 +298,15 @@ function inicializarMapa() {
   _adicionarBotoesCamadas();
 
   map.on('popupclose', function (e) {
-    if (_togglingPopup) return;
+    if (_togglingPopup || _modoDesenho) return; // Não fecha o card se estiver desenhando a cerca
     if (ativoId && marcadores[ativoId] && e.popup === marcadores[ativoId].getPopup()) {
       fecharCardDispositivo(true);
     }
   });
 
-  map.on('click', function () { _fecharSpider(); });
+  map.on('click', function () { 
+    if (!_modoDesenho) _fecharSpider(); 
+  });
 
   map.on('zoomend', function () {
     _fecharSpider();
@@ -488,7 +490,7 @@ async function ativarRota(dispositivoId) {
 
   try {
     const now = new Date();
-    const from = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const from = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString();
     const hist = await window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/historico?from=${from}&to=${now.toISOString()}`);
     const pontos = (hist.posicoes || []).map(p => [p.latitude, p.longitude]);
 
@@ -714,9 +716,7 @@ function iniciarDesenhoCirculo(dispositivoId) {
     banner.style.display = 'block';
   }
 
-  // Remove temporariamente o evento de clique do mapa que desativa o foco
-  map.off('click', fecharCardDispositivo);
-
+  // Captura o próximo clique no mapa
   map.once('click', function (e) {
     if (!_modoDesenho) return;
     
@@ -801,9 +801,6 @@ function _cancelarDesenhoCirculo() {
   if (banner) banner.style.display = 'none';
   const dlg = document.getElementById('dlg-cerca');
   if (dlg) dlg.style.display = 'none';
-
-  // Reativa o evento de clique do mapa para fechar card
-  map.on('click', fecharCardDispositivo);
 }
 
 // ── Badges de alarme sobre marcadores ────────────────────────────────────────
