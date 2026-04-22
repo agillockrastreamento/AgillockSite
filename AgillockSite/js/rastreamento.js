@@ -781,8 +781,9 @@ function _mostrarDialogoCerca(dispositivoId, latlng) {
     const raio = parseInt(document.getElementById('cerca-raio-input').value) || 500;
     const area = `CIRCLE (${latlng.lat.toFixed(6)} ${latlng.lng.toFixed(6)}, ${raio})`;
 
-    this.disabled = true;
-    this.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    const btnCriar = this;
+    btnCriar.disabled = true;
+    btnCriar.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
 
     try {
       const cerca = await window.AL.apiPost('/api/rastreamento/cercas', {
@@ -807,8 +808,9 @@ function _mostrarDialogoCerca(dispositivoId, latlng) {
       AL.showAlert('Cerca criada!', 'success');
     } catch (err) {
       AL.showAlert('Erro ao criar cerca: ' + (err.message || ''), 'danger');
-      this.disabled = false;
-      this.innerHTML = 'Confirmar';
+    } finally {
+      btnCriar.disabled = false;
+      btnCriar.innerHTML = '<i class="fa fa-check"></i> Criar';
     }
   };
 
@@ -826,6 +828,13 @@ function _cancelarDesenhoCirculo() {
   const dlg = document.getElementById('dlg-cerca');
   if (dlg) dlg.style.display = 'none';
   
+  // Garante que o botão de confirmar volte ao estado normal
+  const btnConfirmar = document.getElementById('btn-cerca-confirmar');
+  if (btnConfirmar) {
+    btnConfirmar.disabled = false;
+    btnConfirmar.innerHTML = '<i class="fa fa-check"></i> Criar';
+  }
+
   // Remove o estado ativo do botão no card
   const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
   if (btn) btn.classList.remove('ativo');

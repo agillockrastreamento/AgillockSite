@@ -264,10 +264,10 @@ function inicializarMapa() {
   _adicionarBotoesCamadas();
 
   map.on('popupclose', function (e) {
-    if (_togglingPopup) return;
+    if (_togglingPopup || _modoDesenho) return;
     if (ativoId && marcadores[ativoId] && e.popup === marcadores[ativoId].getPopup()) fecharCardDispositivo(true);
   });
-  map.on('click', function () { _fecharSpider(); });
+  map.on('click', function () { if (!_modoDesenho) _fecharSpider(); });
   map.on('zoomend', function () { _fecharSpider(); if (!modoFoco) renderMarcadores(); });
 }
 
@@ -1010,9 +1010,14 @@ function mostrarCardDispositivo(id) {
   card.innerHTML = `
     ${imgHtml}
     <div class="dcard-header">
-      <div>
+      <div style="flex:1;min-width:0">
         <div class="v-nome">${v.nome}</div>
-        ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+          ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
+          <a href="dispositivo-detalhe.html?id=${v.dispositivoId}" title="Mais detalhes" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#e8f4fd;border-radius:50%;color:#2980b9;font-size:11px;text-decoration:none;" class="btn-dcard-gear">
+            <i class="fa fa-cog"></i>
+          </a>
+        </div>
       </div>
       <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
     </div>
@@ -1046,6 +1051,12 @@ function mostrarCardDispositivo(id) {
 
   card.style.display = 'block';
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
+
+  // Verifica se tem cerca para ativar o botão visualmente
+  AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
+    const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
+    if (btn && cercas.length > 0) btn.classList.add('ativo');
+  }).catch(() => {});
 
   AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`).then(tipos => {
     const permitidos = ['engineStop', 'engineResume'];
@@ -1237,9 +1248,9 @@ function _criarSetasNoRastro(pontos, cor) {
   const setas = [];
   const step = Math.max(1, Math.floor(pontos.length / 8));
   for (let i = step; i < pontos.length - 1; i += step) {
-    const [lat1, lng1] = pontos[i - 1], [lat2, lng2] = pontos[i];
-    const ang = Math.atan2(lng2 - lng1, lat2 - lat1) * 180 / Math.PI;
-    const seta = L.marker([lat2, lng2], {
+    const p1 = pontos[i - 1], p2 = pontos[i];
+    const ang = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI;
+    const seta = L.marker([p2[0], p2[1]], {
       icon: L.divIcon({
         html: `<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:10px solid ${cor};transform:rotate(${ang}deg);transform-origin:center"></div>`,
         className: '', iconSize: [10, 10], iconAnchor: [5, 5],
@@ -1252,16 +1263,31 @@ function _criarSetasNoRastro(pontos, cor) {
 }
 
 async function _carregarRastroDispositivo(id) {
+  const btn = document.querySelector(`.dcard-acao[data-acao="rota"]`);
+  if (btn) { btn.classList.add('carregando'); btn.querySelector('i').className = 'fa fa-spinner fa-spin'; }
+
   try {
     const now = new Date();
-    const from = new Date(now.getTime() - 3600000).toISOString();
+    const from = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString(); // 5 horas
     const hist = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/historico?from=${from}&to=${now.toISOString()}`);
     const pontos = (hist.posicoes || []).map(p => [p.latitude, p.longitude]);
-    if (pontos.length < 2) return;
-    const polyline = L.polyline(pontos, { color: '#e74c3c', weight: 3, opacity: 0.85 }).addTo(map);
-    const setas = _criarSetasNoRastro(pontos, '#e74c3c');
-    _rotasIndividuais[id] = { polyline, setas };
-  } catch {}
+    
+    if (pontos.length >= 2) {
+      const cor = '#e74c3c';
+      const polyline = L.polyline(pontos, { color: cor, weight: 4, opacity: 0.85 }).addTo(map);
+      const setas = _criarSetasNoRastro(pontos, cor);
+      _rotasIndividuais[id] = { polyline, setas };
+      
+      const bounds = polyline.getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds.pad(0.1));
+      if (btn) { btn.classList.remove('carregando'); btn.classList.add('ativo'); btn.querySelector('i').className = 'fa fa-road'; }
+    } else {
+      AL_CLIENTE.showAlert('Sem histórico de posição nas últimas 5h.', 'warning');
+      if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-road'; }
+    }
+  } catch (err) {
+    if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-road'; }
+  }
 }
 
 window.ativarRota = function (dispositivoId) {
@@ -1271,10 +1297,12 @@ window.ativarRota = function (dispositivoId) {
     if (map.hasLayer(polyline)) map.removeLayer(polyline);
     setas.forEach(s => { if (map.hasLayer(s)) map.removeLayer(s); });
     delete _rotasIndividuais[dispositivoId];
-    if (btn) btn.classList.remove('ativo');
+    if (btn) {
+      btn.classList.remove('ativo');
+      btn.querySelector('i').className = 'fa fa-road';
+    }
   } else {
     _carregarRastroDispositivo(dispositivoId);
-    if (btn) btn.classList.add('ativo');
   }
 };
 
@@ -1295,15 +1323,22 @@ function _parsearAreaTraccar(area) {
 function _criarCamadaCerca(cerca) {
   const parsed = _parsearAreaTraccar(cerca.area);
   if (!parsed) return null;
-  const opcoes = { color: '#27ae60', weight: 2, fillOpacity: 0.08, fillColor: '#27ae60' };
+  const cor = '#27ae60';
+  const opcoes = { color: cor, weight: 2, fillOpacity: 0.08, fillColor: cor };
   let camada;
   if (parsed.tipo === 'circle') {
     camada = L.circle([parsed.lat, parsed.lng], { ...opcoes, radius: parsed.raio });
   } else {
     camada = L.polygon(parsed.coords, opcoes);
   }
-  camada.bindTooltip(cerca.name, { className: 'cerca-tooltip', permanent: false });
-  camada.on('contextmenu', function () {
+  
+  camada.bindTooltip(`<b>${cerca.name || 'Cerca'}</b><br>Clique para remover`, { className: 'cerca-tooltip', sticky: true });
+  
+  camada.on('mouseover', function () { this.setStyle({ fillOpacity: 0.2, weight: 3 }); });
+  camada.on('mouseout', function () { this.setStyle({ fillOpacity: 0.08, weight: 2 }); });
+
+  camada.on('click', function (e) {
+    L.DomEvent.stopPropagation(e);
     if (confirm(`Remover a cerca "${cerca.name}"?`)) removerCerca(cerca.id);
   });
   return camada;
@@ -1329,6 +1364,7 @@ function mostrarCercas() {
 function ocultarCercas() {
   if (_cercasLayer && map.hasLayer(_cercasLayer)) map.removeLayer(_cercasLayer);
   _cercasLayer = null;
+  _cancelarDesenhoCirculo();
 }
 
 async function removerCerca(id) {
@@ -1336,6 +1372,16 @@ async function removerCerca(id) {
     await AL_CLIENTE.apiDelete(`/api/cliente/rastreamento/cercas/${id}`);
     if (_overlay.cercas) mostrarCercas();
     AL_CLIENTE.showAlert('Cerca removida.', 'success');
+    
+    // Se removeu, verifica se o botão no card deve ser desativado
+    if (ativoId) {
+       AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${ativoId}/cercas`).then(c => {
+         if (c.length === 0) {
+           const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
+           if (btn) btn.classList.remove('ativo');
+         }
+       }).catch(() => {});
+    }
   } catch (err) {
     AL_CLIENTE.showAlert('Erro ao remover cerca: ' + err.message);
   }
@@ -1343,22 +1389,25 @@ async function removerCerca(id) {
 
 window.iniciarDesenhoCirculo = function (dispositivoId) {
   _cancelarDesenhoCirculo();
+  const v = veiculosMap[dispositivoId];
+  if (!v || !v.posicao) {
+    AL_CLIENTE.showAlert('Veículo sem posição para criar cerca.', 'warning');
+    return;
+  }
+
+  const latlng = L.latLng(v.posicao.latitude, v.posicao.longitude);
   _modoDesenho = { dispositivoId, circle: null };
-  _cercaPendente.dispositivoId = dispositivoId;
-  const banner = document.getElementById('mapa-instrucao');
-  if (banner) { banner.textContent = 'Clique no mapa para posicionar o centro da cerca'; banner.style.display = 'block'; }
-  map.getContainer().style.cursor = 'crosshair';
-  map.once('click', function (e) {
-    if (!_modoDesenho) return;
-    _cercaPendente.ponto = e.latlng;
-    _modoDesenho.circle = L.circle([e.latlng.lat, e.latlng.lng], {
-      radius: 200, color: '#e67e22', fillColor: '#e67e22',
-      fillOpacity: 0.12, weight: 2, dashArray: '6,4',
-    }).addTo(map);
-    map.getContainer().style.cursor = '';
-    if (banner) banner.style.display = 'none';
-    _mostrarDialogoCerca();
-  });
+  _cercaPendente = { ponto: latlng, dispositivoId: dispositivoId };
+
+  const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
+  if (btn) btn.classList.add('ativo');
+
+  _modoDesenho.circle = L.circle(latlng, {
+    radius: 200, color: '#e67e22', fillColor: '#e67e22',
+    fillOpacity: 0.12, weight: 2, dashArray: '6,4',
+  }).addTo(map);
+
+  _mostrarDialogoCerca();
 };
 
 function _mostrarDialogoCerca() {
@@ -1378,8 +1427,6 @@ function _mostrarDialogoCerca() {
   dlg.style.display = 'block';
 
   const confirmar = document.getElementById('btn-cerca-confirmar');
-  const cancelar = document.getElementById('btn-cerca-cancelar');
-
   if (confirmar) {
     confirmar.onclick = async function () {
       const nome = (document.getElementById('cerca-nome')?.value || '').trim();
@@ -1388,8 +1435,12 @@ function _mostrarDialogoCerca() {
       const devId = _cercaPendente.dispositivoId;
       if (!nome) { AL_CLIENTE.showAlert('Informe um nome para a cerca.'); return; }
       if (!ponto) { _cancelarDesenhoCirculo(); return; }
+      
       const area = `CIRCLE (${ponto.lat.toFixed(6)} ${ponto.lng.toFixed(6)}, ${raio})`;
-      this.disabled = true; this.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+      const btnCriar = this;
+      btnCriar.disabled = true; 
+      btnCriar.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+      
       try {
         await AL_CLIENTE.apiPost('/api/cliente/rastreamento/cercas', { nome, area, dispositivoId: devId });
         _cancelarDesenhoCirculo();
@@ -1397,10 +1448,14 @@ function _mostrarDialogoCerca() {
         if (_overlay.cercas) mostrarCercas();
       } catch (err) {
         AL_CLIENTE.showAlert('Erro ao criar cerca: ' + err.message);
-        this.disabled = false; this.innerHTML = '<i class="fa fa-check"></i> Criar';
+      } finally {
+        btnCriar.disabled = false;
+        btnCriar.innerHTML = '<i class="fa fa-check"></i> Criar';
       }
     };
   }
+  
+  const cancelar = document.getElementById('btn-cerca-cancelar');
   if (cancelar) {
     cancelar.onclick = _cancelarDesenhoCirculo;
   }
@@ -1419,15 +1474,37 @@ function _cancelarDesenhoCirculo() {
 
 // ── Botões de ação do card de dispositivo ─────────────────────────────────────
 
+window.acaoDispositivoCliente = async function(acao, dispositivoId) {
+  if (acao === 'rota') { ativarRota(dispositivoId); return; }
+  if (acao === 'cerca') {
+    const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
+    if (btn && btn.classList.contains('ativo')) {
+      if (confirm('Deseja remover as cercas vinculadas a este dispositivo?')) {
+        try {
+          const cercas = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${dispositivoId}/cercas`);
+          for (const c of cercas) {
+            await removerCerca(c.id);
+          }
+          btn.classList.remove('ativo');
+        } catch (err) {
+          AL_CLIENTE.showAlert('Erro ao remover cercas.', 'danger');
+        }
+      }
+      return;
+    }
+    iniciarDesenhoCirculo(dispositivoId);
+  }
+};
+
 function _htmlAcoesCard(dispositivoId) {
   const rotaAtiva = !!_rotasIndividuais[dispositivoId];
   return `
-    <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="ativarRota('${dispositivoId}')" title="Rota">
+    <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivoCliente('rota','${dispositivoId}')" title="Rota">
       <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
       <span>Rota</span>
     </button>
-    <button class="dcard-acao" data-acao="cerca" onclick="iniciarDesenhoCirculo('${dispositivoId}')" title="Criar Cerca">
-      <span class="dcard-acao-icon"><i class="fa fa-map-o"></i></span>
+    <button class="dcard-acao" data-acao="cerca" onclick="acaoDispositivoCliente('cerca','${dispositivoId}')" title="Criar Cerca">
+      <span class="dcard-acao-icon"><i class="fa fa-circle-o"></i></span>
       <span>Cerca</span>
     </button>
   `;
