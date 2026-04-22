@@ -128,7 +128,7 @@ router.get('/dispositivos/:id/historico', requireRoles('ADMIN', 'COLABORADOR'), 
   const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
 
-  const historico = await traccarGetPositionHistory(traccarDevice.id, fromDate, toDate);
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate);
 
   res.json({
     dispositivo: { id: dispositivo.id, nome: dispositivo.nome, placa: dispositivo.placa },
@@ -164,7 +164,7 @@ router.get('/dispositivos/:id/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
   const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
 
-  const viagens = await traccarGetTrips(traccarDevice.id, fromDate, toDate);
+  const viagens = await traccarGetTrips([traccarDevice.id], fromDate, toDate);
 
   res.json(viagens.map(v => ({
     inicio: v.startTime,
@@ -200,7 +200,7 @@ router.get('/dispositivos/:id/paradas', requireRoles('ADMIN', 'COLABORADOR'), as
   const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
 
-  const paradas = await traccarGetStops(traccarDevice.id, fromDate, toDate);
+  const paradas = await traccarGetStops([traccarDevice.id], fromDate, toDate);
 
   res.json(paradas.map(p => ({
     inicio: p.startTime,
@@ -231,7 +231,8 @@ router.get('/dispositivos/:id/eventos', requireRoles('ADMIN', 'COLABORADOR'), as
   const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
 
-  const eventos = await traccarGetEvents(traccarDevice.id, fromDate, toDate);
+  const eventos = await traccarGetEvents([traccarDevice.id], fromDate, toDate);
+
 
   res.json(eventos.map(e => ({
     id: e.id,
@@ -260,7 +261,7 @@ router.get('/dispositivos/:id/resumo', requireRoles('ADMIN', 'COLABORADOR'), asy
   const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
 
-  const resumos = await traccarGetSummary(traccarDevice.id, fromDate, toDate);
+  const resumos = await traccarGetSummary([traccarDevice.id], fromDate, toDate);
 
   if (!resumos.length) { res.json(null); return; }
   const r = resumos[0];
