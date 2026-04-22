@@ -214,13 +214,13 @@
       position: absolute;
       top: 12px;
       left: 12px;
-      z-index: 5500 !important; /* Aumentado para cobrir tudo */
-      width: 280px; /* Padronizado com Admin */
+      z-index: 6000 !important; /* Garantido acima de tudo */
+      width: 280px;
       background: #fff;
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.22);
       overflow-y: auto;
-      max-height: calc(var(--real-vh, 100vh) - 180px); /* Garante que não bata no rodapé */
+      max-height: calc(100% - 205px); /* Desconta rodapé (180px) + top margin */
       scrollbar-width: thin;
       scrollbar-color: #ccc #fff;
       border: 1px solid rgba(0,0,0,0.05);
