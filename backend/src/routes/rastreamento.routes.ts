@@ -495,6 +495,7 @@ router.get('/logs', requireRoles('ADMIN'), async (_req: AuthRequest, res: Respon
     res.send(logText);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    console.error('[Logs] Erro ao buscar logs do Traccar:', msg);
     res.status(502).json({ error: `Erro ao buscar logs: ${msg}` });
   }
 });
