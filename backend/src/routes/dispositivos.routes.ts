@@ -36,6 +36,8 @@ const DISPOSITIVO_SELECT = {
   placa: true, marca: true, modeloVeiculo: true, cor: true, ano: true,
   renavam: true, chassi: true, combustivel: true, localInstalacao: true, instalador: true,
   consumo: true, limiteVelocidade: true, senha: true, ignorarOdometro: true,
+  odometroSistemaMetros: true, horimetroSistemaSegundos: true,
+  telemetriaUltimaPosicaoEm: true, telemetriaUltimaLatitude: true, telemetriaUltimaLongitude: true, telemetriaUltimaIgnicao: true,
   imagemUrl: true, valorPadrao: true,
   clienteId: true, vendedorId: true, criadoPorId: true,
   createdAt: true, updatedAt: true,
@@ -49,6 +51,21 @@ const CLIENTES_VINCULADOS_INCLUDE = {
     include: { motorista: { select: { id: true, nome: true } } },
   },
 };
+
+function parseOptionalKm(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const numero = Number(value);
+  return Number.isFinite(numero) && numero >= 0 ? numero : null;
+}
+
+function mapDispositivoResponse(dispositivo: Record<string, unknown>) {
+  return {
+    ...dispositivo,
+    odometro: typeof dispositivo.odometroSistemaMetros === 'number' ? Math.round(dispositivo.odometroSistemaMetros) / 1000 : null,
+    horimetro: typeof dispositivo.horimetroSistemaSegundos === 'number' ? Math.round((dispositivo.horimetroSistemaSegundos / 3600) * 10) / 10 : 0,
+  };
+}
 
 // ─── GET /api/dispositivos ─────────────────────────────────────────────────
 router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
@@ -83,7 +100,7 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
     orderBy: { nome: 'asc' },
   });
 
-  res.json(dispositivos);
+  res.json(dispositivos.map(mapDispositivoResponse));
 });
 
 // ─── GET /api/dispositivos/:id ─────────────────────────────────────────────
@@ -105,7 +122,7 @@ router.get('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
     return;
   }
 
-  res.json(dispositivo);
+  res.json(mapDispositivoResponse(dispositivo));
 });
 
 // ─── POST /api/dispositivos ────────────────────────────────────────────────
@@ -119,8 +136,11 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
     modeloRastreador, telefoneRastreador, iccid, operadora,
     placa, marca, modeloVeiculo, cor, ano, renavam, chassi, combustivel, localInstalacao, instalador,
     consumo, limiteVelocidade, senha, ignorarOdometro,
+    odometro,
     valorPadrao, clienteId, vendedorId,
   } = req.body;
+
+  const odometroKm = parseOptionalKm(odometro);
 
   if (!nome || !identificador) {
     res.status(400).json({ error: 'Nome e identificador são obrigatórios.' });
@@ -169,6 +189,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
       limiteVelocidade: limiteVelocidade ? Number(limiteVelocidade) : null,
       senha: senha || null,
       ignorarOdometro: ignorarOdometro === 'true' || ignorarOdometro === true,
+      odometroSistemaMetros: odometroKm != null ? Math.round(odometroKm * 1000) : null,
       imagemUrl,
       valorPadrao: valorPadrao ? Number(valorPadrao) : null,
       clienteId: clienteId || null,
@@ -197,7 +218,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
   traccarCreateDevice(dispositivo.nome, dispositivo.identificador)
     .catch(err => console.error('[Traccar] Falha ao criar dispositivo:', err.message));
 
-  res.status(201).json(dispositivo);
+  res.status(201).json(mapDispositivoResponse(dispositivo));
 });
 
 // ─── PUT /api/dispositivos/:id ─────────────────────────────────────────────
@@ -219,8 +240,10 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     modeloRastreador, telefoneRastreador, iccid, operadora,
     placa, marca, modeloVeiculo, cor, ano, renavam, chassi, combustivel, localInstalacao, instalador,
     consumo, limiteVelocidade, senha, ignorarOdometro,
+    odometro,
     valorPadrao, clienteId, vendedorId,
   } = req.body;
+  const odometroKm = parseOptionalKm(odometro);
 
   // Verificar unicidade do identificador (se mudou)
   const novoIdentificador = identificador ? String(identificador).trim() : existe.identificador;
@@ -280,6 +303,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
       ...(limiteVelocidade !== undefined ? { limiteVelocidade: limiteVelocidade ? Number(limiteVelocidade) : null } : {}),
       ...(senha !== undefined ? { senha: senha || null } : {}),
       ...(ignorarOdometro !== undefined ? { ignorarOdometro: ignorarOdometro === 'true' || ignorarOdometro === true } : {}),
+      ...(odometro !== undefined ? { odometroSistemaMetros: odometroKm != null ? Math.round(odometroKm * 1000) : null } : {}),
       ...(req.file ? { imagemUrl: novaImagemUrl } : {}),
       ...(valorPadrao !== undefined ? { valorPadrao: valorPadrao ? Number(valorPadrao) : null } : {}),
       ...(clienteId !== undefined ? { clienteId: clienteId || null } : {}),
@@ -314,7 +338,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     })
     .catch(err => console.error('[Traccar] Falha ao sincronizar dispositivo:', err.message));
 
-  res.json(dispositivo);
+  res.json(mapDispositivoResponse(dispositivo));
 });
 
 // ─── PATCH /api/dispositivos/:id/status — Toggle ativo ────────────────────

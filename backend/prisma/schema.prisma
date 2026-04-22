@@ -232,6 +232,12 @@ model Dispositivo {
   limiteVelocidade Float?
   senha            String?
   ignorarOdometro  Boolean  @default(false)
+  odometroSistemaMetros    Float?
+  horimetroSistemaSegundos Int      @default(0)
+  telemetriaUltimaPosicaoEm DateTime?
+  telemetriaUltimaLatitude  Float?
+  telemetriaUltimaLongitude Float?
+  telemetriaUltimaIgnicao   Boolean?
 
   // Imagem
   imagemUrl        String?

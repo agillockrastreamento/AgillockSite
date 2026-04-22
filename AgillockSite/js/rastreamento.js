@@ -46,6 +46,9 @@ const _rotasIndividuais = {};
 
 // Modal de comando
 let _cmdDispositivoId = null;
+let _medidoresDispositivoId = null;
+const _usuarioRastreamento = (window.AL && typeof window.AL.getUser === 'function') ? window.AL.getUser() : null;
+const _podeEditarMedidores = !!(_usuarioRastreamento && _usuarioRastreamento.role === 'ADMIN');
 
 // ── Eventos ───────────────────────────────────────────────────────────────────
 const TIPOS_EVENTO_ADMIN = [
@@ -106,6 +109,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const wrap = document.getElementById('cmd-custom-wrap');
     if (wrap) { wrap.style.display = isCustom ? 'block' : 'none'; }
   });
+
+  inicializarModalMedidores();
 });
 
 // ── Painel de Eventos — inicialização ─────────────────────────────────────────
@@ -640,6 +645,106 @@ function fecharModalComando_resetCustom() {
 }
 
 // ── Cercas (Geofences) ────────────────────────────────────────────────────────
+
+function inicializarModalMedidores() {
+  if (document.getElementById('modal-medidores-overlay')) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'modal-medidores-overlay';
+  wrap.style.display = 'none';
+  wrap.style.position = 'fixed';
+  wrap.style.inset = '0';
+  wrap.style.background = 'rgba(0,0,0,0.45)';
+  wrap.style.zIndex = '4000';
+  wrap.style.alignItems = 'center';
+  wrap.style.justifyContent = 'center';
+  wrap.innerHTML = `
+    <div style="width:min(92vw,420px);background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden">
+      <div style="padding:16px 18px;border-bottom:1px solid #e9ecef;display:flex;align-items:center;justify-content:space-between">
+        <strong id="modal-medidores-titulo" style="font-size:16px;color:#2c3e50">Editar medidores</strong>
+        <button type="button" id="btn-fechar-modal-medidores" style="border:none;background:none;font-size:22px;line-height:1;color:#7f8c8d">&times;</button>
+      </div>
+      <div style="padding:18px">
+        <div class="form-group">
+          <label for="medidores-odometro">Odômetro (km)</label>
+          <input type="number" class="form-control" id="medidores-odometro" min="0" step="0.1" />
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="medidores-horimetro">Motor (h)</label>
+          <input type="number" class="form-control" id="medidores-horimetro" min="0" step="0.1" />
+        </div>
+        <div id="medidores-resultado" style="margin-top:12px;font-size:12px;"></div>
+      </div>
+      <div style="padding:14px 18px;border-top:1px solid #e9ecef;display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn btn-default btn-sm" id="btn-cancelar-modal-medidores">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-salvar-medidores"><i class="fa fa-save"></i> Salvar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+
+  document.getElementById('btn-fechar-modal-medidores').addEventListener('click', fecharModalMedidores);
+  document.getElementById('btn-cancelar-modal-medidores').addEventListener('click', fecharModalMedidores);
+  document.getElementById('btn-salvar-medidores').addEventListener('click', salvarMedidoresDoModal);
+  wrap.addEventListener('click', function (e) {
+    if (e.target === wrap) fecharModalMedidores();
+  });
+}
+
+function abrirModalMedidores(dispositivoId) {
+  if (!_podeEditarMedidores) return;
+  const v = veiculosMap[dispositivoId];
+  if (!v) return;
+  _medidoresDispositivoId = dispositivoId;
+  document.getElementById('modal-medidores-titulo').textContent = `Editar medidores - ${v.nome}`;
+  document.getElementById('medidores-odometro').value = v.posicao?.odometro != null ? (v.posicao.odometro / 1000).toFixed(1) : '';
+  document.getElementById('medidores-horimetro').value = v.posicao?.horas_motor != null ? v.posicao.horas_motor : 0;
+  document.getElementById('medidores-resultado').textContent = '';
+  document.getElementById('modal-medidores-overlay').style.display = 'flex';
+}
+
+function fecharModalMedidores() {
+  const wrap = document.getElementById('modal-medidores-overlay');
+  if (wrap) wrap.style.display = 'none';
+  _medidoresDispositivoId = null;
+}
+
+async function salvarMedidoresDoModal() {
+  if (!_medidoresDispositivoId) return;
+  const btn = document.getElementById('btn-salvar-medidores');
+  const resultado = document.getElementById('medidores-resultado');
+  const odometroRaw = document.getElementById('medidores-odometro').value.trim();
+  const horimetroRaw = document.getElementById('medidores-horimetro').value.trim();
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
+  resultado.textContent = '';
+
+  try {
+    const data = await window.AL.apiPatch(`/api/rastreamento/dispositivos/${_medidoresDispositivoId}/medidores`, {
+      odometro: odometroRaw === '' ? null : Number(odometroRaw),
+      horimetro: horimetroRaw === '' ? 0 : Number(horimetroRaw),
+    });
+
+    const veiculo = veiculosMap[_medidoresDispositivoId];
+    if (veiculo && veiculo.posicao) {
+      veiculo.posicao.odometro = data.odometro != null ? Math.round(data.odometro * 1000) : null;
+      veiculo.posicao.horas_motor = data.horimetro;
+    }
+
+    resultado.style.color = '#27ae60';
+    resultado.textContent = 'Medidores atualizados.';
+    mostrarCardDispositivo(_medidoresDispositivoId);
+    setTimeout(fecharModalMedidores, 700);
+  } catch (err) {
+    resultado.style.color = '#e74c3c';
+    resultado.textContent = 'Erro: ' + (err.message || 'Falha ao salvar.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-save"></i> Salvar';
+  }
+}
+
+window.abrirModalMedidores = abrirModalMedidores;
 
 function _parsearAreaTraccar(area) {
   if (!area) return null;
@@ -1469,8 +1574,8 @@ function mostrarCardDispositivo(id) {
   if (p?.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
   if (bat != null)          si.push(`<span style="color:${batCor}"><i class="fa ${batFa}"></i> Bateria: ${bat}%</span>`);
   if (p?.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
-  if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km</span>`);
-  if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
+  if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km${_podeEditarMedidores ? ` <button type="button" onclick="abrirModalMedidores('${v.dispositivoId}')" title="Editar odômetro e motor" style="border:none;background:none;color:#2980b9;padding:0 0 0 6px"><i class="fa fa-pencil"></i></button>` : ''}</span>`);
+  if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h${_podeEditarMedidores ? ` <button type="button" onclick="abrirModalMedidores('${v.dispositivoId}')" title="Editar odômetro e motor" style="border:none;background:none;color:#2980b9;padding:0 0 0 6px"><i class="fa fa-pencil"></i></button>` : ''}</span>`);
   if (v?.motorista?.nome) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${v.motorista.nome}</span>`);
   else if (p?.motorista_id) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista ID: ${p.motorista_id}</span>`);
   if (p?.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
@@ -1604,8 +1709,8 @@ function atualizarCardAtivo(dispositivoId) {
     if (p?.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
     if (bat != null)          si.push(`<span style="color:${batCor}"><i class="fa ${batFa}"></i> Bateria: ${bat}%</span>`);
     if (p?.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
-    if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km</span>`);
-    if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
+    if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km${_podeEditarMedidores ? ` <button type="button" onclick="abrirModalMedidores('${v.dispositivoId}')" title="Editar odômetro e motor" style="border:none;background:none;color:#2980b9;padding:0 0 0 6px"><i class="fa fa-pencil"></i></button>` : ''}</span>`);
+    if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h${_podeEditarMedidores ? ` <button type="button" onclick="abrirModalMedidores('${v.dispositivoId}')" title="Editar odômetro e motor" style="border:none;background:none;color:#2980b9;padding:0 0 0 6px"><i class="fa fa-pencil"></i></button>` : ''}</span>`);
     if (v?.motorista?.nome) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${v.motorista.nome}</span>`);
     else if (p?.motorista_id) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista ID: ${p.motorista_id}</span>`);
     if (p?.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);

@@ -1,6 +1,12 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { IncomingMessage, Server } from 'http';
-import { traccarGetSessionCookie, normalizeAttributes, EVENT_TYPE_LABELS } from './traccar.service';
+import prisma from '../utils/prisma';
+import { traccarGetSessionCookie, normalizeAttributes, EVENT_TYPE_LABELS, traccarGetDevices } from './traccar.service';
+import {
+  DISPOSITIVO_MEDIDORES_SELECT,
+  sincronizarDispositivosComPosicoes,
+  decorarPosicaoComMedidores,
+} from './medidores.service';
 
 const TRACCAR_URL = process.env.TRACCAR_URL || 'http://traccar:8082';
 const WS_TRACCAR_URL = TRACCAR_URL.replace('http://', 'ws://').replace('https://', 'wss://');
@@ -10,6 +16,7 @@ const frontendClients = new Set<WebSocket>();
 
 let traccarWs: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
+const traccarIdToUniqueId = new Map<number, string>();
 
 // ── Iniciar o servidor WebSocket para o frontend ──────────────────────────────
 
@@ -51,6 +58,13 @@ async function connectToTraccar() {
   }
 
   console.log('[WS Traccar] Conectando...');
+  try {
+    const devices = await traccarGetDevices();
+    traccarIdToUniqueId.clear();
+    devices.forEach(device => traccarIdToUniqueId.set(device.id, device.uniqueId));
+  } catch (err) {
+    console.warn('[WS Traccar] Falha ao atualizar cache de dispositivos.', err);
+  }
   traccarWs = new WebSocket(`${WS_TRACCAR_URL}/api/socket`, {
     headers: { Cookie: cookie },
   });
@@ -59,7 +73,7 @@ async function connectToTraccar() {
     console.log('[WS Traccar] Conectado.');
   });
 
-  traccarWs.on('message', (data: Buffer) => {
+  traccarWs.on('message', async (data: Buffer) => {
     const raw = data.toString();
 
     if (raw === '{}' || raw.trim() === '') return;
@@ -71,7 +85,7 @@ async function connectToTraccar() {
       return;
     }
 
-    const payload = transformTraccarMessage(msg);
+    const payload = await transformTraccarMessage(msg);
     if (!payload) return;
 
     const outgoing = JSON.stringify(payload);
@@ -96,23 +110,77 @@ async function connectToTraccar() {
 
 // ── Transformar mensagem do Traccar para o formato do frontend ────────────────
 
-function transformTraccarMessage(msg: TraccarWsMessage): object | null {
+async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | null> {
   const result: Record<string, unknown> = {};
+
+  if (msg.devices?.length) {
+    msg.devices.forEach(device => traccarIdToUniqueId.set(device.id, device.uniqueId));
+  }
+
+  const identificadores = Array.from(new Set(
+    (msg.positions || [])
+      .map(position => traccarIdToUniqueId.get(position.deviceId))
+      .filter((value): value is string => !!value),
+  ));
+  const dispositivos = identificadores.length
+    ? await prisma.dispositivo.findMany({
+      where: { identificador: { in: identificadores } },
+      select: { identificador: true, id: true, ...DISPOSITIVO_MEDIDORES_SELECT },
+    })
+    : [];
+  const localPorIdentificador = new Map(dispositivos.map(dispositivo => [dispositivo.identificador, dispositivo]));
+
+  if (msg.positions?.length) {
+    const posicaoPorIdentificador = new Map<string, {
+      deviceId: number;
+      latitude: number;
+      longitude: number;
+      altitude: number;
+      speed: number;
+      course: number;
+      fixTime: string;
+      deviceTime: string;
+      serverTime: string;
+      valid: boolean;
+      address: string | null;
+      attributes: Record<string, unknown>;
+    }>();
+    msg.positions.forEach(position => {
+      const identificador = traccarIdToUniqueId.get(position.deviceId);
+      if (identificador) posicaoPorIdentificador.set(identificador, position);
+    });
+    const atualizados = await sincronizarDispositivosComPosicoes(
+      dispositivos,
+      posicaoPorIdentificador as unknown as Map<string, any>,
+    );
+    atualizados.forEach((dispositivo, identificador) => {
+      localPorIdentificador.set(identificador, dispositivo);
+    });
+  }
 
   if (msg.positions?.length) {
     result.positions = msg.positions.map(p => ({
       deviceId: p.deviceId,
-      latitude: p.latitude,
-      longitude: p.longitude,
-      velocidade: Math.round(p.speed * 1.852),
-      curso: p.course,
-      altitude: p.altitude,
-      fixTime: p.fixTime,
-      deviceTime: p.deviceTime,
-      serverTime: p.serverTime,
-      valida: p.valid,
-      endereco: p.address,
-      ...normalizeAttributes(p.attributes ?? {}),
+      ...(() => {
+        const identificador = traccarIdToUniqueId.get(p.deviceId);
+        const dispositivo = identificador ? localPorIdentificador.get(identificador) : null;
+        if (!dispositivo) {
+          return {
+            latitude: p.latitude,
+            longitude: p.longitude,
+            velocidade: Math.round(p.speed * 1.852),
+            curso: p.course,
+            altitude: p.altitude,
+            fixTime: p.fixTime,
+            deviceTime: p.deviceTime,
+            serverTime: p.serverTime,
+            valida: p.valid,
+            endereco: p.address,
+            ...normalizeAttributes(p.attributes ?? {}),
+          };
+        }
+        return decorarPosicaoComMedidores(dispositivo, p as any);
+      })(),
     }));
   }
 

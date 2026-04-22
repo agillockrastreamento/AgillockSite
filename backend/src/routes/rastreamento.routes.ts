@@ -24,6 +24,14 @@ import {
   normalizeAttributes,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
+import {
+  DISPOSITIVO_MEDIDORES_SELECT,
+  sincronizarDispositivosComPosicoes,
+  decorarPosicaoComMedidores,
+  aplicarResumoComMedidores,
+  aplicarViagensComMedidores,
+  aplicarParadasComMedidores,
+} from '../services/medidores.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -39,6 +47,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       select: {
         id: true, nome: true, identificador: true, placa: true,
         categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true, imagemUrl: true,
+        ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { select: { id: true, nome: true } },
         motoristasVinculados: {
           include: { motorista: { select: { id: true, nome: true } } }
@@ -69,10 +78,18 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
   try { posicoes = await traccarGetPositions(); } catch { /* sem posições */ }
 
   const posicaoPorDeviceId = new Map(posicoes.map(p => [p.deviceId, p]));
+  const posicaoPorIdentificador = new Map<string, Awaited<ReturnType<typeof traccarGetPositions>>[number]>();
+  for (const dispositivo of dispositivos) {
+    const traccar = traccarByImei.get(dispositivo.identificador);
+    const posicao = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
+    if (posicao) posicaoPorIdentificador.set(dispositivo.identificador, posicao);
+  }
+  const estadosAtualizados = await sincronizarDispositivosComPosicoes(dispositivos, posicaoPorIdentificador);
 
   const resultado = dispositivos.map(d => {
     const traccar = traccarByImei.get(d.identificador);
     const posicao = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
+    const estado = estadosAtualizados.get(d.identificador) ?? d;
     const motorista = d.motoristasVinculados && d.motoristasVinculados.length > 0 ? d.motoristasVinculados[0].motorista : null;
 
     return {
@@ -91,19 +108,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       traccarId: traccar?.id ?? null,
       status: traccar?.status ?? 'unknown',
       lastUpdate: traccar?.lastUpdate ?? null,
-      posicao: posicao ? {
-        latitude: posicao.latitude,
-        longitude: posicao.longitude,
-        velocidade: Math.round(posicao.speed * 1.852),
-        curso: posicao.course,
-        altitude: posicao.altitude,
-        fixTime: posicao.fixTime,
-        deviceTime: posicao.deviceTime,
-        serverTime: posicao.serverTime,
-        valida: posicao.valid,
-        endereco: posicao.address,
-        ...normalizeAttributes(posicao.attributes),
-      } : null,
+      posicao: posicao ? decorarPosicaoComMedidores(estado, posicao) : null,
     };
   });
 
@@ -118,7 +123,7 @@ router.get('/dispositivos/:id/historico', requireRoles('ADMIN', 'COLABORADOR'), 
 
   const dispositivo = await prisma.dispositivo.findUnique({
     where: { id },
-    select: { id: true, nome: true, identificador: true, placa: true },
+    select: { id: true, nome: true, identificador: true, placa: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
@@ -133,16 +138,7 @@ router.get('/dispositivos/:id/historico', requireRoles('ADMIN', 'COLABORADOR'), 
   res.json({
     dispositivo: { id: dispositivo.id, nome: dispositivo.nome, placa: dispositivo.placa },
     total: historico.length,
-    posicoes: historico.map(p => ({
-      latitude: p.latitude,
-      longitude: p.longitude,
-      velocidade: Math.round(p.speed * 1.852),
-      curso: p.course,
-      altitude: p.altitude,
-      fixTime: p.fixTime,
-      valida: p.valid,
-      ...normalizeAttributes(p.attributes),
-    })),
+    posicoes: historico.map(p => decorarPosicaoComMedidores(dispositivo, p)),
   });
 });
 
@@ -154,7 +150,7 @@ router.get('/dispositivos/:id/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
 
   const dispositivo = await prisma.dispositivo.findUnique({
     where: { id },
-    select: { id: true, nome: true, identificador: true },
+    select: { id: true, nome: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
@@ -165,8 +161,10 @@ router.get('/dispositivos/:id/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
   const toDate = to ? new Date(to) : new Date();
 
   const viagens = await traccarGetTrips([traccarDevice.id], fromDate, toDate);
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
+  const viagensComMedidores = aplicarViagensComMedidores(dispositivo, viagens, historico);
 
-  res.json(viagens.map(v => ({
+  res.json(viagensComMedidores.map(v => ({
     inicio: v.startTime,
     fim: v.endTime,
     origem: v.startAddress,
@@ -190,7 +188,7 @@ router.get('/dispositivos/:id/paradas', requireRoles('ADMIN', 'COLABORADOR'), as
 
   const dispositivo = await prisma.dispositivo.findUnique({
     where: { id },
-    select: { id: true, nome: true, identificador: true },
+    select: { id: true, nome: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
@@ -201,15 +199,17 @@ router.get('/dispositivos/:id/paradas', requireRoles('ADMIN', 'COLABORADOR'), as
   const toDate = to ? new Date(to) : new Date();
 
   const paradas = await traccarGetStops([traccarDevice.id], fromDate, toDate);
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
+  const paradasComMedidores = aplicarParadasComMedidores(paradas, historico);
 
-  res.json(paradas.map(p => ({
+  res.json(paradasComMedidores.map(p => ({
     inicio: p.startTime,
     fim: p.endTime,
     endereco: p.address,
     latitude: p.lat,
     longitude: p.lon,
     duracao: Math.round(p.duration / 60000),
-    horasMotor: Math.round((p.engineHours || 0) / 3600000),
+    horasMotor: Math.round((p.engineHours || 0) / 3600000 * 10) / 10,
   })));
 });
 
@@ -221,7 +221,7 @@ router.get('/dispositivos/:id/eventos', requireRoles('ADMIN', 'COLABORADOR'), as
 
   const dispositivo = await prisma.dispositivo.findUnique({
     where: { id },
-    select: { id: true, nome: true, identificador: true },
+    select: { id: true, nome: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
@@ -251,7 +251,7 @@ router.get('/dispositivos/:id/resumo', requireRoles('ADMIN', 'COLABORADOR'), asy
 
   const dispositivo = await prisma.dispositivo.findUnique({
     where: { id },
-    select: { id: true, nome: true, identificador: true },
+    select: { id: true, nome: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
@@ -262,9 +262,10 @@ router.get('/dispositivos/:id/resumo', requireRoles('ADMIN', 'COLABORADOR'), asy
   const toDate = to ? new Date(to) : new Date();
 
   const resumos = await traccarGetSummary([traccarDevice.id], fromDate, toDate);
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
 
   if (!resumos.length) { res.json(null); return; }
-  const r = resumos[0];
+  const r = aplicarResumoComMedidores(dispositivo, resumos[0], historico);
   res.json({
     distancia: Math.round(r.distance / 100) / 10,
     velocidadeMedia: Math.round(r.averageSpeed * 1.852),
@@ -320,6 +321,55 @@ router.post('/dispositivos/:id/comandos', requireRoles('ADMIN', 'COLABORADOR'), 
 });
 
 // ── GET /api/rastreamento/dispositivos/:id/detalhe ────────────────────────────
+router.patch('/dispositivos/:id/medidores', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const { odometro, horimetro } = req.body as { odometro?: number | null; horimetro?: number | null };
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (traccarDevice) {
+    try {
+      const posicoes = await traccarGetPositions([traccarDevice.id]);
+      const atual = posicoes[0];
+      if (atual) {
+        const atualizados = await sincronizarDispositivosComPosicoes([dispositivo], new Map([[dispositivo.identificador, atual]]));
+        Object.assign(dispositivo, atualizados.get(dispositivo.identificador) ?? dispositivo);
+      }
+    } catch {
+      // mantém o estado persistido
+    }
+  }
+
+  const data: Record<string, unknown> = {};
+  if (odometro !== undefined) {
+    data.odometroSistemaMetros = odometro == null ? null : Math.round(Number(odometro) * 1000);
+  }
+  if (horimetro !== undefined) {
+    data.horimetroSistemaSegundos = horimetro == null ? 0 : Math.max(0, Math.round(Number(horimetro) * 3600));
+  }
+
+  const atualizado = await prisma.dispositivo.update({
+    where: { id },
+    data,
+    select: {
+      id: true,
+      odometroSistemaMetros: true,
+      horimetroSistemaSegundos: true,
+    },
+  });
+
+  res.json({
+    id: atualizado.id,
+    odometro: atualizado.odometroSistemaMetros != null ? Math.round(atualizado.odometroSistemaMetros) / 1000 : null,
+    horimetro: Math.round((atualizado.horimetroSistemaSegundos / 3600) * 10) / 10,
+  });
+});
+
 router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
 
@@ -329,6 +379,7 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
       id: true, nome: true, identificador: true, placa: true, categoria: true,
       marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true,
       ativo: true, imagemUrl: true,
+      ...DISPOSITIVO_MEDIDORES_SELECT,
       cliente: { select: { id: true, nome: true } },
       motoristasVinculados: {
         include: { motorista: { select: { id: true, nome: true } } }
@@ -345,6 +396,11 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
       const posicoes = await traccarGetPositions([traccarDevice.id]);
       posicao = posicoes[0];
     } catch { /* sem posição */ }
+  }
+
+  if (posicao) {
+    const atualizados = await sincronizarDispositivosComPosicoes([dispositivo], new Map([[dispositivo.identificador, posicao]]));
+    Object.assign(dispositivo, atualizados.get(dispositivo.identificador) ?? dispositivo);
   }
 
   const attrs = posicao?.attributes ?? {};
@@ -378,18 +434,8 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
       attributes: traccarDevice.attributes,
     } : null,
     posicao: posicao ? {
-      latitude: posicao.latitude,
-      longitude: posicao.longitude,
-      altitude: posicao.altitude,
-      velocidade: Math.round(posicao.speed * 1.852),
-      curso: posicao.course,
-      fixTime: posicao.fixTime,
-      deviceTime: posicao.deviceTime,
-      serverTime: posicao.serverTime,
-      valida: posicao.valid,
-      endereco: posicao.address,
+      ...decorarPosicaoComMedidores(dispositivo, posicao),
       atributos: attrs,
-      ...normalizeAttributes(attrs),
     } : null,
   });
 });
@@ -513,11 +559,15 @@ router.get('/relatorios/batch/historico', requireRoles('ADMIN', 'COLABORADOR'), 
   const toDate = new Date(to);
 
   try {
+    const traccarDevices = await traccarGetDevices();
+    const dispositivosTraccar = traccarDevices.filter(d => ids.includes(d.id));
+    const identificadorPorTraccarId = new Map(dispositivosTraccar.map(d => [d.id, d.uniqueId]));
     // Busca os nomes dos dispositivos para o frontend mapear
     const dispositivosLocal = await prisma.dispositivo.findMany({
-      where: { identificador: { in: (await traccarGetDevices()).filter(d => ids.includes(d.id)).map(d => d.uniqueId) } },
-      select: { id: true, nome: true, placa: true, identificador: true }
+      where: { identificador: { in: dispositivosTraccar.map(d => d.uniqueId) } },
+      select: { id: true, nome: true, placa: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT }
     });
+    const localPorIdentificador = new Map(dispositivosLocal.map(d => [d.identificador, d]));
 
     const historico = await traccarGetPositionHistory(ids, fromDate, toDate);
     
@@ -525,12 +575,10 @@ router.get('/relatorios/batch/historico', requireRoles('ADMIN', 'COLABORADOR'), 
       dispositivos: dispositivosLocal,
       posicoes: historico.map(p => ({
         deviceId: p.deviceId,
-        latitude: p.latitude,
-        longitude: p.longitude,
-        velocidade: Math.round(p.speed * 1.852),
-        fixTime: p.fixTime,
-        valida: p.valid,
-        ...normalizeAttributes(p.attributes),
+        ...decorarPosicaoComMedidores(
+          localPorIdentificador.get(identificadorPorTraccarId.get(p.deviceId) || '') || { odometroSistemaMetros: null, horimetroSistemaSegundos: 0 },
+          p,
+        ),
       })),
     });
   } catch (err: unknown) {
@@ -546,8 +594,24 @@ router.get('/relatorios/batch/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
 
   const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
   try {
-    const viagens = await traccarGetTrips(ids, new Date(from), new Date(to));
-    res.json(viagens);
+    const [viagens, traccarDevices, historico] = await Promise.all([
+      traccarGetTrips(ids, new Date(from), new Date(to)),
+      traccarGetDevices(),
+      traccarGetPositionHistory(ids, new Date(from), new Date(to)).catch(() => []),
+    ]);
+    const dispositivosTraccar = traccarDevices.filter(d => ids.includes(d.id));
+    const dispositivosLocal = await prisma.dispositivo.findMany({
+      where: { identificador: { in: dispositivosTraccar.map(d => d.uniqueId) } },
+      select: { identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
+    });
+    const localPorTraccarId = new Map(
+      dispositivosTraccar.map(device => [device.id, dispositivosLocal.find(local => local.identificador === device.uniqueId)]),
+    );
+    res.json(viagens.map(viagem => {
+      const dispositivo = localPorTraccarId.get(viagem.deviceId);
+      if (!dispositivo) return viagem;
+      return aplicarViagensComMedidores(dispositivo, [viagem], historico)[0];
+    }));
   } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar viagens.' }); }
 });
 
@@ -559,8 +623,11 @@ router.get('/relatorios/batch/paradas', requireRoles('ADMIN', 'COLABORADOR'), as
 
   const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
   try {
-    const paradas = await traccarGetStops(ids, new Date(from), new Date(to));
-    res.json(paradas);
+    const [paradas, historico] = await Promise.all([
+      traccarGetStops(ids, new Date(from), new Date(to)),
+      traccarGetPositionHistory(ids, new Date(from), new Date(to)).catch(() => []),
+    ]);
+    res.json(aplicarParadasComMedidores(paradas, historico));
   } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar paradas.' }); }
 });
 
@@ -592,8 +659,28 @@ router.get('/relatorios/batch/resumo', requireRoles('ADMIN', 'COLABORADOR'), asy
 
   const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
   try {
-    const resumo = await traccarGetSummary(ids, new Date(from), new Date(to));
-    res.json(resumo);
+    const [resumo, traccarDevices, historico] = await Promise.all([
+      traccarGetSummary(ids, new Date(from), new Date(to)),
+      traccarGetDevices(),
+      traccarGetPositionHistory(ids, new Date(from), new Date(to)).catch(() => []),
+    ]);
+    const dispositivosTraccar = traccarDevices.filter(d => ids.includes(d.id));
+    const dispositivosLocal = await prisma.dispositivo.findMany({
+      where: { identificador: { in: dispositivosTraccar.map(d => d.uniqueId) } },
+      select: { identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
+    });
+    const localPorTraccarId = new Map(
+      dispositivosTraccar.map(device => [device.id, dispositivosLocal.find(local => local.identificador === device.uniqueId)]),
+    );
+    res.json(resumo.map(item => {
+      const dispositivo = localPorTraccarId.get(item.deviceId);
+      if (!dispositivo) return item;
+      return aplicarResumoComMedidores(
+        dispositivo,
+        item,
+        historico.filter(posicao => posicao.deviceId === item.deviceId),
+      );
+    }));
   } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar resumo.' }); }
 });
 

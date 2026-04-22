@@ -992,7 +992,7 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor) {
   if (p.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
   
   if (p.odometro != null) {
-    const km = Math.round(p.odometro).toLocaleString('pt-BR');
+    const km = Math.round(p.odometro / 1000).toLocaleString('pt-BR');
     si.push(`<span><i class="fa fa-dashboard" style="color:#7f8c8d"></i> Odômetro: ${km} km</span>`);
   }
   if (p.horas_motor != null) {

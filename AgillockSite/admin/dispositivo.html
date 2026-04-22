@@ -285,6 +285,14 @@
             </div>
           </div>
         </div>
+        <div class="row">
+          <div class="col-sm-4">
+            <div class="form-group">
+              <label>Odômetro Atual (km)</label>
+              <input type="number" class="form-control" id="d-odometro" placeholder="Ex.: 125430" min="0" step="0.1" />
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Card Configurações -->
@@ -708,6 +716,7 @@
       document.getElementById('d-combustivel').value = d.combustivel || '';
       document.getElementById('d-local-instalacao').value = d.localInstalacao || '';
       document.getElementById('d-instalador').value = d.instalador || '';
+      document.getElementById('d-odometro').value = d.odometro != null ? d.odometro : '';
       // Config
       document.getElementById('d-consumo').value = d.consumo || '';
       document.getElementById('d-velocidade').value = d.limiteVelocidade || '';
@@ -765,6 +774,7 @@
       formData.append('combustivel', document.getElementById('d-combustivel').value.trim());
       formData.append('localInstalacao', document.getElementById('d-local-instalacao').value.trim());
       formData.append('instalador', document.getElementById('d-instalador').value.trim());
+      formData.append('odometro', document.getElementById('d-odometro').value.trim());
       formData.append('consumo', document.getElementById('d-consumo').value.trim());
       formData.append('limiteVelocidade', document.getElementById('d-velocidade').value.trim());
       formData.append('senha', document.getElementById('d-senha').value.trim());

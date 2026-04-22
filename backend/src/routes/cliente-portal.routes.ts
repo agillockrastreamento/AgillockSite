@@ -24,6 +24,14 @@ import {
   normalizeAttributes,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
+import {
+  DISPOSITIVO_MEDIDORES_SELECT,
+  sincronizarDispositivosComPosicoes,
+  decorarPosicaoComMedidores,
+  aplicarResumoComMedidores,
+  aplicarViagensComMedidores,
+  aplicarParadasComMedidores,
+} from '../services/medidores.service';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
@@ -111,6 +119,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
         id: true, nome: true, identificador: true, placa: true,
         categoria: true, marca: true, modeloVeiculo: true, cor: true,
         limiteVelocidade: true, imagemUrlCliente: true,
+        ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { select: { id: true, nome: true } },
       },
     }),
@@ -135,10 +144,18 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
   try { posicoes = await traccarGetPositions(); } catch { /* sem posições */ }
 
   const posicaoPorDeviceId = new Map(posicoes.map(p => [p.deviceId, p]));
+  const posicaoPorIdentificador = new Map<string, Awaited<ReturnType<typeof traccarGetPositions>>[number]>();
+  for (const dispositivo of dispositivos) {
+    const traccar = traccarByImei.get(dispositivo.identificador);
+    const posicao = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
+    if (posicao) posicaoPorIdentificador.set(dispositivo.identificador, posicao);
+  }
+  const estadosAtualizados = await sincronizarDispositivosComPosicoes(dispositivos, posicaoPorIdentificador);
 
   const resultado = dispositivos.map(d => {
     const traccar = traccarByImei.get(d.identificador);
     const posicao = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
+    const estado = estadosAtualizados.get(d.identificador) ?? d;
 
     return {
       dispositivoId: d.id,
@@ -154,19 +171,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
       traccarId: traccar?.id ?? null,
       status: traccar?.status ?? 'unknown',
       lastUpdate: traccar?.lastUpdate ?? null,
-      posicao: posicao ? {
-        latitude: posicao.latitude,
-        longitude: posicao.longitude,
-        velocidade: Math.round(posicao.speed * 1.852),
-        curso: posicao.course,
-        altitude: posicao.altitude,
-        fixTime: posicao.fixTime,
-        deviceTime: posicao.deviceTime,
-        serverTime: posicao.serverTime,
-        valida: posicao.valid,
-        endereco: posicao.address,
-        ...normalizeAttributes(posicao.attributes),
-      } : null,
+      posicao: posicao ? decorarPosicaoComMedidores(estado, posicao) : null,
     };
   });
 
@@ -194,7 +199,7 @@ router.get('/rastreamento/dispositivos/:id/historico', async (req: ClienteReques
         { clientesVinculados: { some: { clienteId } } },
       ],
     },
-    select: { id: true, nome: true, identificador: true, placa: true },
+    select: { id: true, nome: true, identificador: true, placa: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
 
   if (!dispositivo) {
@@ -216,16 +221,7 @@ router.get('/rastreamento/dispositivos/:id/historico', async (req: ClienteReques
   res.json({
     dispositivo: { id: dispositivo.id, nome: dispositivo.nome, placa: dispositivo.placa },
     total: historico.length,
-    posicoes: historico.map(p => ({
-      latitude: p.latitude,
-      longitude: p.longitude,
-      velocidade: Math.round(p.speed * 1.852),
-      curso: p.course,
-      altitude: p.altitude,
-      fixTime: p.fixTime,
-      valida: p.valid,
-      ...normalizeAttributes(p.attributes),
-    })),
+    posicoes: historico.map(p => decorarPosicaoComMedidores(dispositivo, p)),
   });
 });
 
@@ -247,7 +243,7 @@ router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest,
       ativo: true,
       OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
     },
-    select: { id: true, identificador: true },
+    select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) {
     res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
@@ -264,8 +260,10 @@ router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest,
   const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
   const viagens = await traccarGetTrips([traccarDevice.id], fromDate, toDate);
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
+  const viagensComMedidores = aplicarViagensComMedidores(dispositivo, viagens, historico);
 
-  res.json(viagens.map(v => ({
+  res.json(viagensComMedidores.map(v => ({
     inicio: v.startTime,
     fim: v.endTime,
     origem: v.startAddress,
@@ -299,7 +297,7 @@ router.get('/rastreamento/dispositivos/:id/paradas', async (req: ClienteRequest,
       ativo: true,
       OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
     },
-    select: { id: true, identificador: true },
+    select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) {
     res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
@@ -315,8 +313,10 @@ router.get('/rastreamento/dispositivos/:id/paradas', async (req: ClienteRequest,
   const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
   const paradas = await traccarGetStops([traccarDevice.id], fromDate, toDate);
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
+  const paradasComMedidores = aplicarParadasComMedidores(paradas, historico);
 
-  res.json(paradas.map(p => ({
+  res.json(paradasComMedidores.map(p => ({
     inicio: p.startTime,
     fim: p.endTime,
     duracao: Math.round(p.duration / 60000),
@@ -344,7 +344,7 @@ router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest,
       ativo: true,
       OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
     },
-    select: { id: true, identificador: true },
+    select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) {
     res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
@@ -389,7 +389,7 @@ router.get('/rastreamento/dispositivos/:id/resumo', async (req: ClienteRequest, 
       ativo: true,
       OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
     },
-    select: { id: true, identificador: true },
+    select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
   if (!dispositivo) {
     res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
@@ -405,6 +405,7 @@ router.get('/rastreamento/dispositivos/:id/resumo', async (req: ClienteRequest, 
   const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
   const resumos = await traccarGetSummary([traccarDevice.id], fromDate, toDate);
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
 
   if (!resumos.length) {
     res.json({
@@ -417,7 +418,7 @@ router.get('/rastreamento/dispositivos/:id/resumo', async (req: ClienteRequest, 
     return;
   }
 
-  const r = resumos[0];
+  const r = aplicarResumoComMedidores(dispositivo, resumos[0], historico);
   res.json({
     distancia: Math.round(r.distance / 100) / 10,
     velocidadeMedia: Math.round(r.averageSpeed * 1.852),
