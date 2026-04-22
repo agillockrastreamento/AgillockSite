@@ -70,15 +70,15 @@ export async function traccarGetPositions(deviceIds?: number[]): Promise<Traccar
 }
 
 export async function traccarGetPositionHistory(
-  deviceId: number,
+  deviceIds: number[],
   from: Date,
   to: Date,
 ): Promise<TraccarPosition[]> {
   const params = new URLSearchParams({
-    deviceId: String(deviceId),
     from: from.toISOString(),
     to: to.toISOString(),
   });
+  deviceIds.forEach(id => params.append('deviceId', String(id)));
   const res = await fetch(`${TRACCAR_URL}/api/positions?${params}`, { headers: defaultHeaders });
   if (!res.ok) throw new Error(`Traccar ${res.status}`);
   return res.json() as Promise<TraccarPosition[]>;
@@ -87,31 +87,31 @@ export async function traccarGetPositionHistory(
 // ── Relatórios ────────────────────────────────────────────────────────────────
 
 export async function traccarGetTrips(
-  deviceId: number,
+  deviceIds: number[],
   from: Date,
   to: Date,
 ): Promise<TraccarTrip[]> {
   const params = new URLSearchParams({
-    deviceId: String(deviceId),
     from: from.toISOString(),
     to: to.toISOString(),
   });
+  deviceIds.forEach(id => params.append('deviceId', String(id)));
   const res = await fetch(`${TRACCAR_URL}/api/reports/trips?${params}`, { headers: defaultHeaders });
   if (!res.ok) throw new Error(`Traccar ${res.status}`);
   return res.json() as Promise<TraccarTrip[]>;
 }
 
 export async function traccarGetEvents(
-  deviceId: number,
+  deviceIds: number[],
   from: Date,
   to: Date,
   types?: string[],
 ): Promise<TraccarEvent[]> {
   const params = new URLSearchParams({
-    deviceId: String(deviceId),
     from: from.toISOString(),
     to: to.toISOString(),
   });
+  deviceIds.forEach(id => params.append('deviceId', String(id)));
   if (types?.length) types.forEach(t => params.append('type', t));
   const res = await fetch(`${TRACCAR_URL}/api/reports/events?${params}`, { headers: defaultHeaders });
   if (!res.ok) throw new Error(`Traccar ${res.status}`);
@@ -119,15 +119,15 @@ export async function traccarGetEvents(
 }
 
 export async function traccarGetSummary(
-  deviceId: number,
+  deviceIds: number[],
   from: Date,
   to: Date,
 ): Promise<TraccarSummary[]> {
   const params = new URLSearchParams({
-    deviceId: String(deviceId),
     from: from.toISOString(),
     to: to.toISOString(),
   });
+  deviceIds.forEach(id => params.append('deviceId', String(id)));
   const res = await fetch(`${TRACCAR_URL}/api/reports/summary?${params}`, { headers: defaultHeaders });
   if (!res.ok) throw new Error(`Traccar ${res.status}`);
   return res.json() as Promise<TraccarSummary[]>;
@@ -153,18 +153,40 @@ export async function traccarGetCommandTypes(deviceId: number): Promise<string[]
 }
 
 export async function traccarGetStops(
-  deviceId: number,
+  deviceIds: number[],
   from: Date,
   to: Date,
 ): Promise<TraccarStop[]> {
   const params = new URLSearchParams({
-    deviceId: String(deviceId),
     from: from.toISOString(),
     to: to.toISOString(),
   });
+  deviceIds.forEach(id => params.append('deviceId', String(id)));
   const res = await fetch(`${TRACCAR_URL}/api/reports/stops?${params}`, { headers: defaultHeaders });
   if (!res.ok) throw new Error(`Traccar ${res.status}`);
   return res.json() as Promise<TraccarStop[]>;
+}
+
+export async function traccarExportReport(
+  type: 'route' | 'events' | 'trips' | 'stops' | 'summary',
+  deviceIds: number[],
+  from: Date,
+  to: Date,
+): Promise<Response> {
+  const params = new URLSearchParams({
+    from: from.toISOString(),
+    to: to.toISOString(),
+  });
+  deviceIds.forEach(id => params.append('deviceId', String(id)));
+  
+  const res = await fetch(`${TRACCAR_URL}/api/reports/${type}?${params}`, {
+    headers: {
+      ...defaultHeaders,
+      'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    },
+  });
+  if (!res.ok) throw new Error(`Traccar export ${res.status}`);
+  return res;
 }
 
 // ── Logs do servidor ──────────────────────────────────────────────────────────

@@ -20,6 +20,7 @@ import {
   traccarLinkGeofenceToDevice,
   traccarUnlinkGeofenceFromDevice,
   traccarGetServerLog,
+  traccarExportReport,
   normalizeAttributes,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
@@ -497,6 +498,132 @@ router.get('/logs', requireRoles('ADMIN'), async (_req: AuthRequest, res: Respon
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[Logs] Erro ao buscar logs do Traccar:', msg);
     res.status(502).json({ error: `Erro ao buscar logs: ${msg}` });
+  }
+});
+
+// ── GET /api/rastreamento/relatorios/batch/historico ───────────────────────────
+router.get('/relatorios/batch/historico', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { from, to } = req.query as { from: string; to: string };
+  const deviceIds = (req.query.deviceId as string[] | string);
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+
+  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  try {
+    // Busca os nomes dos dispositivos para o frontend mapear
+    const dispositivosLocal = await prisma.dispositivo.findMany({
+      where: { identificador: { in: (await traccarGetDevices()).filter(d => ids.includes(d.id)).map(d => d.uniqueId) } },
+      select: { id: true, nome: true, placa: true, identificador: true }
+    });
+
+    const historico = await traccarGetPositionHistory(ids, fromDate, toDate);
+    
+    res.json({
+      dispositivos: dispositivosLocal,
+      posicoes: historico.map(p => ({
+        deviceId: p.deviceId,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        velocidade: Math.round(p.speed * 1.852),
+        fixTime: p.fixTime,
+        valida: p.valid,
+        ...normalizeAttributes(p.attributes),
+      })),
+    });
+  } catch (err: unknown) {
+    res.status(502).json({ error: `Erro ao buscar histórico: ${err}` });
+  }
+});
+
+// ── GET /api/rastreamento/relatorios/batch/viagens ─────────────────────────────
+router.get('/relatorios/batch/viagens', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { from, to } = req.query as { from: string; to: string };
+  const deviceIds = (req.query.deviceId as string[] | string);
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+
+  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  try {
+    const viagens = await traccarGetTrips(ids, new Date(from), new Date(to));
+    res.json(viagens);
+  } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar viagens.' }); }
+});
+
+// ── GET /api/rastreamento/relatorios/batch/paradas ─────────────────────────────
+router.get('/relatorios/batch/paradas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { from, to } = req.query as { from: string; to: string };
+  const deviceIds = (req.query.deviceId as string[] | string);
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+
+  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  try {
+    const paradas = await traccarGetStops(ids, new Date(from), new Date(to));
+    res.json(paradas);
+  } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar paradas.' }); }
+});
+
+// ── GET /api/rastreamento/relatorios/batch/eventos ─────────────────────────────
+router.get('/relatorios/batch/eventos', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { from, to } = req.query as { from: string; to: string };
+  const deviceIds = (req.query.deviceId as string[] | string);
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+
+  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  try {
+    const eventos = await traccarGetEvents(ids, new Date(from), new Date(to));
+    res.json(eventos.map(e => ({
+      id: e.id,
+      deviceId: e.deviceId,
+      tipo: e.type,
+      tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
+      hora: e.eventTime,
+      atributos: e.attributes,
+    })));
+  } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar eventos.' }); }
+});
+
+// ── GET /api/rastreamento/relatorios/batch/resumo ──────────────────────────────
+router.get('/relatorios/batch/resumo', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { from, to } = req.query as { from: string; to: string };
+  const deviceIds = (req.query.deviceId as string[] | string);
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+
+  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  try {
+    const resumo = await traccarGetSummary(ids, new Date(from), new Date(to));
+    res.json(resumo);
+  } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar resumo.' }); }
+});
+
+// ── GET /api/rastreamento/relatorios/exportar ──────────────────────────────────
+router.get('/relatorios/exportar', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { from, to, type } = req.query as { from: string; to: string; type: string };
+  const deviceIds = (req.query.deviceId as string[] | string);
+  
+  if (!from || !to || !type || !deviceIds) {
+    res.status(400).json({ error: 'Parâmetros incompletos.' });
+    return;
+  }
+
+  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+
+  try {
+    const response = await traccarExportReport(
+      type as any,
+      ids,
+      new Date(from),
+      new Date(to)
+    );
+
+    const buffer = await response.arrayBuffer();
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);
+    res.send(Buffer.from(buffer));
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro na exportação: ${msg}` });
   }
 });
 

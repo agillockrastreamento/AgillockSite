@@ -10,8 +10,26 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
   <style>
+    /* ── Select2 Custom ── */
+    .select2-container--default .select2-selection--multiple {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      min-height: 34px;
+    }
+    html.dark-theme .select2-container--default .select2-selection--multiple {
+      background-color: #252535;
+      border-color: #3a3a5c;
+    }
+    html.dark-theme .select2-container--default .select2-selection--multiple .select2-selection__choice {
+      background-color: #3a3a5c;
+      border-color: #444;
+      color: #e0e6f0;
+    }
+    .select2-container { flex: 1; max-width: 400px; }
+
     /* ── Toolbar ── */
     .rel-toolbar {
       background: #fff;
@@ -28,6 +46,38 @@
     }
     .rel-toolbar .form-control, .rel-toolbar .btn { margin: 0; }
     #sel-dispositivo { min-width: 200px; max-width: 280px; }
+
+    /* ── Select2 Custom ── */
+    .select2-container--default .select2-selection--multiple {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      min-height: 34px;
+      padding-top: 1px;
+    }
+    html.dark-theme .select2-container--default .select2-selection--multiple {
+      background-color: #252535;
+      border-color: #3a3a5c;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-top: 4px;
+      color: #333;
+    }
+    html.dark-theme .select2-container--default .select2-selection--multiple .select2-selection__choice {
+      background-color: #3a3a5c;
+      border-color: #444;
+      color: #e0e6f0;
+    }
+    html.dark-theme .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+      color: #e87070;
+    }
+    html.dark-theme .select2-dropdown { background-color: #1e2530; border-color: #3a3a5c; color: #adb5bd; }
+    html.dark-theme .select2-results__option--highlighted[aria-selected] { background-color: #2980b9; color: #fff; }
+    .select2-container { flex: 1; max-width: 400px !important; min-width: 250px; }
+    .select2-search__field { font-size: 12px !important; }
 
     /* Inputs dark */
     html.dark-theme .form-control {
@@ -343,23 +393,61 @@
 
     <!-- Toolbar de seleção -->
     <div class="rel-toolbar" style="margin-top:56px">
-      <select id="sel-dispositivo" class="form-control input-sm">
-        <option value="">Selecionar dispositivo...</option>
-      </select>
-      <div class="btn-group">
-        <button class="btn btn-default btn-sm periodo-btn active" data-periodo="hoje">Hoje</button>
-        <button class="btn btn-default btn-sm periodo-btn" data-periodo="ontem">Ontem</button>
-        <button class="btn btn-default btn-sm periodo-btn" data-periodo="7dias">7 dias</button>
-        <button class="btn btn-default btn-sm periodo-btn" data-periodo="custom">Personalizado</button>
-      </div>
-      <!-- Datas + botão só para período personalizado -->
-      <div id="custom-datas" style="display:none;gap:6px;align-items:center">
-        <input type="date" id="dt-de" class="form-control input-sm" style="width:130px" />
-        <span style="color:#888;font-size:12px">até</span>
-        <input type="date" id="dt-ate" class="form-control input-sm" style="width:130px" />
+      <div style="flex:1; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <select id="sel-dispositivo" class="form-control" multiple="multiple" style="width:100%"></select>
+
+        <div class="btn-group">
+          <button class="btn btn-default btn-sm periodo-btn active" data-periodo="hoje">Hoje</button>
+          <button class="btn btn-default btn-sm periodo-btn" data-periodo="ontem">Ontem</button>
+          <button class="btn btn-default btn-sm periodo-btn" data-periodo="7dias">7 Dias</button>
+          <button class="btn btn-default btn-sm periodo-btn" data-periodo="custom">Custom</button>
+        </div>
+
+        <div id="custom-datas" style="display:none; gap:10px; align-items:center;">
+          <input type="date" id="dt-de" class="form-control input-sm">
+          <span>até</span>
+          <input type="date" id="dt-ate" class="form-control input-sm">
+        </div>
+
         <button class="btn btn-primary btn-sm" id="btn-carregar">
           <i class="fa fa-search"></i> Carregar
         </button>
+      </div>
+
+      <button class="btn btn-success btn-sm" id="btn-abrir-exportar">
+        <i class="fa fa-file-excel-o"></i> Exportar XML
+      </button>
+    </div>
+
+    <!-- Modal de Exportação -->
+    <div class="modal fade" id="modal-exportar" tabindex="-1">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header" style="background:#27ae60; color:#fff; padding:10px 15px">
+            <h5 class="modal-title">Exportar Relatório (XML)</h5>
+          </div>
+          <div class="modal-body" style="padding:15px">
+            <div class="form-group">
+              <label style="font-size:12px; font-weight:600">Tipo de Relatório</label>
+              <select id="export-tipo" class="form-control input-sm">
+                <option value="route">Rota / Trajeto</option>
+                <option value="events">Eventos</option>
+                <option value="trips">Viagens</option>
+                <option value="stops">Paradas</option>
+                <option value="summary">Resumo / Totais</option>
+              </select>
+            </div>
+            <p class="text-muted" style="font-size:11px; margin-top:10px; line-height:1.4">
+              <i class="fa fa-info-circle"></i> O relatório incluirá todos os dispositivos selecionados no período filtrado.
+            </p>
+          </div>
+          <div class="modal-footer" style="padding:10px">
+            <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-success btn-sm" id="btn-confirmar-exportar">
+              <i class="fa fa-download"></i> Baixar
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -415,6 +503,7 @@
 
   <script src="../js/jquery.js"></script>
   <script src="../js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/auth-guard.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
