@@ -165,6 +165,14 @@ export async function traccarGetStops(
   return res.json() as Promise<TraccarStop[]>;
 }
 
+// ── Logs do servidor ──────────────────────────────────────────────────────────
+
+export async function traccarGetServerLog(): Promise<string> {
+  const res = await fetch(`${TRACCAR_URL}/api/server/log`, { headers: defaultHeaders });
+  if (!res.ok) throw new Error(`Traccar ${res.status}`);
+  return res.text();
+}
+
 // ── Autenticação WebSocket (precisa de cookie de sessão) ─────────────────────
 
 export async function traccarGetSessionCookie(): Promise<string> {
@@ -378,4 +386,121 @@ export interface TraccarStop {
   duration: number;
   engineHours: number;
   spentFuel: number;
+}
+
+export interface TraccarGeofence {
+  id: number;
+  name: string;
+  description?: string;
+  area: string; // WKT: "CIRCLE (lat lon, radius)" ou "POLYGON ((lon lat, ...))"
+  calendarId?: number;
+  attributes?: Record<string, unknown>;
+}
+
+export interface TraccarDriver {
+  id: number;
+  name: string;
+  uniqueId: string;
+  attributes?: Record<string, unknown>;
+}
+
+// ── Geofences ─────────────────────────────────────────────────────────────────
+
+export async function traccarGetGeofences(deviceId?: number): Promise<TraccarGeofence[]> {
+  const url = deviceId
+    ? `${TRACCAR_URL}/api/geofences?deviceId=${deviceId}`
+    : `${TRACCAR_URL}/api/geofences`;
+  const res = await fetch(url, { headers: defaultHeaders });
+  if (!res.ok) throw new Error(`Traccar ${res.status}`);
+  return res.json() as Promise<TraccarGeofence[]>;
+}
+
+export async function traccarCreateGeofence(name: string, area: string): Promise<TraccarGeofence> {
+  const res = await fetch(`${TRACCAR_URL}/api/geofences`, {
+    method: 'POST',
+    headers: defaultHeaders,
+    body: JSON.stringify({ name, area }),
+  });
+  if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
+  return res.json() as Promise<TraccarGeofence>;
+}
+
+export async function traccarDeleteGeofence(id: number): Promise<void> {
+  const res = await fetch(`${TRACCAR_URL}/api/geofences/${id}`, {
+    method: 'DELETE',
+    headers: defaultHeaders,
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`Traccar ${res.status}`);
+}
+
+export async function traccarLinkGeofenceToDevice(geofenceId: number, deviceId: number): Promise<void> {
+  const res = await fetch(`${TRACCAR_URL}/api/permissions`, {
+    method: 'POST',
+    headers: defaultHeaders,
+    body: JSON.stringify({ deviceId, geofenceId }),
+  });
+  if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
+}
+
+export async function traccarUnlinkGeofenceFromDevice(geofenceId: number, deviceId: number): Promise<void> {
+  const res = await fetch(`${TRACCAR_URL}/api/permissions`, {
+    method: 'DELETE',
+    headers: defaultHeaders,
+    body: JSON.stringify({ deviceId, geofenceId }),
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`Traccar ${res.status}`);
+}
+
+// ── Motoristas (Drivers) ──────────────────────────────────────────────────────
+
+export async function traccarGetDrivers(): Promise<TraccarDriver[]> {
+  const res = await fetch(`${TRACCAR_URL}/api/drivers`, { headers: defaultHeaders });
+  if (!res.ok) throw new Error(`Traccar ${res.status}`);
+  return res.json() as Promise<TraccarDriver[]>;
+}
+
+export async function traccarCreateDriver(name: string, uniqueId: string): Promise<TraccarDriver> {
+  const res = await fetch(`${TRACCAR_URL}/api/drivers`, {
+    method: 'POST',
+    headers: defaultHeaders,
+    body: JSON.stringify({ name, uniqueId }),
+  });
+  if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
+  return res.json() as Promise<TraccarDriver>;
+}
+
+export async function traccarUpdateDriver(traccarId: number, name: string, uniqueId: string): Promise<TraccarDriver> {
+  const res = await fetch(`${TRACCAR_URL}/api/drivers/${traccarId}`, {
+    method: 'PUT',
+    headers: defaultHeaders,
+    body: JSON.stringify({ id: traccarId, name, uniqueId }),
+  });
+  if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
+  return res.json() as Promise<TraccarDriver>;
+}
+
+export async function traccarDeleteDriver(traccarId: number): Promise<void> {
+  const res = await fetch(`${TRACCAR_URL}/api/drivers/${traccarId}`, {
+    method: 'DELETE',
+    headers: defaultHeaders,
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`Traccar ${res.status}`);
+}
+
+export async function traccarLinkDriverToDevice(driverId: number, deviceId: number): Promise<void> {
+  const res = await fetch(`${TRACCAR_URL}/api/permissions`, {
+    method: 'POST',
+    headers: defaultHeaders,
+    body: JSON.stringify({ deviceId, driverId }),
+  });
+  if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
+}
+
+export async function traccarUnlinkDriverFromDevice(driverId: number, deviceId: number): Promise<void> {
+  const res = await fetch(`${TRACCAR_URL}/api/permissions`, {
+    method: 'DELETE',
+    headers: defaultHeaders,
+    body: JSON.stringify({ deviceId, driverId }),
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`Traccar ${res.status}`);
 }

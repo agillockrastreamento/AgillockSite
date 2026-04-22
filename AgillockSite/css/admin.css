@@ -126,7 +126,7 @@ html.al-sb-collapsed .admin-sidebar { width: 64px !important; }
     background: rgba(0,0,0,0.18);
 }
 .sidebar-dropdown.open .sidebar-submenu {
-    max-height: 200px;
+    max-height: 220px;
 }
 .sidebar-submenu li a {
     padding-left: 40px !important;

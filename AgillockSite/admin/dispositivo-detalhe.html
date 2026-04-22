@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Detalhes do Dispositivo — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
+    #al-alert-container { flex-shrink: 0; }
+    .detalhe-scroll { flex: 1; overflow-y: auto; padding: 0 4px; }
+    .detalhe-section { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 16px; overflow: hidden; }
+    html.dark-theme .detalhe-section { background: #141820; }
+    .detalhe-section-header { padding: 10px 16px; font-weight: 700; font-size: 13px; letter-spacing: .03em; text-transform: uppercase; color: #fab32c; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+    html.dark-theme .detalhe-section-header { background: #1c2230; border-bottom-color: #2a3040; }
+    .detalhe-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .detalhe-table td { padding: 8px 16px; border-bottom: 1px solid #f4f4f4; vertical-align: top; }
+    html.dark-theme .detalhe-table td { border-bottom-color: #222a38; }
+    .detalhe-table tr:last-child td { border-bottom: none; }
+    .detalhe-table td:first-child { width: 32%; color: #888; font-family: monospace; font-size: 12px; }
+    .detalhe-table td:nth-child(2) { width: 32%; color: #555; }
+    html.dark-theme .detalhe-table td:nth-child(2) { color: #aaa; }
+    .detalhe-table td:last-child { font-weight: 500; word-break: break-all; }
+    .badge-online { background: #27ae60; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+    .badge-offline { background: #e74c3c; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+    .badge-unknown { background: #95a5a6; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+    .btn-back { display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;color:inherit;font-size:14px;transition:background .15s; }
+    .btn-back:hover { background: rgba(0,0,0,.07); }
+    html.dark-theme .btn-back:hover { background: rgba(255,255,255,.08); }
+    #loading-state { display:flex;align-items:center;justify-content:center;height:200px;color:#aaa;gap:12px;font-size:15px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <button class="btn-back" id="btn-voltar" title="Voltar ao rastreamento">
+          <i class="fa fa-arrow-left"></i>
+        </button>
+        <h2 class="topbar-title" id="topbar-titulo">Detalhes do Dispositivo</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-default btn-sm" id="btn-atualizar" title="Atualizar dados">
+          <i class="fa fa-refresh"></i> Atualizar
+        </button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="detalhe-scroll" id="detalhe-scroll">
+      <div id="loading-state">
+        <i class="fa fa-spinner fa-spin fa-lg"></i> Carregando…
+      </div>
+      <div id="detalhe-conteudo" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+    if (!currentUser) return;
+
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge ' + (currentUser.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    // Voltar para rastreamento (preserva estado de dispositivo focado se vier por query)
+    var params = new URLSearchParams(window.location.search);
+    var dispositivoId = params.get('id');
+    document.getElementById('btn-voltar').addEventListener('click', function () {
+      if (dispositivoId) {
+        window.location.href = 'rastreamento.html?focar=' + encodeURIComponent(dispositivoId);
+      } else {
+        window.location.href = 'rastreamento.html';
+      }
+    });
+
+    if (!dispositivoId) {
+      AL.showAlert('ID do dispositivo não informado.', 'danger');
+      document.getElementById('loading-state').style.display = 'none';
+      return;
+    }
+
+    function esc(s) {
+      return String(s == null ? '—' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function fmtVal(v) {
+      if (v == null) return '<span style="color:#bbb">—</span>';
+      if (typeof v === 'boolean') return v
+        ? '<span style="color:#27ae60"><i class="fa fa-check"></i> Sim</span>'
+        : '<span style="color:#e74c3c"><i class="fa fa-times"></i> Não</span>';
+      if (typeof v === 'object') return '<code style="font-size:11px">' + esc(JSON.stringify(v)) + '</code>';
+      return esc(String(v));
+    }
+
+    function fmtDate(s) {
+      if (!s) return '—';
+      try { return new Date(s).toLocaleString('pt-BR'); } catch (e) { return s; }
+    }
+
+    function badgeStatus(s) {
+      var cls = s === 'online' ? 'badge-online' : s === 'offline' ? 'badge-offline' : 'badge-unknown';
+      var label = s === 'online' ? 'Online' : s === 'offline' ? 'Offline' : 'Desconhecido';
+      return '<span class="' + cls + '">' + label + '</span>';
+    }
+
+    function buildSection(titulo, icone, linhas) {
+      if (!linhas.length) return '';
+      var rows = linhas.map(function (l) {
+        return '<tr><td>' + esc(l[0]) + '</td><td>' + esc(l[1]) + '</td><td>' + fmtVal(l[2]) + '</td></tr>';
+      }).join('');
+      return '<div class="detalhe-section">'
+        + '<div class="detalhe-section-header"><i class="fa ' + icone + ' fa-fw"></i> ' + titulo + '</div>'
+        + '<table class="detalhe-table"><tbody>' + rows + '</tbody></table>'
+        + '</div>';
+    }
+
+    // Mapa de atributos Traccar → [nome legível, descrição curta]
+    var ATTR_INFO = {
+      ignition:      ['ignition',      'Ignição'],
+      motion:        ['motion',        'Em movimento'],
+      alarm:         ['alarm',         'Alarme'],
+      blocked:       ['blocked',       'Bloqueado'],
+      charge:        ['charge',        'Carregando'],
+      rssi:          ['rssi',          'Sinal GSM (dBm)'],
+      sat:           ['sat',           'Satélites GPS'],
+      power:         ['power',         'Tensão veículo (V)'],
+      battery:       ['battery',       'Tensão bateria (V)'],
+      batteryLevel:  ['batteryLevel',  'Nível bateria (%)'],
+      distance:      ['distance',      'Distância segmento (m)'],
+      totalDistance: ['totalDistance', 'Odômetro total (m)'],
+      hours:         ['hours',         'Horas de motor (ms)'],
+      fuel:          ['fuel',          'Combustível'],
+      fuelUsed:      ['fuelUsed',      'Combustível gasto'],
+      input:         ['input',         'Entrada digital'],
+      output:        ['output',        'Saída digital'],
+      driverUniqueId:['driverUniqueId','ID Motorista'],
+      pdop:          ['pdop',          'PDOP'],
+      hdop:          ['hdop',          'HDOP'],
+      vdop:          ['vdop',          'VDOP'],
+      index:         ['index',         'Índice de mensagem'],
+      protocol:      ['protocol',      'Protocolo'],
+      deviceId:      ['deviceId',      'ID Dispositivo (Traccar)'],
+      raw:           ['raw',           'Dados brutos'],
+      result:        ['result',        'Resultado de comando'],
+    };
+
+    function renderDetalhe(data) {
+      var d = data.dispositivo;
+      var t = data.traccar;
+      var p = data.posicao;
+
+      document.getElementById('topbar-titulo').textContent = d.nome || d.identificador;
+
+      var html = '';
+
+      // --- Seção: Dispositivo (nosso banco)
+      html += buildSection('Dispositivo', 'fa-microchip', [
+        ['id',            'ID interno',         d.id],
+        ['nome',          'Nome',               d.nome],
+        ['identificador', 'IMEI / Identificador', d.identificador],
+        ['placa',         'Placa',              d.placa],
+        ['categoria',     'Categoria',          d.categoria],
+        ['marca',         'Marca',              d.marca],
+        ['modeloVeiculo', 'Modelo',             d.modeloVeiculo],
+        ['cor',           'Cor',                d.cor],
+        ['limiteVelocidade', 'Limite velocidade (km/h)', d.limiteVelocidade],
+        ['ativo',         'Ativo',              d.ativo],
+        ['cliente',       'Cliente',            d.cliente ? d.cliente.nome : null],
+      ]);
+
+      // --- Seção: Traccar
+      if (t) {
+        var traccarLinhas = [
+          ['id',         'ID Traccar',          t.id],
+          ['status',     'Status',              t.status],
+          ['lastUpdate', 'Última atualização',  fmtDate(t.lastUpdate)],
+          ['positionId', 'ID posição atual',    t.positionId],
+          ['groupId',    'Grupo',               t.groupId || null],
+          ['disabled',   'Desabilitado',        t.disabled],
+        ];
+        // Atributos do device no Traccar
+        if (t.attributes && Object.keys(t.attributes).length) {
+          Object.keys(t.attributes).forEach(function (k) {
+            traccarLinhas.push([k, k, t.attributes[k]]);
+          });
+        }
+        html += buildSection('Traccar', 'fa-server', traccarLinhas);
+      } else {
+        html += '<div class="detalhe-section"><div class="detalhe-section-header"><i class="fa fa-server fa-fw"></i> Traccar</div>'
+          + '<div style="padding:16px;color:#aaa;font-size:13px;">Dispositivo não sincronizado com o Traccar.</div></div>';
+      }
+
+      // --- Seção: Posição
+      if (p) {
+        html += buildSection('Última Posição', 'fa-map-marker', [
+          ['fixTime',    'Data/hora GPS',        fmtDate(p.fixTime)],
+          ['deviceTime', 'Data/hora dispositivo', fmtDate(p.deviceTime)],
+          ['serverTime', 'Data/hora servidor',   fmtDate(p.serverTime)],
+          ['latitude',   'Latitude',             p.latitude],
+          ['longitude',  'Longitude',            p.longitude],
+          ['altitude',   'Altitude (m)',         p.altitude],
+          ['velocidade', 'Velocidade (km/h)',    p.velocidade],
+          ['curso',      'Curso (graus)',        p.curso],
+          ['valida',     'Posição válida',       p.valida],
+          ['endereco',   'Endereço',             p.endereco],
+        ]);
+
+        // --- Seção: Atributos da posição
+        var attrLinhas = [];
+        var rawAttrs = p.atributos || {};
+        var knownKeys = Object.keys(ATTR_INFO);
+        // Known attrs first
+        knownKeys.forEach(function (k) {
+          if (rawAttrs[k] !== undefined) {
+            attrLinhas.push([k, ATTR_INFO[k][1], rawAttrs[k]]);
+          }
+        });
+        // Unknown (extra) attrs
+        Object.keys(rawAttrs).forEach(function (k) {
+          if (!ATTR_INFO[k]) {
+            attrLinhas.push([k, k, rawAttrs[k]]);
+          }
+        });
+        if (attrLinhas.length) {
+          html += buildSection('Atributos da Posição', 'fa-list-alt', attrLinhas);
+        }
+      } else {
+        html += '<div class="detalhe-section"><div class="detalhe-section-header"><i class="fa fa-map-marker fa-fw"></i> Última Posição</div>'
+          + '<div style="padding:16px;color:#aaa;font-size:13px;">Sem posição registrada para este dispositivo.</div></div>';
+      }
+
+      document.getElementById('detalhe-conteudo').innerHTML = html;
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('detalhe-conteudo').style.display = 'block';
+    }
+
+    function carregarDetalhe() {
+      document.getElementById('loading-state').style.display = 'flex';
+      document.getElementById('detalhe-conteudo').style.display = 'none';
+      AL.apiGet('/rastreamento/dispositivos/' + encodeURIComponent(dispositivoId) + '/detalhe')
+        .then(function (data) { renderDetalhe(data); })
+        .catch(function (err) {
+          document.getElementById('loading-state').style.display = 'none';
+          AL.showAlert(err.message || 'Erro ao carregar detalhes.', 'danger');
+        });
+    }
+
+    document.getElementById('btn-atualizar').addEventListener('click', carregarDetalhe);
+
+    carregarDetalhe();
+  })();
+  </script>
+</body>
+</html>

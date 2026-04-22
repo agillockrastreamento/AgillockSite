@@ -16,6 +16,11 @@ import {
   traccarGetSummary,
   traccarGetCommandTypes,
   traccarSendCommand,
+  traccarGetGeofences,
+  traccarCreateGeofence,
+  traccarDeleteGeofence,
+  traccarLinkGeofenceToDevice,
+  traccarUnlinkGeofenceFromDevice,
   normalizeAttributes,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
@@ -588,6 +593,94 @@ router.post('/dispositivos/:dispositivoId/comandos', async (req: ClienteRequest,
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Erro ao enviar comando.' });
+  }
+});
+
+// ── GET /api/cliente/rastreamento/cercas ──────────────────────────────────────
+// Retorna cercas vinculadas a dispositivos deste cliente
+router.get('/rastreamento/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const dispositivos = await prisma.dispositivo.findMany({
+    where: { clienteId, ativo: true },
+    select: { identificador: true },
+  });
+
+  const todasCercas: unknown[] = [];
+  const vistos = new Set<number>();
+
+  for (const d of dispositivos) {
+    const td = await traccarGetDeviceByImei(d.identificador).catch(() => null);
+    if (!td) continue;
+    const cercas = await traccarGetGeofences(td.id).catch(() => []);
+    for (const c of cercas) {
+      if (!vistos.has(c.id)) {
+        vistos.add(c.id);
+        todasCercas.push(c);
+      }
+    }
+  }
+
+  res.json(todasCercas);
+});
+
+// ── POST /api/cliente/rastreamento/cercas ─────────────────────────────────────
+router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const { nome, area, dispositivoId } = req.body as { nome: string; area: string; dispositivoId?: string };
+  if (!nome || !area) { res.status(400).json({ error: 'Campos "nome" e "area" são obrigatórios.' }); return; }
+
+  // Verifica que o dispositivo pertence ao cliente
+  if (dispositivoId) {
+    const dispositivo = await prisma.dispositivo.findFirst({
+      where: { id: dispositivoId, clienteId, ativo: true },
+      select: { identificador: true },
+    });
+    if (!dispositivo) { res.status(403).json({ error: 'Dispositivo não autorizado.' }); return; }
+
+    try {
+      const cerca = await traccarCreateGeofence(nome, area);
+      const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+      if (traccarDevice) {
+        await traccarLinkGeofenceToDevice(cerca.id, traccarDevice.id).catch(() => {});
+      }
+      res.json(cerca);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.status(502).json({ error: `Erro ao criar cerca: ${msg}` });
+    }
+    return;
+  }
+
+  try {
+    const cerca = await traccarCreateGeofence(nome, area);
+    res.json(cerca);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao criar cerca: ${msg}` });
+  }
+});
+
+// ── DELETE /api/cliente/rastreamento/cercas/:id ───────────────────────────────
+router.delete('/rastreamento/cercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const geofenceId = parseInt(param(req, 'id'));
+  if (isNaN(geofenceId)) { res.status(400).json({ error: 'ID inválido.' }); return; }
+
+  try {
+    await traccarDeleteGeofence(geofenceId);
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao remover cerca: ${msg}` });
   }
 });
 

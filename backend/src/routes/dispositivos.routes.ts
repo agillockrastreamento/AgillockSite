@@ -45,6 +45,9 @@ const CLIENTES_VINCULADOS_INCLUDE = {
   clientesVinculados: {
     include: { cliente: { select: { id: true, nome: true } } },
   },
+  motoristasVinculados: {
+    include: { motorista: { select: { id: true, nome: true } } },
+  },
 };
 
 // ─── GET /api/dispositivos ─────────────────────────────────────────────────
@@ -68,10 +71,13 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
     include: {
       cliente: { select: { id: true, nome: true } },
       vendedor: { select: { id: true, nome: true } },
-      _count: { select: { clientesVinculados: true } },
+      _count: { select: { clientesVinculados: true, motoristasVinculados: true } },
       clientesVinculados: {
         take: 1,
         include: { cliente: { select: { id: true, nome: true } } },
+      },
+      motoristasVinculados: {
+        include: { motorista: { select: { id: true, nome: true } } },
       },
     },
     orderBy: { nome: 'asc' },

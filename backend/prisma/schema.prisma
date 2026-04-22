@@ -241,19 +241,43 @@ model Dispositivo {
   valorPadrao Decimal? @db.Decimal(10, 2)
 
   clienteId   String?
-  cliente     Cliente? @relation(fields: [clienteId], references: [id])
+  cliente     Cliente?  @relation(fields: [clienteId], references: [id])
   vendedorId  String?
-  vendedor    User?    @relation("DispositivoVendedor", fields: [vendedorId], references: [id])
+  vendedor    User?     @relation("DispositivoVendedor", fields: [vendedorId], references: [id])
   criadoPorId String
-  criadoPor   User     @relation("DispositivoCriador", fields: [criadoPorId], references: [id])
+  criadoPor   User      @relation("DispositivoCriador", fields: [criadoPorId], references: [id])
 
   boletos            Boleto[]
   boletosUnificados  BoletoDispositivo[]
   clientesVinculados DispositivoCliente[]
+  motoristasVinculados MotoristaDispositivo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Motorista {
+  id            String   @id @default(uuid())
+  nome          String
+  identificador String?  @unique
+  traccarId     Int?
+  cnh           String?
+  telefone      String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dispositivosVinculados MotoristaDispositivo[]
+}
+
+model MotoristaDispositivo {
+  motoristaId   String
+  dispositivoId String
+  motorista     Motorista   @relation(fields: [motoristaId], references: [id], onDelete: Cascade)
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  @@id([motoristaId, dispositivoId])
+}
+
 
 model DispositivoCliente {
   dispositivoId String

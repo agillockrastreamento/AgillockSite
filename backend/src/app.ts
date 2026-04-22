@@ -16,6 +16,7 @@ import adminRoutes from './routes/admin.routes';
 import webhooksRoutes from './routes/webhooks.routes';
 import contratosRoutes from './routes/contratos.routes';
 import rastreamentoRoutes from './routes/rastreamento.routes';
+import motoristasRoutes from './routes/motoristas.routes';
 import clienteLoginRoutes from './routes/cliente-login.routes';
 import clientePortalRoutes from './routes/cliente-portal.routes';
 
@@ -66,6 +67,7 @@ app.use('/api/dispositivos', dispositivosRoutes);
 app.use('/api', usuariosRoutes);           // colaboradores + vendedores (authMiddleware global ADMIN)
 app.use('/api', adminRoutes);              // rotas admin utilitárias
 app.use('/api/rastreamento', rastreamentoRoutes);
+app.use('/api/motoristas', motoristasRoutes);
 app.use('/api/clientes', clienteLoginRoutes);   // CRUD do login do cliente (admin/colaborador)
 app.use('/api/cliente', clientePortalRoutes);   // portal do cliente (JWT role=CLIENTE)
 

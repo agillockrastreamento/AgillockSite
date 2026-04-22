@@ -14,6 +14,12 @@ import {
   traccarGetSummary,
   traccarSendCommand,
   traccarGetCommandTypes,
+  traccarGetGeofences,
+  traccarCreateGeofence,
+  traccarDeleteGeofence,
+  traccarLinkGeofenceToDevice,
+  traccarUnlinkGeofenceFromDevice,
+  traccarGetServerLog,
   normalizeAttributes,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
@@ -33,6 +39,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
         id: true, nome: true, identificador: true, placa: true,
         categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true, imagemUrl: true,
         cliente: { select: { id: true, nome: true } },
+        motorista: { select: { id: true, nome: true } },
       },
     }),
     traccarGetDevices(),
@@ -76,6 +83,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       cor: d.cor,
       limiteVelocidade: d.limiteVelocidade,
       cliente: d.cliente,
+      motorista: d.motorista,
       traccarId: traccar?.id ?? null,
       status: traccar?.status ?? 'unknown',
       lastUpdate: traccar?.lastUpdate ?? null,
@@ -303,6 +311,181 @@ router.post('/dispositivos/:id/comandos', requireRoles('ADMIN', 'COLABORADOR'), 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Erro ao enviar comando: ${msg}` });
+  }
+});
+
+// ── GET /api/rastreamento/dispositivos/:id/detalhe ────────────────────────────
+router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: {
+      id: true, nome: true, identificador: true, placa: true, categoria: true,
+      marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true,
+      ativo: true, imagemUrl: true,
+      cliente: { select: { id: true, nome: true } },
+    },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+
+  let posicao: Awaited<ReturnType<typeof traccarGetPositions>>[number] | undefined;
+  if (traccarDevice) {
+    try {
+      const posicoes = await traccarGetPositions([traccarDevice.id]);
+      posicao = posicoes[0];
+    } catch { /* sem posição */ }
+  }
+
+  const attrs = posicao?.attributes ?? {};
+
+  res.json({
+    dispositivo: {
+      id: dispositivo.id,
+      nome: dispositivo.nome,
+      identificador: dispositivo.identificador,
+      placa: dispositivo.placa,
+      categoria: dispositivo.categoria,
+      marca: dispositivo.marca,
+      modeloVeiculo: dispositivo.modeloVeiculo,
+      cor: dispositivo.cor,
+      limiteVelocidade: dispositivo.limiteVelocidade,
+      ativo: dispositivo.ativo,
+      imagemUrl: dispositivo.imagemUrl,
+      cliente: dispositivo.cliente,
+    },
+    traccar: traccarDevice ? {
+      id: traccarDevice.id,
+      status: traccarDevice.status,
+      lastUpdate: traccarDevice.lastUpdate,
+      positionId: traccarDevice.positionId,
+      groupId: traccarDevice.groupId,
+      disabled: traccarDevice.disabled,
+      attributes: traccarDevice.attributes,
+    } : null,
+    posicao: posicao ? {
+      latitude: posicao.latitude,
+      longitude: posicao.longitude,
+      altitude: posicao.altitude,
+      velocidade: Math.round(posicao.speed * 1.852),
+      curso: posicao.course,
+      fixTime: posicao.fixTime,
+      deviceTime: posicao.deviceTime,
+      serverTime: posicao.serverTime,
+      valida: posicao.valid,
+      endereco: posicao.address,
+      atributos: attrs,
+      ...normalizeAttributes(attrs),
+    } : null,
+  });
+});
+
+// ── GET /api/rastreamento/cercas ──────────────────────────────────────────────
+router.get('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const cercas = await traccarGetGeofences();
+    res.json(cercas);
+  } catch {
+    res.json([]);
+  }
+});
+
+// ── GET /api/rastreamento/dispositivos/:id/cercas ─────────────────────────────
+router.get('/dispositivos/:id/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: { identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.json([]); return; }
+
+  try {
+    const cercas = await traccarGetGeofences(traccarDevice.id);
+    res.json(cercas);
+  } catch {
+    res.json([]);
+  }
+});
+
+// ── POST /api/rastreamento/cercas ─────────────────────────────────────────────
+router.post('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { nome, area, dispositivoId } = req.body as { nome: string; area: string; dispositivoId?: string };
+
+  if (!nome || !area) { res.status(400).json({ error: 'Campos "nome" e "area" são obrigatórios.' }); return; }
+
+  try {
+    const cerca = await traccarCreateGeofence(nome, area);
+
+    if (dispositivoId) {
+      const dispositivo = await prisma.dispositivo.findUnique({
+        where: { id: dispositivoId },
+        select: { identificador: true },
+      });
+      if (dispositivo) {
+        const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+        if (traccarDevice) {
+          await traccarLinkGeofenceToDevice(cerca.id, traccarDevice.id).catch(() => {});
+        }
+      }
+    }
+
+    res.json(cerca);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao criar cerca: ${msg}` });
+  }
+});
+
+// ── DELETE /api/rastreamento/cercas/:id ───────────────────────────────────────
+router.delete('/cercas/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = parseInt(param(req, 'id'));
+  if (isNaN(id)) { res.status(400).json({ error: 'ID inválido.' }); return; }
+
+  try {
+    await traccarDeleteGeofence(id);
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao remover cerca: ${msg}` });
+  }
+});
+
+// ── DELETE /api/rastreamento/cercas/:id/dispositivos/:dispositivoId ───────────
+router.delete('/cercas/:id/dispositivos/:dispositivoId', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const geofenceId = parseInt(param(req, 'id'));
+  const dispositivoId = param(req, 'dispositivoId');
+  if (isNaN(geofenceId)) { res.status(400).json({ error: 'ID inválido.' }); return; }
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id: dispositivoId },
+    select: { identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (traccarDevice) {
+    await traccarUnlinkGeofenceFromDevice(geofenceId, traccarDevice.id).catch(() => {});
+  }
+
+  res.json({ ok: true });
+});
+
+// ── GET /api/rastreamento/logs ─────────────────────────────────────────────────
+// Retorna as últimas linhas do log do servidor Traccar.
+// O frontend pode filtrar por identificador/IMEI do dispositivo.
+router.get('/logs', requireRoles('ADMIN'), async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const logText = await traccarGetServerLog();
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(logText);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao buscar logs: ${msg}` });
   }
 });
 

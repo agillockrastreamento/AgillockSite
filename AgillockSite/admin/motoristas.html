@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Motoristas — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
+    #al-alert-container, .filter-bar { flex-shrink: 0; }
+    .table-responsive { flex: 1; overflow-y: auto; border-radius: 8px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 0; }
+    html.dark-theme .table-responsive { background: #141820; }
+    .admin-table thead th { position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
+
+    /* Modal */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); z-index: 3000;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+    #modal-box {
+      background: #fff; border-radius: 10px; width: 440px; max-width: 95vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden;
+    }
+    html.dark-theme #modal-box { background: #1e1e2e; }
+    #modal-header {
+      background: #1e2530; color: #fff;
+      padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+    }
+    #modal-titulo { font-size: 14px; font-weight: 700; }
+    #modal-fechar { background: none; border: none; color: rgba(255,255,255,.7); font-size: 20px; cursor: pointer; line-height: 1; padding: 0; }
+    #modal-body { padding: 18px 16px; }
+    #modal-body label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+    html.dark-theme #modal-body label { color: #aaa; }
+    #modal-body .form-group { margin-bottom: 12px; }
+    #modal-footer {
+      padding: 12px 16px; border-top: 1px solid #eee;
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    html.dark-theme #modal-footer { border-color: #333; }
+
+    /* Vínculo */
+    .tag-dispositivo {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #e8f4fd; color: #2980b9; border-radius: 12px;
+      padding: 2px 8px; font-size: 12px; margin: 2px;
+    }
+    html.dark-theme .tag-dispositivo { background: #1a3045; color: #74b9e8; }
+    .tag-dispositivo button {
+      background: none; border: none; color: inherit; cursor: pointer; padding: 0; font-size: 13px; line-height: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown open">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li class="active"><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Motoristas</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button id="btn-novo" class="btn btn-primary-al">
+          <i class="fa fa-plus"></i> Novo Motorista
+        </button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-6">
+          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por nome, CNH ou telefone…" />
+        </div>
+        <div class="col-sm-3">
+          <select id="filtro-status" class="form-control">
+            <option value="">Todos os status</option>
+            <option value="true">Ativo</option>
+            <option value="false">Inativo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>CNH</th>
+            <th>Telefone</th>
+            <th>Dispositivos Vinculados</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tabela-body">
+          <tr><td colspan="6" class="text-center text-muted" style="padding:40px;">
+            <i class="fa fa-spinner fa-spin fa-2x"></i>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay">
+    <div id="modal-box">
+      <div id="modal-header">
+        <span id="modal-titulo"><i class="fa fa-id-card-o" style="margin-right:6px"></i> Motorista</span>
+        <button id="modal-fechar" title="Fechar">×</button>
+      </div>
+      <div id="modal-body">
+        <input type="hidden" id="modal-id" />
+        <div class="form-group">
+          <label for="modal-nome">Nome *</label>
+          <input type="text" id="modal-nome" class="form-control" placeholder="Nome completo" />
+        </div>
+        <div class="form-group">
+          <label for="modal-identificador">Identificador (Driver ID)</label>
+          <input type="text" id="modal-identificador" class="form-control" placeholder="Ex: 426696170" />
+        </div>
+        <div class="form-group">
+          <label for="modal-cnh">CNH</label>
+          <input type="text" id="modal-cnh" class="form-control" placeholder="Número da CNH" />
+        </div>
+        <div class="form-group">
+          <label for="modal-telefone">Telefone</label>
+          <input type="text" id="modal-telefone" class="form-control" placeholder="(00) 00000-0000" />
+        </div>
+        <div class="form-group" id="modal-dispositivo-wrap">
+          <label for="modal-dispositivo">Vincular a Dispositivo</label>
+          <select id="modal-dispositivo" class="form-control">
+            <option value="">Nenhum dispositivo</option>
+          </select>
+        </div>
+      </div>
+      <div id="modal-footer">
+        <button type="button" class="btn btn-default btn-sm" id="btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-salvar">
+          <i class="fa fa-check"></i> Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de vínculo avulso -->
+  <div id="vincular-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;width:380px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden;">
+      <div style="background:#1e2530;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:14px;font-weight:700"><i class="fa fa-link" style="margin-right:6px"></i> Vincular Dispositivo</span>
+        <button onclick="fecharVincular()" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;line-height:1;padding:0">×</button>
+      </div>
+      <div style="padding:18px 16px;">
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:#555">Motorista</label>
+          <div id="vincular-nome" style="font-size:14px;font-weight:600;margin-top:2px;margin-bottom:12px"></div>
+        </div>
+        <div class="form-group">
+          <label for="vincular-dispositivo" style="font-size:12px;font-weight:600;color:#555">Dispositivo</label>
+          <select id="vincular-dispositivo" class="form-control"></select>
+        </div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn btn-default btn-sm" onclick="fecharVincular()">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-confirmar-vincular">
+          <i class="fa fa-link"></i> Vincular
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var currentUser = AL.requireAuth(['ADMIN']);
+    if (!currentUser) return;
+
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge badge-ativo';
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    var todosMotoristas = [];
+    var todosDispositivos = [];
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ── Carregar dispositivos para o select ──────────────────────────────────────
+    AL.apiGet('/api/dispositivos').then(function (data) {
+      todosDispositivos = Array.isArray(data) ? data : (data.dispositivos || []);
+      preencherSelectDispositivos();
+    }).catch(function () {});
+
+    function preencherSelectDispositivos() {
+      var opts = '<option value="">Nenhum dispositivo</option>';
+      todosDispositivos.forEach(function (d) {
+        if (!d.ativo) return;
+        var label = d.nome + (d.placa ? ' (' + d.placa + ')' : '');
+        opts += '<option value="' + esc(d.id) + '">' + esc(label) + '</option>';
+      });
+      document.getElementById('modal-dispositivo').innerHTML = opts;
+      var vinc = document.getElementById('vincular-dispositivo');
+      if (vinc) vinc.innerHTML = opts;
+    }
+
+    // ── Carregar motoristas ───────────────────────────────────────────────────────
+    function carregarMotoristas() {
+      AL.apiGet('/api/motoristas').then(function (data) {
+        todosMotoristas = Array.isArray(data) ? data : [];
+        renderTabela();
+      }).catch(function (err) {
+        AL.showAlert(err.message || 'Erro ao carregar motoristas.', 'danger');
+      });
+    }
+
+    // ── Filtro ────────────────────────────────────────────────────────────────────
+    var filtroTimer = null;
+    document.getElementById('filtro-busca').addEventListener('input', function () {
+      clearTimeout(filtroTimer);
+      filtroTimer = setTimeout(renderTabela, 200);
+    });
+    document.getElementById('filtro-status').addEventListener('change', renderTabela);
+
+    function renderTabela() {
+      var busca = document.getElementById('filtro-busca').value.toLowerCase();
+      var filtroStatus = document.getElementById('filtro-status').value;
+      var lista = todosMotoristas.filter(function (m) {
+        if (filtroStatus !== '' && String(m.ativo) !== filtroStatus) return false;
+        if (busca && !(
+          m.nome.toLowerCase().indexOf(busca) !== -1 ||
+          (m.cnh || '').toLowerCase().indexOf(busca) !== -1 ||
+          (m.telefone || '').toLowerCase().indexOf(busca) !== -1
+        )) return false;
+        return true;
+      });
+
+      var tbody = document.getElementById('tabela-body');
+      if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:32px;">Nenhum motorista encontrado.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map(function (m) {
+        var disps = (m.dispositivos || []).map(function (d) {
+          return '<span class="tag-dispositivo">'
+            + '<i class="fa fa-microchip"></i> ' + esc(d.nome || d.placa || d.identificador)
+            + '<button onclick="desvincularDispositivo(\'' + esc(m.id) + '\',\'' + esc(d.id) + '\')" title="Desvincular"><i class="fa fa-times"></i></button>'
+            + '</span>';
+        }).join('');
+
+        return '<tr>'
+          + '<td><strong>' + esc(m.nome) + '</strong></td>'
+          + '<td>' + esc(m.cnh || '—') + '</td>'
+          + '<td>' + esc(m.telefone || '—') + '</td>'
+          + '<td>' + (disps || '<span style="color:#bbb;font-size:12px">—</span>') + '</td>'
+          + '<td>' + AL.badgeStatus(m.ativo) + '</td>'
+          + '<td style="text-align:right;white-space:nowrap">'
+          + '<button class="btn btn-xs btn-default" style="margin-right:4px" onclick="abrirVincular(\'' + esc(m.id) + '\',\'' + esc(m.nome) + '\')" title="Vincular dispositivo"><i class="fa fa-link"></i></button>'
+          + '<button class="btn btn-xs btn-default" style="margin-right:4px" onclick="editarMotorista(\'' + esc(m.id) + '\')" title="Editar"><i class="fa fa-pencil"></i></button>'
+          + '<button class="btn btn-xs btn-default" style="margin-right:4px" onclick="toggleStatus(\'' + esc(m.id) + '\')" title="Ativar/Inativar"><i class="fa fa-power-off"></i></button>'
+          + '<button class="btn btn-xs btn-danger" onclick="deletarMotorista(\'' + esc(m.id) + '\',\'' + esc(m.nome) + '\')" title="Excluir"><i class="fa fa-trash"></i></button>'
+          + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    // ── Modal Novo/Editar ─────────────────────────────────────────────────────────
+    document.getElementById('btn-novo').addEventListener('click', function () { abrirModal(); });
+    document.getElementById('modal-fechar').addEventListener('click', fecharModal);
+    document.getElementById('btn-cancelar').addEventListener('click', fecharModal);
+    document.getElementById('modal-overlay').addEventListener('click', function (e) {
+      if (e.target === this) fecharModal();
+    });
+    document.getElementById('btn-salvar').addEventListener('click', salvarMotorista);
+
+    function abrirModal(m) {
+      document.getElementById('modal-id').value = m ? m.id : '';
+      document.getElementById('modal-titulo').innerHTML = '<i class="fa fa-id-card-o" style="margin-right:6px"></i>' + (m ? 'Editar Motorista' : 'Novo Motorista');
+      document.getElementById('modal-nome').value = m ? (m.nome || '') : '';
+      document.getElementById('modal-identificador').value = m ? (m.identificador || '') : '';
+      document.getElementById('modal-cnh').value = m ? (m.cnh || '') : '';
+      document.getElementById('modal-telefone').value = m ? (m.telefone || '') : '';
+      var sel = document.getElementById('modal-dispositivo');
+      sel.value = '';
+      // Ao editar, não pré-seleciona dispositivo (pode ter vários)
+      document.getElementById('modal-dispositivo-wrap').style.display = m ? 'none' : 'block';
+      document.getElementById('modal-overlay').classList.add('open');
+      document.getElementById('modal-nome').focus();
+    }
+
+    function fecharModal() {
+      document.getElementById('modal-overlay').classList.remove('open');
+    }
+
+    window.editarMotorista = function (id) {
+      var m = todosMotoristas.find(function (x) { return x.id === id; });
+      if (m) abrirModal(m);
+    };
+
+    async function salvarMotorista() {
+      var id = document.getElementById('modal-id').value;
+      var nome = document.getElementById('modal-nome').value.trim();
+      var identificador = document.getElementById('modal-identificador').value.trim();
+      var cnh = document.getElementById('modal-cnh').value.trim();
+      var telefone = document.getElementById('modal-telefone').value.trim();
+      var dispositivoId = document.getElementById('modal-dispositivo').value;
+
+      if (!nome) { AL.showAlert('Nome é obrigatório.', 'warning'); return; }
+
+      var btn = document.getElementById('btn-salvar');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+      try {
+        var payload = { 
+          nome: nome, 
+          identificador: identificador || null,
+          cnh: cnh || null, 
+          telefone: telefone || null 
+        };
+        if (!id && dispositivoId) payload.dispositivoId = dispositivoId;
+
+        if (id) {
+          await AL.apiPut('/api/motoristas/' + encodeURIComponent(id), payload);
+        } else {
+          await AL.apiPost('/api/motoristas', payload);
+        }
+        fecharModal();
+        await carregarMotoristas();
+        AL.showAlert(id ? 'Motorista atualizado.' : 'Motorista criado.', 'success');
+      } catch (err) {
+        AL.showAlert(err.message || 'Erro ao salvar.', 'danger');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-check"></i> Salvar';
+      }
+    }
+
+    // ── Toggle status ─────────────────────────────────────────────────────────────
+    window.toggleStatus = async function (id) {
+      try {
+        await AL.apiPatch('/api/motoristas/' + encodeURIComponent(id) + '/status', {});
+        await carregarMotoristas();
+      } catch (err) {
+        AL.showAlert(err.message || 'Erro ao alterar status.', 'danger');
+      }
+    };
+
+    // ── Deletar ───────────────────────────────────────────────────────────────────
+    window.deletarMotorista = async function (id, nome) {
+      if (!confirm('Excluir motorista "' + nome + '"? Os vínculos com dispositivos serão removidos.')) return;
+      try {
+        await AL.apiDelete('/api/motoristas/' + encodeURIComponent(id));
+        await carregarMotoristas();
+        AL.showAlert('Motorista excluído.', 'success');
+      } catch (err) {
+        AL.showAlert(err.message || 'Erro ao excluir.', 'danger');
+      }
+    };
+
+    // ── Vincular avulso ───────────────────────────────────────────────────────────
+    var _vincularId = null;
+    window.abrirVincular = function (id, nome) {
+      _vincularId = id;
+      document.getElementById('vincular-nome').textContent = nome;
+      var sel = document.getElementById('vincular-dispositivo');
+      sel.innerHTML = '<option value="">Selecione o dispositivo...</option>';
+      todosDispositivos.forEach(function (d) {
+        if (!d.ativo) return;
+        var label = d.nome + (d.placa ? ' (' + d.placa + ')' : '');
+        sel.innerHTML += '<option value="' + esc(d.id) + '">' + esc(label) + '</option>';
+      });
+      document.getElementById('vincular-overlay').style.display = 'flex';
+    };
+    window.fecharVincular = function () {
+      document.getElementById('vincular-overlay').style.display = 'none';
+      _vincularId = null;
+    };
+    document.getElementById('btn-confirmar-vincular').addEventListener('click', async function () {
+      var dispositivoId = document.getElementById('vincular-dispositivo').value;
+      if (!dispositivoId || !_vincularId) { AL.showAlert('Selecione um dispositivo.', 'warning'); return; }
+      try {
+        await AL.apiPost('/api/motoristas/' + encodeURIComponent(_vincularId) + '/vincular', { dispositivoId: dispositivoId });
+        fecharVincular();
+        await carregarMotoristas();
+        AL.showAlert('Motorista vinculado ao dispositivo.', 'success');
+      } catch (err) {
+        AL.showAlert(err.message || 'Erro ao vincular.', 'danger');
+      }
+    });
+
+    // ── Desvincular ───────────────────────────────────────────────────────────────
+    window.desvincularDispositivo = async function (motoristaId, dispositivoId) {
+      if (!confirm('Desvincular este dispositivo do motorista?')) return;
+      try {
+        await AL.apiDelete('/api/motoristas/' + encodeURIComponent(motoristaId) + '/vincular/' + encodeURIComponent(dispositivoId));
+        await carregarMotoristas();
+        AL.showAlert('Dispositivo desvinculado.', 'success');
+      } catch (err) {
+        AL.showAlert(err.message || 'Erro ao desvincular.', 'danger');
+      }
+    };
+
+    carregarMotoristas();
+  })();
+  </script>
+</body>
+</html>

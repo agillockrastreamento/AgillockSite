@@ -15,60 +15,158 @@
   <style>
     body { overflow: hidden; }
 
+    /* Ajuste do botão de tipos de mapa (Layers) */
+        .leaflet-control-layers {
+         width: 35px !important;
+         height: 35px !important;
+         background-color: #fff !important;
+          border-radius: 50% !important;
+          border: 2px solid #c2c1c1 !important;
+        box-shadow: none !important;
+          overflow: hidden;
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         padding: 0 !important;
+       }
+       .leaflet-control-layers-toggle {
+         width: 35px !important;
+         height: 35px !important;
+         background-size: 20px 20px !important;
+          margin: 0 !important;
+        }
+       /* Mantém o menu lateral legível quando expandido */
+       .leaflet-control-layers-expanded {
+         width: auto !important;
+         height: auto !important;
+         border-radius: 8px !important;
+         padding: 10px !important;
+       }
+       
+
     .admin-content {
       height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
+    /* ── Topbar estendida com busca e contadores ── */
+    .admin-topbar {
+      z-index: 5000;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      flex-wrap: nowrap;
+    }
+    #topbar-busca-wrap {
+      flex: 1;
+      max-width: 280px;
+      position: relative;
+      z-index: 5001 !important;
+    }
+    #filtro { width: 100%; }
+    #topbar-counters {
+      font-size: 11px;
+      color: #888;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* ── Bandeja de camadas ── */
+    #mapa-tray {
+      position: absolute; top: 10px; right: 52px; z-index: 940;
+      background: rgba(20,20,30,0.85); backdrop-filter: blur(6px);
+      border-radius: 12px; padding: 10px;
+      display: flex; flex-direction: column; gap: 4px;
+      transform: translateX(8px); opacity: 0;
+      transition: transform .2s ease, opacity .2s ease;
+      pointer-events: none;
+    }
+    #mapa-tray.aberta { transform: translateX(0); opacity: 1; pointer-events: all; }
+    .ml-btn {
+      display: flex; align-items: center; gap: 10px;
+      background: none; border: none; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px;
+      color: #fff; font-size: 12px; font-weight: 600;
+      white-space: nowrap; transition: background .12s;
+    }
+    .ml-btn:hover { background: rgba(255,255,255,.1); }
+    .ml-btn.ativo { background: rgba(250,179,44,.18); }
+    .ml-btn-icon {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+      transition: background .12s, border-color .12s;
+    }
+    .ml-btn.ativo .ml-btn-icon { background: rgba(250,179,44,.35); border-color: #fab32c; color: #fab32c; }
+
+    /* ── Lista de resultados flutuante (abaixo do input na topbar) ── */
+    #lista-resultados-busca {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 2000;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-top: none;
+      border-radius: 0 0 6px 6px;
+      max-height: 260px;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .dark-theme #lista-resultados-busca {
+      background: #1e1e2e;
+      border-color: #333;
+    }
+
+    /* ── Layout principal ── */
     #rastreamento-layout {
       flex: 1;
       display: flex;
       overflow: hidden;
     }
 
-    /* ── Sidebar de veículos ── */
-    #sidebar-rastr {
-      width: 280px;
-      min-width: 280px;
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid #ddd;
-      background: #fff;
-      z-index: 10;
-    }
-    .dark-theme #sidebar-rastr { background: #1e1e2e; border-color: #333; }
-
-    #sidebar-header-rastr { padding: 10px 12px; border-bottom: 1px solid #eee; }
-    .dark-theme #sidebar-header-rastr { border-color: #333; }
-
-    #sidebar-counters { font-size: 11px; color: #888; margin-top: 6px; }
-
-    /* ── Resultados de busca ── */
-    #lista-resultados-busca {
-      border-bottom: 1px solid #eee;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-    .dark-theme #lista-resultados-busca { border-color: #333; }
-
-    /* ── Card do dispositivo ── */
-    #device-detail-card {
+    /* ── Área do mapa ── */
+    #mapa-area {
       flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    #mapa { width: 100%; height: 100%; }
+    .leaflet-grab { cursor: crosshair !important; }
+    .leaflet-drag-target { cursor: grabbing !important; }
+
+    /* ── Card flutuante sobre o mapa ── */
+    #device-detail-card {
+      display: none;
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 900;
+      width: 270px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22);
       overflow-y: auto;
+      max-height: calc(100% - 24px);
       scrollbar-width: thin;
       scrollbar-color: #ccc #fff;
     }
     html.dark-theme #device-detail-card {
+      background: #1e1e2e;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
       scrollbar-color: #3a3a5c #1e1e2e;
     }
     #device-detail-card::-webkit-scrollbar { width: 5px; }
     #device-detail-card::-webkit-scrollbar-track { background: #fff; }
     #device-detail-card::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-    #device-detail-card::-webkit-scrollbar-thumb:hover { background: #aaa; }
     html.dark-theme #device-detail-card::-webkit-scrollbar-track { background: #1e1e2e; }
     html.dark-theme #device-detail-card::-webkit-scrollbar-thumb { background: #3a3a5c; }
-    html.dark-theme #device-detail-card::-webkit-scrollbar-thumb:hover { background: #555580; }
+
     .dcard-header {
       display: flex;
       justify-content: space-between;
@@ -78,72 +176,264 @@
     }
     .dark-theme .dcard-header { border-color: #333; }
     .dcard-fechar {
-      background: none;
-      border: none;
-      font-size: 18px;
-      line-height: 1;
-      color: #999;
-      cursor: pointer;
-      padding: 0 2px;
-      flex-shrink: 0;
+      background: none; border: none; font-size: 18px; line-height: 1;
+      color: #999; cursor: pointer; padding: 0 2px; flex-shrink: 0;
     }
     .dcard-fechar:hover { color: #e74c3c; }
     .dcard-body { padding: 10px 12px 14px; }
+    .dcard-val { color: #333; }
+    html.dark-theme .dcard-val { color: #f0f2f5; }
+    .dcard-lbl { font-weight: 600; color: #333; }
+    html.dark-theme .dcard-lbl { color: #adb5bd; }
+    .dcard-section {
+      font-size: 11px;
+      border-top: 1px solid rgba(128,128,128,.18);
+      padding-top: 6px; margin-top: 4px; line-height: 1.7;
+    }
+    html.dark-theme .dcard-section { border-top-color: rgba(255,255,255,.1); }
 
-    /* ── Itens da lista de busca ── */
+    /* ── Itens de busca ── */
     .veiculo-item {
-      padding: 9px 12px;
-      border-bottom: 1px solid #f0f0f0;
-      cursor: pointer;
-      transition: background 0.12s;
+      padding: 9px 12px; border-bottom: 1px solid #f0f0f0;
+      cursor: pointer; transition: background 0.12s;
     }
     .dark-theme .veiculo-item { border-color: #2a2a3e; }
     .veiculo-item:hover { background: #f7f7f7; }
     .dark-theme .veiculo-item:hover { background: #252535; }
     .veiculo-item.ativo { background: #e8f4fd; }
     .dark-theme .veiculo-item.ativo { background: #1a3a5c; }
-
     .v-nome { font-weight: 600; font-size: 13px; }
     .v-placa {
-      display: inline-block;
-      background: #333; color: #fff;
-      padding: 0 5px; border-radius: 3px;
-      font-size: 11px; font-weight: 700;
-      letter-spacing: 1px;
+      display: inline-block; background: #333; color: #fff;
+      padding: 0 5px; border-radius: 3px; font-size: 11px; font-weight: 700; letter-spacing: 1px;
     }
     .v-status { font-size: 11px; margin-top: 3px; }
     .v-cliente { font-size: 11px; color: #888; margin-top: 1px; }
-
     .dot-online  { color: #27ae60; }
     .dot-moving  { color: #2980b9; }
     .dot-offline { color: #bdc3c7; }
     .dot-lastpos { color: #e67e22; }
 
-    /* ── Mapa ── */
-    #mapa { flex: 1; }
-    .leaflet-grab { cursor: crosshair !important; }
-    .leaflet-drag-target { cursor: grabbing !important; }
-
-    /* ── Card do dispositivo — texto adaptável ao tema ── */
-    /* Texto de valor (data/hora, endereço, km/h numérico) */
-    .dcard-val  { color: #333; }
-    html.dark-theme .dcard-val  { color: #f0f2f5; }
-
-    /* Label ("Servidor:", "Dispositivo:", "GPS:") — bold, tom ligeiramente diferente */
-    .dcard-lbl  { font-weight: 600; color: #333; }
-    html.dark-theme .dcard-lbl  { font-weight: 600; color: #adb5bd; }
-
-    /* Blocos de timestamps e endereço */
-    .dcard-section {
-      font-size: 11px;
-      border-top: 1px solid rgba(128,128,128,.18);
-      padding-top: 6px;
-      margin-top: 4px;
-      line-height: 1.7;
+    /* ── Área de Eventos ── */
+    #eventos-panel {
+      width: 300px;
+      min-width: 300px;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid #ddd;
+      background: #fff;
+      z-index: 10;
+      overflow: hidden;
     }
-    html.dark-theme .dcard-section { border-top-color: rgba(255,255,255,.1); }
+    .dark-theme #eventos-panel { background: #1e1e2e; border-color: #333; }
 
-    /* ── Badge WS status ── */
+    #eventos-header {
+      padding: 10px 12px 0;
+      border-bottom: 1px solid #eee;
+      flex-shrink: 0;
+    }
+    .dark-theme #eventos-header { border-color: #333; }
+    #eventos-header h5 {
+      font-size: 13px; font-weight: 700; margin: 0 0 8px;
+      color: #333;
+    }
+    .dark-theme #eventos-header h5 { color: #f0f2f5; }
+
+    #eventos-filtros {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-bottom: 10px;
+    }
+
+    /* Dropdown de tipo de evento */
+    #evt-tipo-wrap {
+      flex: 1;
+      position: relative;
+    }
+    #evt-tipo-btn {
+      width: 100%;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #333;
+      gap: 4px;
+    }
+    .dark-theme #evt-tipo-btn {
+      background: #252535;
+      border-color: #444;
+      color: #e2e8f0;
+    }
+    #evt-tipo-btn:hover { border-color: #2980b9; }
+    #evt-tipo-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 3000;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0 0 6px 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.13);
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .dark-theme #evt-tipo-dropdown {
+      background: #252535;
+      border-color: #444;
+    }
+    #evt-tipo-dropdown.open { display: block; }
+    .evt-tipo-item {
+      padding: 7px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #333;
+    }
+    .dark-theme .evt-tipo-item { color: #e2e8f0; }
+    .evt-tipo-item:hover { background: rgba(41,128,185,0.08); }
+    .evt-tipo-item input[type=checkbox] { cursor: pointer; }
+
+    #evt-btn-notif {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      color: #333;
+      flex-shrink: 0;
+      transition: border-color .15s, color .15s;
+    }
+    .dark-theme #evt-btn-notif { background: #252535; border-color: #444; color: #e2e8f0; }
+    #evt-btn-notif:hover { border-color: #f39c12; color: #f39c12; }
+    #evt-btn-notif.ativo { background: #333; color: #fff; border-color: #333; }
+    .dark-theme #evt-btn-notif.ativo { background: #f39c12; border-color: #f39c12; color: #fff; }
+
+    #evt-btn-limpar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      color: #333;
+      flex-shrink: 0;
+      transition: border-color .15s, color .15s;
+    }
+    .dark-theme #evt-btn-limpar { background: #252535; border-color: #444; color: #e2e8f0; }
+    #evt-btn-limpar:hover { border-color: #e74c3c; color: #e74c3c; }
+
+    #eventos-lista {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #ccc #fff;
+    }
+    .dark-theme #eventos-lista { scrollbar-color: #3a3a5c #1e1e2e; }
+    #eventos-lista::-webkit-scrollbar { width: 5px; }
+    #eventos-lista::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    .dark-theme #eventos-lista::-webkit-scrollbar-thumb { background: #3a3a5c; }
+
+    #eventos-vazio {
+      padding: 30px 16px;
+      text-align: center;
+      color: #aaa;
+      font-size: 12px;
+    }
+
+    .evento-item {
+      border-left: 3px solid #e74c3c;
+      border-bottom: 1px solid #f0f0f0;
+      padding: 9px 12px;
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .dark-theme .evento-item { border-bottom-color: #2a2a3e; }
+    .evento-item:hover { background: #fdf0f0; }
+    .dark-theme .evento-item:hover { background: #2a1a1a; }
+    .evento-item.tipo-geofence { border-left-color: #27ae60; }
+    .dark-theme .evento-item.tipo-geofence:hover { background: #1a2a1a; }
+    .evento-item.tipo-geofence:hover { background: #f0fdf4; }
+    .evento-item.tipo-overspeed { border-left-color: #e67e22; }
+    .evento-item.tipo-command { border-left-color: #2980b9; }
+    .evento-item.tipo-fuel { border-left-color: #8e44ad; }
+    .evento-item.tipo-ignition { border-left-color: #27ae60; }
+    .evento-item.tipo-driver { border-left-color: #7f8c8d; }
+    .evento-item.tipo-text { border-left-color: #16a085; }
+
+    .evt-dispositivo {
+      font-weight: 700; font-size: 12px; color: #e74c3c;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .evento-item.tipo-geofence .evt-dispositivo,
+    .evento-item.tipo-ignition .evt-dispositivo { color: #27ae60; }
+    .evento-item.tipo-overspeed .evt-dispositivo { color: #e67e22; }
+    .evento-item.tipo-command .evt-dispositivo { color: #2980b9; }
+    .evento-item.tipo-fuel .evt-dispositivo { color: #8e44ad; }
+    .evento-item.tipo-driver .evt-dispositivo,
+    .evento-item.tipo-text .evt-dispositivo { color: #7f8c8d; }
+
+    .evt-desc { font-size: 11px; color: #555; margin-top: 1px; }
+    .dark-theme .evt-desc { color: #aaa; }
+
+    .evt-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 3px;
+    }
+    .evt-tempo { font-size: 10px; color: #aaa; }
+    .evt-ico-pin { color: #e74c3c; font-size: 13px; flex-shrink: 0; }
+
+    /* ── Popup de evento no mapa ── */
+    #evento-popup-mapa {
+      display: none;
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22);
+      padding: 12px 16px;
+      min-width: 220px;
+      max-width: 320px;
+      text-align: center;
+    }
+    .dark-theme #evento-popup-mapa {
+      background: #1e1e2e;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    #evento-popup-mapa h6 {
+      font-weight: 700; font-size: 14px; margin: 0 0 4px;
+      color: #333;
+    }
+    .dark-theme #evento-popup-mapa h6 { color: #f0f2f5; }
+    #evento-popup-mapa .ep-data { font-size: 12px; color: #555; margin-bottom: 4px; }
+    .dark-theme #evento-popup-mapa .ep-data { color: #aaa; }
+    #evento-popup-mapa .ep-end { font-size: 11px; color: #888; }
+    .dark-theme #evento-popup-mapa .ep-end { color: #999; }
+    #btn-fechar-evt-popup {
+      position: absolute; top: 6px; right: 8px;
+      background: none; border: none;
+      font-size: 16px; color: #aaa; cursor: pointer; line-height: 1;
+    }
+    #btn-fechar-evt-popup:hover { color: #e74c3c; }
+
+    /* ── Badge WS ── */
     #ws-status {
       position: fixed; bottom: 14px; right: 14px;
       padding: 4px 10px; border-radius: 20px;
@@ -154,16 +444,114 @@
     #ws-status.desconectado { background: #e74c3c; color: #fff; }
     #ws-status.reconectando { background: #f39c12; color: #fff; }
 
-    /* ── Popup de veículo (simplificado) ── */
+    /* ── Popup Leaflet veículo ── */
     .popup-veiculo .leaflet-popup-content-wrapper {
-      padding: 0 !important;
-      border-radius: 8px !important;
-      overflow: hidden !important;
+      padding: 0 !important; border-radius: 8px !important; overflow: hidden !important;
     }
-    .popup-veiculo .leaflet-popup-content {
-      margin: 0 !important;
-      width: auto !important;
+    .popup-veiculo .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+
+    /* ── Botões de ação do card ── */
+    .dcard-acao {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      background: none; border: none; cursor: pointer; padding: 4px 2px;
+      font-size: 10px; color: #555; min-width: 48px;
+      transition: color .15s;
     }
+    .dark-theme .dcard-acao { color: #aaa; }
+    .dcard-acao-icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1.5px solid #ccc;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; color: #555;
+      transition: border-color .15s, background .15s, color .15s;
+    }
+    .dark-theme .dcard-acao-icon { border-color: #444; color: #aaa; }
+    .dcard-acao:hover .dcard-acao-icon { border-color: #2980b9; color: #2980b9; }
+    .dcard-acao.ativo .dcard-acao-icon { background: #e8f4fd; border-color: #2980b9; color: #2980b9; }
+    .dark-theme .dcard-acao.ativo .dcard-acao-icon { background: #1a3a5c; }
+    .dcard-acao span { font-weight: 600; }
+
+    /* ── Modal de Comando ── */
+    #modal-cmd-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 3000;
+      align-items: center; justify-content: center;
+    }
+    #modal-cmd-overlay[style*="flex"] { display: flex !important; }
+    #modal-cmd {
+      background: #fff; border-radius: 10px; width: 340px; max-width: 95vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    .dark-theme #modal-cmd { background: #1e1e2e; }
+    #modal-cmd-header {
+      background: #1e2530; color: #fff;
+      padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+    }
+    #modal-cmd-titulo { font-size: 14px; font-weight: 700; }
+    #btn-fechar-modal-cmd {
+      background: none; border: none; color: rgba(255,255,255,.7);
+      font-size: 20px; cursor: pointer; line-height: 1; padding: 0;
+    }
+    #modal-cmd-body { padding: 18px 16px; }
+    #modal-cmd-body label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 5px; }
+    .dark-theme #modal-cmd-body label { color: #aaa; }
+    #cmd-tipo-select {
+      width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px;
+      font-size: 13px; background: #fff; color: #333;
+    }
+    .dark-theme #cmd-tipo-select { background: #252535; border-color: #444; color: #e2e8f0; }
+    #cmd-resultado { margin-top: 10px; font-size: 12px; min-height: 16px; }
+    #modal-cmd-footer {
+      padding: 12px 16px; border-top: 1px solid #eee;
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .dark-theme #modal-cmd-footer { border-color: #333; }
+    #btn-enviar-cmd {
+      background: #2980b9; color: #fff; border: none; border-radius: 6px;
+      padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    #btn-enviar-cmd:disabled { opacity: 0.6; cursor: default; }
+    #btn-enviar-cmd:hover:not(:disabled) { background: #1f6a9a; }
+
+    /* ── Diálogo de Cerca ── */
+    #dlg-cerca {
+      display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; background: #fff; border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22);
+      padding: 16px 18px; min-width: 260px;
+      flex-direction: column;
+    }
+    .dark-theme #dlg-cerca { background: #1e1e2e; }
+    #dlg-cerca h6 { font-weight: 700; font-size: 13px; margin: 0 0 12px; color: #333; }
+    .dark-theme #dlg-cerca h6 { color: #f0f2f5; }
+    #dlg-cerca label { font-size: 11px; font-weight: 600; color: #888; display: block; margin-bottom: 3px; }
+    #dlg-cerca input {
+      width: 100%; padding: 6px 9px; border: 1px solid #ccc; border-radius: 5px;
+      font-size: 12px; margin-bottom: 10px; background: #fff; color: #333;
+    }
+    .dark-theme #dlg-cerca input { background: #252535; border-color: #444; color: #e2e8f0; }
+    #dlg-cerca-btns { display: flex; gap: 8px; }
+    #btn-cerca-confirmar {
+      flex: 1; background: #27ae60; color: #fff; border: none;
+      border-radius: 6px; padding: 7px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    #btn-cerca-cancelar {
+      flex: 1; background: #eee; color: #555; border: none;
+      border-radius: 6px; padding: 7px; font-size: 12px; cursor: pointer;
+    }
+    .dark-theme #btn-cerca-cancelar { background: #333; color: #aaa; }
+
+    /* ── Banner de instrução no mapa ── */
+    #mapa-instrucao {
+      display: none; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; background: rgba(0,0,0,0.75); color: #fff;
+      padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 600;
+      white-space: nowrap; pointer-events: none;
+    }
+
+    /* ── Tooltip de cerca ── */
+    .cerca-tooltip { font-size: 11px; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -187,6 +575,8 @@
           <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
           <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
           <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
         </ul>
       </li>
       <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
@@ -210,30 +600,119 @@
   <!-- Conteúdo principal -->
   <div class="admin-content">
     <div class="admin-topbar">
-      <div style="display:flex;align-items:center;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
         <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
-        <h2 class="topbar-title">Rastreamento</h2>
+        <h2 class="topbar-title" style="white-space:nowrap">Rastreamento</h2>
       </div>
+      <!-- Busca na topbar -->
+      <div id="topbar-busca-wrap">
+        <input type="text" id="filtro" class="form-control input-sm" placeholder="Buscar veículo ou placa...">
+        <div id="lista-resultados-busca" style="display:none"></div>
+      </div>
+      <!-- Contadores de status -->
+      <div id="topbar-counters">Carregando...</div>
     </div>
 
     <div id="rastreamento-layout">
 
-      <!-- Sidebar de veículos -->
-      <div id="sidebar-rastr">
-        <div id="sidebar-header-rastr">
-          <input type="text" id="filtro" class="form-control input-sm"
-                 placeholder="Buscar veículo ou placa...">
-          <div id="sidebar-counters">Carregando...</div>
+      <!-- Área do mapa -->
+      <div id="mapa-area">
+        <div id="mapa"></div>
+
+        <!-- Bandeja de camadas (toggle criado como Leaflet control no JS) -->
+        <div id="mapa-tray">
+          <button class="ml-btn ativo" id="ml-alarmes"><span class="ml-btn-icon"><i class="fa fa-bell"></i></span> Alarmes</button>
+          <button class="ml-btn ativo" id="ml-dispositivos"><span class="ml-btn-icon"><i class="fa fa-car"></i></span> Dispositivos</button>
+          <button class="ml-btn ativo" id="ml-labels"><span class="ml-btn-icon"><i class="fa fa-comment"></i></span> Labels</button>
+          <button class="ml-btn" id="ml-cercas"><span class="ml-btn-icon"><i class="fa fa-circle-o"></i></span> Cercas</button>
+          <button class="ml-btn" id="ml-rastro"><span class="ml-btn-icon"><i class="fa fa-ellipsis-h"></i></span> Rastro</button>
         </div>
-        <!-- Resultados de busca (visível só ao digitar) -->
-        <div id="lista-resultados-busca" style="display:none"></div>
-        <!-- Card do dispositivo selecionado -->
-        <div id="device-detail-card" style="display:none"></div>
+
+        <!-- Card flutuante do dispositivo selecionado -->
+        <div id="device-detail-card"></div>
+
+        <!-- Popup de evento no mapa -->
+        <div id="evento-popup-mapa">
+          <button id="btn-fechar-evt-popup" title="Fechar">×</button>
+          <h6 id="ep-titulo"></h6>
+          <div class="ep-data" id="ep-data"></div>
+          <div class="ep-end" id="ep-end"></div>
+        </div>
+
+        <!-- Banner de instrução (ex: clique no mapa para posicionar a cerca) -->
+        <div id="mapa-instrucao"></div>
+
+        <!-- Diálogo de criação de cerca -->
+        <div id="dlg-cerca">
+          <h6><i class="fa fa-map-marker" style="color:#27ae60;margin-right:6px"></i> Nova Cerca</h6>
+          <label for="cerca-nome-input">Nome da cerca</label>
+          <input type="text" id="cerca-nome-input" placeholder="Ex: Garagem, Área restrita..." />
+          <label for="cerca-raio-input">Raio (metros)</label>
+          <input type="number" id="cerca-raio-input" value="500" min="50" max="50000" />
+          <div id="dlg-cerca-btns">
+            <button id="btn-cerca-confirmar" type="button"><i class="fa fa-check"></i> Criar</button>
+            <button id="btn-cerca-cancelar" type="button">Cancelar</button>
+          </div>
+        </div>
       </div>
 
-      <!-- Mapa -->
-      <div id="mapa"></div>
+      <!-- Painel de Eventos -->
+      <div id="eventos-panel">
+        <div id="eventos-header">
+          <h5>Eventos</h5>
+          <div id="eventos-filtros">
+            <div id="evt-tipo-wrap">
+              <button id="evt-tipo-btn" type="button">
+                <span id="evt-tipo-label">Tipo</span>
+                <i class="fa fa-chevron-down" style="font-size:10px"></i>
+              </button>
+              <div id="evt-tipo-dropdown">
+                <!-- Opções preenchidas via JS -->
+              </div>
+            </div>
+            <button id="evt-btn-notif" title="Notificações sonoras" class="ativo">
+              <i class="fa fa-bell"></i>
+            </button>
+            <button id="evt-btn-limpar" title="Limpar eventos">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        <div id="eventos-lista">
+          <div id="eventos-vazio">
+            <i class="fa fa-bell-o" style="font-size:28px;display:block;margin-bottom:8px;color:#ddd"></i>
+            Aguardando eventos...
+          </div>
+        </div>
+      </div>
 
+    </div>
+  </div>
+
+  <!-- Modal de Comando (admin only) -->
+  <div id="modal-cmd-overlay" style="display:none">
+    <div id="modal-cmd">
+      <div id="modal-cmd-header">
+        <span id="modal-cmd-titulo"><i class="fa fa-terminal" style="margin-right:6px"></i> Enviar Comando</span>
+        <button id="btn-fechar-modal-cmd" title="Fechar" onclick="fecharModalComando()">×</button>
+      </div>
+      <div id="modal-cmd-body">
+        <label for="cmd-tipo-select">Tipo de comando</label>
+        <select id="cmd-tipo-select">
+          <option value="">Carregando...</option>
+        </select>
+        <div id="cmd-custom-wrap" style="display:none;margin-top:10px;">
+          <label for="cmd-custom-data">Comando personalizado</label>
+          <input type="text" id="cmd-custom-data" class="form-control" placeholder="Ex: AT#REBOOT" style="font-family:monospace;font-size:13px;" />
+        </div>
+        <div id="cmd-resultado"></div>
+      </div>
+      <div id="modal-cmd-footer">
+        <button type="button" class="btn btn-default btn-sm" onclick="fecharModalComando()">Cancelar</button>
+        <button id="btn-enviar-cmd" type="button" onclick="enviarComandoDoModal()">
+          <i class="fa fa-paper-plane"></i> Enviar
+        </button>
+      </div>
     </div>
   </div>
 
@@ -268,6 +747,14 @@
 
       document.getElementById('btn-logout').addEventListener('click', AL.logout);
       AL.initThemeToggle('btn-tema');
+
+      // Fechar dropdown de tipo ao clicar fora
+      document.addEventListener('click', function (e) {
+        var wrap = document.getElementById('evt-tipo-wrap');
+        if (wrap && !wrap.contains(e.target)) {
+          document.getElementById('evt-tipo-dropdown').classList.remove('open');
+        }
+      });
     })();
   </script>
   <script src="../js/rastreamento.js"></script>

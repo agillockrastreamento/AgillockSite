@@ -26,3 +26,5 @@ backend/cert/*.pem
 backend/cert/*.key
 backend/cert/*.pfx
 backend/uploads/
+
+FotosReferencia/

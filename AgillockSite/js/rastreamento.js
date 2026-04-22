@@ -1,9 +1,9 @@
 'use strict';
 
 let map;
-const marcadores = {};      // dispositivoId → L.Marker individual
-const _clusterBadges = {};  // coordKey → L.Marker (badge com contador)
-const _clusterGrupos = {};  // coordKey → { ids: [...], lat, lng }
+const marcadores = {};
+const _clusterBadges = {};
+const _clusterGrupos = {};
 let veiculosMap = {};
 let traccarIdParaDispositivoId = {};
 let boundsAjustados = false;
@@ -16,26 +16,257 @@ let wsReconectTimer = null;
 let ativoId = null;
 let modoFoco = false;
 const marcadoresIconeKey = {};
-const _estadoSince = {}; // dispositivoId → { emMovimento, desde (ms) }
+const _estadoSince = {};
 
-// Spider state (expansão de cluster)
 const _spider = { markers: [], linhas: [], chave: null };
+
+// ── Camadas de overlay ────────────────────────────────────────────────────────
+const _overlay = {
+  alarmes: true,    // mostrar badge de alarme sobre dispositivos
+  labels: true,     // mostrar placa/nome sobre dispositivos
+  cercas: false,    // mostrar cercas geovirtual
+  rastro: false,    // mostrar rastro da última hora
+};
+
+// Rastros: dispositivoId → { linha: L.Polyline, setas: L.Marker[] }
+const _rastros = {};
+
+// Marcadores de alarme: dispositivoId → L.Marker (badge flutuante)
+const _alarmeBadges = {};
+
+// Cercas: geofenceId → { camada: L.Layer, dados: {...} }
+const _cercasLayer = {};
+let _cercasCarregadas = false;
+
+// Modo desenho de cerca
+let _modoDesenho = null; // null | { dispositivoId, etapa: 'centro'|'confirmar', circle, center }
+
+// Rota individual: dispositivoId → { linha: L.Polyline, setas: L.Marker[] }
+const _rotasIndividuais = {};
+
+// Modal de comando
+let _cmdDispositivoId = null;
+
+// ── Eventos ───────────────────────────────────────────────────────────────────
+const TIPOS_EVENTO_ADMIN = [
+  { tipo: 'commandResult',  label: 'Resultado do Comando',       css: 'tipo-command'  },
+  { tipo: 'commandQueued',  label: 'Comando na Fila/Enviado',    css: 'tipo-command'  },
+  { tipo: 'deviceOverspeed',label: 'Excedido o Limite de Velocidade', css: 'tipo-overspeed' },
+  { tipo: 'deviceFuelDrop', label: 'Queda de Combustível',       css: 'tipo-fuel'     },
+  { tipo: 'deviceFuelIncrease', label: 'Aumento de Combustível', css: 'tipo-fuel'     },
+  { tipo: 'geofenceEnter',  label: 'Entrada na Cerca Virtual',   css: 'tipo-geofence' },
+  { tipo: 'geofenceExit',   label: 'Saída da Cerca Virtual',     css: 'tipo-geofence' },
+  { tipo: 'alarm',          label: 'Alarme',                     css: 'tipo-alarm'    },
+  { tipo: 'textMessage',    label: 'Mensagem de Texto Recebida', css: 'tipo-text'     },
+  { tipo: 'driverChanged',  label: 'Condutor Alterado',          css: 'tipo-driver'   },
+];
+
+// Filtros ativos (null = todos)
+let _evtFiltros = new Set(); // vazio = sem filtro de tipo
+let _evtNotif = true;        // notificação sonora ativa
+
+// Lista de eventos recebidos: { dispositivoId, tipo, tipoLabel, serverTime, lat, lng, positionId }
+const _eventos = [];
+const MAX_EVENTOS = 200;
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function () {
   inicializarMapa();
+  inicializarEventosPanel();
   carregarPosicoes();
   document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
 
-  // Re-renderiza o card aberto quando o tema muda (para atualizar cores do velocímetro SVG)
   new MutationObserver(function () {
     if (ativoId) mostrarCardDispositivo(ativoId);
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+  // Fechar busca ao clicar fora
+  document.addEventListener('click', function (e) {
+    const wrap = document.getElementById('topbar-busca-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById('lista-resultados-busca').style.display = 'none';
+    }
+  });
+
+  // Fechar popup de evento
+  document.getElementById('btn-fechar-evt-popup').addEventListener('click', function () {
+    document.getElementById('evento-popup-mapa').style.display = 'none';
+  });
+
+  // Modal de comando — fechar
+  document.getElementById('btn-fechar-modal-cmd').addEventListener('click', fecharModalComando);
+  document.getElementById('modal-cmd-overlay').addEventListener('click', function (e) {
+    if (e.target === this) fecharModalComando();
+  });
+  document.getElementById('btn-enviar-cmd').addEventListener('click', enviarComandoDoModal);
+  document.getElementById('cmd-tipo-select').addEventListener('change', function () {
+    document.getElementById('btn-enviar-cmd').disabled = !this.value;
+    const isCustom = this.value === 'custom';
+    const wrap = document.getElementById('cmd-custom-wrap');
+    if (wrap) { wrap.style.display = isCustom ? 'block' : 'none'; }
+  });
 });
 
+// ── Painel de Eventos — inicialização ─────────────────────────────────────────
+
+function inicializarEventosPanel() {
+  const dropdown = document.getElementById('evt-tipo-dropdown');
+  dropdown.innerHTML = TIPOS_EVENTO_ADMIN.map(t =>
+    `<label class="evt-tipo-item">
+      <input type="checkbox" data-tipo="${t.tipo}" checked>
+      ${t.label}
+    </label>`
+  ).join('');
+
+  // Ao desmarcar/marcar, atualiza filtros
+  dropdown.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      _atualizarFiltrosTipo();
+      renderEventosLista();
+    });
+  });
+
+  // Toggle do dropdown
+  document.getElementById('evt-tipo-btn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+
+  // Notificação sonora
+  document.getElementById('evt-btn-notif').addEventListener('click', function () {
+    _evtNotif = !_evtNotif;
+    this.classList.toggle('ativo', _evtNotif);
+  });
+
+  // Limpar eventos
+  document.getElementById('evt-btn-limpar').addEventListener('click', function () {
+    _eventos.length = 0;
+    renderEventosLista();
+  });
+}
+
+function _atualizarFiltrosTipo() {
+  const checkboxes = document.querySelectorAll('#evt-tipo-dropdown input[type=checkbox]');
+  _evtFiltros.clear();
+  let todas = true;
+  checkboxes.forEach(function (cb) {
+    if (!cb.checked) { _evtFiltros.add(cb.dataset.tipo); todas = false; }
+  });
+  const label = document.getElementById('evt-tipo-label');
+  if (todas) {
+    label.textContent = 'Tipo';
+  } else {
+    const ativas = TIPOS_EVENTO_ADMIN.length - _evtFiltros.size;
+    label.textContent = `Tipo (${ativas}/${TIPOS_EVENTO_ADMIN.length})`;
+  }
+}
+
+function adicionarEvento(evt) {
+  _eventos.unshift(evt);
+  if (_eventos.length > MAX_EVENTOS) _eventos.length = MAX_EVENTOS;
+  renderEventosLista();
+  if (_evtNotif) _tocarSomEvento(evt.tipo);
+}
+
+function _tocarSomEvento(tipo) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(tipo === 'alarm' ? 880 : 660, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+function _cssEvento(tipo) {
+  if (tipo === 'geofenceEnter' || tipo === 'geofenceExit') return 'tipo-geofence';
+  if (tipo === 'deviceOverspeed') return 'tipo-overspeed';
+  if (tipo === 'commandResult' || tipo === 'commandQueued') return 'tipo-command';
+  if (tipo === 'deviceFuelDrop' || tipo === 'deviceFuelIncrease') return 'tipo-fuel';
+  if (tipo === 'ignitionOn' || tipo === 'ignitionOff') return 'tipo-ignition';
+  if (tipo === 'driverChanged') return 'tipo-driver';
+  if (tipo === 'textMessage') return 'tipo-text';
+  return '';
+}
+
+function renderEventosLista() {
+  const lista = document.getElementById('eventos-lista');
+  const filtrados = _eventos.filter(e => !_evtFiltros.has(e.tipo));
+
+  if (!filtrados.length) {
+    lista.innerHTML = `<div id="eventos-vazio">
+      <i class="fa fa-bell-o" style="font-size:28px;display:block;margin-bottom:8px;color:#ddd"></i>
+      Aguardando eventos...
+    </div>`;
+    return;
+  }
+
+  lista.innerHTML = filtrados.map(function (e, idx) {
+    const css = _cssEvento(e.tipo);
+    const tempo = fmtTempoDecorrido(e.serverTime);
+    const nomeDev = _nomeDispositivo(e.dispositivoId);
+    return `<div class="evento-item ${css}" onclick="clicarEvento(${_eventos.indexOf(e)})">
+      <div class="evt-dispositivo">${nomeDev}</div>
+      <div class="evt-desc">${e.tipoLabel || e.tipo}</div>
+      <div class="evt-footer">
+        <span class="evt-tempo">há ${tempo}</span>
+        <i class="fa fa-map-marker evt-ico-pin"></i>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _nomeDispositivo(dispositivoId) {
+  const v = veiculosMap[dispositivoId];
+  if (!v) return dispositivoId || '—';
+  return v.placa ? `${v.nome} ${v.placa}` : v.nome;
+}
+
+window.clicarEvento = function (idx) {
+  const e = _eventos[idx];
+  if (!e) return;
+
+  // Focar no dispositivo se tiver posição
+  if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
+    focar(e.dispositivoId);
+  } else if (e.lat != null && e.lng != null) {
+    map.flyTo([e.lat, e.lng], 16, { animate: true, duration: 0.8 });
+  }
+
+  // Mostrar popup de evento no mapa
+  const popup = document.getElementById('evento-popup-mapa');
+  document.getElementById('ep-titulo').textContent = e.tipoLabel || e.tipo;
+
+  const dt = e.serverTime ? new Date(e.serverTime) : null;
+  document.getElementById('ep-data').textContent = dt
+    ? `${dt.toLocaleDateString('pt-BR')} | ${dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}`
+    : '';
+
+  const nomeDev = _nomeDispositivo(e.dispositivoId);
+  const pos = veiculosMap[e.dispositivoId]?.posicao;
+  const addrId = 'ep-end-addr';
+  if (pos) {
+    document.getElementById('ep-end').id = addrId;
+    document.getElementById('ep-end').textContent = 'Buscando endereço...';
+    geocodificarCoordenadas(pos.latitude, pos.longitude, addrId);
+  } else {
+    document.getElementById('ep-end').textContent = nomeDev;
+  }
+
+  popup.style.display = 'block';
+};
+
+// ── Mapa ──────────────────────────────────────────────────────────────────────
+
 function inicializarMapa() {
-  map = L.map('mapa', { zoomControl: true, maxZoom: 21 }).setView([-15.78, -47.93], 5);
+  map = L.map('mapa', { zoomControl: false, maxZoom: 21 }).setView([-15.78, -47.93], 5);
 
   const tilesEsri = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
@@ -52,6 +283,8 @@ function inicializarMapa() {
 
   tilesCartoDB.addTo(map);
 
+  // Zoom e camadas de tile — todos à direita
+  L.control.zoom({ position: 'topright' }).addTo(map);
   L.control.layers(
     { 'CartoDB Voyager': tilesCartoDB, 'OpenStreetMap': tilesOsm, 'ESRI Street': tilesEsri },
     {},
@@ -60,62 +293,98 @@ function inicializarMapa() {
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
-  // ── CSS do controle de toggle ─────────────────────────────────────────────
-  (function () {
-    const s = document.createElement('style');
-    s.textContent = `
-      .popup-toggle-ctrl { position: relative; }
-      .popup-toggle-ctrl .pt-header { width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:default;background:#fff;color:#333; }
-      .popup-toggle-ctrl .pt-panel { display:none;position:absolute;right:0;top:0;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,0.4);padding:6px 0;min-width:130px;z-index:10; }
-      .popup-toggle-ctrl:hover .pt-panel { display:block; }
-      .dark-theme .popup-toggle-ctrl .pt-header { background:#fff;color:#333; }
-      .dark-theme .popup-toggle-ctrl .pt-panel { background:#2d3748;color:#e2e8f0; }
-      .pt-option { display:flex;align-items:center;gap:7px;padding:5px 12px;cursor:pointer;font-size:12px;white-space:nowrap; }
-      .pt-option:hover { background:rgba(41,128,185,0.1); }
-      .pt-radio { width:10px;height:10px;border:2px solid #aaa;border-radius:50%;flex-shrink:0; }
-      .pt-radio.active { border-color:#2980b9;background:#2980b9; }
-      .leaflet-control-layers-toggle { width:30px !important; height:30px !important; }
-      .leaflet-control-layers-list { min-width:130px !important; }
-    `;
-    document.head.appendChild(s);
-  })();
+  // Localização primeiro (topright) → tray toggle fica abaixo dela
+  _adicionarBotaoLocalizacao();
+  _adicionarBotoesCamadas();
 
-  let _popupToggleEl = null;
-  function _sincRadiosPopup() {
-    if (!_popupToggleEl) return;
-    _popupToggleEl.querySelectorAll('.pt-option').forEach(function (el) {
-      const ok = (el.dataset.val === '1') === _mostrarPopup;
-      el.querySelector('.pt-radio').className = 'pt-radio' + (ok ? ' active' : '');
-    });
-  }
+  map.on('popupclose', function (e) {
+    if (_togglingPopup) return;
+    if (ativoId && marcadores[ativoId] && e.popup === marcadores[ativoId].getPopup()) {
+      fecharCardDispositivo(true);
+    }
+  });
 
-  const BtnPopupToggle = L.Control.extend({
+  map.on('click', function () { _fecharSpider(); });
+
+  map.on('zoomend', function () {
+    _fecharSpider();
+    if (!modoFoco) renderMarcadores();
+  });
+}
+
+// ── Botões de camadas sobre o mapa ────────────────────────────────────────────
+
+function _adicionarBotoesCamadas() {
+  const tray = document.getElementById('mapa-tray');
+  if (!tray) return;
+
+  // Toggle criado como Leaflet control para ficar abaixo do botão de localização
+  let _toggleBtn = null;
+  const BtnTray = L.Control.extend({
     onAdd() {
-      const c = L.DomUtil.create('div', 'leaflet-bar leaflet-control popup-toggle-ctrl');
-      c.innerHTML = `
-        <div class="pt-header"><i class="fa fa-tag" style="font-size:14px"></i></div>
-        <div class="pt-panel">
-          <div class="pt-option" data-val="1"><span class="pt-radio active"></span> Mostrar placa</div>
-          <div class="pt-option" data-val="0"><span class="pt-radio"></span> Ocultar placa</div>
-        </div>`;
-      L.DomEvent.disableClickPropagation(c);
-      _popupToggleEl = c;
-      c.querySelectorAll('.pt-option').forEach(function (el) {
-        L.DomEvent.on(el, 'click', function () {
-          const novo = el.dataset.val === '1';
-          if (novo === _mostrarPopup) return;
-          _mostrarPopup = novo;
-          _atualizarBindingsPopup();
-          _sincRadiosPopup();
-        });
+      const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+      btn.id = 'mapa-tray-toggle';
+      btn.title = 'Camadas do mapa';
+      btn.style.cssText = 'width:35px;height:35px;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;background:#fff;border:2.5px solid #ccc;line-height:1;border-radius:50%;';
+      btn.innerHTML = '<i class="fa fa-database" style="color:#333"></i>';
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.disableScrollPropagation(btn);
+      L.DomEvent.on(btn, 'click', function (e) {
+        L.DomEvent.stop(e);
+        const aberta = tray.classList.toggle('aberta');
+        btn.style.background = aberta ? '#fab32c' : '#fff';
+        btn.querySelector('i').style.color = aberta ? '#222' : '#333';
       });
-      return c;
+      _toggleBtn = btn;
+      return btn;
     },
     onRemove() {},
   });
-  new BtnPopupToggle({ position: 'topright' }).addTo(map);
+  new BtnTray({ position: 'topright' }).addTo(map);
 
-  // ── Botão de localização do usuário (esquerda, abaixo do zoom) ─────────────
+  L.DomEvent.disableClickPropagation(tray);
+
+  // Fechar bandeja ao clicar fora
+  document.addEventListener('click', function (e) {
+    if (!tray.contains(e.target) && (!_toggleBtn || !_toggleBtn.contains(e.target))) {
+      tray.classList.remove('aberta');
+      if (_toggleBtn) { _toggleBtn.style.background = '#fff'; _toggleBtn.querySelector('i').style.color = '#333'; }
+    }
+  });
+
+  document.getElementById('ml-alarmes').addEventListener('click', function () {
+    _overlay.alarmes = !_overlay.alarmes;
+    this.classList.toggle('ativo', _overlay.alarmes);
+    _atualizarAlarmeBadges();
+  });
+
+  document.getElementById('ml-dispositivos').addEventListener('click', function () {
+    this.classList.toggle('ativo');
+  });
+
+  document.getElementById('ml-labels').addEventListener('click', function () {
+    _overlay.labels = !_overlay.labels;
+    this.classList.toggle('ativo', _overlay.labels);
+    _mostrarPopup = _overlay.labels;
+    _atualizarBindingsPopup();
+  });
+
+  document.getElementById('ml-cercas').addEventListener('click', function () {
+    _overlay.cercas = !_overlay.cercas;
+    this.classList.toggle('ativo', _overlay.cercas);
+    if (_overlay.cercas) carregarCercas().then(mostrarCercas); else ocultarCercas();
+  });
+
+  document.getElementById('ml-rastro').addEventListener('click', function () {
+    _overlay.rastro = !_overlay.rastro;
+    this.classList.toggle('ativo', _overlay.rastro);
+    if (_overlay.rastro) _carregarRastros(); else _limparRastros();
+  });
+}
+
+// ── Botão de localização ──────────────────────────────────────────────────────
+
+function _adicionarBotaoLocalizacao() {
   let _marcadorUser = null;
   const BtnLoc = L.Control.extend({
     onAdd() {
@@ -144,30 +413,433 @@ function inicializarMapa() {
     },
     onRemove() {},
   });
-  new BtnLoc({ position: 'topleft' }).addTo(map);
+  new BtnLoc({ position: 'topright' }).addTo(map);
+}
 
-  // Fecha card quando popup do marcador ativo é fechado pelo X do Leaflet
-  map.on('popupclose', function (e) {
-    if (_togglingPopup) return;
-    if (ativoId && marcadores[ativoId] && e.popup === marcadores[ativoId].getPopup()) {
-      fecharCardDispositivo(true);
+// ── Rastros ───────────────────────────────────────────────────────────────────
+
+function _limparRastros() {
+  Object.values(_rastros).forEach(function (r) {
+    if (r.linha && map.hasLayer(r.linha)) map.removeLayer(r.linha);
+    (r.setas || []).forEach(s => { if (map.hasLayer(s)) map.removeLayer(s); });
+  });
+  Object.keys(_rastros).forEach(k => delete _rastros[k]);
+}
+
+function _criarSetasNoRastro(pontos, cor) {
+  const setas = [];
+  const intervalo = Math.max(1, Math.floor(pontos.length / 8)); // até 8 setas
+  for (let i = intervalo; i < pontos.length - 1; i += intervalo) {
+    const p1 = pontos[i - 1], p2 = pontos[i];
+    const ang = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI;
+    const seta = L.marker(p2, {
+      icon: L.divIcon({
+        html: `<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid ${cor};transform:rotate(${90 - ang}deg);transform-origin:center center;opacity:0.85"></div>`,
+        className: '', iconSize: [10, 9], iconAnchor: [5, 4],
+      }),
+      interactive: false,
+      zIndexOffset: -100,
+    });
+    setas.push(seta);
+    seta.addTo(map);
+  }
+  return setas;
+}
+
+async function _carregarRastros() {
+  const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao);
+  for (const id of ids) {
+    if (!_overlay.rastro) break;
+    await _carregarRastroDispositivo(id, '/api/rastreamento/dispositivos');
+  }
+}
+
+async function _carregarRastroDispositivo(id, baseUrl) {
+  try {
+    const now = new Date();
+    const from = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const hist = await window.AL.apiGet(`${baseUrl}/${id}/historico?from=${from}&to=${now.toISOString()}`);
+    const pontos = (hist.posicoes || []).map(p => [p.latitude, p.longitude]);
+    if (pontos.length >= 2) {
+      const cor = '#2980b9';
+      const linha = L.polyline(pontos, { color: cor, weight: 3, opacity: 0.7 }).addTo(map);
+      const setas = _criarSetasNoRastro(pontos, cor);
+      _rastros[id] = { linha, setas };
+    }
+  } catch {}
+}
+
+// ── Rota individual (botão Rota no card) ──────────────────────────────────────
+
+async function ativarRota(dispositivoId) {
+  // Toggle: se já existe, remove
+  if (_rotasIndividuais[dispositivoId]) {
+    const r = _rotasIndividuais[dispositivoId];
+    if (r.linha && map.hasLayer(r.linha)) map.removeLayer(r.linha);
+    (r.setas || []).forEach(s => { if (map.hasLayer(s)) map.removeLayer(s); });
+    delete _rotasIndividuais[dispositivoId];
+    // Atualiza botão no card
+    const btn = document.querySelector('.dcard-acao[data-acao="rota"]');
+    if (btn) btn.classList.remove('ativo');
+    return;
+  }
+
+  const btn = document.querySelector('.dcard-acao[data-acao="rota"]');
+  if (btn) { btn.classList.add('carregando'); btn.querySelector('i').className = 'fa fa-spinner fa-spin'; }
+
+  try {
+    const now = new Date();
+    const from = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const hist = await window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/historico?from=${from}&to=${now.toISOString()}`);
+    const pontos = (hist.posicoes || []).map(p => [p.latitude, p.longitude]);
+
+    if (pontos.length >= 2) {
+      const cor = '#e74c3c';
+      const linha = L.polyline(pontos, { color: cor, weight: 4, opacity: 0.85 }).addTo(map);
+      const setas = _criarSetasNoRastro(pontos, cor);
+      _rotasIndividuais[dispositivoId] = { linha, setas };
+      map.fitBounds(linha.getBounds().pad(0.1));
+      if (btn) { btn.classList.remove('carregando'); btn.classList.add('ativo'); btn.querySelector('i').className = 'fa fa-route'; }
+    } else {
+      AL.showAlert('Sem histórico de posição na última hora.', 'warning');
+      if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-route'; }
+    }
+  } catch {
+    AL.showAlert('Erro ao carregar rota.', 'danger');
+    if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-route'; }
+  }
+}
+
+window.acaoDispositivo = function (acao, dispositivoId) {
+  if (acao === 'rota') { ativarRota(dispositivoId); return; }
+  if (acao === 'comando') { abrirModalComando(dispositivoId); return; }
+  if (acao === 'cerca') { iniciarDesenhoCirculo(dispositivoId); return; }
+};
+
+// ── Modal de Comando ──────────────────────────────────────────────────────────
+
+async function abrirModalComando(dispositivoId) {
+  _cmdDispositivoId = dispositivoId;
+  const v = veiculosMap[dispositivoId];
+  const modal = document.getElementById('modal-cmd');
+  document.getElementById('modal-cmd-titulo').textContent = v ? `Comando — ${v.nome}` : 'Comando';
+  document.getElementById('cmd-tipo-select').innerHTML = '<option value="">Carregando...</option>';
+  document.getElementById('btn-enviar-cmd').disabled = true;
+  document.getElementById('cmd-resultado').textContent = '';
+  modal.style.display = 'flex';
+
+  try {
+    const tipos = await window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/tipos-comandos`);
+    const CMD_LABELS = {
+      engineStop: 'Desligar Motor', engineResume: 'Religar Motor',
+      custom: 'Comando personalizado', positionSingle: 'Solicitar posição',
+      positionPeriodic: 'Rastreamento periódico', positionStop: 'Parar rastreamento',
+      alarmArm: 'Ativar Alarme', alarmDisarm: 'Desativar Alarme',
+      outputControl: 'Controle de saída', rebootDevice: 'Reiniciar dispositivo',
+      silenceAlarm: 'Silenciar alarme', factoryReset: 'Reset de fábrica',
+      setTimezone: 'Definir fuso horário', setSpeed: 'Velocidade limite',
+      sendSms: 'Enviar SMS', message: 'Enviar mensagem',
+      requestPhoto: 'Solicitar foto', voiceMonitoring: 'Monitoramento de voz',
+      immobilize: 'Imobilizar veículo', driverUnique: 'Identificação motorista',
+      configuration: 'Configurar dispositivo', getVersion: 'Versão firmware',
+    };
+    const lista = Array.isArray(tipos) ? tipos.map(t => typeof t === 'string' ? t : t.type) : [];
+    if (!lista.length) {
+      document.getElementById('cmd-tipo-select').innerHTML = '<option value="">Nenhum comando suportado</option>';
+      return;
+    }
+    document.getElementById('cmd-tipo-select').innerHTML =
+      '<option value="">Selecione o tipo...</option>' +
+      lista.map(t => `<option value="${t}">${CMD_LABELS[t] || t}</option>`).join('');
+  } catch {
+    document.getElementById('cmd-tipo-select').innerHTML = '<option value="">Erro ao carregar tipos</option>';
+  }
+}
+
+function fecharModalComando() {
+  document.getElementById('modal-cmd').style.display = 'none';
+  _cmdDispositivoId = null;
+  fecharModalComando_resetCustom();
+}
+
+async function enviarComandoDoModal() {
+  const tipo = document.getElementById('cmd-tipo-select').value;
+  if (!tipo || !_cmdDispositivoId) return;
+
+  if (tipo === 'custom') {
+    const customData = (document.getElementById('cmd-custom-data')?.value || '').trim();
+    if (!customData) {
+      const res = document.getElementById('cmd-resultado');
+      res.textContent = 'Digite o comando personalizado.';
+      res.style.color = '#e74c3c';
+      return;
+    }
+  }
+
+  const btn = document.getElementById('btn-enviar-cmd');
+  const res = document.getElementById('cmd-resultado');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando...';
+  res.textContent = '';
+  res.style.color = '';
+
+  const payload = { tipo };
+  if (tipo === 'custom') {
+    payload.atributos = { data: document.getElementById('cmd-custom-data').value.trim() };
+  }
+
+  try {
+    await window.AL.apiPost(`/api/rastreamento/dispositivos/${_cmdDispositivoId}/comandos`, payload);
+    res.textContent = 'Comando enviado com sucesso!';
+    res.style.color = '#27ae60';
+    setTimeout(fecharModalComando, 1500);
+  } catch (err) {
+    res.textContent = 'Erro: ' + (err.message || 'Falha ao enviar.');
+    res.style.color = '#e74c3c';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-paper-plane"></i> Enviar';
+  }
+}
+
+function fecharModalComando_resetCustom() {
+  const wrap = document.getElementById('cmd-custom-wrap');
+  if (wrap) wrap.style.display = 'none';
+  const input = document.getElementById('cmd-custom-data');
+  if (input) input.value = '';
+}
+
+// ── Cercas (Geofences) ────────────────────────────────────────────────────────
+
+function _parsearAreaTraccar(area) {
+  if (!area) return null;
+  // CIRCLE (lat lon, radius)
+  const circleMatch = area.match(/CIRCLE\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*,\s*([\d.]+)\s*\)/i);
+  if (circleMatch) {
+    return { tipo: 'circulo', lat: parseFloat(circleMatch[1]), lng: parseFloat(circleMatch[2]), raio: parseFloat(circleMatch[3]) };
+  }
+  // POLYGON ((lon lat, lon lat, ...))
+  const polyMatch = area.match(/POLYGON\s*\(\s*\(\s*(.+?)\s*\)\s*\)/i);
+  if (polyMatch) {
+    const pontos = polyMatch[1].split(',').map(p => {
+      const [lng, lat] = p.trim().split(/\s+/).map(Number);
+      return [lat, lng];
+    });
+    return { tipo: 'poligono', pontos };
+  }
+  return null;
+}
+
+function _criarCamadaCerca(cerca) {
+  const geo = _parsearAreaTraccar(cerca.area);
+  if (!geo) return null;
+  let camada;
+  if (geo.tipo === 'circulo') {
+    camada = L.circle([geo.lat, geo.lng], {
+      radius: geo.raio, color: '#27ae60', fillColor: '#27ae60',
+      fillOpacity: 0.08, weight: 2, dashArray: '6,4',
+    });
+  } else {
+    camada = L.polygon(geo.pontos, {
+      color: '#27ae60', fillColor: '#27ae60',
+      fillOpacity: 0.08, weight: 2, dashArray: '6,4',
+    });
+  }
+  camada.bindTooltip(cerca.name || `Cerca ${cerca.id}`, { sticky: true, className: 'cerca-tooltip' });
+  camada.on('contextmenu', function (e) {
+    L.DomEvent.stopPropagation(e);
+    if (confirm(`Remover cerca "${cerca.name || cerca.id}"?`)) {
+      removerCerca(cerca.id);
     }
   });
+  return camada;
+}
 
-  // Clique fora de marcador fecha spider
-  map.on('click', function () { _fecharSpider(); });
+async function carregarCercas() {
+  if (_cercasCarregadas && _overlay.cercas) return;
+  try {
+    const cercas = await window.AL.apiGet('/api/rastreamento/cercas');
+    cercas.forEach(function (c) {
+      if (_cercasLayer[c.id]) return;
+      const camada = _criarCamadaCerca(c);
+      if (camada) {
+        _cercasLayer[c.id] = { camada, dados: c };
+        if (_overlay.cercas) camada.addTo(map);
+      }
+    });
+    _cercasCarregadas = true;
+  } catch {}
+}
 
-  // Re-agrupa por pixel ao mudar o zoom
-  map.on('zoomend', function () {
-    _fecharSpider();
-    if (!modoFoco) renderMarcadores();
+function mostrarCercas() {
+  Object.values(_cercasLayer).forEach(function (c) {
+    if (!map.hasLayer(c.camada)) c.camada.addTo(map);
   });
+}
+
+function ocultarCercas() {
+  Object.values(_cercasLayer).forEach(function (c) {
+    if (map.hasLayer(c.camada)) map.removeLayer(c.camada);
+  });
+  // Remove também a cerca em desenho
+  _cancelarDesenhoCirculo();
+}
+
+async function removerCerca(geofenceId) {
+  try {
+    await window.AL.apiDelete(`/api/rastreamento/cercas/${geofenceId}`);
+    const entry = _cercasLayer[geofenceId];
+    if (entry) {
+      if (map.hasLayer(entry.camada)) map.removeLayer(entry.camada);
+      delete _cercasLayer[geofenceId];
+    }
+  } catch (err) {
+    AL.showAlert('Erro ao remover cerca: ' + (err.message || ''), 'danger');
+  }
+}
+
+// ── Desenho de cerca (círculo) ────────────────────────────────────────────────
+
+function iniciarDesenhoCirculo(dispositivoId) {
+  _cancelarDesenhoCirculo();
+
+  _modoDesenho = { dispositivoId, etapa: 'centro', circle: null, center: null };
+  map.getContainer().style.cursor = 'crosshair';
+
+  // Banner de instrução
+  const banner = document.getElementById('mapa-instrucao');
+  if (banner) {
+    banner.textContent = 'Clique no mapa para definir o centro da cerca';
+    banner.style.display = 'block';
+  }
+
+  map.once('click', function (e) {
+    if (!_modoDesenho) return;
+    _modoDesenho.center = e.latlng;
+    _modoDesenho.etapa = 'raio';
+
+    // Cria círculo inicial (500m) e exibe diálogo
+    _modoDesenho.circle = L.circle(e.latlng, {
+      radius: 500, color: '#f39c12', fillColor: '#f39c12',
+      fillOpacity: 0.12, weight: 2, dashArray: '6,4',
+    }).addTo(map);
+
+    if (banner) banner.style.display = 'none';
+    map.getContainer().style.cursor = '';
+
+    _mostrarDialogoCerca(dispositivoId, e.latlng);
+  });
+}
+
+function _mostrarDialogoCerca(dispositivoId, latlng) {
+  const v = veiculosMap[dispositivoId];
+  const nomeSugerido = v ? `Cerca — ${v.placa || v.nome}` : 'Nova Cerca';
+
+  const dlg = document.getElementById('dlg-cerca');
+  document.getElementById('cerca-nome-input').value = nomeSugerido;
+  document.getElementById('cerca-raio-input').value = '500';
+  dlg.style.display = 'flex';
+
+  // Atualiza círculo ao mudar raio
+  document.getElementById('cerca-raio-input').oninput = function () {
+    const r = parseInt(this.value) || 500;
+    if (_modoDesenho?.circle) _modoDesenho.circle.setRadius(r);
+  };
+
+  document.getElementById('btn-cerca-confirmar').onclick = async function () {
+    const nome = document.getElementById('cerca-nome-input').value.trim() || nomeSugerido;
+    const raio = parseInt(document.getElementById('cerca-raio-input').value) || 500;
+    const area = `CIRCLE (${latlng.lat.toFixed(6)} ${latlng.lng.toFixed(6)}, ${raio})`;
+
+    this.disabled = true;
+    this.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+    try {
+      const cerca = await window.AL.apiPost('/api/rastreamento/cercas', {
+        nome, area, dispositivoId,
+      });
+
+      // Remove o círculo temporário e adiciona o definitivo
+      if (_modoDesenho?.circle && map.hasLayer(_modoDesenho.circle)) {
+        map.removeLayer(_modoDesenho.circle);
+      }
+      _modoDesenho = null;
+      dlg.style.display = 'none';
+
+      const camada = _criarCamadaCerca(cerca);
+      if (camada) {
+        _cercasLayer[cerca.id] = { camada, dados: cerca };
+        camada.addTo(map); // sempre mostra a cerca criada
+        if (!_overlay.cercas) {
+          // Habilita visualmente o botão de cercas
+          const btnCercas = document.getElementById('ml-cercas');
+          if (btnCercas) { btnCercas.classList.add('ativo'); _overlay.cercas = true; }
+        }
+      }
+      AL.showAlert('Cerca criada!', 'success');
+    } catch (err) {
+      AL.showAlert('Erro ao criar cerca: ' + (err.message || ''), 'danger');
+      this.disabled = false;
+      this.innerHTML = 'Confirmar';
+    }
+  };
+
+  document.getElementById('btn-cerca-cancelar').onclick = _cancelarDesenhoCirculo;
+}
+
+function _cancelarDesenhoCirculo() {
+  if (_modoDesenho?.circle && map.hasLayer(_modoDesenho.circle)) {
+    map.removeLayer(_modoDesenho.circle);
+  }
+  _modoDesenho = null;
+  map.getContainer().style.cursor = '';
+  const banner = document.getElementById('mapa-instrucao');
+  if (banner) banner.style.display = 'none';
+  const dlg = document.getElementById('dlg-cerca');
+  if (dlg) dlg.style.display = 'none';
+}
+
+// ── Badges de alarme sobre marcadores ────────────────────────────────────────
+
+function _atualizarAlarmeBadges() {
+  Object.keys(veiculosMap).forEach(id => {
+    const v = veiculosMap[id];
+    if (!v?.posicao) return;
+    _renderAlarmeBadge(id, v);
+  });
+}
+
+function _renderAlarmeBadge(id, v) {
+  if (_alarmeBadges[id]) {
+    if (map.hasLayer(_alarmeBadges[id])) map.removeLayer(_alarmeBadges[id]);
+    delete _alarmeBadges[id];
+  }
+  if (!_overlay.alarmes) return;
+  if (!v?.posicao?.alarme) return;
+
+  const badge = L.marker([v.posicao.latitude, v.posicao.longitude], {
+    icon: L.divIcon({
+      html: `<div style="
+        background:#e74c3c;color:#fff;
+        border-radius:20px;padding:2px 8px;
+        font-size:10px;font-weight:700;
+        white-space:nowrap;
+        box-shadow:0 2px 6px rgba(0,0,0,0.3);
+        display:flex;align-items:center;gap:4px;
+      "><i class="fa fa-bell" style="font-size:9px"></i> ${v.posicao.alarme}</div>`,
+      className: '',
+      iconAnchor: [0, 36],
+      iconSize: null,
+    }),
+    zIndexOffset: 800,
+    interactive: false,
+  });
+  badge.addTo(map);
+  _alarmeBadges[id] = badge;
 }
 
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
 
 async function carregarPosicoes() {
-  // 1. Renderizar cache instantaneamente enquanto o REST carrega
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (raw) {
@@ -183,14 +855,11 @@ async function carregarPosicoes() {
     }
   } catch {}
 
-  // 2. Conectar WebSocket imediatamente (já tem o mapeamento do cache)
   conectarWebSocket();
 
-  // 3. Buscar dados frescos em segundo plano
   try {
     const lista = await window.AL.apiGet('/api/rastreamento/posicoes');
 
-    // Remove marcadores de dispositivos que não existem mais
     Object.keys(marcadores).forEach(id => {
       if (!lista.find(v => v.dispositivoId === id)) {
         if (map.hasLayer(marcadores[id])) map.removeLayer(marcadores[id]);
@@ -198,7 +867,6 @@ async function carregarPosicoes() {
         delete marcadoresIconeKey[id];
       }
     });
-    // Limpa todos os badges de cluster (serão recriados pelo renderMarcadores)
     Object.keys(_clusterBadges).forEach(chave => {
       if (map.hasLayer(_clusterBadges[chave])) map.removeLayer(_clusterBadges[chave]);
       delete _clusterBadges[chave];
@@ -223,16 +891,20 @@ async function carregarPosicoes() {
     renderMarcadores();
     renderSidebar();
     if (!boundsAjustados) { ajustarBounds(); boundsAjustados = true; }
+
+    if (_overlay.alarmes) _atualizarAlarmeBadges();
+    if (_overlay.rastro) _carregarRastros();
+    if (_overlay.cercas) carregarCercas().then(mostrarCercas);
   } catch (err) {
     console.error('Erro ao carregar posições:', err);
     if (!Object.keys(veiculosMap).length) {
-      document.getElementById('sidebar-counters').innerHTML =
+      document.getElementById('topbar-counters').innerHTML =
         '<span style="color:#e74c3c"><i class="fa fa-exclamation-triangle"></i> Erro ao carregar</span>';
     }
   }
 }
 
-// ── WebSocket — atualizações em tempo real ────────────────────────────────────
+// ── WebSocket ─────────────────────────────────────────────────────────────────
 
 function conectarWebSocket() {
   if (ws && ws.readyState < 2) return;
@@ -306,6 +978,18 @@ function processarMensagemWs(msg) {
 
       atualizarMarcador(dispositivoId);
       atualizarCardAtivo(dispositivoId);
+
+      // Atualiza badge de alarme
+      if (_overlay.alarmes) _renderAlarmeBadge(dispositivoId, veiculosMap[dispositivoId]);
+
+      // Atualiza rastro global em tempo real
+      if (_overlay.rastro && _rastros[dispositivoId]?.linha) {
+        _rastros[dispositivoId].linha.addLatLng([pos.latitude, pos.longitude]);
+      }
+      // Atualiza rota individual em tempo real
+      if (_rotasIndividuais[dispositivoId]?.linha) {
+        _rotasIndividuais[dispositivoId].linha.addLatLng([pos.latitude, pos.longitude]);
+      }
     });
   }
 
@@ -322,7 +1006,23 @@ function processarMensagemWs(msg) {
     });
   }
 
-  renderSidebar(); // atualiza contadores
+  if (msg.events?.length) {
+    msg.events.forEach(function (e) {
+      const dispositivoId = traccarIdParaDispositivoId[e.deviceId];
+      const pos = dispositivoId ? veiculosMap[dispositivoId]?.posicao : null;
+      adicionarEvento({
+        dispositivoId: dispositivoId || null,
+        tipo: e.type,
+        tipoLabel: e.tipoLabel,
+        serverTime: e.serverTime,
+        positionId: e.positionId,
+        lat: pos?.latitude ?? null,
+        lng: pos?.longitude ?? null,
+      });
+    });
+  }
+
+  renderSidebar();
 }
 
 function setWsStatus(estado, texto) {
@@ -331,12 +1031,10 @@ function setWsStatus(estado, texto) {
   el.innerHTML = `<i class="fa fa-circle"></i> ${texto}`;
 }
 
-// ── Cluster customizado ───────────────────────────────────────────────────────
+// ── Cluster ───────────────────────────────────────────────────────────────────
 
-const CLUSTER_PX = 40; // pixels — adapta ao zoom automaticamente
+const CLUSTER_PX = 40;
 
-// Agrupa markers por proximidade visual (pixels na tela), não por distância geográfica fixa.
-// Resultado: { chave → { ids: [...], lat, lng } }
 function _agruparPorPixel() {
   const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao);
   const visitados = new Set();
@@ -360,7 +1058,6 @@ function _agruparPorPixel() {
       }
     });
 
-    // Centróide do grupo
     const lat = grupo.reduce((s, i) => s + veiculosMap[i].posicao.latitude,  0) / grupo.length;
     const lng = grupo.reduce((s, i) => s + veiculosMap[i].posicao.longitude, 0) / grupo.length;
     const chave = [...grupo].sort().join('|');
@@ -392,7 +1089,7 @@ function _fecharSpider() {
 }
 
 function _abrirSpider(chave, centroLatLng) {
-  if (_spider.chave === chave) { _fecharSpider(); return; } // toggle
+  if (_spider.chave === chave) { _fecharSpider(); return; }
   _fecharSpider();
   _spider.chave = chave;
   const ids = _clusterGrupos[chave]?.ids || [];
@@ -414,7 +1111,7 @@ function _abrirSpider(chave, centroLatLng) {
     const sm = L.marker(spiderLatLng, { icon: criarIcone(v), zIndexOffset: 1000 });
     if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
     sm.on('click', function (e) {
-      L.DomEvent.stopPropagation(e); // evita fechar spider pelo map.on('click')
+      L.DomEvent.stopPropagation(e);
       _fecharSpider();
       focar(id);
     });
@@ -423,16 +1120,14 @@ function _abrirSpider(chave, centroLatLng) {
   });
 }
 
-// ── Marcadores no mapa ────────────────────────────────────────────────────────
+// ── Marcadores ────────────────────────────────────────────────────────────────
 
 function renderMarcadores() {
-  const grupos = _agruparPorPixel(); // { chave → { ids, lat, lng } }
+  const grupos = _agruparPorPixel();
 
-  // Atualiza estado global de grupos
   Object.keys(_clusterGrupos).forEach(k => delete _clusterGrupos[k]);
   Object.assign(_clusterGrupos, grupos);
 
-  // Remove badges de clusters que deixaram de existir ou que se desfizeram
   Object.keys(_clusterBadges).forEach(chave => {
     if (!grupos[chave] || grupos[chave].ids.length < 2) {
       if (map.hasLayer(_clusterBadges[chave])) map.removeLayer(_clusterBadges[chave]);
@@ -443,11 +1138,9 @@ function renderMarcadores() {
   Object.entries(grupos).forEach(([chave, { ids, lat, lng }]) => {
     const isCluster = ids.length > 1;
 
-    // Marcadores individuais
     ids.forEach(id => {
       const v = veiculosMap[id];
       const { latitude, longitude } = v.posicao;
-      // Visível no mapa quando: não está em cluster E (não está em modo foco OU é o ativo)
       const visivel = !isCluster && (!modoFoco || id === ativoId);
 
       if (!marcadores[id]) {
@@ -470,7 +1163,6 @@ function renderMarcadores() {
       }
     });
 
-    // Badge de cluster
     if (isCluster) {
       if (modoFoco) {
         if (_clusterBadges[chave] && map.hasLayer(_clusterBadges[chave])) {
@@ -520,18 +1212,16 @@ function atualizarMarcador(dispositivoId) {
 }
 
 function _corMarcador(v) {
-  if (!v.posicao || v.status !== 'online') return '#95a5a6'; // cinza: offline ou sem dados
-  if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c'; // vermelho: excesso
-  if (v.posicao.emMovimento || v.posicao.ignicao === true) return '#2980b9'; // azul: em movimento ou ignição ligada
-  return '#27ae60'; // verde: parado / ignição desligada
+  if (!v.posicao || v.status !== 'online') return '#95a5a6';
+  if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c';
+  if (v.posicao.emMovimento || v.posicao.ignicao === true) return '#2980b9';
+  return '#27ae60';
 }
 
 function _iconeKey(v) {
-  const course = v.posicao ? Math.round(v.posicao.curso / 5) * 5 : 0; // Agrupa de 5 em 5 graus para evitar re-renders excessivos
+  const course = v.posicao ? Math.round(v.posicao.curso / 5) * 5 : 0;
   return `${_corMarcador(v)}|${v.categoria}|${course}`;
 }
-
-// ── Mapeamento categoria → ícone 3D ──────────────────────────────────────────
 
 function criarIcone(v) {
   const cor = _corMarcador(v);
@@ -540,7 +1230,7 @@ function criarIcone(v) {
   return L.divIcon({ html, className: '', iconSize: [48, 48], iconAnchor: [24, 24], popupAnchor: [0, -14] });
 }
 
-// ── Popup simplificado (apenas placa) ────────────────────────────────────────
+// ── Popup simplificado ────────────────────────────────────────────────────────
 
 let _mostrarPopup = true;
 let _togglingPopup = false;
@@ -631,13 +1321,16 @@ function renderSidebar() {
   const offline = todos.filter(v => v.status !== 'online').length;
   const semPos  = todos.filter(v => !v.posicao).length;
 
-  document.getElementById('sidebar-counters').innerHTML =
-    `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp;
-     <span class="dot-offline">●</span> ${offline} offline
-     ${semPos ? `&nbsp;·&nbsp; <span style="color:#e67e22">${semPos} sem posição</span>` : ''}`;
+  const el = document.getElementById('topbar-counters');
+  if (el) {
+    el.innerHTML =
+      `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp;
+       <span class="dot-offline">●</span> ${offline} offline
+       ${semPos ? `&nbsp;·&nbsp;<span style="color:#e67e22">${semPos} sem pos.</span>` : ''}`;
+  }
 }
 
-// ── Resultados de busca ───────────────────────────────────────────────────────
+// ── Busca ─────────────────────────────────────────────────────────────────────
 
 function renderBuscaResultados() {
   const filtro = (document.getElementById('filtro').value || '').toLowerCase().trim();
@@ -693,7 +1386,7 @@ function pesoStatus(v) {
   return 1;
 }
 
-// ── Card do dispositivo selecionado ───────────────────────────────────────────
+// ── Card do dispositivo (flutuante sobre o mapa) ──────────────────────────────
 
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id];
@@ -726,10 +1419,9 @@ function mostrarCardDispositivo(id) {
   const addrTxt = hasCached ? (cachedAddr ? `${cachedAddr} ${coords}` : coords) : (p ? 'Buscando...' : '—');
 
   const imgHtml = v.imagemUrl
-    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none'" />`
+    ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:120px;object-fit:cover;display:block;border-radius:10px 10px 0 0" onerror="this.style.display='none'" />`
     : '';
 
-  // Monta itens de status — exibe apenas os que o dispositivo enviou
   const si = [];
   if (p?.ignicao === true)  si.push(`<span style="color:#27ae60"><i class="fa fa-key"></i> Ignição: Ligado</span>`);
   if (p?.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
@@ -737,10 +1429,10 @@ function mostrarCardDispositivo(id) {
   if (p?.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
   if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km</span>`);
   if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
-  if (p?.motorista_id)      si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${p.motorista_id}</span>`);
+  if (v?.motorista?.nome) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${v.motorista.nome}</span>`);
+  else if (p?.motorista_id) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista ID: ${p.motorista_id}</span>`);
   if (p?.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
 
-  // Três horários com data + hora + segundos
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
   const horasHtml = p ? `
     <div class="dcard-section dcard-val">
@@ -760,7 +1452,12 @@ function mostrarCardDispositivo(id) {
           ${v.identificador ? `<span class="v-placa" style="font-family:monospace">${v.identificador}</span>` : ''}
         </div>
       </div>
-      <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar" style="margin-left:6px;flex-shrink:0">×</button>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:6px">
+        <a href="dispositivo-detalhe.html?id=${v.dispositivoId}" title="Mais detalhes" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#f0f2f5;border-radius:50%;border:none;color:#555;font-size:13px;text-decoration:none;cursor:pointer" class="btn-dcard-gear">
+          <i class="fa fa-cog"></i>
+        </a>
+        <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
+      </div>
     </div>
     <div class="dcard-body">
       ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
@@ -784,19 +1481,42 @@ function mostrarCardDispositivo(id) {
           <i class="fa fa-history"></i> Histórico
         </a>
       </div>
+      ${_htmlAcoesCard(v.dispositivoId)}
     </div>
   `;
 
   card.style.display = 'block';
 
-  // Auto-geocodifica se não estiver em cache
   if (p && !hasCached) {
     geocodificarCoordenadas(p.latitude, p.longitude, addrId);
   }
 }
 
+function _htmlAcoesCard(dispositivoId) {
+  const temRota = !!_rotasIndividuais[dispositivoId];
+  return `
+    <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
+      <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">AÇÕES</div>
+      <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
+        <button class="dcard-acao${temRota ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivo('rota','${dispositivoId}')" title="Rota">
+          <div class="dcard-acao-icon"><i class="fa fa-road"></i></div>
+          <span>Rota</span>
+        </button>
+        <button class="dcard-acao" data-acao="comando" onclick="acaoDispositivo('comando','${dispositivoId}')" title="Comando">
+          <div class="dcard-acao-icon"><i class="fa fa-terminal"></i></div>
+          <span>Comando</span>
+        </button>
+        <button class="dcard-acao" data-acao="cerca" onclick="acaoDispositivo('cerca','${dispositivoId}')" title="Criar Cerca">
+          <div class="dcard-acao-icon"><i class="fa fa-circle-o"></i></div>
+          <span>Cerca</span>
+        </button>
+      </div>
+    </div>`;
+}
+
 window.fecharCardDispositivo = function (skipClosePopup) {
   if (modoFoco) desativarFoco();
+  _cancelarDesenhoCirculo();
   document.getElementById('device-detail-card').style.display = 'none';
   ativoId = null;
   if (!skipClosePopup) map.closePopup();
@@ -840,7 +1560,8 @@ function atualizarCardAtivo(dispositivoId) {
     if (p?.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
     if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km</span>`);
     if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
-    if (p?.motorista_id)      si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${p.motorista_id}</span>`);
+    if (v?.motorista?.nome) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${v.motorista.nome}</span>`);
+    else if (p?.motorista_id) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista ID: ${p.motorista_id}</span>`);
     if (p?.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
     elSI.innerHTML = si.join('');
   }
@@ -862,35 +1583,31 @@ function atualizarCardAtivo(dispositivoId) {
 function ativarFoco(id) {
   modoFoco = true;
   _fecharSpider();
-  // Oculta todos os badges de cluster
   Object.values(_clusterBadges).forEach(b => { if (map.hasLayer(b)) map.removeLayer(b); });
-  // Oculta todos os marcadores individuais exceto o ativo
   Object.keys(marcadores).forEach(mid => {
     if (mid !== id && map.hasLayer(marcadores[mid])) map.removeLayer(marcadores[mid]);
   });
-  // Garante que o ativo está visível
   if (marcadores[id] && !map.hasLayer(marcadores[id])) marcadores[id].addTo(map);
 }
 
 function desativarFoco() {
   modoFoco = false;
   _fecharSpider();
-  renderMarcadores(); // reconstrói todos os marcadores e badges
+  renderMarcadores();
 }
 
-// ── Interações ────────────────────────────────────────────────────────────────
+// ── Foco / Interações ─────────────────────────────────────────────────────────
 
 window.focar = function (dispositivoId) {
   mostrarCardDispositivo(dispositivoId);
 
   const v = veiculosMap[dispositivoId];
-  if (!v?.posicao) return; // sem posição: abre card apenas
+  if (!v?.posicao) return;
 
   ativarFoco(dispositivoId);
   const { latitude, longitude } = v.posicao;
   map.flyTo([latitude, longitude], 16, { animate: true, duration: 0.8 });
 
-  // Abre popup no marcador após a animação (para navegação via busca)
   setTimeout(() => {
     if (_mostrarPopup && marcadores[dispositivoId] && map.hasLayer(marcadores[dispositivoId])) {
       marcadores[dispositivoId].openPopup();
@@ -914,7 +1631,7 @@ function ajustarBounds() {
   map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 14 });
 }
 
-// ── Geocodificação reversa (Nominatim) ────────────────────────────────────────
+// ── Geocodificação reversa ────────────────────────────────────────────────────
 
 const _geocodeCache = {};
 

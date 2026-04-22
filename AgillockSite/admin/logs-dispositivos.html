@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Logs dos Dispositivos — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
+    #al-alert-container { flex-shrink: 0; }
+    .log-toolbar {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; background: #fff; border-bottom: 1px solid #e8e8e8;
+      flex-wrap: wrap;
+    }
+    html.dark-theme .log-toolbar { background: #141820; border-color: #222a38; }
+    .log-terminal {
+      flex: 1; overflow-y: auto;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px; line-height: 1.55;
+      background: #0e1117; color: #c9d1d9;
+      padding: 12px 16px;
+    }
+    .log-line { white-space: pre-wrap; word-break: break-all; padding: 1px 0; }
+    .log-line.warn  { color: #f39c12; }
+    .log-line.error { color: #e74c3c; }
+    .log-line.info  { color: #7ec8e3; }
+    .log-line.debug { color: #8b949e; }
+    .log-line .hl   { background: rgba(250,179,44,.25); border-radius: 2px; padding: 0 2px; }
+    #log-empty { color: #666; font-style: italic; padding: 20px 0; text-align: center; }
+    #log-status { font-size: 11px; color: #aaa; }
+    #log-status.live { color: #27ae60; }
+    #log-status.paused { color: #f39c12; }
+    .log-toolbar .form-control { height: 32px; font-size: 13px; }
+    .log-toolbar select { min-width: 220px; }
+    #log-filtro-texto { min-width: 200px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown open">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li class="active"><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Logs dos Dispositivos</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span id="log-status" class="paused"><i class="fa fa-circle" style="font-size:8px;vertical-align:middle"></i> Pausado</span>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Toolbar -->
+    <div class="log-toolbar">
+      <select id="log-dispositivo" class="form-control">
+        <option value="">Todos os dispositivos</option>
+      </select>
+      <input type="text" id="log-filtro-texto" class="form-control" placeholder="Filtrar texto…" />
+      <button id="btn-toggle-live" class="btn btn-default btn-sm">
+        <i class="fa fa-play"></i> Iniciar
+      </button>
+      <button id="btn-limpar" class="btn btn-default btn-sm" title="Limpar terminal">
+        <i class="fa fa-trash-o"></i>
+      </button>
+      <button id="btn-baixar" class="btn btn-default btn-sm" title="Baixar log">
+        <i class="fa fa-download"></i>
+      </button>
+      <label style="font-size:12px;color:#888;margin:0;display:flex;align-items:center;gap:4px">
+        <input type="checkbox" id="chk-auto-scroll" checked /> Auto-scroll
+      </label>
+      <label style="font-size:12px;color:#888;margin:0;display:flex;align-items:center;gap:4px">
+        <input type="checkbox" id="chk-mostrar-todos" checked /> Mostrar todos os níveis
+      </label>
+    </div>
+
+    <!-- Terminal -->
+    <div class="log-terminal" id="log-terminal">
+      <div id="log-empty">Selecione um dispositivo e clique em Iniciar para ver os logs em tempo real.</div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var currentUser = AL.requireAuth(['ADMIN']);
+    if (!currentUser) return;
+
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge badge-ativo';
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    var _live = false;
+    var _timer = null;
+    var _lastLines = new Set();
+    var _allLogLines = [];
+    var MAX_LINES = 2000;
+    var _dispositivoMap = {}; // imei -> nome
+
+    // ── Carregar dispositivos ─────────────────────────────────────────────────────
+    AL.apiGet('/api/dispositivos').then(function (data) {
+      var lista = Array.isArray(data) ? data : (data.dispositivos || []);
+      var sel = document.getElementById('log-dispositivo');
+      lista.forEach(function (d) {
+        if (!d.ativo) return;
+        _dispositivoMap[d.identificador] = d.nome;
+        var opt = document.createElement('option');
+        opt.value = d.identificador;
+        opt.textContent = d.nome + (d.placa ? ' (' + d.placa + ')' : '') + ' — ' + d.identificador;
+        sel.appendChild(opt);
+      });
+    }).catch(function () {});
+
+    // ── Controles ─────────────────────────────────────────────────────────────────
+    document.getElementById('btn-toggle-live').addEventListener('click', function () {
+      if (_live) pararLive(); else iniciarLive();
+    });
+
+    document.getElementById('btn-limpar').addEventListener('click', function () {
+      _allLogLines = [];
+      _lastLines.clear();
+      document.getElementById('log-terminal').innerHTML = '<div id="log-empty" style="color:#666;font-style:italic;padding:20px 0;text-align:center">Log limpo.</div>';
+    });
+
+    document.getElementById('btn-baixar').addEventListener('click', function () {
+      var texto = _allLogLines.join('\n');
+      var blob = new Blob([texto], { type: 'text/plain' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'traccar-log-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('log-filtro-texto').addEventListener('input', function () {
+      renderLog();
+    });
+
+    document.getElementById('chk-mostrar-todos').addEventListener('change', renderLog);
+
+    function iniciarLive() {
+      _live = true;
+      document.getElementById('btn-toggle-live').innerHTML = '<i class="fa fa-pause"></i> Pausar';
+      document.getElementById('btn-toggle-live').className = 'btn btn-warning btn-sm';
+      setStatus('live', '<i class="fa fa-circle" style="font-size:8px;vertical-align:middle;animation:blink 1s infinite"></i> Ao vivo');
+      buscarLog();
+      _timer = setInterval(buscarLog, 5000);
+    }
+
+    function pararLive() {
+      _live = false;
+      clearInterval(_timer);
+      document.getElementById('btn-toggle-live').innerHTML = '<i class="fa fa-play"></i> Iniciar';
+      document.getElementById('btn-toggle-live').className = 'btn btn-default btn-sm';
+      setStatus('paused', '<i class="fa fa-circle" style="font-size:8px;vertical-align:middle"></i> Pausado');
+    }
+
+    function setStatus(cls, html) {
+      var el = document.getElementById('log-status');
+      el.className = cls;
+      el.innerHTML = html;
+    }
+
+    // ── Buscar log ────────────────────────────────────────────────────────────────
+    async function buscarLog() {
+      try {
+        var token = localStorage.getItem('al_token') || '';
+        var url = window.API_URL + '/api/rastreamento/logs';
+        var resp = await fetch(url, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var texto = await resp.text();
+        processarLog(texto);
+      } catch (err) {
+        setStatus('paused', '<i class="fa fa-exclamation-triangle" style="color:#e74c3c"></i> Erro: ' + (err.message || 'falha'));
+      }
+    }
+
+    function processarLog(texto) {
+      var linhas = texto.split('\n').filter(function (l) { return l.trim(); });
+      var novas = linhas.filter(function (l) { return !_lastLines.has(l); });
+      if (!novas.length) return;
+      novas.forEach(function (l) {
+        _allLogLines.push(l);
+        _lastLines.add(l);
+      });
+      // Limitar buffer
+      if (_allLogLines.length > MAX_LINES) {
+        var excesso = _allLogLines.length - MAX_LINES;
+        _allLogLines.splice(0, excesso);
+        // Reconstruir lastLines
+        _lastLines.clear();
+        _allLogLines.forEach(function (l) { _lastLines.add(l); });
+      }
+      renderLog();
+    }
+
+    function renderLog() {
+      var filtroTexto = document.getElementById('log-filtro-texto').value.toLowerCase();
+      var filtroImei = document.getElementById('log-dispositivo').value;
+      var mostrarTodos = document.getElementById('chk-mostrar-todos').checked;
+
+      var linhas = _allLogLines.filter(function (l) {
+        if (filtroImei && l.indexOf(filtroImei) === -1) return false;
+        if (filtroTexto && l.toLowerCase().indexOf(filtroTexto) === -1) return false;
+        if (!mostrarTodos && l.toLowerCase().indexOf(' debug') !== -1) return false;
+        return true;
+      });
+
+      var terminal = document.getElementById('log-terminal');
+
+      if (!linhas.length) {
+        terminal.innerHTML = '<div id="log-empty" style="color:#666;font-style:italic;padding:20px 0;text-align:center">'
+          + (_allLogLines.length ? 'Nenhuma linha corresponde ao filtro.' : 'Aguardando dados...')
+          + '</div>';
+        return;
+      }
+
+      var html = linhas.map(function (l) {
+        var cls = 'log-line';
+        var lower = l.toLowerCase();
+        if (lower.indexOf(' error') !== -1 || lower.indexOf('[error]') !== -1) cls += ' error';
+        else if (lower.indexOf(' warn') !== -1 || lower.indexOf('[warn]') !== -1) cls += ' warn';
+        else if (lower.indexOf(' info') !== -1 || lower.indexOf('[info]') !== -1) cls += ' info';
+        else if (lower.indexOf(' debug') !== -1) cls += ' debug';
+
+        var text = esc(l);
+        // Highlight filtro
+        if (filtroTexto) {
+          var re = new RegExp('(' + escapeRe(filtroTexto) + ')', 'gi');
+          text = text.replace(re, '<span class="hl">$1</span>');
+        }
+        // Highlight IMEI do dispositivo selecionado
+        if (filtroImei) {
+          var re2 = new RegExp('(' + escapeRe(filtroImei) + ')', 'g');
+          text = text.replace(re2, '<span class="hl">$1</span>');
+        }
+        return '<div class="' + cls + '">' + text + '</div>';
+      }).join('');
+
+      terminal.innerHTML = html;
+
+      if (document.getElementById('chk-auto-scroll').checked) {
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function escapeRe(s) {
+      return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+  })();
+  </script>
+  <style>
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  </style>
+</body>
+</html>

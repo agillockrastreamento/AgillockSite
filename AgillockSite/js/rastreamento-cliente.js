@@ -22,17 +22,58 @@ let ativoId = null;
 let modoFoco = false;
 const _geocodeCache = {};
 
+// ── Camadas de overlay ────────────────────────────────────────────────────────
+const _overlay = {
+  alarmes: true,
+  labels: true,
+  cercas: false,
+  rastro: false,
+};
+const _rastros = {};
+const _alarmeBadges = {};
+const _rotasIndividuais = {};
+let _cercasLayer = null;
+let _modoDesenho = null; // null | { dispositivoId, circle }
+let _cercaPendente = { ponto: null, dispositivoId: null };
+
+// ── Eventos (cliente: apenas 4 tipos) ────────────────────────────────────────
+const TIPOS_EVENTO_CLIENTE = [
+  { tipo: 'ignitionOn',   label: 'Ignição Ligada',          css: 'tipo-ignition' },
+  { tipo: 'ignitionOff',  label: 'Ignição Desligada',        css: 'tipo-ignition' },
+  { tipo: 'geofenceEnter',label: 'Entrada na Cerca Virtual', css: 'tipo-geofence' },
+  { tipo: 'geofenceExit', label: 'Saída da Cerca Virtual',   css: 'tipo-geofence' },
+];
+
+let _evtFiltros = new Set();
+let _evtNotif = true;
+const _eventos = [];
+const MAX_EVENTOS = 100;
+
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function () {
   verificarAcesso().then(function (bloqueado) {
     if (bloqueado) return;
     inicializarMapa();
+    inicializarEventosPanel();
     carregarPosicoes();
     document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
     new MutationObserver(function () {
       if (ativoId) atualizarCardAtivo(ativoId);
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    // Fechar busca ao clicar fora
+    document.addEventListener('click', function (e) {
+      const wrap = document.getElementById('topbar-busca-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('lista-resultados-busca').style.display = 'none';
+      }
+    });
+
+    // Fechar popup de evento
+    document.getElementById('btn-fechar-evt-popup').addEventListener('click', function () {
+      document.getElementById('evento-popup-mapa').style.display = 'none';
+    });
   });
 });
 
@@ -53,10 +94,150 @@ async function verificarAcesso() {
   return false;
 }
 
+// ── Painel de Eventos ─────────────────────────────────────────────────────────
+
+function inicializarEventosPanel() {
+  const dropdown = document.getElementById('evt-tipo-dropdown');
+  dropdown.innerHTML = TIPOS_EVENTO_CLIENTE.map(t =>
+    `<label class="evt-tipo-item">
+      <input type="checkbox" data-tipo="${t.tipo}" checked>
+      ${t.label}
+    </label>`
+  ).join('');
+
+  dropdown.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      _atualizarFiltrosTipo();
+      renderEventosLista();
+    });
+  });
+
+  document.getElementById('evt-tipo-btn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+
+  document.getElementById('evt-btn-notif').addEventListener('click', function () {
+    _evtNotif = !_evtNotif;
+    this.classList.toggle('ativo', _evtNotif);
+  });
+
+  document.getElementById('evt-btn-limpar').addEventListener('click', function () {
+    _eventos.length = 0;
+    renderEventosLista();
+  });
+}
+
+function _atualizarFiltrosTipo() {
+  const checkboxes = document.querySelectorAll('#evt-tipo-dropdown input[type=checkbox]');
+  _evtFiltros.clear();
+  let todas = true;
+  checkboxes.forEach(function (cb) {
+    if (!cb.checked) { _evtFiltros.add(cb.dataset.tipo); todas = false; }
+  });
+  const label = document.getElementById('evt-tipo-label');
+  if (todas) {
+    label.textContent = 'Tipo';
+  } else {
+    const ativas = TIPOS_EVENTO_CLIENTE.length - _evtFiltros.size;
+    label.textContent = `Tipo (${ativas}/${TIPOS_EVENTO_CLIENTE.length})`;
+  }
+}
+
+function adicionarEvento(evt) {
+  // Filtra apenas os tipos permitidos para cliente
+  const tiposPermitidos = TIPOS_EVENTO_CLIENTE.map(t => t.tipo);
+  if (!tiposPermitidos.includes(evt.tipo)) return;
+  _eventos.unshift(evt);
+  if (_eventos.length > MAX_EVENTOS) _eventos.length = MAX_EVENTOS;
+  renderEventosLista();
+  if (_evtNotif) _tocarSomEvento(evt.tipo);
+}
+
+function _tocarSomEvento(tipo) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(tipo === 'geofenceEnter' || tipo === 'geofenceExit' ? 880 : 660, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+function renderEventosLista() {
+  const lista = document.getElementById('eventos-lista');
+  const filtrados = _eventos.filter(e => !_evtFiltros.has(e.tipo));
+
+  if (!filtrados.length) {
+    lista.innerHTML = `<div id="eventos-vazio">
+      <i class="fa fa-bell-o" style="font-size:28px;display:block;margin-bottom:8px;color:#ddd"></i>
+      Aguardando eventos...
+    </div>`;
+    return;
+  }
+
+  lista.innerHTML = filtrados.map(function (e) {
+    const css = (e.tipo === 'geofenceEnter' || e.tipo === 'geofenceExit') ? 'tipo-geofence' : 'tipo-ignition';
+    const tempo = fmtTempoDecorrido(e.serverTime);
+    const nomeDev = _nomeDispositivo(e.dispositivoId);
+    return `<div class="evento-item ${css}" onclick="clicarEvento(${_eventos.indexOf(e)})">
+      <div class="evt-dispositivo">${nomeDev}</div>
+      <div class="evt-desc">${e.tipoLabel || e.tipo}</div>
+      <div class="evt-footer">
+        <span class="evt-tempo">há ${tempo}</span>
+        <i class="fa fa-map-marker evt-ico-pin"></i>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _nomeDispositivo(dispositivoId) {
+  const v = veiculosMap[dispositivoId];
+  if (!v) return dispositivoId || '—';
+  return v.placa ? `${v.nome} ${v.placa}` : v.nome;
+}
+
+window.clicarEvento = function (idx) {
+  const e = _eventos[idx];
+  if (!e) return;
+
+  if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
+    focar(e.dispositivoId);
+  } else if (e.lat != null && e.lng != null) {
+    map.flyTo([e.lat, e.lng], 16, { animate: true, duration: 0.8 });
+  }
+
+  const popup = document.getElementById('evento-popup-mapa');
+  document.getElementById('ep-titulo').textContent = e.tipoLabel || e.tipo;
+
+  const dt = e.serverTime ? new Date(e.serverTime) : null;
+  document.getElementById('ep-data').textContent = dt
+    ? `${dt.toLocaleDateString('pt-BR')} | ${dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}`
+    : '';
+
+  const pos = veiculosMap[e.dispositivoId]?.posicao;
+  if (pos) {
+    const addrId = 'ep-end-addr';
+    document.getElementById('ep-end').id = addrId;
+    document.getElementById('ep-end').textContent = 'Buscando endereço...';
+    geocodificarCoordenadas(pos.latitude, pos.longitude, addrId);
+  } else {
+    document.getElementById('ep-end').textContent = _nomeDispositivo(e.dispositivoId);
+  }
+
+  popup.style.display = 'block';
+};
+
 // ── Mapa ──────────────────────────────────────────────────────────────────────
 
 function inicializarMapa() {
-  map = L.map('mapa', { zoomControl: true, maxZoom: 21 }).setView([-15.78, -47.93], 5);
+  map = L.map('mapa', { zoomControl: false, maxZoom: 21 }).setView([-15.78, -47.93], 5);
 
   const tilesCartoDB = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
@@ -71,70 +252,16 @@ function inicializarMapa() {
     { attribution: 'Tiles © Esri', maxNativeZoom: 19, maxZoom: 21 }
   );
   tilesCartoDB.addTo(map);
+  L.control.zoom({ position: 'topright' }).addTo(map);
   L.control.layers(
     { 'CartoDB Voyager': tilesCartoDB, 'OpenStreetMap': tilesOsm, 'ESRI Street': tilesEsri },
     {}, { position: 'topright', collapsed: true }
   ).addTo(map);
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
-  // ── CSS + controle toggle hover ───────────────────────────────────────────
-  (function () {
-    if (document.getElementById('popup-toggle-css')) return;
-    const s = document.createElement('style');
-    s.id = 'popup-toggle-css';
-    s.textContent = `
-      .popup-toggle-ctrl { position: relative; }
-      .popup-toggle-ctrl .pt-header { width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:default;background:#fff;color:#333; }
-      .popup-toggle-ctrl .pt-panel { display:none;position:absolute;right:0;top:0;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,0.4);padding:6px 0;min-width:130px;z-index:10; }
-      .popup-toggle-ctrl:hover .pt-panel { display:block; }
-      .dark-theme .popup-toggle-ctrl .pt-header { background:#fff;color:#333; }
-      .dark-theme .popup-toggle-ctrl .pt-panel { background:#2d3748;color:#e2e8f0; }
-      .pt-option { display:flex;align-items:center;gap:7px;padding:5px 12px;cursor:pointer;font-size:12px;white-space:nowrap; }
-      .pt-option:hover { background:rgba(41,128,185,0.1); }
-      .pt-radio { width:10px;height:10px;border:2px solid #aaa;border-radius:50%;flex-shrink:0; }
-      .pt-radio.active { border-color:#2980b9;background:#2980b9; }
-      .leaflet-control-layers-toggle { width:30px !important; height:30px !important; }
-      .leaflet-control-layers-list { min-width:130px !important; }
-    `;
-    document.head.appendChild(s);
-  })();
-
-  let _popupToggleEl = null;
-  function _sincRadiosPopup() {
-    if (!_popupToggleEl) return;
-    _popupToggleEl.querySelectorAll('.pt-option').forEach(function (el) {
-      const ok = (el.dataset.val === '1') === _mostrarPopup;
-      el.querySelector('.pt-radio').className = 'pt-radio' + (ok ? ' active' : '');
-    });
-  }
-
-  const BtnPopupToggle = L.Control.extend({
-    onAdd() {
-      const c = L.DomUtil.create('div', 'leaflet-bar leaflet-control popup-toggle-ctrl');
-      c.innerHTML = `
-        <div class="pt-header"><i class="fa fa-tag" style="font-size:14px"></i></div>
-        <div class="pt-panel">
-          <div class="pt-option" data-val="1"><span class="pt-radio active"></span> Mostrar placa</div>
-          <div class="pt-option" data-val="0"><span class="pt-radio"></span> Ocultar placa</div>
-        </div>`;
-      L.DomEvent.disableClickPropagation(c);
-      _popupToggleEl = c;
-      c.querySelectorAll('.pt-option').forEach(function (el) {
-        L.DomEvent.on(el, 'click', function () {
-          const novo = el.dataset.val === '1';
-          if (novo === _mostrarPopup) return;
-          _mostrarPopup = novo;
-          _atualizarBindingsPopup();
-          _sincRadiosPopup();
-        });
-      });
-      return c;
-    },
-    onRemove() {},
-  });
-  new BtnPopupToggle({ position: 'topright' }).addTo(map);
-
+  // Localização primeiro → tray toggle fica abaixo
   _adicionarBotaoLocalizacao(map);
+  _adicionarBotoesCamadas();
 
   map.on('popupclose', function (e) {
     if (_togglingPopup) return;
@@ -142,6 +269,128 @@ function inicializarMapa() {
   });
   map.on('click', function () { _fecharSpider(); });
   map.on('zoomend', function () { _fecharSpider(); if (!modoFoco) renderMarcadores(); });
+}
+
+// ── Botões de camadas ─────────────────────────────────────────────────────────
+
+function _adicionarBotoesCamadas() {
+  const tray = document.getElementById('mapa-tray');
+  if (!tray) return;
+
+  let _toggleBtn = null;
+  const BtnTray = L.Control.extend({
+    onAdd() {
+      const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+      btn.id = 'mapa-tray-toggle';
+      btn.title = 'Camadas do mapa';
+      btn.style.cssText = 'width:35px;height:35px;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;background:#fff;border:2.5px solid #ccc;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,0.3);border-radius:50%;';
+      btn.innerHTML = '<i class="fa fa-database" style="color:#333"></i>';
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.disableScrollPropagation(btn);
+      L.DomEvent.on(btn, 'click', function (e) {
+        L.DomEvent.stop(e);
+        const aberta = tray.classList.toggle('aberta');
+        btn.style.background = aberta ? '#fab32c' : '#fff';
+        btn.querySelector('i').style.color = aberta ? '#222' : '#333';
+      });
+      _toggleBtn = btn;
+      return btn;
+    },
+    onRemove() {},
+  });
+  new BtnTray({ position: 'topright' }).addTo(map);
+
+  L.DomEvent.disableClickPropagation(tray);
+
+  document.addEventListener('click', function (e) {
+    if (!tray.contains(e.target) && (!_toggleBtn || !_toggleBtn.contains(e.target))) {
+      tray.classList.remove('aberta');
+      if (_toggleBtn) { _toggleBtn.style.background = '#fff'; _toggleBtn.querySelector('i').style.color = '#333'; }
+    }
+  });
+
+  document.getElementById('ml-alarmes').addEventListener('click', function () {
+    _overlay.alarmes = !_overlay.alarmes;
+    this.classList.toggle('ativo', _overlay.alarmes);
+    _atualizarAlarmeBadges();
+  });
+
+  document.getElementById('ml-dispositivos').addEventListener('click', function () {
+    this.classList.toggle('ativo');
+  });
+
+  document.getElementById('ml-labels').addEventListener('click', function () {
+    _overlay.labels = !_overlay.labels;
+    this.classList.toggle('ativo', _overlay.labels);
+    _mostrarPopup = _overlay.labels;
+    _atualizarBindingsPopup();
+  });
+
+  document.getElementById('ml-cercas').addEventListener('click', function () {
+    _overlay.cercas = !_overlay.cercas;
+    this.classList.toggle('ativo', _overlay.cercas);
+    if (_overlay.cercas) carregarCercas().then(mostrarCercas); else ocultarCercas();
+  });
+
+  document.getElementById('ml-rastro').addEventListener('click', function () {
+    _overlay.rastro = !_overlay.rastro;
+    this.classList.toggle('ativo', _overlay.rastro);
+    if (_overlay.rastro) _carregarRastros(); else _limparRastros();
+  });
+}
+
+// ── Rastros ───────────────────────────────────────────────────────────────────
+
+function _limparRastros() {
+  Object.values(_rastros).forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+  Object.keys(_rastros).forEach(k => delete _rastros[k]);
+}
+
+async function _carregarRastros() {
+  const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao);
+  for (const id of ids) {
+    if (!_overlay.rastro) break;
+    try {
+      const now = new Date();
+      const from = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+      const hist = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/historico?from=${from}&to=${now.toISOString()}`);
+      if (!_overlay.rastro) break;
+      const pontos = (hist.posicoes || []).map(p => [p.latitude, p.longitude]);
+      if (pontos.length >= 2) {
+        const linha = L.polyline(pontos, {
+          color: '#2980b9', weight: 3, opacity: 0.7, dashArray: '6,4',
+        }).addTo(map);
+        _rastros[id] = linha;
+      }
+    } catch {}
+  }
+}
+
+// ── Badges de alarme ──────────────────────────────────────────────────────────
+
+function _atualizarAlarmeBadges() {
+  Object.keys(veiculosMap).forEach(id => {
+    const v = veiculosMap[id];
+    if (!v?.posicao) return;
+    _renderAlarmeBadge(id, v);
+  });
+}
+
+function _renderAlarmeBadge(id, v) {
+  if (_alarmeBadges[id]) {
+    if (map.hasLayer(_alarmeBadges[id])) map.removeLayer(_alarmeBadges[id]);
+    delete _alarmeBadges[id];
+  }
+  if (!_overlay.alarmes || !v?.posicao?.alarme) return;
+  const badge = L.marker([v.posicao.latitude, v.posicao.longitude], {
+    icon: L.divIcon({
+      html: `<div style="background:#e74c3c;color:#fff;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;gap:4px;"><i class="fa fa-bell" style="font-size:9px"></i> ${v.posicao.alarme}</div>`,
+      className: '', iconAnchor: [0, 36], iconSize: null,
+    }),
+    zIndexOffset: 800, interactive: false,
+  });
+  badge.addTo(map);
+  _alarmeBadges[id] = badge;
 }
 
 function _adicionarBotaoLocalizacao(mapInst) {
@@ -173,7 +422,7 @@ function _adicionarBotaoLocalizacao(mapInst) {
     },
     onRemove() {},
   });
-  new BtnLoc({ position: 'topleft' }).addTo(mapInst);
+  new BtnLoc({ position: 'topright' }).addTo(mapInst);
 }
 
 // ── Carga de posições ─────────────────────────────────────────────────────────
@@ -223,10 +472,12 @@ async function carregarPosicoes() {
     if (!boundsAjustados) {
       if (ajustarBounds()) boundsAjustados = true;
     }
+    if (_overlay.alarmes) _atualizarAlarmeBadges();
+    if (_overlay.rastro) _carregarRastros();
   } catch (err) {
     if (err.message === 'acesso_bloqueado') { verificarAcesso(); return; }
     if (!Object.keys(veiculosMap).length) {
-      const counters = document.getElementById('sidebar-counters');
+      const counters = document.getElementById('topbar-counters');
       if (counters) counters.innerHTML = '<span style="color:#e74c3c"><i class="fa fa-exclamation-triangle"></i> Erro ao carregar</span>';
     }
   }
@@ -274,6 +525,9 @@ function processarMensagemWs(msg) {
         horas_motor: pos.horas_motor, bloqueado: pos.bloqueado, endereco: pos.endereco,
       };
       atualizarMarcador(did); atualizarCardAtivo(did); atualizarCardBarra(did);
+      if (_overlay.alarmes) _renderAlarmeBadge(did, veiculosMap[did]);
+      if (_overlay.rastro && _rastros[did]) _rastros[did].addLatLng([pos.latitude, pos.longitude]);
+      if (_rotasIndividuais[did]) _rotasIndividuais[did].polyline.addLatLng([pos.latitude, pos.longitude]);
     });
   }
   if (msg.devices?.length) {
@@ -282,6 +536,20 @@ function processarMensagemWs(msg) {
       if (!did || !veiculosMap[did]) return;
       veiculosMap[did].status = d.status; veiculosMap[did].lastUpdate = d.lastUpdate;
       atualizarMarcador(did); atualizarCardAtivo(did); atualizarCardBarra(did);
+    });
+  }
+  if (msg.events?.length) {
+    msg.events.forEach(function (e) {
+      const did = traccarIdParaDispositivoId[e.deviceId];
+      const pos = did ? veiculosMap[did]?.posicao : null;
+      adicionarEvento({
+        dispositivoId: did || null,
+        tipo: e.type,
+        tipoLabel: e.tipoLabel,
+        serverTime: e.serverTime,
+        lat: pos?.latitude ?? null,
+        lng: pos?.longitude ?? null,
+      });
     });
   }
   renderSidebar();
@@ -444,14 +712,15 @@ function _atualizarBindingsPopup() {
   }
 }
 
-// ── Sidebar: contadores + busca ───────────────────────────────────────────────
+// ── Contadores ────────────────────────────────────────────────────────────────
 
 function renderSidebar() {
   const todos = Object.values(veiculosMap);
   const online = todos.filter(v => v.status === 'online').length;
   const offline = todos.length - online;
-  const el = document.getElementById('sidebar-counters');
-  if (el) el.innerHTML = `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp; <span class="dot-offline">●</span> ${offline} offline`;
+  const semPos = todos.filter(v => !v.posicao).length;
+  const el = document.getElementById('topbar-counters');
+  if (el) el.innerHTML = `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp; <span class="dot-offline">●</span> ${offline} offline${semPos ? `&nbsp;·&nbsp;<span style="color:#e67e22">${semPos} sem pos.</span>` : ''}`;
 }
 
 function renderBuscaResultados() {
@@ -769,6 +1038,12 @@ function mostrarCardDispositivo(id) {
       </div>
     </div>
   `;
+  // Inject action buttons (Rota + Cerca)
+  const acoesDivCli = document.createElement('div');
+  acoesDivCli.style.cssText = 'padding:10px 12px 14px;border-top:1px solid rgba(128,128,128,0.15);display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
+  acoesDivCli.innerHTML = _htmlAcoesCard(id);
+  card.appendChild(acoesDivCli);
+
   card.style.display = 'block';
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
 
@@ -803,6 +1078,7 @@ window.enviarComandoDaSidebar = async function(did, tipo) {
 
 window.fecharCardDispositivo = function (skipClosePopup) {
   if (modoFoco) desativarFoco();
+  _cancelarDesenhoCirculo();
   document.getElementById('device-detail-card').style.display = 'none';
   ativoId = null;
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.remove('ativo'));
@@ -827,12 +1103,12 @@ function atualizarCardAtivo(did) {
   }
   const elVel = document.getElementById('dcard-velocimetro');
   if (elVel) elVel.innerHTML = p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : '';
-  const elStatus = document.getElementById('dcard-status');
-  if (elStatus) {
+  const elStatusItems = document.getElementById('dcard-status');
+  if (elStatusItems) {
     const bat2 = p?.bateria_nivel != null ? p.bateria_nivel : null;
     const batCor2 = bat2 >= 40 ? '#27ae60' : bat2 >= 20 ? '#f39c12' : '#e74c3c';
     const batFa2 = bat2 >= 80 ? 'fa-battery-full' : bat2 >= 60 ? 'fa-battery-3' : bat2 >= 40 ? 'fa-battery-2' : bat2 >= 20 ? 'fa-battery-1' : 'fa-battery-0';
-    elStatus.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2);
+    elStatusItems.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2);
   }
   const tsSrv = document.getElementById('dcard-ts-srv'), tsDev = document.getElementById('dcard-ts-dev'), tsGps = document.getElementById('dcard-ts-gps');
   if (tsSrv && p) tsSrv.textContent = fmtGPSTimeSec(p.serverTime);
@@ -954,6 +1230,208 @@ window.abrirOverlay = function (did, tipo) {
   document.getElementById('overlay-historico').classList.add('ativo');
   history.pushState({ overlay: true }, '');
 };
+
+// ── Rota individual do dispositivo ────────────────────────────────────────────
+
+function _criarSetasNoRastro(pontos, cor) {
+  const setas = [];
+  const step = Math.max(1, Math.floor(pontos.length / 8));
+  for (let i = step; i < pontos.length - 1; i += step) {
+    const [lat1, lng1] = pontos[i - 1], [lat2, lng2] = pontos[i];
+    const ang = Math.atan2(lng2 - lng1, lat2 - lat1) * 180 / Math.PI;
+    const seta = L.marker([lat2, lng2], {
+      icon: L.divIcon({
+        html: `<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:10px solid ${cor};transform:rotate(${ang}deg);transform-origin:center"></div>`,
+        className: '', iconSize: [10, 10], iconAnchor: [5, 5],
+      }),
+      interactive: false, zIndexOffset: 200,
+    }).addTo(map);
+    setas.push(seta);
+  }
+  return setas;
+}
+
+async function _carregarRastroDispositivo(id) {
+  try {
+    const now = new Date();
+    const from = new Date(now.getTime() - 3600000).toISOString();
+    const hist = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/historico?from=${from}&to=${now.toISOString()}`);
+    const pontos = (hist.posicoes || []).map(p => [p.latitude, p.longitude]);
+    if (pontos.length < 2) return;
+    const polyline = L.polyline(pontos, { color: '#e74c3c', weight: 3, opacity: 0.85 }).addTo(map);
+    const setas = _criarSetasNoRastro(pontos, '#e74c3c');
+    _rotasIndividuais[id] = { polyline, setas };
+  } catch {}
+}
+
+window.ativarRota = function (dispositivoId) {
+  const btn = document.querySelector(`.dcard-acao[data-acao="rota"]`);
+  if (_rotasIndividuais[dispositivoId]) {
+    const { polyline, setas } = _rotasIndividuais[dispositivoId];
+    if (map.hasLayer(polyline)) map.removeLayer(polyline);
+    setas.forEach(s => { if (map.hasLayer(s)) map.removeLayer(s); });
+    delete _rotasIndividuais[dispositivoId];
+    if (btn) btn.classList.remove('ativo');
+  } else {
+    _carregarRastroDispositivo(dispositivoId);
+    if (btn) btn.classList.add('ativo');
+  }
+};
+
+// ── Cercas (Geofences) ────────────────────────────────────────────────────────
+
+function _parsearAreaTraccar(area) {
+  if (!area) return null;
+  const circleMatch = area.match(/CIRCLE\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*,\s*([\d.]+)\s*\)/i);
+  if (circleMatch) return { tipo: 'circle', lat: parseFloat(circleMatch[1]), lng: parseFloat(circleMatch[2]), raio: parseFloat(circleMatch[3]) };
+  const polyMatch = area.match(/POLYGON\s*\(\((.*)\)\)/i);
+  if (polyMatch) {
+    const coords = polyMatch[1].trim().split(',').map(p => { const [lng, lat] = p.trim().split(/\s+/); return [parseFloat(lat), parseFloat(lng)]; });
+    return { tipo: 'polygon', coords };
+  }
+  return null;
+}
+
+function _criarCamadaCerca(cerca) {
+  const parsed = _parsearAreaTraccar(cerca.area);
+  if (!parsed) return null;
+  const opcoes = { color: '#27ae60', weight: 2, fillOpacity: 0.08, fillColor: '#27ae60' };
+  let camada;
+  if (parsed.tipo === 'circle') {
+    camada = L.circle([parsed.lat, parsed.lng], { ...opcoes, radius: parsed.raio });
+  } else {
+    camada = L.polygon(parsed.coords, opcoes);
+  }
+  camada.bindTooltip(cerca.name, { className: 'cerca-tooltip', permanent: false });
+  camada.on('contextmenu', function () {
+    if (confirm(`Remover a cerca "${cerca.name}"?`)) removerCerca(cerca.id);
+  });
+  return camada;
+}
+
+async function carregarCercas() {
+  const data = await AL_CLIENTE.apiGet('/api/cliente/rastreamento/cercas');
+  return Array.isArray(data) ? data : (data.cercas || []);
+}
+
+function mostrarCercas() {
+  carregarCercas().then(function (cercas) {
+    ocultarCercas();
+    _cercasLayer = L.layerGroup();
+    cercas.forEach(function (c) {
+      const camada = _criarCamadaCerca(c);
+      if (camada) _cercasLayer.addLayer(camada);
+    });
+    _cercasLayer.addTo(map);
+  }).catch(function () {});
+}
+
+function ocultarCercas() {
+  if (_cercasLayer && map.hasLayer(_cercasLayer)) map.removeLayer(_cercasLayer);
+  _cercasLayer = null;
+}
+
+async function removerCerca(id) {
+  try {
+    await AL_CLIENTE.apiDelete(`/api/cliente/rastreamento/cercas/${id}`);
+    if (_overlay.cercas) mostrarCercas();
+    AL_CLIENTE.showAlert('Cerca removida.', 'success');
+  } catch (err) {
+    AL_CLIENTE.showAlert('Erro ao remover cerca: ' + err.message);
+  }
+}
+
+window.iniciarDesenhoCirculo = function (dispositivoId) {
+  _cancelarDesenhoCirculo();
+  _modoDesenho = { dispositivoId, circle: null };
+  _cercaPendente.dispositivoId = dispositivoId;
+  const banner = document.getElementById('mapa-instrucao');
+  if (banner) { banner.textContent = 'Clique no mapa para posicionar o centro da cerca'; banner.style.display = 'block'; }
+  map.getContainer().style.cursor = 'crosshair';
+  map.once('click', function (e) {
+    if (!_modoDesenho) return;
+    _cercaPendente.ponto = e.latlng;
+    _modoDesenho.circle = L.circle([e.latlng.lat, e.latlng.lng], {
+      radius: 200, color: '#e67e22', fillColor: '#e67e22',
+      fillOpacity: 0.12, weight: 2, dashArray: '6,4',
+    }).addTo(map);
+    map.getContainer().style.cursor = '';
+    if (banner) banner.style.display = 'none';
+    _mostrarDialogoCerca();
+  });
+};
+
+function _mostrarDialogoCerca() {
+  const dlg = document.getElementById('dlg-cerca');
+  if (!dlg) return;
+  const v = _modoDesenho?.dispositivoId ? veiculosMap[_modoDesenho.dispositivoId] : null;
+  const nomeInput = document.getElementById('cerca-nome');
+  if (nomeInput) nomeInput.value = v ? `Cerca — ${v.placa || v.nome}` : '';
+  const raioInput = document.getElementById('cerca-raio');
+  if (raioInput) {
+    raioInput.value = '200';
+    raioInput.oninput = function () {
+      const r = parseInt(this.value) || 200;
+      if (_modoDesenho?.circle) _modoDesenho.circle.setRadius(r);
+    };
+  }
+  dlg.style.display = 'block';
+
+  const confirmar = document.getElementById('btn-cerca-confirmar');
+  const cancelar = document.getElementById('btn-cerca-cancelar');
+
+  if (confirmar) {
+    confirmar.onclick = async function () {
+      const nome = (document.getElementById('cerca-nome')?.value || '').trim();
+      const raio = parseInt(document.getElementById('cerca-raio')?.value) || 200;
+      const ponto = _cercaPendente.ponto;
+      const devId = _cercaPendente.dispositivoId;
+      if (!nome) { AL_CLIENTE.showAlert('Informe um nome para a cerca.'); return; }
+      if (!ponto) { _cancelarDesenhoCirculo(); return; }
+      const area = `CIRCLE (${ponto.lat.toFixed(6)} ${ponto.lng.toFixed(6)}, ${raio})`;
+      this.disabled = true; this.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+      try {
+        await AL_CLIENTE.apiPost('/api/cliente/rastreamento/cercas', { nome, area, dispositivoId: devId });
+        _cancelarDesenhoCirculo();
+        AL_CLIENTE.showAlert('Cerca criada!', 'success');
+        if (_overlay.cercas) mostrarCercas();
+      } catch (err) {
+        AL_CLIENTE.showAlert('Erro ao criar cerca: ' + err.message);
+        this.disabled = false; this.innerHTML = '<i class="fa fa-check"></i> Criar';
+      }
+    };
+  }
+  if (cancelar) {
+    cancelar.onclick = _cancelarDesenhoCirculo;
+  }
+}
+
+function _cancelarDesenhoCirculo() {
+  if (_modoDesenho?.circle && map.hasLayer(_modoDesenho.circle)) map.removeLayer(_modoDesenho.circle);
+  _modoDesenho = null;
+  _cercaPendente = { ponto: null, dispositivoId: null };
+  if (map) map.getContainer().style.cursor = '';
+  const banner = document.getElementById('mapa-instrucao');
+  if (banner) banner.style.display = 'none';
+  const dlg = document.getElementById('dlg-cerca');
+  if (dlg) { dlg.style.display = 'none'; const btn = document.getElementById('btn-cerca-confirmar'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-check"></i> Criar'; } }
+}
+
+// ── Botões de ação do card de dispositivo ─────────────────────────────────────
+
+function _htmlAcoesCard(dispositivoId) {
+  const rotaAtiva = !!_rotasIndividuais[dispositivoId];
+  return `
+    <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="ativarRota('${dispositivoId}')" title="Rota">
+      <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
+      <span>Rota</span>
+    </button>
+    <button class="dcard-acao" data-acao="cerca" onclick="iniciarDesenhoCirculo('${dispositivoId}')" title="Criar Cerca">
+      <span class="dcard-acao-icon"><i class="fa fa-map-o"></i></span>
+      <span>Cerca</span>
+    </button>
+  `;
+}
 
 setInterval(() => { AL_CLIENTE.apiGet('/api/cliente/rastreamento/status-acesso').catch(() => {}); }, 60000);
 
