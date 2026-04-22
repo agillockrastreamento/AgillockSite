@@ -1040,12 +1040,7 @@ function mostrarCardDispositivo(id) {
       </div>
     </div>
   `;
-  // Inject action buttons (Rota + Cerca)
-  const acoesDivCli = document.createElement('div');
-  acoesDivCli.style.cssText = 'padding:10px 12px 14px;border-top:1px solid rgba(128,128,128,0.15);display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
-  acoesDivCli.innerHTML = _htmlAcoesCard(id);
-  card.appendChild(acoesDivCli);
-
+  
   card.style.display = 'block';
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
 
@@ -1054,12 +1049,14 @@ function mostrarCardDispositivo(id) {
     AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`),
     AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`)
   ]).then(([cercas, tipos]) => {
-    // 1. Atualiza botões de ação (Rota + Cerca)
+    // 1. Injeta botões de ação (Rota + Cerca) SEM DUPLICIDADE
     const temCerca = cercas && cercas.length > 0;
+    const rotaAtiva = !!_rotasIndividuais[id];
+    
     const acoesDivCli = document.createElement('div');
+    acoesDivCli.id = 'dcard-acoes-container';
     acoesDivCli.style.cssText = 'padding:10px 12px 14px;border-top:1px solid rgba(128,128,128,0.15);display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
     
-    const rotaAtiva = !!_rotasIndividuais[id];
     acoesDivCli.innerHTML = `
       <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivoCliente('rota','${id}')" title="Rota">
         <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
@@ -1070,6 +1067,11 @@ function mostrarCardDispositivo(id) {
         <span>Cerca</span>
       </button>
     `;
+    
+    // Remove container antigo se existir (prevenção extra)
+    const antigo = document.getElementById('dcard-acoes-container');
+    if (antigo) antigo.remove();
+    
     card.appendChild(acoesDivCli);
 
     // 2. Atualiza comandos de bloqueio/desbloqueio
@@ -1088,11 +1090,6 @@ function mostrarCardDispositivo(id) {
     }
   }).catch(err => {
     console.error('Erro ao carregar extras do card:', err);
-    // Fallback: mostra ações básicas mesmo em caso de erro na API
-    const acoesDivCli = document.createElement('div');
-    acoesDivCli.style.cssText = 'padding:10px 12px 14px;border-top:1px solid rgba(128,128,128,0.15);display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
-    acoesDivCli.innerHTML = _htmlAcoesCard(id);
-    card.appendChild(acoesDivCli);
   });
 }
 
