@@ -305,7 +305,7 @@
     function carregarDetalhe() {
       document.getElementById('loading-state').style.display = 'flex';
       document.getElementById('detalhe-conteudo').style.display = 'none';
-      AL.apiGet('/rastreamento/dispositivos/' + encodeURIComponent(dispositivoId) + '/detalhe')
+      AL.apiGet('/api/rastreamento/dispositivos/' + encodeURIComponent(dispositivoId) + '/detalhe')
         .then(function (data) { renderDetalhe(data); })
         .catch(function (err) {
           document.getElementById('loading-state').style.display = 'none';
