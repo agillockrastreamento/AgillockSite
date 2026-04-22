@@ -39,7 +39,9 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
         id: true, nome: true, identificador: true, placa: true,
         categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true, imagemUrl: true,
         cliente: { select: { id: true, nome: true } },
-        motorista: { select: { id: true, nome: true } },
+        motoristasVinculados: {
+          include: { motorista: { select: { id: true, nome: true } } }
+        },
       },
     }),
     traccarGetDevices(),
@@ -70,6 +72,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
   const resultado = dispositivos.map(d => {
     const traccar = traccarByImei.get(d.identificador);
     const posicao = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
+    const motorista = d.motoristasVinculados && d.motoristasVinculados.length > 0 ? d.motoristasVinculados[0].motorista : null;
 
     return {
       dispositivoId: d.id,
@@ -83,7 +86,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       cor: d.cor,
       limiteVelocidade: d.limiteVelocidade,
       cliente: d.cliente,
-      motorista: d.motorista,
+      motorista: motorista,
       traccarId: traccar?.id ?? null,
       status: traccar?.status ?? 'unknown',
       lastUpdate: traccar?.lastUpdate ?? null,
@@ -325,6 +328,9 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
       marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true,
       ativo: true, imagemUrl: true,
       cliente: { select: { id: true, nome: true } },
+      motoristasVinculados: {
+        include: { motorista: { select: { id: true, nome: true } } }
+      },
     },
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
@@ -340,6 +346,9 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
   }
 
   const attrs = posicao?.attributes ?? {};
+  const motorista = dispositivo.motoristasVinculados && dispositivo.motoristasVinculados.length > 0 
+    ? dispositivo.motoristasVinculados[0].motorista 
+    : null;
 
   res.json({
     dispositivo: {
@@ -355,6 +364,7 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
       ativo: dispositivo.ativo,
       imagemUrl: dispositivo.imagemUrl,
       cliente: dispositivo.cliente,
+      motorista: motorista,
     },
     traccar: traccarDevice ? {
       id: traccarDevice.id,
