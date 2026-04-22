@@ -515,10 +515,36 @@ async function ativarRota(dispositivoId) {
   }
 }
 
-window.acaoDispositivo = function (acao, dispositivoId) {
+window.acaoDispositivo = async function (acao, dispositivoId) {
   if (acao === 'rota') { ativarRota(dispositivoId); return; }
   if (acao === 'comando') { abrirModalComando(dispositivoId); return; }
-  if (acao === 'cerca') { iniciarDesenhoCirculo(dispositivoId); return; }
+  if (acao === 'cerca') {
+    const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
+    if (btn && btn.classList.contains('ativo')) {
+      // Se já está ativo, oferece remover
+      if (confirm('Deseja remover as cercas vinculadas a este dispositivo?')) {
+        try {
+          // Busca cercas deste dispositivo para remover
+          const cercas = await window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/cercas`);
+          if (cercas.length === 0) {
+             AL.showAlert('Nenhuma cerca vinculada encontrada.', 'info');
+             btn.classList.remove('ativo');
+             return;
+          }
+          for (const c of cercas) {
+            await removerCerca(c.id);
+          }
+          AL.showAlert('Cercas removidas.', 'success');
+          btn.classList.remove('ativo');
+        } catch (err) {
+          AL.showAlert('Erro ao remover cercas.', 'danger');
+        }
+      }
+      return;
+    }
+    iniciarDesenhoCirculo(dispositivoId); 
+    return; 
+  }
 };
 
 // ── Modal de Comando ──────────────────────────────────────────────────────────
@@ -638,24 +664,32 @@ function _criarCamadaCerca(cerca) {
   const geo = _parsearAreaTraccar(cerca.area);
   if (!geo) return null;
   let camada;
+  const cor = '#27ae60';
   if (geo.tipo === 'circulo') {
     camada = L.circle([geo.lat, geo.lng], {
-      radius: geo.raio, color: '#27ae60', fillColor: '#27ae60',
+      radius: geo.raio, color: cor, fillColor: cor,
       fillOpacity: 0.08, weight: 2, dashArray: '6,4',
     });
   } else {
     camada = L.polygon(geo.pontos, {
-      color: '#27ae60', fillColor: '#27ae60',
+      color: cor, fillColor: cor,
       fillOpacity: 0.08, weight: 2, dashArray: '6,4',
     });
   }
-  camada.bindTooltip(cerca.name || `Cerca ${cerca.id}`, { sticky: true, className: 'cerca-tooltip' });
-  camada.on('contextmenu', function (e) {
+  
+  camada.bindTooltip(`<b>${cerca.name || 'Cerca'}</b><br>Clique para remover`, { sticky: true, className: 'cerca-tooltip' });
+  
+  // Efeito de hover
+  camada.on('mouseover', function () { this.setStyle({ fillOpacity: 0.2, weight: 3 }); });
+  camada.on('mouseout', function () { this.setStyle({ fillOpacity: 0.08, weight: 2 }); });
+
+  camada.on('click', function (e) {
     L.DomEvent.stopPropagation(e);
     if (confirm(`Remover cerca "${cerca.name || cerca.id}"?`)) {
       removerCerca(cerca.id);
     }
   });
+  
   return camada;
 }
 
@@ -706,33 +740,26 @@ async function removerCerca(geofenceId) {
 
 function iniciarDesenhoCirculo(dispositivoId) {
   _cancelarDesenhoCirculo();
-
-  _modoDesenho = { dispositivoId, etapa: 'centro', circle: null, center: null };
-  map.getContainer().style.cursor = 'crosshair';
-
-  const banner = document.getElementById('mapa-instrucao');
-  if (banner) {
-    banner.textContent = 'Clique no mapa para definir o centro da cerca';
-    banner.style.display = 'block';
+  const v = veiculosMap[dispositivoId];
+  if (!v || !v.posicao) {
+    AL.showAlert('Veículo sem posição para criar cerca.', 'warning');
+    return;
   }
 
-  // Captura o próximo clique no mapa
-  map.once('click', function (e) {
-    if (!_modoDesenho) return;
-    
-    _modoDesenho.center = e.latlng;
-    _modoDesenho.etapa = 'raio';
+  const latlng = L.latLng(v.posicao.latitude, v.posicao.longitude);
+  _modoDesenho = { dispositivoId, etapa: 'raio', circle: null, center: latlng };
+  
+  // Ativa visualmente o botão no card
+  const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
+  if (btn) btn.classList.add('ativo');
 
-    _modoDesenho.circle = L.circle(e.latlng, {
-      radius: 500, color: '#f39c12', fillColor: '#f39c12',
-      fillOpacity: 0.12, weight: 2, dashArray: '6,4',
-    }).addTo(map);
+  // Cria círculo inicial (500m) automaticamente sobre o veículo
+  _modoDesenho.circle = L.circle(latlng, {
+    radius: 500, color: '#f39c12', fillColor: '#f39c12',
+    fillOpacity: 0.12, weight: 2, dashArray: '6,4',
+  }).addTo(map);
 
-    if (banner) banner.style.display = 'none';
-    map.getContainer().style.cursor = '';
-
-    _mostrarDialogoCerca(dispositivoId, e.latlng);
-  });
+  _mostrarDialogoCerca(dispositivoId, latlng);
 }
 
 function _mostrarDialogoCerca(dispositivoId, latlng) {
@@ -744,7 +771,6 @@ function _mostrarDialogoCerca(dispositivoId, latlng) {
   document.getElementById('cerca-raio-input').value = '500';
   dlg.style.display = 'flex';
 
-  // Atualiza círculo ao mudar raio
   document.getElementById('cerca-raio-input').oninput = function () {
     const r = parseInt(this.value) || 500;
     if (_modoDesenho?.circle) _modoDesenho.circle.setRadius(r);
@@ -763,7 +789,6 @@ function _mostrarDialogoCerca(dispositivoId, latlng) {
         nome, area, dispositivoId,
       });
 
-      // Remove o círculo temporário e adiciona o definitivo
       if (_modoDesenho?.circle && map.hasLayer(_modoDesenho.circle)) {
         map.removeLayer(_modoDesenho.circle);
       }
@@ -773,9 +798,8 @@ function _mostrarDialogoCerca(dispositivoId, latlng) {
       const camada = _criarCamadaCerca(cerca);
       if (camada) {
         _cercasLayer[cerca.id] = { camada, dados: cerca };
-        camada.addTo(map); // sempre mostra a cerca criada
+        camada.addTo(map);
         if (!_overlay.cercas) {
-          // Habilita visualmente o botão de cercas
           const btnCercas = document.getElementById('ml-cercas');
           if (btnCercas) { btnCercas.classList.add('ativo'); _overlay.cercas = true; }
         }
@@ -801,6 +825,10 @@ function _cancelarDesenhoCirculo() {
   if (banner) banner.style.display = 'none';
   const dlg = document.getElementById('dlg-cerca');
   if (dlg) dlg.style.display = 'none';
+  
+  // Remove o estado ativo do botão no card
+  const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
+  if (btn) btn.classList.remove('ativo');
 }
 
 // ── Badges de alarme sobre marcadores ────────────────────────────────────────
@@ -1493,6 +1521,12 @@ function mostrarCardDispositivo(id) {
   if (p && !hasCached) {
     geocodificarCoordenadas(p.latitude, p.longitude, addrId);
   }
+
+  // Verifica se tem cerca para ativar o botão
+  window.AL.apiGet(`/api/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
+    const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
+    if (btn && cercas.length > 0) btn.classList.add('ativo');
+  }).catch(() => {});
 }
 
 function _htmlAcoesCard(dispositivoId) {
