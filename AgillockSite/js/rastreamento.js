@@ -499,14 +499,14 @@ async function ativarRota(dispositivoId) {
       const setas = _criarSetasNoRastro(pontos, cor);
       _rotasIndividuais[dispositivoId] = { linha, setas };
       map.fitBounds(linha.getBounds().pad(0.1));
-      if (btn) { btn.classList.remove('carregando'); btn.classList.add('ativo'); btn.querySelector('i').className = 'fa fa-route'; }
+      if (btn) { btn.classList.remove('carregando'); btn.classList.add('ativo'); btn.querySelector('i').className = 'fa fa-road'; }
     } else {
       AL.showAlert('Sem histórico de posição na última hora.', 'warning');
-      if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-route'; }
+      if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-road'; }
     }
   } catch {
     AL.showAlert('Erro ao carregar rota.', 'danger');
-    if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-route'; }
+    if (btn) { btn.classList.remove('carregando'); btn.querySelector('i').className = 'fa fa-road'; }
   }
 }
 
@@ -521,7 +521,7 @@ window.acaoDispositivo = function (acao, dispositivoId) {
 async function abrirModalComando(dispositivoId) {
   _cmdDispositivoId = dispositivoId;
   const v = veiculosMap[dispositivoId];
-  const modal = document.getElementById('modal-cmd');
+  const modal = document.getElementById('modal-cmd-overlay');
   document.getElementById('modal-cmd-titulo').textContent = v ? `Comando — ${v.nome}` : 'Comando';
   document.getElementById('cmd-tipo-select').innerHTML = '<option value="">Carregando...</option>';
   document.getElementById('btn-enviar-cmd').disabled = true;
@@ -557,7 +557,7 @@ async function abrirModalComando(dispositivoId) {
 }
 
 function fecharModalComando() {
-  document.getElementById('modal-cmd').style.display = 'none';
+  document.getElementById('modal-cmd-overlay').style.display = 'none';
   _cmdDispositivoId = null;
   fecharModalComando_resetCustom();
 }
@@ -705,19 +705,24 @@ function iniciarDesenhoCirculo(dispositivoId) {
   _modoDesenho = { dispositivoId, etapa: 'centro', circle: null, center: null };
   map.getContainer().style.cursor = 'crosshair';
 
-  // Banner de instrução
   const banner = document.getElementById('mapa-instrucao');
   if (banner) {
     banner.textContent = 'Clique no mapa para definir o centro da cerca';
     banner.style.display = 'block';
   }
 
+  // Desativa temporariamente a interatividade dos marcadores para o clique ir para o mapa
+  Object.values(marcadores).forEach(m => { if (m.getElement()) m.getElement().style.pointerEvents = 'none'; });
+
   map.once('click', function (e) {
     if (!_modoDesenho) return;
+    
+    // Reativa interatividade
+    Object.values(marcadores).forEach(m => { if (m.getElement()) m.getElement().style.pointerEvents = 'auto'; });
+
     _modoDesenho.center = e.latlng;
     _modoDesenho.etapa = 'raio';
 
-    // Cria círculo inicial (500m) e exibe diálogo
     _modoDesenho.circle = L.circle(e.latlng, {
       radius: 500, color: '#f39c12', fillColor: '#f39c12',
       fillOpacity: 0.12, weight: 2, dashArray: '6,4',
@@ -796,6 +801,9 @@ function _cancelarDesenhoCirculo() {
   if (banner) banner.style.display = 'none';
   const dlg = document.getElementById('dlg-cerca');
   if (dlg) dlg.style.display = 'none';
+
+  // Reativa cliques nos marcadores
+  Object.values(marcadores).forEach(m => { if (m.getElement()) m.getElement().style.pointerEvents = 'auto'; });
 }
 
 // ── Badges de alarme sobre marcadores ────────────────────────────────────────
@@ -1447,17 +1455,15 @@ function mostrarCardDispositivo(id) {
     <div class="dcard-header">
       <div style="flex:1;min-width:0">
         <div class="v-nome">${v.nome}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
-          ${v.placa ? `<span class="v-placa">${v.placa}</span>` : '<span></span>'}
-          ${v.identificador ? `<span class="v-placa" style="font-family:monospace">${v.identificador}</span>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+          ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
+          ${v.identificador ? `<span class="v-placa" style="font-family:monospace;background:#f0f2f5;color:#666">${v.identificador}</span>` : ''}
+          <a href="dispositivo-detalhe.html?id=${v.dispositivoId}" title="Mais detalhes" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#e8f4fd;border-radius:50%;color:#2980b9;font-size:11px;text-decoration:none;" class="btn-dcard-gear">
+            <i class="fa fa-cog"></i>
+          </a>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:6px">
-        <a href="dispositivo-detalhe.html?id=${v.dispositivoId}" title="Mais detalhes" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#f0f2f5;border-radius:50%;border:none;color:#555;font-size:13px;text-decoration:none;cursor:pointer" class="btn-dcard-gear">
-          <i class="fa fa-cog"></i>
-        </a>
-        <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
-      </div>
+      <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
     </div>
     <div class="dcard-body">
       ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
