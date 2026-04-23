@@ -146,15 +146,16 @@
       position: absolute;
       top: 12px;
       left: 12px;
-      z-index: 900;
-      width: 270px;
+      z-index: 2100;
+      width: 290px;
       background: #fff;
       border-radius: 10px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.22);
-      overflow-y: auto;
+      overflow: hidden;
       max-height: calc(100% - 24px);
       scrollbar-width: thin;
       scrollbar-color: #ccc #fff;
+      flex-direction: column;
     }
     html.dark-theme #device-detail-card {
       background: #1e1e2e;
@@ -166,6 +167,81 @@
     #device-detail-card::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
     html.dark-theme #device-detail-card::-webkit-scrollbar-track { background: #1e1e2e; }
     html.dark-theme #device-detail-card::-webkit-scrollbar-thumb { background: #3a3a5c; }
+
+    #device-attrs-card {
+      display: none;
+      position: absolute;
+      top: 12px;
+      left: 314px;
+      z-index: 2100;
+      width: 360px;
+      max-width: calc(100% - 326px);
+      max-height: calc(100% - 24px);
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22);
+      overflow: hidden;
+    }
+    html.dark-theme #device-attrs-card {
+      background: #141820;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .dattrs-header {
+      padding: 10px 16px;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: #fab32c;
+      border-bottom: 1px solid #f0f0f0;
+      background: #fafafa;
+    }
+    html.dark-theme .dattrs-header {
+      background: #1c2230;
+      border-bottom-color: #2a3040;
+    }
+    .dattrs-body {
+      max-height: calc(100vh - 92px);
+      overflow-y: auto;
+    }
+    .dattrs-body::-webkit-scrollbar { width: 5px; }
+    .dattrs-body::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    html.dark-theme .dattrs-body::-webkit-scrollbar-thumb { background: #3a3a5c; }
+    .dattrs-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .dattrs-table td {
+      padding: 8px 16px;
+      border-bottom: 1px solid #f4f4f4;
+      vertical-align: top;
+    }
+    html.dark-theme .dattrs-table td { border-bottom-color: #222a38; }
+    .dattrs-table tr:last-child td { border-bottom: none; }
+    .dattrs-table td:first-child {
+      width: 30%;
+      color: #888;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .dattrs-table td:nth-child(2) {
+      width: 34%;
+      color: #555;
+    }
+    html.dark-theme .dattrs-table td:nth-child(2) { color: #aaa; }
+    .dattrs-table td:last-child {
+      font-weight: 500;
+      word-break: break-all;
+      color: #222;
+    }
+    html.dark-theme .dattrs-table td:last-child { color: #f0f2f5; }
+    .dattrs-empty {
+      padding: 16px;
+      color: #999;
+      font-size: 12px;
+    }
+    html.dark-theme .dattrs-empty { color: #8b949e; }
 
     .dcard-header {
       display: flex;
@@ -180,7 +256,7 @@
       color: #999; cursor: pointer; padding: 0 2px; flex-shrink: 0;
     }
     .dcard-fechar:hover { color: #e74c3c; }
-    .dcard-body { padding: 10px 12px 14px; }
+    .dcard-body { padding: 10px 12px 14px; overflow-y: auto; flex: 1; }
     .dcard-val { color: #333; }
     html.dark-theme .dcard-val { color: #f0f2f5; }
     .dcard-lbl { font-weight: 600; color: #333; }
@@ -470,6 +546,44 @@
     .dcard-acao.ativo .dcard-acao-icon { background: #e8f4fd; border-color: #2980b9; color: #2980b9; }
     .dark-theme .dcard-acao.ativo .dcard-acao-icon { background: #1a3a5c; }
     .dcard-acao span { font-weight: 600; }
+    .dcard-report-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin-top: 10px;
+      color: #fff !important;
+      font-weight: 600;
+    }
+    .dcard-summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .dcard-summary-stat {
+      background: #f7f7f7;
+      border-radius: 6px;
+      padding: 7px 8px;
+      text-align: center;
+    }
+    html.dark-theme .dcard-summary-stat { background: #252535; }
+    .dcard-summary-val { font-size: 17px; font-weight: 700; color: #2980b9; }
+    .dcard-summary-lbl { font-size: 10px; color: #aaa; margin-top: 1px; }
+    .dcard-footer {
+      flex-shrink: 0;
+      padding: 10px 12px 12px;
+      border-top: 1px solid rgba(128,128,128,.15);
+      background: #fff;
+    }
+    html.dark-theme .dcard-footer {
+      background: #1e1e2e;
+      border-top-color: rgba(255,255,255,.1);
+    }
+    .dcard-footer .btn {
+      width: 100%;
+      font-weight: 700;
+    }
 
     /* ── Modal de Comando ── */
     #modal-cmd-overlay {
@@ -667,6 +781,7 @@
 
         <!-- Card flutuante do dispositivo selecionado -->
         <div id="device-detail-card"></div>
+        <div id="device-attrs-card"></div>
 
         <!-- Popup de evento no mapa -->
         <div id="evento-popup-mapa">

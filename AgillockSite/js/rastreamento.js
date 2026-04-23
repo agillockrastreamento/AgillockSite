@@ -49,6 +49,48 @@ let _cmdDispositivoId = null;
 let _medidoresDispositivoId = null;
 const _usuarioRastreamento = (window.AL && typeof window.AL.getUser === 'function') ? window.AL.getUser() : null;
 const _podeEditarMedidores = !!(_usuarioRastreamento && _usuarioRastreamento.role === 'ADMIN');
+const _cardAdminExpandido = _podeEditarMedidores;
+const _cardFocusOffsetPx = _cardAdminExpandido ? 310 : 0;
+const _detalheDispositivoCache = {};
+const _detalheDispositivoPendentes = {};
+const _detalheAtributosThrottle = {};
+const _resumoHojeCache = {};
+const _resumoHojePendentes = {};
+const ATTR_INFO_CARD = {
+  ignition: ['ignition', 'Ignição'],
+  motion: ['motion', 'Em movimento'],
+  alarm: ['alarm', 'Alarme'],
+  blocked: ['blocked', 'Bloqueado'],
+  charge: ['charge', 'Carregando'],
+  rssi: ['rssi', 'Sinal GSM (dBm)'],
+  sat: ['sat', 'Satélites GPS'],
+  power: ['power', 'Tensão veículo (V)'],
+  battery: ['battery', 'Tensão bateria (V)'],
+  batteryLevel: ['batteryLevel', 'Nível bateria (%)'],
+  distance: ['distance', 'Distância segmento (m)'],
+  totalDistance: ['totalDistance', 'Odômetro total (m)'],
+  hours: ['hours', 'Horas de motor (ms)'],
+  fuel: ['fuel', 'Combustível'],
+  fuelUsed: ['fuelUsed', 'Combustível gasto'],
+  input: ['input', 'Entrada digital'],
+  output: ['output', 'Saída digital'],
+  driverUniqueId: ['driverUniqueId', 'ID Motorista'],
+  pdop: ['pdop', 'PDOP'],
+  hdop: ['hdop', 'HDOP'],
+  vdop: ['vdop', 'VDOP'],
+  index: ['index', 'Índice de mensagem'],
+  protocol: ['protocol', 'Protocolo'],
+  deviceId: ['deviceId', 'ID Dispositivo (Traccar)'],
+  raw: ['raw', 'Dados brutos'],
+  result: ['result', 'Resultado de comando'],
+};
+
+function _intervaloHoje() {
+  const agora = new Date();
+  const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  const fim = new Date(inicio.getTime() + 24 * 60 * 60 * 1000 - 1000);
+  return { inicio: inicio.toISOString(), fim: fim.toISOString() };
+}
 
 // ── Eventos ───────────────────────────────────────────────────────────────────
 const TIPOS_EVENTO_ADMIN = [
@@ -1118,6 +1160,7 @@ function processarMensagemWs(msg) {
 
       atualizarMarcador(dispositivoId);
       atualizarCardAtivo(dispositivoId);
+      _agendarAtualizacaoAtributos(dispositivoId);
 
       // Atualiza badge de alarme
       if (_overlay.alarmes) _renderAlarmeBadge(dispositivoId, veiculosMap[dispositivoId]);
@@ -1526,6 +1569,165 @@ function pesoStatus(v) {
   return 1;
 }
 
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function _fmtAtributoCard(valor) {
+  if (valor == null) return '<span style="color:#bbb">—</span>';
+  if (typeof valor === 'boolean') {
+    return valor
+      ? '<span style="color:#27ae60"><i class="fa fa-check"></i> Sim</span>'
+      : '<span style="color:#e74c3c"><i class="fa fa-times"></i> Não</span>';
+  }
+  if (typeof valor === 'object') {
+    return `<code style="font-size:11px">${esc(String(JSON.stringify(valor)))}</code>`;
+  }
+  return esc(String(valor));
+}
+
+function _renderAtributosCard(dispositivoId, data) {
+  if (!_cardAdminExpandido) return;
+  const card = document.getElementById('device-attrs-card');
+  if (!card || ativoId !== dispositivoId) return;
+
+  const attrs = data?.posicao?.atributos || {};
+  const linhas = [];
+  Object.keys(ATTR_INFO_CARD).forEach(k => {
+    if (attrs[k] !== undefined) linhas.push([k, ATTR_INFO_CARD[k][1], attrs[k]]);
+  });
+  Object.keys(attrs).forEach(k => {
+    if (!ATTR_INFO_CARD[k]) linhas.push([k, k, attrs[k]]);
+  });
+
+  card.innerHTML = `
+    <div class="dattrs-header"><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</div>
+    <div class="dattrs-body">
+      ${linhas.length ? `
+        <table class="dattrs-table">
+          <tbody>
+            ${linhas.map(l => `<tr><td>${esc(l[0])}</td><td>${esc(l[1])}</td><td>${_fmtAtributoCard(l[2])}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      ` : '<div class="dattrs-empty">Sem atributos de posição para exibir.</div>'}
+    </div>
+  `;
+  card.style.display = 'block';
+}
+
+function _carregarAtributosCard(dispositivoId, force) {
+  if (!_cardAdminExpandido) return;
+  const card = document.getElementById('device-attrs-card');
+  if (!card) return;
+
+  if (!force && _detalheDispositivoCache[dispositivoId]) {
+    _renderAtributosCard(dispositivoId, _detalheDispositivoCache[dispositivoId]);
+    return;
+  }
+  if (_detalheDispositivoPendentes[dispositivoId]) return;
+
+  card.innerHTML = `
+    <div class="dattrs-header"><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</div>
+    <div class="dattrs-body"><div class="dattrs-empty"><i class="fa fa-spinner fa-spin"></i> Carregando atributos...</div></div>
+  `;
+  card.style.display = 'block';
+
+  _detalheDispositivoPendentes[dispositivoId] = true;
+  window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/detalhe`)
+    .then(data => {
+      _detalheDispositivoCache[dispositivoId] = data;
+      _renderAtributosCard(dispositivoId, data);
+    })
+    .catch(() => {
+      if (ativoId !== dispositivoId) return;
+      card.innerHTML = `
+        <div class="dattrs-header"><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</div>
+        <div class="dattrs-body"><div class="dattrs-empty">Não foi possível carregar os atributos da posição.</div></div>
+      `;
+      card.style.display = 'block';
+    })
+    .finally(() => {
+      delete _detalheDispositivoPendentes[dispositivoId];
+    });
+}
+
+function _agendarAtualizacaoAtributos(dispositivoId) {
+  if (!_cardAdminExpandido || ativoId !== dispositivoId) return;
+  clearTimeout(_detalheAtributosThrottle[dispositivoId]);
+  _detalheAtributosThrottle[dispositivoId] = setTimeout(() => {
+    _carregarAtributosCard(dispositivoId, true);
+  }, 1200);
+}
+
+function _latLngComOffset(posicao) {
+  if (!_cardFocusOffsetPx || !map || !posicao) return [posicao.latitude, posicao.longitude];
+  const zoom = map.getZoom() || 16;
+  const point = map.project([posicao.latitude, posicao.longitude], zoom);
+  const centerPoint = L.point(point.x - _cardFocusOffsetPx, point.y);
+  const target = map.unproject(centerPoint, zoom);
+  return [target.lat, target.lng];
+}
+
+function _fmtResumoDuracao(minutos) {
+  if (!minutos) return '—';
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  return h ? `${h}h ${m}min` : `${m}min`;
+}
+
+function _renderResumoHojeAdmin(dispositivoId) {
+  const alvo = document.getElementById(`dcard-resumo-hoje-${dispositivoId}`);
+  if (!alvo) return;
+  const resumo = _resumoHojeCache[dispositivoId];
+  if (!resumo) {
+    alvo.innerHTML = '<div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div>';
+    return;
+  }
+  alvo.innerHTML = `
+    <div class="dcard-summary-grid">
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.km}</div><div class="dcard-summary-lbl">Distância</div></div>
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.velMax}</div><div class="dcard-summary-lbl">Vel. Máxima</div></div>
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.tempo}</div><div class="dcard-summary-lbl">Em Movimento</div></div>
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.viagens}</div><div class="dcard-summary-lbl">Viagens</div></div>
+    </div>
+  `;
+}
+
+function _carregarResumoHojeAdmin(dispositivoId) {
+  if (_resumoHojeCache[dispositivoId]) {
+    _renderResumoHojeAdmin(dispositivoId);
+    return;
+  }
+  if (_resumoHojePendentes[dispositivoId]) return;
+  _resumoHojePendentes[dispositivoId] = true;
+  const { inicio, fim } = _intervaloHoje();
+  window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/viagens?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`)
+    .then(viagens => {
+      const lista = Array.isArray(viagens) ? viagens : [];
+      const totalKm = lista.reduce((s, v) => s + (v.distancia || 0), 0);
+      const velMax = lista.reduce((m, v) => Math.max(m, v.velocidadeMaxima || 0), 0);
+      const totalMin = lista.reduce((s, v) => s + (v.duracao || 0), 0);
+      _resumoHojeCache[dispositivoId] = {
+        km: totalKm ? `${totalKm.toFixed(1)} km` : '—',
+        velMax: velMax ? `${velMax} km/h` : '—',
+        tempo: totalMin ? _fmtResumoDuracao(totalMin) : '—',
+        viagens: String(lista.length || 0),
+      };
+      _renderResumoHojeAdmin(dispositivoId);
+    })
+    .catch(() => {
+      _resumoHojeCache[dispositivoId] = { km: '—', velMax: '—', tempo: '—', viagens: '0' };
+      _renderResumoHojeAdmin(dispositivoId);
+    })
+    .finally(() => {
+      delete _resumoHojePendentes[dispositivoId];
+    });
+}
+
 // ── Card do dispositivo (flutuante sobre o mapa) ──────────────────────────────
 
 function mostrarCardDispositivo(id) {
@@ -1582,8 +1784,22 @@ function mostrarCardDispositivo(id) {
     </div>` : '';
 
   const card = document.getElementById('device-detail-card');
+  const linkVerMais = '';
+  const botoesAcao = _cardAdminExpandido
+    ? `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn">
+         <i class="fa fa-bar-chart"></i> Relatório
+       </a>`
+    : `<div style="margin-top:10px;display:flex;gap:6px">
+         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff">
+           <i class="fa fa-bar-chart"></i> Relatório
+         </a>
+         <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
+           <i class="fa fa-history"></i> Histórico
+         </a>
+       </div>`;
   card.innerHTML = `
     ${imgHtml}
+    ${linkVerMais}
     <div class="dcard-header">
       <div style="flex:1;min-width:0">
         <div class="v-nome">${v.nome}</div>
@@ -1624,6 +1840,35 @@ function mostrarCardDispositivo(id) {
   `;
 
   card.style.display = 'block';
+  card.style.display = 'flex';
+
+  if (_cardAdminExpandido) {
+    const body = card.querySelector('.dcard-body');
+    const acoesRapidas = body ? Array.from(body.children).find(el => el.tagName === 'DIV' && el.getAttribute('style') && el.getAttribute('style').indexOf('display:flex;gap:6px') !== -1) : null;
+    if (acoesRapidas) {
+      acoesRapidas.outerHTML = botoesAcao;
+    }
+    const acoesSection = body ? Array.from(body.children).find(el => el.innerHTML && el.innerHTML.indexOf('A') !== -1 && el.innerHTML.indexOf('dcard-acao') !== -1) : null;
+    if (acoesSection && !body.querySelector(`#dcard-resumo-hoje-${id}`)) {
+      acoesSection.insertAdjacentHTML('afterend', `
+        <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
+          <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">RESUMO DE HOJE</div>
+          <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
+        </div>
+      `);
+    }
+    if (!card.querySelector('.dcard-footer')) {
+      card.insertAdjacentHTML('beforeend', `
+        <div class="dcard-footer">
+          <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-primary">
+            <i class="fa fa-history"></i> Ver Mais
+          </a>
+        </div>
+      `);
+    }
+  }
+  _carregarAtributosCard(id, false);
+  _carregarResumoHojeAdmin(id);
 
   if (p && !hasCached) {
     geocodificarCoordenadas(p.latitude, p.longitude, addrId);
@@ -1662,6 +1907,8 @@ window.fecharCardDispositivo = function (skipClosePopup) {
   if (modoFoco) desativarFoco();
   _cancelarDesenhoCirculo();
   document.getElementById('device-detail-card').style.display = 'none';
+  const attrsCard = document.getElementById('device-attrs-card');
+  if (attrsCard) attrsCard.style.display = 'none';
   ativoId = null;
   if (!skipClosePopup) map.closePopup();
 };
@@ -1718,8 +1965,9 @@ function atualizarCardAtivo(dispositivoId) {
   if (tsGps && p) tsGps.textContent = fmtGPSTimeSec(p.fixTime);
 
   if (modoFoco && v?.posicao) {
-    map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
+    map.panTo(_latLngComOffset(v.posicao), { animate: true, duration: 0.5 });
   }
+  _agendarAtualizacaoAtributos(dispositivoId);
 }
 
 // ── Modo foco ─────────────────────────────────────────────────────────────────
@@ -1749,8 +1997,7 @@ window.focar = function (dispositivoId) {
   if (!v?.posicao) return;
 
   ativarFoco(dispositivoId);
-  const { latitude, longitude } = v.posicao;
-  map.flyTo([latitude, longitude], 16, { animate: true, duration: 0.8 });
+  map.flyTo(_latLngComOffset(v.posicao), 16, { animate: true, duration: 0.8 });
 
   setTimeout(() => {
     if (_mostrarPopup && marcadores[dispositivoId] && map.hasLayer(marcadores[dispositivoId])) {

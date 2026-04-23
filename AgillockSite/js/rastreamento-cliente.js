@@ -21,6 +21,8 @@ let wsReconectTimer = null;
 let ativoId = null;
 let modoFoco = false;
 const _geocodeCache = {};
+const _resumoHojeClienteCache = {};
+const _resumoHojeClientePendentes = {};
 
 // ── Camadas de overlay ────────────────────────────────────────────────────────
 const _overlay = {
@@ -35,6 +37,13 @@ const _rotasIndividuais = {};
 let _cercasLayer = null;
 let _modoDesenho = null; // null | { dispositivoId, circle }
 let _cercaPendente = { ponto: null, dispositivoId: null };
+
+function _intervaloHojeCliente() {
+  const agora = new Date();
+  const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  const fim = new Date(inicio.getTime() + 24 * 60 * 60 * 1000 - 1000);
+  return { inicio: inicio.toISOString(), fim: fim.toISOString() };
+}
 
 // ── Eventos (cliente: apenas 4 tipos) ────────────────────────────────────────
 const TIPOS_EVENTO_CLIENTE = [
@@ -1003,6 +1012,61 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor) {
   return si.join('');
 }
 
+function _fmtResumoDurCliente(min) {
+  if (!min) return '—';
+  const h = Math.floor(min / 60), m = min % 60;
+  return h ? `${h}h ${m}min` : `${m}min`;
+}
+
+function _renderResumoHojeCliente(id) {
+  const el = document.getElementById(`dcard-resumo-hoje-${id}`);
+  if (!el) return;
+  const resumo = _resumoHojeClienteCache[id];
+  if (!resumo) {
+    el.innerHTML = '<div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="dcard-summary-grid">
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.km}</div><div class="dcard-summary-lbl">Distância</div></div>
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.velMax}</div><div class="dcard-summary-lbl">Vel. Máxima</div></div>
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.tempo}</div><div class="dcard-summary-lbl">Em Movimento</div></div>
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.viagens}</div><div class="dcard-summary-lbl">Viagens</div></div>
+    </div>
+  `;
+}
+
+function _carregarResumoHojeCliente(id) {
+  if (_resumoHojeClienteCache[id]) {
+    _renderResumoHojeCliente(id);
+    return;
+  }
+  if (_resumoHojeClientePendentes[id]) return;
+  _resumoHojeClientePendentes[id] = true;
+  const { inicio, fim } = _intervaloHojeCliente();
+  AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/viagens?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`)
+    .then(viagens => {
+      const lista = Array.isArray(viagens) ? viagens : [];
+      const km = lista.reduce((s, v) => s + (v.distancia || 0), 0);
+      const velMax = lista.reduce((m, v) => Math.max(m, v.velocidadeMaxima || 0), 0);
+      const min = lista.reduce((s, v) => s + (v.duracao || 0), 0);
+      _resumoHojeClienteCache[id] = {
+        km: km ? `${km.toFixed(1)} km` : '—',
+        velMax: velMax ? `${velMax} km/h` : '—',
+        tempo: min ? _fmtResumoDurCliente(min) : '—',
+        viagens: String(lista.length || 0),
+      };
+      _renderResumoHojeCliente(id);
+    })
+    .catch(() => {
+      _resumoHojeClienteCache[id] = { km: '—', velMax: '—', tempo: '—', viagens: '0' };
+      _renderResumoHojeCliente(id);
+    })
+    .finally(() => {
+      delete _resumoHojeClientePendentes[id];
+    });
+}
+
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id]; if (!v) return;
   ativoId = id;
@@ -1067,11 +1131,16 @@ function mostrarCardDispositivo(id) {
         <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-history"></i> Histórico</button>
       </div>
       ${_htmlAcoesCard(id)}
+      <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
+        <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">RESUMO DE HOJE</div>
+        <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
+      </div>
     </div>
   `;
   
-  card.style.display = 'block';
+  card.style.display = 'flex';
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
+  _carregarResumoHojeCliente(id);
 
   // Verifica cercas para ativar o botão visualmente
   AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`).then(cercas => {

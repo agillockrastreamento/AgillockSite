@@ -219,11 +219,12 @@
       background: #fff;
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.22);
-      overflow-y: auto;
+      overflow: hidden;
       max-height: calc(100% - 150px); /* Desconta rodapé (180px) + top margin */
       scrollbar-width: thin;
       scrollbar-color: #ccc #fff;
       border: 1px solid rgba(0,0,0,0.05);
+      flex-direction: column;
     }
     html.dark-theme #device-detail-card {
       background: #1e1e2e;
@@ -244,7 +245,7 @@
       cursor: pointer; padding: 0 2px; flex-shrink: 0;
     }
     .dcard-fechar:hover { color: #e74c3c; }
-    .dcard-body { padding: 10px 12px 14px; }
+    .dcard-body { padding: 10px 12px 14px; overflow-y: auto; flex: 1; }
     .dcard-val { color: #333; }
     html.dark-theme .dcard-val { color: #f0f2f5; }
     .dcard-lbl { font-weight: 600; color: #333; }
@@ -470,6 +471,21 @@
     }
 
     /* ── Tooltip de cerca ── */
+    .dcard-summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .dcard-summary-stat {
+      background: #f7f7f7;
+      border-radius: 6px;
+      padding: 7px 8px;
+      text-align: center;
+    }
+    .dark-theme .dcard-summary-stat { background: #252535; }
+    .dcard-summary-val { font-size: 17px; font-weight: 700; color: #2980b9; }
+    .dcard-summary-lbl { font-size: 10px; color: #aaa; margin-top: 1px; }
     .cerca-tooltip { font-size: 11px; font-weight: 600; }
   </style>
 </head>
