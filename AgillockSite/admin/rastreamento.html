@@ -181,12 +181,25 @@
       border-radius: 10px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.22);
       overflow: hidden;
+      transform: translateX(-16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform .18s ease, opacity .18s ease;
+    }
+    #device-attrs-card.aberto {
+      display: block;
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
     }
     html.dark-theme #device-attrs-card {
       background: #141820;
       box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
     .dattrs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       padding: 10px 16px;
       font-weight: 700;
       font-size: 13px;
@@ -242,6 +255,59 @@
       font-size: 12px;
     }
     html.dark-theme .dattrs-empty { color: #8b949e; }
+    .dcard-tray-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid rgba(41,128,185,.18);
+      background: #eef6fc;
+      color: #2980b9;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      line-height: 1;
+      cursor: pointer;
+      transition: background .12s ease, color .12s ease, border-color .12s ease;
+    }
+    .dcard-tray-toggle:hover {
+      background: #dceffd;
+      border-color: rgba(41,128,185,.35);
+    }
+    html.dark-theme .dcard-tray-toggle {
+      background: rgba(41,128,185,.14);
+      border-color: rgba(41,128,185,.3);
+      color: #87c7ff;
+    }
+    html.dark-theme .dcard-tray-toggle:hover {
+      background: rgba(41,128,185,.22);
+    }
+    .dcard-tray-toggle-main {
+      width: 100%;
+      margin-top: 10px;
+    }
+    .dattrs-toggle {
+      flex-shrink: 0;
+    }
+    .dcard-tracker-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: #777;
+    }
+    .dcard-tracker-meta span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dcard-tracker-meta i {
+      width: 13px;
+      color: #2980b9;
+      text-align: center;
+    }
 
     .dcard-header {
       display: flex;
@@ -757,7 +823,7 @@
       </div>
       <!-- Busca na topbar -->
       <div id="topbar-busca-wrap">
-        <input type="text" id="filtro" class="form-control input-sm" placeholder="Buscar veículo ou placa...">
+        <input type="text" id="filtro" class="form-control input-sm" placeholder="Buscar veículo, placa, IMEI ou cliente...">
         <div id="lista-resultados-busca" style="display:none"></div>
       </div>
       <!-- Contadores de status -->

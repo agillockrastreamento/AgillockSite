@@ -10,6 +10,7 @@ let historicoCache = [];
 
 const urlParams = new URLSearchParams(window.location.search);
 const dispositivoId = urlParams.get('id');
+const backUrl = urlParams.get('back');
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -18,6 +19,8 @@ document.addEventListener('DOMContentLoaded', function () {
     mostrarErro('ID do dispositivo não informado na URL.');
     return;
   }
+  const btnBack = document.getElementById('btn-back-rastreamento');
+  if (btnBack && backUrl) btnBack.href = backUrl;
   inicializarMapa();
   configurarPeriodo();
   carregarDados();

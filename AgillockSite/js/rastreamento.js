@@ -56,6 +56,8 @@ const _detalheDispositivoPendentes = {};
 const _detalheAtributosThrottle = {};
 const _resumoHojeCache = {};
 const _resumoHojePendentes = {};
+const ADMIN_FOCUS_STORAGE_KEY = 'rastreamento_admin_foco';
+let _attrsTrayOpen = false;
 const ATTR_INFO_CARD = {
   ignition: ['ignition', 'Ignição'],
   motion: ['motion', 'Em movimento'],
@@ -91,6 +93,54 @@ function _intervaloHoje() {
   const fim = new Date(inicio.getTime() + 24 * 60 * 60 * 1000 - 1000);
   return { inicio: inicio.toISOString(), fim: fim.toISOString() };
 }
+
+function _salvarFocoAdmin(dispositivoId) {
+  if (!dispositivoId) return;
+  try { sessionStorage.setItem(ADMIN_FOCUS_STORAGE_KEY, dispositivoId); } catch {}
+}
+
+function _limparFocoAdmin() {
+  try { sessionStorage.removeItem(ADMIN_FOCUS_STORAGE_KEY); } catch {}
+}
+
+function _obterFocoAdminPendente() {
+  const focusUrl = new URLSearchParams(window.location.search).get('focus');
+  if (focusUrl) return focusUrl;
+  try { return sessionStorage.getItem(ADMIN_FOCUS_STORAGE_KEY); } catch { return null; }
+}
+
+function _restaurarFocoAdmin() {
+  if (ativoId) return;
+  const dispositivoId = _obterFocoAdminPendente();
+  if (!dispositivoId || !veiculosMap[dispositivoId]) return;
+  focar(dispositivoId);
+}
+
+function _urlDetalheRastreamentoAdmin(dispositivoId) {
+  const back = `rastreamento.html?focus=${encodeURIComponent(dispositivoId)}`;
+  return `rastreamento-detalhe.html?id=${encodeURIComponent(dispositivoId)}&back=${encodeURIComponent(back)}`;
+}
+
+function _aplicarEstadoTrayAtributos() {
+  const attrsCard = document.getElementById('device-attrs-card');
+  const mainToggle = document.getElementById('dcard-tray-toggle-main');
+  if (!attrsCard) return;
+  const aberta = !!(_cardAdminExpandido && ativoId && _attrsTrayOpen);
+  attrsCard.classList.toggle('aberto', aberta);
+  attrsCard.style.display = aberta ? 'block' : 'none';
+  if (mainToggle) mainToggle.style.display = aberta ? 'none' : '';
+}
+
+window.toggleAtributosTray = function () {
+  if (!_cardAdminExpandido || !ativoId) return;
+  _attrsTrayOpen = !_attrsTrayOpen;
+  if (_attrsTrayOpen) _carregarAtributosCard(ativoId, false);
+  _aplicarEstadoTrayAtributos();
+  const v = veiculosMap[ativoId];
+  if (modoFoco && v?.posicao) {
+    map.panTo(_latLngComOffset(v.posicao), { animate: true, duration: 0.35 });
+  }
+};
 
 // ── Eventos ───────────────────────────────────────────────────────────────────
 const TIPOS_EVENTO_ADMIN = [
@@ -1034,6 +1084,7 @@ async function carregarPosicoes() {
       renderSidebar();
       ajustarBounds();
       boundsAjustados = true;
+      _restaurarFocoAdmin();
     }
   } catch {}
 
@@ -1073,6 +1124,7 @@ async function carregarPosicoes() {
     renderMarcadores();
     renderSidebar();
     if (!boundsAjustados) { ajustarBounds(); boundsAjustados = true; }
+    _restaurarFocoAdmin();
 
     if (_overlay.alarmes) _atualizarAlarmeBadges();
     if (_overlay.rastro) _carregarRastros();
@@ -1529,6 +1581,7 @@ function renderBuscaResultados() {
   const filtrados = todos.filter(v =>
     v.nome.toLowerCase().includes(filtro) ||
     (v.placa && v.placa.toLowerCase().includes(filtro)) ||
+    (v.identificador && v.identificador.toLowerCase().includes(filtro)) ||
     (v.cliente?.nome.toLowerCase().includes(filtro))
   ).slice(0, 8);
 
@@ -1605,7 +1658,12 @@ function _renderAtributosCard(dispositivoId, data) {
   });
 
   card.innerHTML = `
-    <div class="dattrs-header"><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</div>
+    <div class="dattrs-header">
+      <span><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</span>
+      <button type="button" class="dcard-tray-toggle dattrs-toggle" onclick="toggleAtributosTray()" title="Fechar bandeja de atributos">
+        <i class="fa fa-chevron-left"></i> Fechar
+      </button>
+    </div>
     <div class="dattrs-body">
       ${linhas.length ? `
         <table class="dattrs-table">
@@ -1616,7 +1674,7 @@ function _renderAtributosCard(dispositivoId, data) {
       ` : '<div class="dattrs-empty">Sem atributos de posição para exibir.</div>'}
     </div>
   `;
-  card.style.display = 'block';
+  _aplicarEstadoTrayAtributos();
 }
 
 function _carregarAtributosCard(dispositivoId, force) {
@@ -1630,11 +1688,18 @@ function _carregarAtributosCard(dispositivoId, force) {
   }
   if (_detalheDispositivoPendentes[dispositivoId]) return;
 
-  card.innerHTML = `
-    <div class="dattrs-header"><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</div>
-    <div class="dattrs-body"><div class="dattrs-empty"><i class="fa fa-spinner fa-spin"></i> Carregando atributos...</div></div>
-  `;
-  card.style.display = 'block';
+  if (!_detalheDispositivoCache[dispositivoId] && _attrsTrayOpen) {
+    card.innerHTML = `
+      <div class="dattrs-header">
+        <span><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</span>
+        <button type="button" class="dcard-tray-toggle dattrs-toggle" onclick="toggleAtributosTray()" title="Fechar bandeja de atributos">
+          <i class="fa fa-chevron-left"></i> Fechar
+        </button>
+      </div>
+      <div class="dattrs-body"><div class="dattrs-empty"><i class="fa fa-spinner fa-spin"></i> Carregando atributos...</div></div>
+    `;
+    _aplicarEstadoTrayAtributos();
+  }
 
   _detalheDispositivoPendentes[dispositivoId] = true;
   window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/detalhe`)
@@ -1643,12 +1708,17 @@ function _carregarAtributosCard(dispositivoId, force) {
       _renderAtributosCard(dispositivoId, data);
     })
     .catch(() => {
-      if (ativoId !== dispositivoId) return;
+      if (ativoId !== dispositivoId || _detalheDispositivoCache[dispositivoId]) return;
       card.innerHTML = `
-        <div class="dattrs-header"><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</div>
+        <div class="dattrs-header">
+          <span><i class="fa fa-list-alt fa-fw"></i> Atributos Da Posição</span>
+          <button type="button" class="dcard-tray-toggle dattrs-toggle" onclick="toggleAtributosTray()" title="Fechar bandeja de atributos">
+            <i class="fa fa-chevron-left"></i> Fechar
+          </button>
+        </div>
         <div class="dattrs-body"><div class="dattrs-empty">Não foi possível carregar os atributos da posição.</div></div>
       `;
-      card.style.display = 'block';
+      _aplicarEstadoTrayAtributos();
     })
     .finally(() => {
       delete _detalheDispositivoPendentes[dispositivoId];
@@ -1656,7 +1726,7 @@ function _carregarAtributosCard(dispositivoId, force) {
 }
 
 function _agendarAtualizacaoAtributos(dispositivoId) {
-  if (!_cardAdminExpandido || ativoId !== dispositivoId) return;
+  if (!_cardAdminExpandido || ativoId !== dispositivoId || !_attrsTrayOpen) return;
   clearTimeout(_detalheAtributosThrottle[dispositivoId]);
   _detalheAtributosThrottle[dispositivoId] = setTimeout(() => {
     _carregarAtributosCard(dispositivoId, true);
@@ -1664,10 +1734,11 @@ function _agendarAtualizacaoAtributos(dispositivoId) {
 }
 
 function _latLngComOffset(posicao) {
-  if (!_cardFocusOffsetPx || !map || !posicao) return [posicao.latitude, posicao.longitude];
+  const offset = _cardAdminExpandido && _attrsTrayOpen ? _cardFocusOffsetPx : 0;
+  if (!offset || !map || !posicao) return [posicao.latitude, posicao.longitude];
   const zoom = map.getZoom() || 16;
   const point = map.project([posicao.latitude, posicao.longitude], zoom);
-  const centerPoint = L.point(point.x - _cardFocusOffsetPx, point.y);
+  const centerPoint = L.point(point.x - offset, point.y);
   const target = map.unproject(centerPoint, zoom);
   return [target.lat, target.lng];
 }
@@ -1734,7 +1805,10 @@ function mostrarCardDispositivo(id) {
   const v = veiculosMap[id];
   if (!v) return;
 
+  const mesmoDispositivo = ativoId === id;
   ativoId = id;
+  if (!mesmoDispositivo) _attrsTrayOpen = false;
+  _salvarFocoAdmin(id);
   const p = v.posicao;
   const isOnline = v.status === 'online';
   const isMoving = isOnline && p?.emMovimento;
@@ -1763,6 +1837,9 @@ function mostrarCardDispositivo(id) {
   const imgHtml = v.imagemUrl
     ? `<img src="${apiBase}${v.imagemUrl}" style="width:100%;height:120px;object-fit:cover;display:block;border-radius:10px 10px 0 0" onerror="this.style.display='none'" />`
     : '';
+  const rastreadorInfo = [];
+  if (v.telefoneRastreador) rastreadorInfo.push(`<span><i class="fa fa-phone"></i> ${esc(v.telefoneRastreador)}</span>`);
+  if (v.operadora) rastreadorInfo.push(`<span><i class="fa fa-signal"></i> ${esc(v.operadora)}</span>`);
 
   const si = [];
   if (p?.ignicao === true)  si.push(`<span style="color:#27ae60"><i class="fa fa-key"></i> Ignição: Ligado</span>`);
@@ -1793,7 +1870,7 @@ function mostrarCardDispositivo(id) {
          <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff">
            <i class="fa fa-bar-chart"></i> Relatório
          </a>
-         <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
+         <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
            <i class="fa fa-history"></i> Histórico
          </a>
        </div>`;
@@ -1815,6 +1892,7 @@ function mostrarCardDispositivo(id) {
     </div>
     <div class="dcard-body">
       ${v.cliente ? `<div style="font-size:12px;color:#888;margin-bottom:4px"><i class="fa fa-user" style="color:#2980b9;width:13px"></i> ${v.cliente.nome}</div>` : ''}
+      ${rastreadorInfo.length ? `<div class="dcard-tracker-meta">${rastreadorInfo.join('')}</div>` : ''}
       <div style="margin-bottom:6px">
         <span id="dcard-status-line" style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}</span>
         ${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}
@@ -1831,10 +1909,15 @@ function mostrarCardDispositivo(id) {
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff">
           <i class="fa fa-bar-chart"></i> Relatório
         </a>
-        <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
+        <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
           <i class="fa fa-history"></i> Histórico
         </a>
       </div>
+      ${_cardAdminExpandido ? `
+        <button type="button" id="dcard-tray-toggle-main" class="dcard-tray-toggle dcard-tray-toggle-main" onclick="toggleAtributosTray()" title="Abrir atributos da posição">
+          <i class="fa fa-chevron-right"></i> Atributos da posição
+        </button>
+      ` : ''}
       ${_htmlAcoesCard(v.dispositivoId)}
     </div>
   `;
@@ -1854,20 +1937,17 @@ function mostrarCardDispositivo(id) {
         <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
           <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">RESUMO DE HOJE</div>
           <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
-        </div>
-      `);
-    }
-    if (!card.querySelector('.dcard-footer')) {
-      card.insertAdjacentHTML('beforeend', `
-        <div class="dcard-footer">
-          <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
-            <i class="fa fa-history"></i> Ver Mais
-          </a>
+          <div style="margin-top:10px">
+            <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="width:100%;text-align:center">
+              <i class="fa fa-history"></i> Ver Mais
+            </a>
+          </div>
         </div>
       `);
     }
   }
-  _carregarAtributosCard(id, false);
+  if (_attrsTrayOpen) _carregarAtributosCard(id, false);
+  _aplicarEstadoTrayAtributos();
   _carregarResumoHojeAdmin(id);
 
   if (p && !hasCached) {
@@ -1908,8 +1988,13 @@ window.fecharCardDispositivo = function (skipClosePopup) {
   _cancelarDesenhoCirculo();
   document.getElementById('device-detail-card').style.display = 'none';
   const attrsCard = document.getElementById('device-attrs-card');
-  if (attrsCard) attrsCard.style.display = 'none';
+  _attrsTrayOpen = false;
+  if (attrsCard) {
+    attrsCard.classList.remove('aberto');
+    attrsCard.style.display = 'none';
+  }
   ativoId = null;
+  _limparFocoAdmin();
   if (!skipClosePopup) map.closePopup();
 };
 
@@ -1991,6 +2076,7 @@ function desativarFoco() {
 // ── Foco / Interações ─────────────────────────────────────────────────────────
 
 window.focar = function (dispositivoId) {
+  _salvarFocoAdmin(dispositivoId);
   mostrarCardDispositivo(dispositivoId);
 
   const v = veiculosMap[dispositivoId];

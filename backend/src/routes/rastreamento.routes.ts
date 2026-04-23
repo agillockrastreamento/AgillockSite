@@ -47,6 +47,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       select: {
         id: true, nome: true, identificador: true, placa: true,
         categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true, imagemUrl: true,
+        telefoneRastreador: true, operadora: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { select: { id: true, nome: true } },
         motoristasVinculados: {
@@ -102,6 +103,8 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       marca: d.marca,
       modeloVeiculo: d.modeloVeiculo,
       cor: d.cor,
+      telefoneRastreador: d.telefoneRastreador,
+      operadora: d.operadora,
       limiteVelocidade: d.limiteVelocidade,
       cliente: d.cliente,
       motorista: motorista,
@@ -378,7 +381,7 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
     select: {
       id: true, nome: true, identificador: true, placa: true, categoria: true,
       marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true,
-      ativo: true, imagemUrl: true,
+      ativo: true, imagemUrl: true, telefoneRastreador: true, operadora: true,
       ...DISPOSITIVO_MEDIDORES_SELECT,
       cliente: { select: { id: true, nome: true } },
       motoristasVinculados: {
@@ -421,6 +424,8 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
       limiteVelocidade: dispositivo.limiteVelocidade,
       ativo: dispositivo.ativo,
       imagemUrl: dispositivo.imagemUrl,
+      telefoneRastreador: dispositivo.telefoneRastreador,
+      operadora: dispositivo.operadora,
       cliente: dispositivo.cliente,
       motorista: motorista,
     },

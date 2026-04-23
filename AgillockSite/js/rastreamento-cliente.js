@@ -23,6 +23,7 @@ let modoFoco = false;
 const _geocodeCache = {};
 const _resumoHojeClienteCache = {};
 const _resumoHojeClientePendentes = {};
+const CLIENT_FOCUS_STORAGE_KEY = 'rastreamento_cliente_foco';
 
 // ── Camadas de overlay ────────────────────────────────────────────────────────
 const _overlay = {
@@ -43,6 +44,26 @@ function _intervaloHojeCliente() {
   const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
   const fim = new Date(inicio.getTime() + 24 * 60 * 60 * 1000 - 1000);
   return { inicio: inicio.toISOString(), fim: fim.toISOString() };
+}
+
+function _salvarFocoCliente(dispositivoId) {
+  if (!dispositivoId) return;
+  try { sessionStorage.setItem(CLIENT_FOCUS_STORAGE_KEY, dispositivoId); } catch {}
+}
+
+function _limparFocoCliente() {
+  try { sessionStorage.removeItem(CLIENT_FOCUS_STORAGE_KEY); } catch {}
+}
+
+function _restaurarFocoCliente() {
+  if (ativoId) return;
+  const focusUrl = new URLSearchParams(window.location.search).get('focus');
+  let dispositivoId = focusUrl;
+  if (!dispositivoId) {
+    try { dispositivoId = sessionStorage.getItem(CLIENT_FOCUS_STORAGE_KEY); } catch {}
+  }
+  if (!dispositivoId || !veiculosMap[dispositivoId]) return;
+  focarCliente(dispositivoId);
 }
 
 // ── Eventos (cliente: apenas 4 tipos) ────────────────────────────────────────
@@ -447,6 +468,7 @@ async function carregarPosicoes() {
       });
       renderMarcadores(); renderSidebar(); renderBarraVeiculos(); 
       if (ajustarBounds()) boundsAjustados = true;
+      _restaurarFocoCliente();
     }
   } catch {}
 
@@ -481,6 +503,7 @@ async function carregarPosicoes() {
     if (!boundsAjustados) {
       if (ajustarBounds()) boundsAjustados = true;
     }
+    _restaurarFocoCliente();
     if (_overlay.alarmes) _atualizarAlarmeBadges();
     if (_overlay.rastro) _carregarRastros();
   } catch (err) {
@@ -1070,6 +1093,7 @@ function _carregarResumoHojeCliente(id) {
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id]; if (!v) return;
   ativoId = id;
+  _salvarFocoCliente(id);
   const p = v.posicao;
   const isOnline = v.status === 'online', isMoving = isOnline && p?.emMovimento;
   const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
@@ -1184,6 +1208,7 @@ window.fecharCardDispositivo = function (skipClosePopup) {
   _cancelarDesenhoCirculo();
   document.getElementById('device-detail-card').style.display = 'none';
   ativoId = null;
+  _limparFocoCliente();
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.remove('ativo'));
   if (!skipClosePopup) map.closePopup();
 };
@@ -1193,6 +1218,7 @@ function atualizarCardAtivo(did) {
   const card = document.getElementById('device-detail-card');
   if (card && card.style.display === 'none') return;
   const v = veiculosMap[did]; if (!v) return;
+  _salvarFocoCliente(did);
   const p = v.posicao;
 
   const elStatus = document.getElementById('dcard-status-text');
@@ -1295,6 +1321,7 @@ function moverCardParaInicio(did) {
 }
 
 window.focar = function (did) {
+  _salvarFocoCliente(did);
   mostrarCardDispositivo(did); moverCardParaInicio(did);
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.toggle('ativo', el.dataset.did === did));
   const v = veiculosMap[did]; if (!v?.posicao) return;
