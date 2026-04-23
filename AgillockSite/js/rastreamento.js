@@ -1786,7 +1786,7 @@ function mostrarCardDispositivo(id) {
   const card = document.getElementById('device-detail-card');
   const linkVerMais = '';
   const botoesAcao = _cardAdminExpandido
-    ? `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn">
+    ? `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn"> 
          <i class="fa fa-bar-chart"></i> Relatório
        </a>`
     : `<div style="margin-top:10px;display:flex;gap:6px">
@@ -1860,7 +1860,7 @@ function mostrarCardDispositivo(id) {
     if (!card.querySelector('.dcard-footer')) {
       card.insertAdjacentHTML('beforeend', `
         <div class="dcard-footer">
-          <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-primary">
+          <a href="rastreamento-detalhe.html?id=${v.dispositivoId}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
             <i class="fa fa-history"></i> Ver Mais
           </a>
         </div>
