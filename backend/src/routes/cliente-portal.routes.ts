@@ -32,6 +32,7 @@ import {
   aplicarViagensComMedidores,
   aplicarParadasComMedidores,
 } from '../services/medidores.service';
+import { CLIENTE_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
@@ -41,7 +42,7 @@ router.use(clienteAuthMiddleware);
 const uploadCliente = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
-      const dir = path.resolve(process.cwd(), 'uploads/cliente');
+      const dir = CLIENTE_UPLOADS_DIR;
       fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
@@ -502,7 +503,7 @@ router.post(
 
     // Remove foto anterior se existir
     if (dispositivo.imagemUrlCliente) {
-      const oldPath = path.resolve(process.cwd(), dispositivo.imagemUrlCliente.replace(/^\//, ''));
+      const oldPath = path.join(UPLOADS_DIR, dispositivo.imagemUrlCliente.replace(/^\/uploads\//, ''));
       fs.unlink(oldPath, () => {});
     }
 
@@ -533,7 +534,7 @@ router.delete('/dispositivos/:dispositivoId/foto', async (req: ClienteRequest, r
     return;
   }
 
-  const filePath = path.resolve(process.cwd(), dispositivo.imagemUrlCliente.replace(/^\//, ''));
+  const filePath = path.join(UPLOADS_DIR, dispositivo.imagemUrlCliente.replace(/^\/uploads\//, ''));
   fs.unlink(filePath, () => {});
 
   await prisma.dispositivo.update({

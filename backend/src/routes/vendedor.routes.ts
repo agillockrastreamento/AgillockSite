@@ -7,9 +7,10 @@ import { verifyToken } from '../utils/jwt';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { COMPROVANTES_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
 // ─── Configuração multer (upload de comprovantes) ─────────────────────────────
-const uploadDir = path.resolve('/app/uploads/comprovantes');
+const uploadDir = COMPROVANTES_UPLOADS_DIR;
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -30,6 +31,15 @@ const upload = multer({
 });
 
 const router = Router();
+
+function resolveComprovantePath(comprovante: string): string {
+  const normalizado = String(comprovante || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!normalizado) return '';
+  if (normalizado.startsWith('uploads/')) {
+    return path.join(UPLOADS_DIR, normalizado.replace(/^uploads\//, ''));
+  }
+  return path.join(UPLOADS_DIR, 'comprovantes', path.basename(normalizado));
+}
 
 // ─── GET /api/vendedor/comprovante/:id — ANTES do authMiddleware global ───────
 // Aceita JWT via header Authorization OU query param ?token= (para abrir em nova aba)
@@ -71,7 +81,7 @@ router.get('/comprovante/:id', async (req: AuthRequest, res: Response): Promise<
     return;
   }
 
-  const filePath = path.resolve('/app', pagamento.comprovante);
+  const filePath = resolveComprovantePath(pagamento.comprovante);
   if (!fs.existsSync(filePath)) {
     res.status(404).json({ error: 'Arquivo não encontrado.' });
     return;
@@ -672,11 +682,11 @@ router.post(
 
     // Remove arquivo anterior se existir
     if (pagamento.comprovante) {
-      const oldPath = path.resolve('/app', pagamento.comprovante);
+      const oldPath = resolveComprovantePath(pagamento.comprovante);
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     }
 
-    const relativePath = path.relative('/app', file.path).replace(/\\/g, '/');
+    const relativePath = path.join('uploads', 'comprovantes', path.basename(file.path)).replace(/\\/g, '/');
     const updated = await prisma.pagamentoComissao.update({
       where: { id },
       data: { comprovante: relativePath, comprovanteMime: file.mimetype },

@@ -6,6 +6,7 @@ import { param, query } from '../utils/params';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import { DISPOSITIVOS_UPLOADS_DIR } from '../utils/upload-paths';
 import {
   traccarCreateDevice,
   traccarUpdateDevice,
@@ -17,7 +18,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // Multer para imagem do dispositivo
-const uploadDir = path.resolve(process.cwd(), 'uploads', 'dispositivos');
+const uploadDir = DISPOSITIVOS_UPLOADS_DIR;
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({

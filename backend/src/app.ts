@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
 import authRoutes from './routes/auth.routes';
 import clientesRoutes from './routes/clientes.routes';
 import placasRoutes from './routes/placas.routes';
@@ -19,6 +18,7 @@ import rastreamentoRoutes from './routes/rastreamento.routes';
 import motoristasRoutes from './routes/motoristas.routes';
 import clienteLoginRoutes from './routes/cliente-login.routes';
 import clientePortalRoutes from './routes/cliente-portal.routes';
+import { UPLOADS_DIR } from './utils/upload-paths';
 
 const app = express();
 
@@ -43,7 +43,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: false })); // EFI webhook envia application/x-www-form-urlencoded
 
 // Servir arquivos estáticos de uploads (imagens de dispositivos, etc.)
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Health check — deve vir antes de qualquer router com prefixo genérico /api
 app.get('/api/health', (_req, res) => {
