@@ -123,12 +123,24 @@ function _urlDetalheRastreamentoAdmin(dispositivoId) {
 
 function _aplicarEstadoTrayAtributos() {
   const attrsCard = document.getElementById('device-attrs-card');
-  const mainToggle = document.getElementById('dcard-tray-toggle-main');
+  const sideToggle = document.getElementById('dcard-tray-side-toggle');
   if (!attrsCard) return;
-  const aberta = !!(_cardAdminExpandido && ativoId && _attrsTrayOpen);
+  const cardAberto = !!(ativoId && document.getElementById('device-detail-card')?.style.display !== 'none');
+  const aberta = !!(_cardAdminExpandido && cardAberto && ativoId && _attrsTrayOpen);
   attrsCard.classList.toggle('aberto', aberta);
   attrsCard.style.display = aberta ? 'block' : 'none';
-  if (mainToggle) mainToggle.style.display = aberta ? 'none' : '';
+  if (sideToggle) {
+    sideToggle.style.display = _cardAdminExpandido && cardAberto && ativoId && !aberta ? 'inline-flex' : 'none';
+    _posicionarBotaoTrayAtributos();
+  }
+}
+
+function _posicionarBotaoTrayAtributos() {
+  const card = document.getElementById('device-detail-card');
+  const sideToggle = document.getElementById('dcard-tray-side-toggle');
+  if (!card || !sideToggle || sideToggle.style.display === 'none') return;
+  sideToggle.style.top = `${card.offsetTop + Math.max(16, (card.offsetHeight / 2) - 21)}px`;
+  sideToggle.style.left = `${card.offsetLeft + card.offsetWidth + 8}px`;
 }
 
 window.toggleAtributosTray = function () {
@@ -163,6 +175,7 @@ let _evtNotif = true;        // notificação sonora ativa
 // Lista de eventos recebidos: { dispositivoId, tipo, tipoLabel, serverTime, lat, lng, positionId }
 const _eventos = [];
 const MAX_EVENTOS = 200;
+const EVENTOS_PANEL_STORAGE_KEY = 'rastreamento_admin_eventos_min';
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -208,6 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ── Painel de Eventos — inicialização ─────────────────────────────────────────
 
 function inicializarEventosPanel() {
+  _aplicarEstadoPainelEventos();
   const dropdown = document.getElementById('evt-tipo-dropdown');
   dropdown.innerHTML = TIPOS_EVENTO_ADMIN.map(t =>
     `<label class="evt-tipo-item">
@@ -241,6 +255,25 @@ function inicializarEventosPanel() {
     _eventos.length = 0;
     renderEventosLista();
   });
+
+  document.getElementById('evt-btn-toggle').addEventListener('click', function () {
+    const panel = document.getElementById('eventos-panel');
+    if (!panel) return;
+    panel.classList.toggle('minimizado');
+    try { localStorage.setItem(EVENTOS_PANEL_STORAGE_KEY, panel.classList.contains('minimizado') ? '1' : '0'); } catch {}
+    this.title = panel.classList.contains('minimizado') ? 'Expandir eventos' : 'Minimizar eventos';
+    if (map) setTimeout(() => map.invalidateSize(), 220);
+  });
+}
+
+function _aplicarEstadoPainelEventos() {
+  const panel = document.getElementById('eventos-panel');
+  const btn = document.getElementById('evt-btn-toggle');
+  if (!panel || !btn) return;
+  let minimizado = false;
+  try { minimizado = localStorage.getItem(EVENTOS_PANEL_STORAGE_KEY) === '1'; } catch {}
+  panel.classList.toggle('minimizado', minimizado);
+  btn.title = minimizado ? 'Expandir eventos' : 'Minimizar eventos';
 }
 
 function _atualizarFiltrosTipo() {
@@ -1376,7 +1409,7 @@ function renderMarcadores() {
     ids.forEach(id => {
       const v = veiculosMap[id];
       const { latitude, longitude } = v.posicao;
-      const visivel = !isCluster && (!modoFoco || id === ativoId);
+      const visivel = modoFoco ? id === ativoId : !isCluster;
 
       if (!marcadores[id]) {
         const icone = criarIcone(v);
@@ -1766,6 +1799,7 @@ function _renderResumoHojeAdmin(dispositivoId) {
       <div class="dcard-summary-stat"><div class="dcard-summary-val">${resumo.viagens}</div><div class="dcard-summary-lbl">Viagens</div></div>
     </div>
   `;
+  _posicionarBotaoTrayAtributos();
 }
 
 function _carregarResumoHojeAdmin(dispositivoId) {
@@ -1913,11 +1947,6 @@ function mostrarCardDispositivo(id) {
           <i class="fa fa-history"></i> Histórico
         </a>
       </div>
-      ${_cardAdminExpandido ? `
-        <button type="button" id="dcard-tray-toggle-main" class="dcard-tray-toggle dcard-tray-toggle-main" onclick="toggleAtributosTray()" title="Abrir atributos da posição">
-          <i class="fa fa-chevron-right"></i> Atributos da posição
-        </button>
-      ` : ''}
       ${_htmlAcoesCard(v.dispositivoId)}
     </div>
   `;
@@ -1948,6 +1977,7 @@ function mostrarCardDispositivo(id) {
   }
   if (_attrsTrayOpen) _carregarAtributosCard(id, false);
   _aplicarEstadoTrayAtributos();
+  _posicionarBotaoTrayAtributos();
   _carregarResumoHojeAdmin(id);
 
   if (p && !hasCached) {
@@ -1957,7 +1987,13 @@ function mostrarCardDispositivo(id) {
   // Verifica se tem cerca para ativar o botão
   window.AL.apiGet(`/api/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
     const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
-    if (btn && cercas.length > 0) btn.classList.add('ativo');
+    if (btn) btn.classList.toggle('ativo', cercas.length > 0);
+    if (cercas.length > 0 && !_overlay.cercas) {
+      _overlay.cercas = true;
+      const btnCercas = document.getElementById('ml-cercas');
+      if (btnCercas) btnCercas.classList.add('ativo');
+      carregarCercas().then(mostrarCercas);
+    }
   }).catch(() => {});
 }
 
@@ -1995,6 +2031,7 @@ window.fecharCardDispositivo = function (skipClosePopup) {
   }
   ativoId = null;
   _limparFocoAdmin();
+  _aplicarEstadoTrayAtributos();
   if (!skipClosePopup) map.closePopup();
 };
 
@@ -2052,6 +2089,7 @@ function atualizarCardAtivo(dispositivoId) {
   if (modoFoco && v?.posicao) {
     map.panTo(_latLngComOffset(v.posicao), { animate: true, duration: 0.5 });
   }
+  _posicionarBotaoTrayAtributos();
   _agendarAtualizacaoAtributos(dispositivoId);
 }
 

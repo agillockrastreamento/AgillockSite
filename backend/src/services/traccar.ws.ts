@@ -198,7 +198,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       deviceId: e.deviceId,
       type: e.type,
       tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
-      serverTime: e.serverTime,
+      serverTime: e.eventTime || e.serverTime,
       positionId: e.positionId,
     }));
   }
@@ -234,6 +234,7 @@ interface TraccarWsMessage {
     deviceId: number;
     positionId: number;
     type: string;
+    eventTime?: string;
     serverTime: string;
   }>;
 }

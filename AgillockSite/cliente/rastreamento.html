@@ -143,6 +143,68 @@
     .leaflet-drag-target { cursor: grabbing !important; }
 
     /* ── Barra de veículos (rodapé do mapa) ── */
+    #barra-veiculos-wrap {
+      flex-shrink: 0;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      transition: height .22s ease, min-height .22s ease, border-top-color .22s ease, background .22s ease;
+    }
+    .dark-theme #barra-veiculos-wrap {
+      background: #1e1e2e;
+      border-top-color: #333;
+    }
+    #barra-veiculos-wrap.minimizada {
+      height: 30px;
+      min-height: 30px;
+      overflow: hidden;
+    }
+    #barra-veiculos-toggle {
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 52px;
+      height: 32px;
+      border: 1px solid #d7d7d7;
+      border-bottom: none;
+      border-radius: 14px 14px 0 0;
+      background: #fff;
+      color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 920;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.12);
+      transition: color .15s, border-color .15s, background .15s, top .22s ease;
+    }
+    .dark-theme #barra-veiculos-toggle {
+      background: #252535;
+      border-color: #444;
+      color: #e2e8f0;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.28);
+    }
+    #barra-veiculos-toggle:hover {
+      color: #2980b9;
+      border-color: #2980b9;
+    }
+    #barra-veiculos-wrap.minimizada #barra-veiculos-toggle {
+      top: -1px;
+      border-radius: 0 0 14px 14px;
+      border-bottom: 1px solid #d7d7d7;
+      border-top: none;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    }
+    .dark-theme #barra-veiculos-wrap.minimizada #barra-veiculos-toggle {
+      border-bottom-color: #444;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.28);
+    }
+    #barra-veiculos-wrap.minimizada #barra-veiculos-toggle i {
+      transform: rotate(180deg);
+    }
     #barra-veiculos {
       flex-shrink: 0;
       display: flex;
@@ -154,14 +216,16 @@
       max-height: 140px;
       overflow: hidden;
       overflow-y: scroll;
-      background: #fff;
-      border-top: 1px solid #e0e0e0;
       scrollbar-width: thin;
     }
-    .dark-theme #barra-veiculos { background: #1e1e2e; border-top-color: #333; }
+    .dark-theme #barra-veiculos { background: #1e1e2e; }
     #barra-veiculos.expandida {
       max-height: 170px;
       overflow-y: scroll;
+    }
+    #barra-veiculos-wrap.minimizada #barra-veiculos {
+      opacity: 0;
+      pointer-events: none;
     }
     #barra-veiculos.expandida::-webkit-scrollbar { width: 6px; }
     #barra-veiculos.expandida::-webkit-scrollbar-thumb {
@@ -278,8 +342,13 @@
       background: #fff;
       z-index: 10;
       overflow: hidden;
+      transition: width .2s ease, min-width .2s ease;
     }
     .dark-theme #eventos-panel { background: #1e1e2e; border-color: #333; }
+    #eventos-panel.minimizado {
+      width: 58px;
+      min-width: 58px;
+    }
 
     #eventos-header {
       padding: 10px 12px 0;
@@ -291,6 +360,21 @@
       font-size: 13px; font-weight: 700; margin: 0 0 8px; color: #333;
     }
     .dark-theme #eventos-header h5 { color: #f0f2f5; }
+    #eventos-panel.minimizado #eventos-header {
+      padding: 10px 8px;
+      border-bottom: none;
+    }
+    #eventos-panel.minimizado #eventos-header h5,
+    #eventos-panel.minimizado #eventos-lista,
+    #eventos-panel.minimizado #evt-tipo-wrap,
+    #eventos-panel.minimizado #evt-btn-notif,
+    #eventos-panel.minimizado #evt-btn-limpar {
+      display: none;
+    }
+    #eventos-panel.minimizado #eventos-filtros {
+      justify-content: center;
+      padding-bottom: 0;
+    }
 
     #eventos-filtros {
       display: flex; align-items: center; gap: 6px; padding-bottom: 10px;
@@ -336,6 +420,15 @@
     }
     .dark-theme #evt-btn-limpar { background: #252535; border-color: #444; color: #e2e8f0; }
     #evt-btn-limpar:hover { border-color: #e74c3c; color: #e74c3c; }
+    #evt-btn-toggle {
+      width: 32px; height: 32px; border-radius: 50%; border: 1px solid #ccc;
+      background: #fff; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; color: #333; flex-shrink: 0; transition: border-color .15s, color .15s, transform .15s;
+    }
+    .dark-theme #evt-btn-toggle { background: #252535; border-color: #444; color: #e2e8f0; }
+    #evt-btn-toggle:hover { border-color: #2980b9; color: #2980b9; }
+    #eventos-panel.minimizado #evt-btn-toggle i { transform: rotate(180deg); }
 
     #eventos-lista {
       flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #ccc #fff;
@@ -568,7 +661,12 @@
         </div>
 
         <!-- Rodapé com cards de veículos -->
-        <div id="barra-veiculos"></div>
+        <div id="barra-veiculos-wrap">
+          <button id="barra-veiculos-toggle" type="button" title="Minimizar dispositivos">
+            <i class="fa fa-chevron-down"></i>
+          </button>
+          <div id="barra-veiculos"></div>
+        </div>
       </div>
 
       <!-- Painel de Eventos -->
@@ -588,6 +686,9 @@
             </button>
             <button id="evt-btn-limpar" title="Limpar eventos">
               <i class="fa fa-trash"></i>
+            </button>
+            <button id="evt-btn-toggle" title="Minimizar eventos">
+              <i class="fa fa-chevron-right"></i>
             </button>
           </div>
         </div>

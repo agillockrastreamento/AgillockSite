@@ -607,7 +607,6 @@ router.get('/rastreamento/cercas', async (req: ClienteRequest, res: Response): P
 
   const dispositivos = await prisma.dispositivo.findMany({
     where: {
-      ativo: true,
       OR: [
         { clienteId: clienteId },
         { clientesVinculados: { some: { clienteId: clienteId } } }
@@ -648,7 +647,6 @@ router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): 
     const dispositivo = await prisma.dispositivo.findFirst({
       where: {
         id: dispositivoId,
-        ativo: true,
         OR: [
           { clienteId: clienteId },
           { clientesVinculados: { some: { clienteId: clienteId } } }

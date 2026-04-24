@@ -78,6 +78,8 @@ let _evtFiltros = new Set();
 let _evtNotif = true;
 const _eventos = [];
 const MAX_EVENTOS = 100;
+const EVENTOS_PANEL_STORAGE_KEY = 'rastreamento_cliente_eventos_min';
+const BARRA_VEICULOS_STORAGE_KEY = 'rastreamento_cliente_barra_min';
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -86,6 +88,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (bloqueado) return;
     inicializarMapa();
     inicializarEventosPanel();
+    inicializarBarraVeiculos();
     carregarPosicoes();
     document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
     new MutationObserver(function () {
@@ -127,6 +130,7 @@ async function verificarAcesso() {
 // ── Painel de Eventos ─────────────────────────────────────────────────────────
 
 function inicializarEventosPanel() {
+  _aplicarEstadoPainelEventos();
   const dropdown = document.getElementById('evt-tipo-dropdown');
   dropdown.innerHTML = TIPOS_EVENTO_CLIENTE.map(t =>
     `<label class="evt-tipo-item">
@@ -156,6 +160,54 @@ function inicializarEventosPanel() {
     _eventos.length = 0;
     renderEventosLista();
   });
+
+  document.getElementById('evt-btn-toggle').addEventListener('click', function () {
+    const panel = document.getElementById('eventos-panel');
+    if (!panel) return;
+    panel.classList.toggle('minimizado');
+    try { localStorage.setItem(EVENTOS_PANEL_STORAGE_KEY, panel.classList.contains('minimizado') ? '1' : '0'); } catch {}
+    this.title = panel.classList.contains('minimizado') ? 'Expandir eventos' : 'Minimizar eventos';
+    if (map) setTimeout(() => map.invalidateSize(), 220);
+  });
+}
+
+function _aplicarEstadoPainelEventos() {
+  const panel = document.getElementById('eventos-panel');
+  const btn = document.getElementById('evt-btn-toggle');
+  if (!panel || !btn) return;
+  let minimizado = false;
+  try { minimizado = localStorage.getItem(EVENTOS_PANEL_STORAGE_KEY) === '1'; } catch {}
+  panel.classList.toggle('minimizado', minimizado);
+  btn.title = minimizado ? 'Expandir eventos' : 'Minimizar eventos';
+}
+
+function inicializarBarraVeiculos() {
+  _aplicarEstadoBarraVeiculos();
+  const btn = document.getElementById('barra-veiculos-toggle');
+  const wrap = document.getElementById('barra-veiculos-wrap');
+  if (!btn || !wrap) return;
+
+  btn.addEventListener('click', function () {
+    wrap.classList.toggle('minimizada');
+    const minimizada = wrap.classList.contains('minimizada');
+    try { localStorage.setItem(BARRA_VEICULOS_STORAGE_KEY, minimizada ? '1' : '0'); } catch {}
+    btn.title = minimizada ? 'Expandir dispositivos' : 'Minimizar dispositivos';
+    if (!minimizada) {
+      const barra = document.getElementById('barra-veiculos');
+      if (barra && barra.scrollTop < 0) barra.scrollTop = 0;
+    }
+    if (map) setTimeout(() => map.invalidateSize(), 220);
+  });
+}
+
+function _aplicarEstadoBarraVeiculos() {
+  const wrap = document.getElementById('barra-veiculos-wrap');
+  const btn = document.getElementById('barra-veiculos-toggle');
+  if (!wrap || !btn) return;
+  let minimizada = false;
+  try { minimizada = localStorage.getItem(BARRA_VEICULOS_STORAGE_KEY) === '1'; } catch {}
+  wrap.classList.toggle('minimizada', minimizada);
+  btn.title = minimizada ? 'Expandir dispositivos' : 'Minimizar dispositivos';
 }
 
 function _atualizarFiltrosTipo() {
@@ -662,7 +714,7 @@ function renderMarcadores() {
     const isCluster = ids.length > 1;
     ids.forEach(id => {
       const v = veiculosMap[id]; const { latitude, longitude } = v.posicao;
-      const visivel = !isCluster && (!modoFoco || id === ativoId);
+      const visivel = modoFoco ? id === ativoId : !isCluster;
       if (!marcadores[id]) {
         const m = L.marker([latitude, longitude], { icon: criarIcone(v) });
         if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
@@ -1169,7 +1221,13 @@ function mostrarCardDispositivo(id) {
   // Verifica cercas para ativar o botão visualmente
   AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
     const btnCerca = card.querySelector('.dcard-acao[data-acao="cerca"]');
-    if (btnCerca && cercas && cercas.length > 0) btnCerca.classList.add('ativo');
+    if (btnCerca) btnCerca.classList.toggle('ativo', !!(cercas && cercas.length > 0));
+    if (cercas && cercas.length > 0 && !_overlay.cercas) {
+      _overlay.cercas = true;
+      const btnCercas = document.getElementById('ml-cercas');
+      if (btnCercas) btnCercas.classList.add('ativo');
+      mostrarCercas();
+    }
   }).catch(() => {});
 
   // Carrega tipos de comandos (Bloqueio/Desbloqueio)
