@@ -1899,11 +1899,11 @@ function mostrarCardDispositivo(id) {
   const linkVerMais = '';
   const botoesAcao = _cardAdminExpandido
     ? `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn" style="border-radius:10px;">
-         <i class="fa fa-bar-chart"></i> Relatório
+         <i class="fa fa-bar-chart"></i>  Relatório
        </a>`
     : `<div style="margin-top:10px;display:flex;gap:6px">
          <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
-           <i class="fa fa-bar-chart"></i> Relatório
+           <i class="fa fa-bar-chart"></i>  Relatório
          </a>
          <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center; border-radius:10px;">
            <i class="fa fa-history"></i> Histórico
@@ -1942,7 +1942,7 @@ function mostrarCardDispositivo(id) {
         </div>` : ''}
       <div style="margin-top:10px;display:flex;gap:6px">
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
-          <i class="fa fa-bar-chart"></i> Relatório
+          <i class="fa fa-bar-chart"></i>  Relatório
         </a>
         <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
           <i class="fa fa-history"></i> Histórico
