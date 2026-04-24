@@ -286,11 +286,32 @@
     .dcard-tray-toggle-main {
       position: absolute;
       z-index: 2101;
-      width: 28px;
-      height: 56px;
+      width: 22px;
+      height: 46px;
       padding: 0;
-      border-radius: 10px 0 0 10px;
+      border-radius: 9px 0 0 9px;
+      background: #fff;
+      border-color: rgba(0,0,0,.08);
+      color: #7c8a98;
       box-shadow: 0 6px 16px rgba(0,0,0,.18);
+    }
+    .dcard-tray-toggle-main:hover {
+      background: #fff;
+      color: #2980b9;
+      border-color: rgba(41,128,185,.28);
+    }
+    html.dark-theme .dcard-tray-toggle-main {
+      background: #1e1e2e;
+      border-color: rgba(255,255,255,.08);
+      color: #aeb8c5;
+    }
+    html.dark-theme .dcard-tray-toggle-main:hover {
+      background: #1e1e2e;
+      color: #87c7ff;
+      border-color: rgba(135,199,255,.28);
+    }
+    .dcard-tray-toggle-main i {
+      font-size: 11px;
     }
     .dattrs-toggle {
       flex-shrink: 0;
@@ -390,7 +411,7 @@
     .dark-theme #eventos-header { border-color: #333; }
     #eventos-header-top {
       display: flex;
-      justify-content: flex-end;
+      justify-content: flex-start;
       margin-bottom: 8px;
     }
     #eventos-header-top + h5 {
