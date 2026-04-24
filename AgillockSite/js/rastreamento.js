@@ -1968,7 +1968,7 @@ function mostrarCardDispositivo(id) {
           <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">RESUMO DE HOJE</div>
           <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
           <div style="margin-top:10px">
-            <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="width:100%;text-align:center">
+            <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="width:100%;text-align:center; border-radius:10px;">
               <i class="fa fa-history"></i> Ver Mais
             </a>
           </div>
