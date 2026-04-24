@@ -17,6 +17,7 @@ const frontendClients = new Set<WebSocket>();
 let traccarWs: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 const traccarIdToUniqueId = new Map<number, string>();
+const lastGeofenceState = new Map<number, string[]>();
 
 // ── Iniciar o servidor WebSocket para o frontend ──────────────────────────────
 
@@ -112,6 +113,13 @@ async function connectToTraccar() {
 
 async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | null> {
   const result: Record<string, unknown> = {};
+  const syntheticEvents: Array<{
+    deviceId: number;
+    type: string;
+    tipoLabel: string;
+    serverTime: string;
+    positionId?: number;
+  }> = [];
 
   if (msg.devices?.length) {
     msg.devices.forEach(device => traccarIdToUniqueId.set(device.id, device.uniqueId));
@@ -182,6 +190,52 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         return decorarPosicaoComMedidores(dispositivo, p as any);
       })(),
     }));
+
+    msg.positions.forEach(position => {
+      const currentGeofences = extractGeofenceKeys(position.attributes);
+      const previousGeofences = lastGeofenceState.get(position.deviceId);
+      lastGeofenceState.set(position.deviceId, currentGeofences);
+      if (!previousGeofences) return;
+
+      const currentSet = new Set(currentGeofences);
+      const previousSet = new Set(previousGeofences);
+      const eventTime = position.fixTime || position.deviceTime || position.serverTime;
+      const positionId = position.id;
+      const hasActualEnter = !!msg.events?.some(e =>
+        e.deviceId === position.deviceId
+        && e.positionId === positionId
+        && e.type === 'geofenceEnter'
+      );
+      const hasActualExit = !!msg.events?.some(e =>
+        e.deviceId === position.deviceId
+        && e.positionId === positionId
+        && e.type === 'geofenceExit'
+      );
+
+      for (const geofenceKey of currentGeofences) {
+        if (!previousSet.has(geofenceKey) && !hasActualEnter) {
+          syntheticEvents.push({
+            deviceId: position.deviceId,
+            type: 'geofenceEnter',
+            tipoLabel: EVENT_TYPE_LABELS.geofenceEnter ?? 'geofenceEnter',
+            serverTime: eventTime,
+            positionId,
+          });
+        }
+      }
+
+      for (const geofenceKey of previousGeofences) {
+        if (!currentSet.has(geofenceKey) && !hasActualExit) {
+          syntheticEvents.push({
+            deviceId: position.deviceId,
+            type: 'geofenceExit',
+            tipoLabel: EVENT_TYPE_LABELS.geofenceExit ?? 'geofenceExit',
+            serverTime: eventTime,
+            positionId,
+          });
+        }
+      }
+    });
   }
 
   if (msg.devices?.length) {
@@ -193,14 +247,21 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
     }));
   }
 
-  if (msg.events?.length) {
-    result.events = msg.events.map(e => ({
+  if (msg.events?.length || syntheticEvents.length) {
+    const realtimeEvents: Array<{
+      deviceId: number;
+      type: string;
+      tipoLabel: string;
+      serverTime: string;
+      positionId?: number;
+    }> = (msg.events || []).map(e => ({
       deviceId: e.deviceId,
       type: e.type,
       tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
       serverTime: e.eventTime || e.serverTime,
       positionId: e.positionId,
     }));
+    result.events = realtimeEvents.concat(syntheticEvents);
   }
 
   if (Object.keys(result).length === 0) return null;
@@ -211,6 +272,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
 
 interface TraccarWsMessage {
   positions?: Array<{
+    id?: number;
     deviceId: number;
     latitude: number;
     longitude: number;
@@ -237,4 +299,34 @@ interface TraccarWsMessage {
     eventTime?: string;
     serverTime: string;
   }>;
+}
+
+function extractGeofenceKeys(attributes: Record<string, unknown> | undefined): string[] {
+  if (!attributes) return [];
+  const values: string[] = [];
+  const pushValue = (value: unknown) => {
+    if (value == null) return;
+    if (Array.isArray(value)) {
+      value.forEach(pushValue);
+      return;
+    }
+    if (typeof value === 'string') {
+      value
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean)
+        .forEach(item => values.push(item));
+      return;
+    }
+    if (typeof value === 'number' || typeof value === 'bigint') {
+      values.push(String(value));
+    }
+  };
+
+  pushValue(attributes.geofenceIds);
+  pushValue(attributes.geofenceId);
+  pushValue(attributes.geofences);
+  pushValue(attributes.geofence);
+
+  return Array.from(new Set(values));
 }
