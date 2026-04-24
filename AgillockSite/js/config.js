@@ -4,7 +4,7 @@
 │   4 -  * Em produção:        'https://api.agillock.com.br'                                                       │
 */         
 
-window.API_URL = 'https://api.agillock.com.br';
+window.API_URL = 'http://localhost:3000';
 
 /**
  * Biblioteca de Ícones SVG 3D para Veículos - AgilLock
