@@ -139,8 +139,9 @@ function _posicionarBotaoTrayAtributos() {
   const card = document.getElementById('device-detail-card');
   const sideToggle = document.getElementById('dcard-tray-side-toggle');
   if (!card || !sideToggle || sideToggle.style.display === 'none') return;
-  sideToggle.style.top = `${card.offsetTop + Math.max(16, (card.offsetHeight / 2) - 21)}px`;
-  sideToggle.style.left = `${card.offsetLeft + card.offsetWidth + 8}px`;
+  const alturaBotao = sideToggle.offsetHeight || 56;
+  sideToggle.style.top = `${card.offsetTop + Math.max(18, (card.offsetHeight / 2) - (alturaBotao / 2))}px`;
+  sideToggle.style.left = `${card.offsetLeft + card.offsetWidth - 2}px`;
 }
 
 window.toggleAtributosTray = function () {

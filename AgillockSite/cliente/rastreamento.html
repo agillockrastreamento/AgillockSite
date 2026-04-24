@@ -163,14 +163,14 @@
     }
     #barra-veiculos-toggle {
       position: absolute;
-      top: -16px;
+      top: -13px;
       left: 50%;
       transform: translateX(-50%);
-      width: 52px;
-      height: 32px;
+      width: 48px;
+      height: 26px;
       border: 1px solid #d7d7d7;
       border-bottom: none;
-      border-radius: 14px 14px 0 0;
+      border-radius: 12px 12px 0 0;
       background: #fff;
       color: #666;
       display: flex;
@@ -192,8 +192,8 @@
       border-color: #2980b9;
     }
     #barra-veiculos-wrap.minimizada #barra-veiculos-toggle {
-      top: -1px;
-      border-radius: 0 0 14px 14px;
+      top: 0;
+      border-radius: 0 0 12px 12px;
       border-bottom: 1px solid #d7d7d7;
       border-top: none;
       box-shadow: 0 2px 10px rgba(0,0,0,0.12);
@@ -356,8 +356,16 @@
       flex-shrink: 0;
     }
     .dark-theme #eventos-header { border-color: #333; }
+    #eventos-header-top {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 8px;
+    }
+    #eventos-header-top + h5 {
+      margin-bottom: 8px;
+    }
     #eventos-header h5 {
-      font-size: 13px; font-weight: 700; margin: 0 0 8px; color: #333;
+      font-size: 13px; font-weight: 700; margin: 0; color: #333;
     }
     .dark-theme #eventos-header h5 { color: #f0f2f5; }
     #eventos-panel.minimizado #eventos-header {
@@ -672,6 +680,11 @@
       <!-- Painel de Eventos -->
       <div id="eventos-panel">
         <div id="eventos-header">
+          <div id="eventos-header-top">
+            <button id="evt-btn-toggle" title="Minimizar eventos">
+              <i class="fa fa-chevron-right"></i>
+            </button>
+          </div>
           <h5>Eventos</h5>
           <div id="eventos-filtros">
             <div id="evt-tipo-wrap">
@@ -686,9 +699,6 @@
             </button>
             <button id="evt-btn-limpar" title="Limpar eventos">
               <i class="fa fa-trash"></i>
-            </button>
-            <button id="evt-btn-toggle" title="Minimizar eventos">
-              <i class="fa fa-chevron-right"></i>
             </button>
           </div>
         </div>
