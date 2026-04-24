@@ -1,7 +1,13 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { IncomingMessage, Server } from 'http';
 import prisma from '../utils/prisma';
-import { traccarGetSessionCookie, normalizeAttributes, EVENT_TYPE_LABELS, traccarGetDevices } from './traccar.service';
+import {
+  traccarGetSessionCookie,
+  normalizeAttributes,
+  EVENT_TYPE_LABELS,
+  traccarGetDevices,
+  traccarGetGeofences,
+} from './traccar.service';
 import {
   DISPOSITIVO_MEDIDORES_SELECT,
   sincronizarDispositivosComPosicoes,
@@ -18,6 +24,8 @@ let traccarWs: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 const traccarIdToUniqueId = new Map<number, string>();
 const lastGeofenceState = new Map<number, string[]>();
+const geofenceCache = new Map<number, { at: number; items: Array<{ id: number; area: string }> }>();
+const GEOFENCE_CACHE_TTL_MS = 30_000;
 
 // ── Iniciar o servidor WebSocket para o frontend ──────────────────────────────
 
@@ -191,11 +199,11 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       })(),
     }));
 
-    msg.positions.forEach(position => {
-      const currentGeofences = extractGeofenceKeys(position.attributes);
+    for (const position of msg.positions) {
+      const currentGeofences = await detectPositionGeofences(position);
       const previousGeofences = lastGeofenceState.get(position.deviceId);
       lastGeofenceState.set(position.deviceId, currentGeofences);
-      if (!previousGeofences) return;
+      if (!previousGeofences) continue;
 
       const currentSet = new Set(currentGeofences);
       const previousSet = new Set(previousGeofences);
@@ -235,7 +243,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
           });
         }
       }
-    });
+    }
   }
 
   if (msg.devices?.length) {
@@ -301,6 +309,23 @@ interface TraccarWsMessage {
   }>;
 }
 
+async function detectPositionGeofences(position: {
+  deviceId: number;
+  latitude: number;
+  longitude: number;
+  attributes?: Record<string, unknown>;
+}): Promise<string[]> {
+  const fromAttributes = extractGeofenceKeys(position.attributes);
+  if (fromAttributes.length) return fromAttributes;
+
+  const geofences = await getDeviceGeofences(position.deviceId);
+  if (!geofences.length) return [];
+
+  return geofences
+    .filter(geofence => pointInsideGeofence(position.latitude, position.longitude, geofence.area))
+    .map(geofence => String(geofence.id));
+}
+
 function extractGeofenceKeys(attributes: Record<string, unknown> | undefined): string[] {
   if (!attributes) return [];
   const values: string[] = [];
@@ -329,4 +354,65 @@ function extractGeofenceKeys(attributes: Record<string, unknown> | undefined): s
   pushValue(attributes.geofence);
 
   return Array.from(new Set(values));
+}
+
+async function getDeviceGeofences(deviceId: number): Promise<Array<{ id: number; area: string }>> {
+  const cached = geofenceCache.get(deviceId);
+  const now = Date.now();
+  if (cached && (now - cached.at) < GEOFENCE_CACHE_TTL_MS) {
+    return cached.items;
+  }
+
+  try {
+    const items = (await traccarGetGeofences(deviceId)).map(geofence => ({ id: geofence.id, area: geofence.area }));
+    geofenceCache.set(deviceId, { at: now, items });
+    return items;
+  } catch {
+    return cached?.items || [];
+  }
+}
+
+function pointInsideGeofence(lat: number, lng: number, area: string): boolean {
+  const circleMatch = area.match(/CIRCLE\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*,\s*([\d.]+)\s*\)/i);
+  if (circleMatch) {
+    const centerLat = Number(circleMatch[1]);
+    const centerLng = Number(circleMatch[2]);
+    const radius = Number(circleMatch[3]);
+    return haversineMeters(lat, lng, centerLat, centerLng) <= radius;
+  }
+
+  const polygonMatch = area.match(/POLYGON\s*\(\s*\(\s*(.+?)\s*\)\s*\)/i);
+  if (polygonMatch) {
+    const points = polygonMatch[1].split(',').map(point => {
+      const [pointLng, pointLat] = point.trim().split(/\s+/).map(Number);
+      return { lat: pointLat, lng: pointLng };
+    });
+    return pointInPolygon(lat, lng, points);
+  }
+
+  return false;
+}
+
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function pointInPolygon(lat: number, lng: number, points: Array<{ lat: number; lng: number }>): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const xi = points[i].lng;
+    const yi = points[i].lat;
+    const xj = points[j].lng;
+    const yj = points[j].lat;
+    const intersects = ((yi > lat) !== (yj > lat))
+      && (lng < ((xj - xi) * (lat - yi)) / ((yj - yi) || Number.EPSILON) + xi);
+    if (intersects) inside = !inside;
+  }
+  return inside;
 }
