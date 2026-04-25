@@ -192,11 +192,12 @@ export function decorarPosicaoComMedidores(
 type MetricasPeriodo = {
   distanciaMetros: number;
   horasMotorMs: number;
+  velocidadeMaximaNos: number | null;
 };
 
 export function calcularMetricasPeriodo(posicoes: TraccarPosition[]): MetricasPeriodo {
   if (!posicoes.length) {
-    return { distanciaMetros: 0, horasMotorMs: 0 };
+    return { distanciaMetros: 0, horasMotorMs: 0, velocidadeMaximaNos: null };
   }
 
   const ordenadas = [...posicoes].sort((a, b) => {
@@ -207,6 +208,16 @@ export function calcularMetricasPeriodo(posicoes: TraccarPosition[]): MetricasPe
 
   let distanciaMetros = 0;
   let horasMotorMs = 0;
+  let velocidadeMaximaNos = 0;
+  let temVelocidade = false;
+
+  for (const posicao of ordenadas) {
+    if (posicao.valid === false) continue;
+    const velocidade = Number(posicao.speed);
+    if (!Number.isFinite(velocidade) || velocidade < 0) continue;
+    velocidadeMaximaNos = Math.max(velocidadeMaximaNos, velocidade);
+    temVelocidade = true;
+  }
 
   for (let i = 1; i < ordenadas.length; i += 1) {
     const anterior = ordenadas[i - 1];
@@ -230,7 +241,15 @@ export function calcularMetricasPeriodo(posicoes: TraccarPosition[]): MetricasPe
     }
   }
 
-  return { distanciaMetros, horasMotorMs };
+  return { distanciaMetros, horasMotorMs, velocidadeMaximaNos: temVelocidade ? velocidadeMaximaNos : null };
+}
+
+function aplicarVelocidadeMaximaPeriodo<T extends { maxSpeed: number }>(
+  base: T,
+  metricas: MetricasPeriodo,
+): T {
+  if (metricas.velocidadeMaximaNos == null) return base;
+  return { ...base, maxSpeed: metricas.velocidadeMaximaNos };
 }
 
 function filtrarPosicoesNoIntervalo(
@@ -252,11 +271,11 @@ export function aplicarResumoComMedidores(
   posicoes: TraccarPosition[],
 ): TraccarSummary {
   const metricas = calcularMetricasPeriodo(posicoes);
-  return {
+  return aplicarVelocidadeMaximaPeriodo({
     ...resumo,
     distance: usaOdometroSistema(dispositivo) ? Math.round(metricas.distanciaMetros) : resumo.distance,
     engineHours: Math.round(metricas.horasMotorMs),
-  };
+  }, metricas);
 }
 
 export function aplicarViagensComMedidores(
@@ -264,14 +283,12 @@ export function aplicarViagensComMedidores(
   viagens: TraccarTrip[],
   posicoes: TraccarPosition[],
 ): TraccarTrip[] {
-  if (!usaOdometroSistema(dispositivo)) return viagens;
-
   return viagens.map(viagem => {
     const metricas = calcularMetricasPeriodo(filtrarPosicoesNoIntervalo(posicoes, viagem.startTime, viagem.endTime));
-    return {
+    return aplicarVelocidadeMaximaPeriodo({
       ...viagem,
-      distance: Math.round(metricas.distanciaMetros),
-    };
+      distance: usaOdometroSistema(dispositivo) ? Math.round(metricas.distanciaMetros) : viagem.distance,
+    }, metricas);
   });
 }
 

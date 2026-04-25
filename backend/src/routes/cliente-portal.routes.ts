@@ -74,6 +74,60 @@ function temEndereco(valor?: string | null): valor is string {
   return !!(valor && valor.trim() && valor.trim() !== '0.00000, 0.00000');
 }
 
+function formatarEnderecoNominatim(address: Record<string, unknown> = {}): string {
+  const partes: string[] = [];
+  const texto = (valor: unknown) => typeof valor === 'string' && valor.trim() ? valor.trim() : '';
+  const amenity = texto(address.amenity);
+  const road = texto(address.road);
+  const houseNumber = texto(address.house_number);
+  const bairro = texto(address.suburb) || texto(address.neighbourhood) || texto(address.quarter);
+  const cidade = texto(address.city) || texto(address.town) || texto(address.village) || texto(address.municipality);
+  const state = texto(address.state);
+  const postcode = texto(address.postcode);
+  const country = texto(address.country);
+  if (amenity) partes.push(amenity);
+  if (road) partes.push(houseNumber ? `${road}, ${houseNumber}` : road);
+  if (bairro) partes.push(bairro);
+  if (cidade) partes.push(cidade);
+  if (state) partes.push(state);
+  if (postcode) partes.push(postcode);
+  if (country) partes.push(country);
+  return partes.join(', ');
+}
+
+async function reverseGeocode(lat: number, lon: number): Promise<string> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    throw new Error('Coordenadas inválidas.');
+  }
+  const params = new URLSearchParams({
+    format: 'jsonv2',
+    lat: String(lat),
+    lon: String(lon),
+    'accept-language': 'pt-BR',
+  });
+  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+    headers: {
+      'User-Agent': 'AgilLockRastreamento/1.0 (https://agillock.com.br)',
+      'Accept': 'application/json',
+    },
+  });
+  if (!res.ok) throw new Error(`Nominatim ${res.status}`);
+  const data = await res.json() as { display_name?: string; address?: Record<string, unknown> };
+  return formatarEnderecoNominatim(data.address) || data.display_name || '';
+}
+
+async function responderReverseGeocode(req: ClienteRequest, res: Response): Promise<void> {
+  const lat = Number(query(req.query.lat));
+  const lon = Number(query(req.query.lon));
+  try {
+    const endereco = await reverseGeocode(lat, lon);
+    res.json({ endereco });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao buscar endereço: ${msg}` });
+  }
+}
+
 // ── Upload de foto do veículo ─────────────────────────────────────────────────
 
 const uploadCliente = multer({
@@ -96,6 +150,8 @@ const uploadCliente = multer({
 });
 
 // ── GET /api/cliente/rastreamento/status-acesso ───────────────────────────────
+router.get('/rastreamento/geocode/reverse', responderReverseGeocode);
+
 router.get('/rastreamento/status-acesso', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
 

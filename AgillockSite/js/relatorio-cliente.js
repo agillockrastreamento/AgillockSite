@@ -172,9 +172,8 @@ async function resolverEndereco(valor, lat, lng) {
   const chave = `${finalLat.toFixed(5)},${finalLng.toFixed(5)}`;
   if (_reverseGeocodeCache[chave]) return _reverseGeocodeCache[chave];
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLng)}&accept-language=pt-BR`);
-    const data = await res.json();
-    const end = data.display_name || fmtEndereco(null, finalLat, finalLng);
+    const data = await apiGet(`/api/cliente/rastreamento/geocode/reverse?lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLng)}`);
+    const end = data.endereco || fmtEndereco(null, finalLat, finalLng);
     _reverseGeocodeCache[chave] = end;
     return end;
   } catch {

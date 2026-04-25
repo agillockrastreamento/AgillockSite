@@ -1531,16 +1531,8 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const ck = `${lat.toFixed(3)},${lng.toFixed(3)}`;
   if (ck in _geocodeCache) { el.textContent = _geocodeCache[ck] ? `${_geocodeCache[ck]} ${coords}` : coords; return; }
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=pt-BR`);
-    const data = await res.json();
-    const a = data.address || {};
-    const partes = [];
-    if (a.road) partes.push(a.house_number ? `${a.road}, ${a.house_number}` : a.road);
-    const bairro = a.suburb || a.neighbourhood;
-    if (bairro) partes.push(bairro);
-    const cidade = a.city || a.town || a.village;
-    if (cidade) partes.push(cidade);
-    const end = partes.join(', ');
+    const data = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
+    const end = data.endereco || '';
     _geocodeCache[ck] = end;
     el.textContent = end ? `${end} ${coords}` : coords;
   } catch { el.textContent = coords; }

@@ -2349,10 +2349,8 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   }
 
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=pt-BR`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const end = data.address ? _formatarEndereco(data.address) : '';
+    const data = await window.AL.apiGet(`/api/rastreamento/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
+    const end = data.endereco || '';
     _geocodeCache[cacheKey] = end;
     el.textContent = end ? `${end} ${coords}` : coords;
   } catch {
