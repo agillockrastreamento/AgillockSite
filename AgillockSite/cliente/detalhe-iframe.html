@@ -50,6 +50,44 @@
     #loading-overlay { display: none; position: absolute; inset: 0; background: rgba(255,255,255,.7); z-index: 600; align-items: center; justify-content: center; }
     .dark-theme #loading-overlay { background: rgba(20,24,32,.7); }
     .leaflet-grab { cursor: crosshair !important; }
+    .leaflet-drag-target { cursor: grabbing !important; }
+
+    .leaflet-control-layers {
+      width: 35px !important;
+      height: 35px !important;
+      background-color: #fff !important;
+      border-radius: 50% !important;
+      border: 2px solid #c2c1c1 !important;
+      box-shadow: none !important;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 !important;
+    }
+    .leaflet-control-layers-toggle {
+      width: 35px !important;
+      height: 35px !important;
+      background-size: 20px 20px !important;
+      margin: 0 !important;
+    }
+    .leaflet-control-layers-expanded {
+      width: auto !important;
+      height: auto !important;
+      border-radius: 8px !important;
+      padding: 10px !important;
+    }
+    .dark-theme .leaflet-control-layers {
+      background: #1e2530 !important;
+      border-color: #3a3a5c !important;
+    }
+    .dark-theme .leaflet-control-layers-toggle {
+      background-color: #1e2530 !important;
+    }
+    .dark-theme .leaflet-control-layers-list {
+      background: #1e2530;
+      color: #c9d1d9;
+    }
   </style>
 </head>
 <body>

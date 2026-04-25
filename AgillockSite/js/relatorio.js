@@ -5,6 +5,16 @@ let chartVelocidade = null;
 let periodoAtual = 'hoje';
 let dispositivoIdsAtuais = [];
 let dispositivosMap = {}; // id -> { nome, placa }
+let _googleMapLayers = {};
+let _googleMapType = 'roadmap';
+let _googleMapTypeControl = null;
+
+const GOOGLE_MAP_TYPES = {
+  roadmap: { label: 'Roadmap', lyrs: 'm' },
+  satellite: { label: 'Satellite', lyrs: 's' },
+  hybrid: { label: 'Hybrid', lyrs: 'y' },
+  terrain: { label: 'Terrain', lyrs: 'p' },
+};
 
 const _COLORS = [
   '#2980b9', '#e74c3c', '#27ae60', '#f39c12', '#8e44ad', 
@@ -195,12 +205,97 @@ async function carregarRelatorio() {
 
 function inicializarMapaRota() {
   mapaRota = L.map('mapa-rota', { zoomControl: true, maxZoom: 21 }).setView([-15.78, -47.93], 5);
+  _googleMapLayers = _criarCamadasGoogle();
   const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 21 });
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 19, maxZoom: 21 });
   const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxNativeZoom: 19, maxZoom: 21 });
-  carto.addTo(mapaRota);
-  L.control.layers({ 'CartoDB': carto, 'OpenStreetMap': osm, 'ESRI Street': esri }, {}, { position: 'topright' }).addTo(mapaRota);
+  _googleMapLayers.roadmap.addTo(mapaRota);
+  L.control.layers({ 'Google Maps': _googleMapLayers.roadmap, 'CartoDB Voyager': carto, 'OpenStreetMap': osm, 'ESRI Street': esri }, {}, { position: 'topright' }).addTo(mapaRota);
+  _adicionarControleTipoGoogle();
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(mapaRota);
+  mapaRota.on('baselayerchange', function () { _atualizarControleTipoGoogle(); });
+}
+
+function _criarCamadasGoogle() {
+  const opts = {
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: 'Map data © Google',
+    maxNativeZoom: 20,
+    maxZoom: 21,
+  };
+  return Object.keys(GOOGLE_MAP_TYPES).reduce(function (acc, tipo) {
+    acc[tipo] = L.tileLayer(
+      'https://{s}.google.com/vt/lyrs=' + GOOGLE_MAP_TYPES[tipo].lyrs + '&x={x}&y={y}&z={z}',
+      opts
+    );
+    return acc;
+  }, {});
+}
+
+function _camadaGoogleAtiva() {
+  return Object.keys(_googleMapLayers).some(function (tipo) {
+    return mapaRota && mapaRota.hasLayer(_googleMapLayers[tipo]);
+  });
+}
+
+function _trocarTipoGoogle(tipo) {
+  if (!_googleMapLayers[tipo] || tipo === _googleMapType) return;
+  const anterior = _googleMapLayers[_googleMapType];
+  if (anterior && mapaRota.hasLayer(anterior)) mapaRota.removeLayer(anterior);
+  _googleMapType = tipo;
+  _googleMapLayers[tipo].addTo(mapaRota);
+  _atualizarControleTipoGoogle();
+}
+
+function _adicionarControleTipoGoogle() {
+  const GoogleTypeControl = L.Control.extend({
+    onAdd() {
+      const wrap = L.DomUtil.create('div', 'leaflet-control google-map-type-control');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;align-items:flex-end;';
+      wrap.innerHTML = `
+        <button type="button" class="leaflet-bar" title="Tipo do Google Maps" style="width:35px;height:35px;display:flex;align-items:center;justify-content:center;background:#fff;border:2.5px solid #ccc;border-radius:50%;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3);">
+          <i class="fa fa-map" style="font-size:13px;color:#333"></i>
+        </button>
+        <div class="google-map-type-menu" style="display:none;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.22);overflow:hidden;min-width:112px">
+          ${Object.keys(GOOGLE_MAP_TYPES).map(function (tipo) {
+            return `<button type="button" data-google-map-type="${tipo}" style="display:block;width:100%;border:0;background:#fff;padding:7px 10px;text-align:left;font-size:12px;cursor:pointer">${GOOGLE_MAP_TYPES[tipo].label}</button>`;
+          }).join('')}
+        </div>`;
+      const btn = wrap.querySelector('button');
+      const menu = wrap.querySelector('.google-map-type-menu');
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.disableScrollPropagation(wrap);
+      L.DomEvent.on(btn, 'click', function (e) {
+        L.DomEvent.stop(e);
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      });
+      wrap.querySelectorAll('[data-google-map-type]').forEach(function (item) {
+        L.DomEvent.on(item, 'click', function (e) {
+          L.DomEvent.stop(e);
+          _trocarTipoGoogle(item.getAttribute('data-google-map-type'));
+          menu.style.display = 'none';
+        });
+      });
+      document.addEventListener('click', function () { menu.style.display = 'none'; });
+      _googleMapTypeControl = wrap;
+      setTimeout(_atualizarControleTipoGoogle, 0);
+      return wrap;
+    },
+    onRemove() {},
+  });
+  new GoogleTypeControl({ position: 'topright' }).addTo(mapaRota);
+}
+
+function _atualizarControleTipoGoogle() {
+  if (!_googleMapTypeControl) return;
+  const ativo = _camadaGoogleAtiva();
+  _googleMapTypeControl.style.display = ativo ? 'flex' : 'none';
+  _googleMapTypeControl.querySelectorAll('[data-google-map-type]').forEach(function (item) {
+    const selecionado = item.getAttribute('data-google-map-type') === _googleMapType;
+    item.style.background = selecionado ? '#e8f4fd' : '#fff';
+    item.style.color = selecionado ? '#2980b9' : '#333';
+    item.style.fontWeight = selecionado ? '700' : '400';
+  });
 }
 
 function renderRota(data) {

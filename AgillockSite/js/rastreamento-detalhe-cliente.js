@@ -10,6 +10,16 @@ const BASE = window.API_URL || 'http://localhost:3000';
 let map;
 let polylineRota = null, polylineDestaque = null, marcadorInicio = null, marcadorFim = null, marcadorAtual = null;
 let historicoCache = [];
+let _googleMapLayers = {};
+let _googleMapType = 'roadmap';
+let _googleMapTypeControl = null;
+
+const GOOGLE_MAP_TYPES = {
+  roadmap: { label: 'Roadmap', lyrs: 'm' },
+  satellite: { label: 'Satellite', lyrs: 's' },
+  hybrid: { label: 'Hybrid', lyrs: 'y' },
+  terrain: { label: 'Terrain', lyrs: 'p' },
+};
 
 // ── API usando token do cliente ───────────────────────────────────────────────
 
@@ -29,18 +39,26 @@ function apiGet(endpoint) {
 
 document.addEventListener('DOMContentLoaded', function () {
   if (!dispositivoId || !clienteToken) { mostrarErro('Parâmetros inválidos.'); return; }
-  inicializarMapa();
+  try {
+    inicializarMapa();
+  } catch (err) {
+    return;
+  }
   configurarPeriodo();
   carregarDados();
 });
 
 function inicializarMapa() {
   map = L.map('mapa-detalhe', { zoomControl: true, maxZoom: 21 }).setView([-15.78, -47.93], 5);
+  _googleMapLayers = _criarCamadasGoogle();
   const tilesCartoDB = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', maxNativeZoom: 19, maxZoom: 21 });
   const tilesOsm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxNativeZoom: 19, maxZoom: 21 });
-  tilesCartoDB.addTo(map);
-  L.control.layers({ 'CartoDB': tilesCartoDB, 'OpenStreetMap': tilesOsm }, {}, { position: 'topright', collapsed: true }).addTo(map);
+  const tilesEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri', maxNativeZoom: 19, maxZoom: 21 });
+  _googleMapLayers.roadmap.addTo(map);
+  L.control.layers({ 'Google Maps': _googleMapLayers.roadmap, 'CartoDB Voyager': tilesCartoDB, 'OpenStreetMap': tilesOsm, 'ESRI Street': tilesEsri }, {}, { position: 'topright', collapsed: true }).addTo(map);
+  _adicionarControleTipoGoogle();
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
+  map.on('baselayerchange', function () { _atualizarControleTipoGoogle(); });
 
   // Botão de localização
   let _marcUserCli = null;
@@ -72,6 +90,88 @@ function inicializarMapa() {
     onRemove() {},
   });
   new BtnLocCli({ position: 'topleft' }).addTo(map);
+}
+
+function _criarCamadasGoogle() {
+  const opts = {
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: 'Map data © Google',
+    maxNativeZoom: 20,
+    maxZoom: 21,
+  };
+  return Object.keys(GOOGLE_MAP_TYPES).reduce(function (acc, tipo) {
+    acc[tipo] = L.tileLayer(
+      'https://{s}.google.com/vt/lyrs=' + GOOGLE_MAP_TYPES[tipo].lyrs + '&x={x}&y={y}&z={z}',
+      opts
+    );
+    return acc;
+  }, {});
+}
+
+function _camadaGoogleAtiva() {
+  return Object.keys(_googleMapLayers).some(function (tipo) {
+    return map && map.hasLayer(_googleMapLayers[tipo]);
+  });
+}
+
+function _trocarTipoGoogle(tipo) {
+  if (!_googleMapLayers[tipo] || tipo === _googleMapType) return;
+  const anterior = _googleMapLayers[_googleMapType];
+  if (anterior && map.hasLayer(anterior)) map.removeLayer(anterior);
+  _googleMapType = tipo;
+  _googleMapLayers[tipo].addTo(map);
+  _atualizarControleTipoGoogle();
+}
+
+function _adicionarControleTipoGoogle() {
+  const GoogleTypeControl = L.Control.extend({
+    onAdd() {
+      const wrap = L.DomUtil.create('div', 'leaflet-control google-map-type-control');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;align-items:flex-end;';
+      wrap.innerHTML = `
+        <button type="button" class="leaflet-bar" title="Tipo do Google Maps" style="width:35px;height:35px;display:flex;align-items:center;justify-content:center;background:#fff;border:2.5px solid #ccc;border-radius:50%;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3);">
+          <i class="fa fa-map" style="font-size:13px;color:#333"></i>
+        </button>
+        <div class="google-map-type-menu" style="display:none;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.22);overflow:hidden;min-width:112px">
+          ${Object.keys(GOOGLE_MAP_TYPES).map(function (tipo) {
+            return `<button type="button" data-google-map-type="${tipo}" style="display:block;width:100%;border:0;background:#fff;padding:7px 10px;text-align:left;font-size:12px;cursor:pointer">${GOOGLE_MAP_TYPES[tipo].label}</button>`;
+          }).join('')}
+        </div>`;
+      const btn = wrap.querySelector('button');
+      const menu = wrap.querySelector('.google-map-type-menu');
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.disableScrollPropagation(wrap);
+      L.DomEvent.on(btn, 'click', function (e) {
+        L.DomEvent.stop(e);
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      });
+      wrap.querySelectorAll('[data-google-map-type]').forEach(function (item) {
+        L.DomEvent.on(item, 'click', function (e) {
+          L.DomEvent.stop(e);
+          _trocarTipoGoogle(item.getAttribute('data-google-map-type'));
+          menu.style.display = 'none';
+        });
+      });
+      document.addEventListener('click', function () { menu.style.display = 'none'; });
+      _googleMapTypeControl = wrap;
+      setTimeout(_atualizarControleTipoGoogle, 0);
+      return wrap;
+    },
+    onRemove() {},
+  });
+  new GoogleTypeControl({ position: 'topright' }).addTo(map);
+}
+
+function _atualizarControleTipoGoogle() {
+  if (!_googleMapTypeControl) return;
+  const ativo = _camadaGoogleAtiva();
+  _googleMapTypeControl.style.display = ativo ? 'flex' : 'none';
+  _googleMapTypeControl.querySelectorAll('[data-google-map-type]').forEach(function (item) {
+    const selecionado = item.getAttribute('data-google-map-type') === _googleMapType;
+    item.style.background = selecionado ? '#e8f4fd' : '#fff';
+    item.style.color = selecionado ? '#2980b9' : '#333';
+    item.style.fontWeight = selecionado ? '700' : '400';
+  });
 }
 
 // ── Período ───────────────────────────────────────────────────────────────────

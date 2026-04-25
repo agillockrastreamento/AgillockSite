@@ -58,6 +58,16 @@ const _resumoHojeCache = {};
 const _resumoHojePendentes = {};
 const ADMIN_FOCUS_STORAGE_KEY = 'rastreamento_admin_foco';
 let _attrsTrayOpen = false;
+let _googleMapLayers = {};
+let _googleMapType = 'roadmap';
+let _googleMapTypeControl = null;
+let _baseMapControlLayers = {};
+const GOOGLE_MAP_TYPES = {
+  roadmap: { label: 'Roadmap', lyrs: 'm' },
+  satellite: { label: 'Satellite', lyrs: 's' },
+  hybrid: { label: 'Hybrid', lyrs: 'y' },
+  terrain: { label: 'Terrain', lyrs: 'p' },
+};
 const ATTR_INFO_CARD = {
   ignition: ['ignition', 'Ignição'],
   motion: ['motion', 'Em movimento'],
@@ -412,15 +422,23 @@ function inicializarMapa() {
     { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxNativeZoom: 19, maxZoom: 21 }
   );
 
-  tilesCartoDB.addTo(map);
+  _googleMapLayers = _criarCamadasGoogle();
+  _baseMapControlLayers = {
+    google: _googleMapLayers.roadmap,
+    carto: tilesCartoDB,
+    osm: tilesOsm,
+    esri: tilesEsri,
+  };
+  _googleMapLayers.roadmap.addTo(map);
 
   // Zoom e camadas de tile — todos à direita
   L.control.zoom({ position: 'topright' }).addTo(map);
   L.control.layers(
-    { 'CartoDB Voyager': tilesCartoDB, 'OpenStreetMap': tilesOsm, 'ESRI Street': tilesEsri },
+    { 'Google Maps': _googleMapLayers.roadmap, 'CartoDB Voyager': tilesCartoDB, 'OpenStreetMap': tilesOsm, 'ESRI Street': tilesEsri },
     {},
     { position: 'topright', collapsed: true }
   ).addTo(map);
+  _adicionarControleTipoGoogle();
 
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
@@ -442,6 +460,101 @@ function inicializarMapa() {
   map.on('zoomend', function () {
     _fecharSpider();
     if (!modoFoco) renderMarcadores();
+  });
+  map.on('baselayerchange', function () {
+    _atualizarControleTipoGoogle();
+  });
+}
+
+function _criarCamadasGoogle() {
+  const opts = {
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: 'Map data © Google',
+    maxNativeZoom: 20,
+    maxZoom: 21,
+  };
+  return Object.keys(GOOGLE_MAP_TYPES).reduce(function (acc, tipo) {
+    acc[tipo] = L.tileLayer(
+      'https://{s}.google.com/vt/lyrs=' + GOOGLE_MAP_TYPES[tipo].lyrs + '&x={x}&y={y}&z={z}',
+      opts
+    );
+    return acc;
+  }, {});
+}
+
+function _camadaGoogleAtiva() {
+  return Object.keys(_googleMapLayers).some(function (tipo) {
+    return map && map.hasLayer(_googleMapLayers[tipo]);
+  });
+}
+
+function _trocarTipoGoogle(tipo) {
+  if (!_googleMapLayers[tipo] || tipo === _googleMapType) return;
+  const anterior = _googleMapLayers[_googleMapType];
+  if (anterior && map.hasLayer(anterior)) map.removeLayer(anterior);
+  _googleMapType = tipo;
+  _googleMapLayers[tipo].addTo(map);
+  _atualizarControleTipoGoogle();
+}
+
+function _ativarMapaGoogle() {
+  if (!map) return;
+  Object.keys(_baseMapControlLayers).forEach(function (key) {
+    const layer = _baseMapControlLayers[key];
+    if (layer && map.hasLayer(layer)) map.removeLayer(layer);
+  });
+  _googleMapLayers[_googleMapType].addTo(map);
+  _atualizarControleTipoGoogle();
+}
+
+function _adicionarControleTipoGoogle() {
+  const GoogleTypeControl = L.Control.extend({
+    onAdd() {
+      const wrap = L.DomUtil.create('div', 'leaflet-control google-map-type-control');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;align-items:flex-end;';
+      wrap.innerHTML = `
+        <button type="button" class="leaflet-bar" title="Tipo do Google Maps" style="width:35px;height:35px;display:flex;align-items:center;justify-content:center;background:#fff;border:2.5px solid #ccc;border-radius:50%;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3);">
+          <i class="fa fa-map" style="font-size:13px;color:#333"></i>
+        </button>
+        <div class="google-map-type-menu" style="display:none;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.22);overflow:hidden;min-width:112px">
+          ${Object.keys(GOOGLE_MAP_TYPES).map(function (tipo) {
+            return `<button type="button" data-google-map-type="${tipo}" style="display:block;width:100%;border:0;background:#fff;padding:7px 10px;text-align:left;font-size:12px;cursor:pointer">${GOOGLE_MAP_TYPES[tipo].label}</button>`;
+          }).join('')}
+        </div>`;
+      const btn = wrap.querySelector('button');
+      const menu = wrap.querySelector('.google-map-type-menu');
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.disableScrollPropagation(wrap);
+      L.DomEvent.on(btn, 'click', function (e) {
+        L.DomEvent.stop(e);
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      });
+      wrap.querySelectorAll('[data-google-map-type]').forEach(function (item) {
+        L.DomEvent.on(item, 'click', function (e) {
+          L.DomEvent.stop(e);
+          _trocarTipoGoogle(item.getAttribute('data-google-map-type'));
+          menu.style.display = 'none';
+        });
+      });
+      document.addEventListener('click', function () { menu.style.display = 'none'; });
+      _googleMapTypeControl = wrap;
+      setTimeout(_atualizarControleTipoGoogle, 0);
+      return wrap;
+    },
+    onRemove() {},
+  });
+  new GoogleTypeControl({ position: 'topright' }).addTo(map);
+}
+
+function _atualizarControleTipoGoogle() {
+  if (!_googleMapTypeControl) return;
+  const ativo = _camadaGoogleAtiva();
+  _googleMapTypeControl.style.display = ativo ? 'flex' : 'none';
+  _googleMapTypeControl.querySelectorAll('[data-google-map-type]').forEach(function (item) {
+    const selecionado = item.getAttribute('data-google-map-type') === _googleMapType;
+    item.style.background = selecionado ? '#e8f4fd' : '#fff';
+    item.style.color = selecionado ? '#2980b9' : '#333';
+    item.style.fontWeight = selecionado ? '700' : '400';
   });
 }
 
@@ -1936,9 +2049,10 @@ function mostrarCardDispositivo(id) {
       <hr id="dcard-divider-speed" style="margin:2px 0 6px;border:none;border-top:1px solid rgba(128,128,128,0.15)${p?.velocidade != null ? '' : ';display:none'}">
       <div id="dcard-status-items" style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:8px">${si.join('')}</div>
       ${horasHtml}
-      ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
-          <i class="fa fa-map-pin" style="color:#e74c3c;width:13px"></i>
-          <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}">${addrTxt}</span>
+      ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4;display:flex;align-items:flex-start;gap:6px">
+          <i class="fa fa-map-pin" style="color:#e74c3c;width:13px;flex:0 0 auto;margin-top:2px"></i>
+          <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="flex:1 1 auto">${addrTxt}</span>
+          ${_htmlBotaoStreetView(p.latitude, p.longitude)}
         </div>` : ''}
       <div style="margin-top:10px;display:flex;gap:6px">
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
