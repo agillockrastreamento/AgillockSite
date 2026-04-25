@@ -120,7 +120,7 @@ function _ajustarAlturaCardDispositivo() {
   const mapRect = mapaEl.getBoundingClientRect();
   const areaRect = area.getBoundingClientRect();
   const topGap = 12;
-  const escalaClearance = 54;
+  const escalaClearance = 30;
   const top = Math.max(topGap, mapRect.top - areaRect.top + topGap);
   const maxHeight = Math.max(220, mapRect.height - topGap - escalaClearance);
   card.style.top = `${top}px`;
