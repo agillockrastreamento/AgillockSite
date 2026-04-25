@@ -586,6 +586,17 @@ function _adicionarBotoesCamadas() {
 
   // Toggle criado como Leaflet control para ficar abaixo do botão de localização
   let _toggleBtn = null;
+  function posicionarTrayCamadas() {
+    if (!_toggleBtn) return;
+    const area = document.getElementById('mapa-area');
+    if (!area) return;
+    const areaRect = area.getBoundingClientRect();
+    const btnRect = _toggleBtn.getBoundingClientRect();
+    const top = Math.max(10, btnRect.top - areaRect.top);
+    const right = Math.max(10, areaRect.right - btnRect.left + 9);
+    tray.style.top = `${top}px`;
+    tray.style.right = `${right}px`;
+  }
   const BtnTray = L.Control.extend({
     onAdd() {
       const btn = L.DomUtil.create('button', 'leaflet-control map-control-btn map-control-btn--tray');
@@ -596,7 +607,9 @@ function _adicionarBotoesCamadas() {
       L.DomEvent.disableScrollPropagation(btn);
       L.DomEvent.on(btn, 'click', function (e) {
         L.DomEvent.stop(e);
-        const aberta = tray.classList.toggle('aberta');
+        const abrindo = !tray.classList.contains('aberta');
+        if (abrindo) posicionarTrayCamadas();
+        const aberta = tray.classList.toggle('aberta', abrindo);
         btn.classList.toggle('ativo', aberta);
       });
       _toggleBtn = btn;
@@ -614,6 +627,9 @@ function _adicionarBotoesCamadas() {
       tray.classList.remove('aberta');
       if (_toggleBtn) _toggleBtn.classList.remove('ativo');
     }
+  });
+  window.addEventListener('resize', function () {
+    if (tray.classList.contains('aberta')) posicionarTrayCamadas();
   });
 
   document.getElementById('ml-alarmes').addEventListener('click', function () {
