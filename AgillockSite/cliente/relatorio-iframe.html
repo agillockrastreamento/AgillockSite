@@ -22,6 +22,17 @@
     html.dark-theme .rel-toolbar { background: #1e2530; border-color: #2d3748; }
     .rel-toolbar .form-control, .rel-toolbar .btn { margin: 0; }
     .periodo-btn.active { background: #fab32c; border-color: #e09520; color: #222; }
+    html.dark-theme .periodo-btn.active,
+    html.dark-theme .periodo-btn.active:hover,
+    html.dark-theme .periodo-btn.active:focus,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active:hover,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active:focus {
+      background: #fab32c !important;
+      border-color: #e09520 !important;
+      color: #222 !important;
+      box-shadow: none;
+    }
     html.dark-theme .btn-default { background: #252535; color: #c9d1d9; border-color: #3a3a5c; }
     html.dark-theme .btn-default:hover { background: #2d3748; color: #fff; }
 
@@ -53,6 +64,8 @@
     html.dark-theme .rel-table th { background: #1e2530; color: #adb5bd; border-color: #2d3748; }
     .rel-table td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; color: #333; }
     html.dark-theme .rel-table td { border-color: #2a2a3e; color: #c9d1d9; }
+    .rel-table--center th,
+    .rel-table--center td { text-align: center; vertical-align: middle; }
 
     .resumo-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(130px,1fr)); gap: 12px; }
     .resumo-card { background: #fff; border-radius: 10px; padding: 16px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); text-align: center; }
@@ -141,6 +154,7 @@
 
     html.dark-theme .form-control { background: #252535; color: #c9d1d9; border-color: #3a3a5c; }
     html.dark-theme .form-control:focus { background: #2a2a40; border-color: #fab32c; box-shadow: none; }
+    .rel-export-btn { margin-left: auto; border-radius: 6px; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -159,6 +173,9 @@
       <input type="date" id="dt-ate" class="form-control input-sm" style="width:130px" />
       <button class="btn btn-primary btn-sm" id="btn-carregar"><i class="fa fa-search"></i></button>
     </div>
+    <button class="btn btn-success btn-sm rel-export-btn" id="btn-exportar">
+      <i class="fa fa-file-excel-o"></i> Exportar XML
+    </button>
   </div>
 
   <!-- Tabs -->

@@ -14,6 +14,7 @@ import {
   traccarGetStops,
   traccarGetEvents,
   traccarGetSummary,
+  traccarExportReport,
   traccarGetCommandTypes,
   traccarSendCommand,
   traccarGetGeofences,
@@ -36,6 +37,42 @@ import { CLIENTE_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
+
+type RelatorioPosicaoBasica = {
+  id: number;
+  deviceId: number;
+  fixTime: string;
+  latitude: number;
+  longitude: number;
+  address: string | null;
+};
+
+function posicaoMaisProxima(
+  posicoes: RelatorioPosicaoBasica[],
+  deviceId: number,
+  iso?: string | null,
+): RelatorioPosicaoBasica | null {
+  if (!iso) return null;
+  const alvo = new Date(iso).getTime();
+  if (!Number.isFinite(alvo)) return null;
+  let melhor: RelatorioPosicaoBasica | null = null;
+  let menorDelta = Number.POSITIVE_INFINITY;
+  for (const posicao of posicoes) {
+    if (posicao.deviceId !== deviceId) continue;
+    const tempo = new Date(posicao.fixTime).getTime();
+    if (!Number.isFinite(tempo)) continue;
+    const delta = Math.abs(tempo - alvo);
+    if (delta < menorDelta) {
+      melhor = posicao;
+      menorDelta = delta;
+    }
+  }
+  return melhor;
+}
+
+function temEndereco(valor?: string | null): valor is string {
+  return !!(valor && valor.trim() && valor.trim() !== '0.00000, 0.00000');
+}
 
 // ── Upload de foto do veículo ─────────────────────────────────────────────────
 
@@ -264,20 +301,24 @@ router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest,
   const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
   const viagensComMedidores = aplicarViagensComMedidores(dispositivo, viagens, historico);
 
-  res.json(viagensComMedidores.map(v => ({
-    inicio: v.startTime,
-    fim: v.endTime,
-    origem: v.startAddress,
-    destino: v.endAddress,
-    origemLat: v.startLat,
-    origemLng: v.startLon,
-    destinoLat: v.endLat,
-    destinoLng: v.endLon,
-    distancia: Math.round(v.distance / 100) / 10,
-    velocidadeMedia: Math.round(v.averageSpeed * 1.852),
-    velocidadeMaxima: Math.round(v.maxSpeed * 1.852),
-    duracao: Math.round(v.duration / 60000),
-  })));
+  res.json(viagensComMedidores.map(v => {
+    const posInicio = posicaoMaisProxima(historico, traccarDevice.id, v.startTime);
+    const posFim = posicaoMaisProxima(historico, traccarDevice.id, v.endTime);
+    return {
+      inicio: v.startTime,
+      fim: v.endTime,
+      origem: temEndereco(v.startAddress) ? v.startAddress : posInicio?.address || null,
+      destino: temEndereco(v.endAddress) ? v.endAddress : posFim?.address || null,
+      origemLat: v.startLat || posInicio?.latitude || 0,
+      origemLng: v.startLon || posInicio?.longitude || 0,
+      destinoLat: v.endLat || posFim?.latitude || 0,
+      destinoLng: v.endLon || posFim?.longitude || 0,
+      distancia: Math.round(v.distance / 100) / 10,
+      velocidadeMedia: Math.round(v.averageSpeed * 1.852),
+      velocidadeMaxima: Math.round(v.maxSpeed * 1.852),
+      duracao: Math.round(v.duration / 60000),
+    };
+  }));
 });
 
 // ── GET /api/cliente/rastreamento/dispositivos/:id/paradas ───────────────────
@@ -316,15 +357,21 @@ router.get('/rastreamento/dispositivos/:id/paradas', async (req: ClienteRequest,
   const paradas = await traccarGetStops([traccarDevice.id], fromDate, toDate);
   const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
   const paradasComMedidores = aplicarParadasComMedidores(paradas, historico);
+  const historicoPorId = new Map(historico.map(p => [p.id, p]));
 
-  res.json(paradasComMedidores.map(p => ({
-    inicio: p.startTime,
-    fim: p.endTime,
-    duracao: Math.round(p.duration / 60000),
-    latitude: p.lat,
-    longitude: p.lon,
-    endereco: p.address,
-  })));
+  res.json(paradasComMedidores.map(p => {
+    const posicao = historicoPorId.get(p.positionId)
+      || posicaoMaisProxima(historico, traccarDevice.id, p.startTime)
+      || posicaoMaisProxima(historico, traccarDevice.id, p.endTime);
+    return {
+      inicio: p.startTime,
+      fim: p.endTime,
+      duracao: Math.round(p.duration / 60000),
+      latitude: p.lat || posicao?.latitude || 0,
+      longitude: p.lon || posicao?.longitude || 0,
+      endereco: temEndereco(p.address) ? p.address : posicao?.address || null,
+    };
+  }));
 });
 
 // ── GET /api/cliente/rastreamento/dispositivos/:id/eventos ───────────────────
@@ -427,6 +474,54 @@ router.get('/rastreamento/dispositivos/:id/resumo', async (req: ClienteRequest, 
     consumoCombustivel: r.spentFuel,
     horasMotor: Math.round(r.engineHours / 360000) / 10, // ms para horas com 1 decimal
   });
+});
+
+router.get('/rastreamento/dispositivos/:id/exportar', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+  const type = query(req.query.type) || 'route';
+
+  if (!from || !to || !['route', 'events', 'trips', 'stops', 'summary'].includes(type)) {
+    res.status(400).json({ error: 'Parâmetros incompletos.' });
+    return;
+  }
+
+  if (await verificarBloqueio(clienteId)) {
+    res.status(403).json({ error: 'acesso_bloqueado' });
+    return;
+  }
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: {
+      id: dispositivoId,
+      ativo: true,
+      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+    },
+    select: { id: true, identificador: true },
+  });
+  if (!dispositivo) {
+    res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
+    return;
+  }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) {
+    res.status(404).json({ error: 'Dispositivo não sincronizado.' });
+    return;
+  }
+
+  try {
+    const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', [traccarDevice.id], new Date(from), new Date(to));
+    const buffer = await response.arrayBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);
+    res.send(Buffer.from(buffer));
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro na exportação: ${msg}` });
+  }
 });
 
 // ── GET /api/cliente/boletos ──────────────────────────────────────────────────

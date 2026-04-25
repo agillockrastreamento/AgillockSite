@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     const selecionados = $(this).val();
     dispositivoIdsAtuais = selecionados || [];
     if (dispositivoIdsAtuais.length > 0 && periodoAtual !== 'custom') carregarRelatorio();
+    else if (dispositivoIdsAtuais.length === 0) renderSemDispositivoSelecionado();
   });
 
   document.getElementById('btn-abrir-exportar').addEventListener('click', function() {
@@ -179,6 +180,7 @@ function isoComFuso(d) {
 
 async function carregarRelatorio() {
   if (dispositivoIdsAtuais.length === 0) {
+    renderSemDispositivoSelecionado();
     AL.showAlert('Selecione os dispositivos.', 'warning');
     return;
   }
@@ -216,6 +218,60 @@ async function carregarRelatorio() {
   } finally {
     document.getElementById('mapa-rota-loading').style.display = 'none';
   }
+}
+
+function renderSemDispositivoSelecionado() {
+  const mensagens = {
+    'eventos-content': 'Selecione pelo menos um veículo para visualizar os eventos.',
+    'viagens-content': 'Selecione pelo menos um veículo para visualizar as viagens.',
+    'paradas-content': 'Selecione pelo menos um veículo para visualizar as paradas.',
+    'resumo-content': 'Selecione pelo menos um veículo para visualizar o resumo.',
+    'grafico-content': 'Selecione pelo menos um veículo para visualizar o gráfico.',
+  };
+  Object.keys(mensagens).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<div class="rel-empty">${mensagens[id]}</div>`;
+  });
+  const rotaStats = document.getElementById('rota-stats');
+  if (rotaStats) rotaStats.innerHTML = '';
+}
+
+function enderecoValido(valor) {
+  return typeof valor === 'string' && valor.trim() && valor.trim() !== '0.00000, 0.00000';
+}
+
+function coordsValidas(lat, lng) {
+  const nLat = Number(lat), nLng = Number(lng);
+  return Number.isFinite(nLat) && Number.isFinite(nLng) && (Math.abs(nLat) > 0.00001 || Math.abs(nLng) > 0.00001);
+}
+
+function fmtEndereco(valor, lat, lng) {
+  if (enderecoValido(valor)) return valor.trim();
+  if (coordsValidas(lat, lng)) return `(${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)})`;
+  return 'Endereço não identificado';
+}
+
+function getInicioViagem(v) {
+  return v.startTime || v.inicio;
+}
+
+function getFimViagem(v) {
+  return v.endTime || v.fim;
+}
+
+function getDistanciaKm(v) {
+  if (v.distancia != null) return Number(v.distancia) || 0;
+  return ((Number(v.distance) || 0) / 1000);
+}
+
+function getDuracaoMin(v) {
+  if (v.duracao != null) return Number(v.duracao) || 0;
+  return ((Number(v.duration) || 0) / 60000);
+}
+
+function getVelMax(v) {
+  if (v.velocidadeMaxima != null) return Number(v.velocidadeMaxima) || 0;
+  return Math.round((Number(v.maxSpeed) || 0) * 1.852);
 }
 
 // ── Aba Rota ──────────────────────────────────────────────────────────────────
@@ -349,7 +405,7 @@ function renderRota(data) {
 function renderEventos(lista) {
   const el = document.getElementById('eventos-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty">Nenhum evento encontrado.</div>'; return; }
-  el.innerHTML = `<div class="table-responsive"><table class="rel-table table">
+  el.innerHTML = `<div class="table-responsive"><table class="rel-table rel-table--center table">
     <thead><tr><th>Veículo</th><th>Hora</th><th>Tipo</th><th>Detalhes</th></tr></thead>
     <tbody>${lista.map(e => {
       const info = _EVENTO_LABEL[e.tipo] || { label: e.tipo, cls: 'ev-default' };
@@ -362,12 +418,34 @@ function renderEventos(lista) {
 function renderViagens(lista) {
   const el = document.getElementById('viagens-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty">Nenhuma viagem encontrada.</div>'; return; }
-  el.innerHTML = `<div class="table-responsive"><table class="rel-table table">
-    <thead><tr><th>Veículo</th><th>Início</th><th>Fim</th><th>Duração</th><th>Km</th><th>Origem/Destino</th></tr></thead>
-    <tbody>${lista.map(v => {
-      const d = dispositivosMap[v.deviceId] || { nome: '—' };
-      return `<tr><td><strong>${d.nome}</strong></td><td>${fmtHora(v.startTime)}</td><td>${fmtHora(v.endTime)}</td><td>${fmtDuracao(v.duration / 60000)}</td><td>${(v.distance / 1000).toFixed(1)} km</td><td style="font-size:10px">${v.startAddress || '—'}<br>→ ${v.endAddress || '—'}</td></tr>`;
-    }).join('')}</tbody></table></div>`;
+  let totalKm = 0, totalMin = 0, vmax = 0;
+  lista.forEach(v => { totalKm += getDistanciaKm(v); totalMin += getDuracaoMin(v); vmax = Math.max(vmax, getVelMax(v)); });
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="resumo-card" style="min-width:100px"><div class="rc-val">${lista.length}</div><div class="rc-lbl">Viagens</div></div>
+      <div class="resumo-card" style="min-width:100px"><div class="rc-val">${totalKm.toFixed(1)}</div><div class="rc-lbl">km total</div></div>
+      <div class="resumo-card" style="min-width:100px"><div class="rc-val">${fmtDuracao(totalMin)}</div><div class="rc-lbl">Tempo total</div></div>
+      <div class="resumo-card" style="min-width:100px"><div class="rc-val">${vmax}</div><div class="rc-lbl">km/h max</div></div>
+    </div>
+    <div class="table-responsive"><table class="rel-table rel-table--center table"><thead><tr>
+      <th>Veículo</th><th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
+    </tr></thead><tbody>
+      ${lista.map((v, i) => {
+        const d = dispositivosMap[v.deviceId] || { nome: '—' };
+        const origem = fmtEndereco(v.startAddress || v.origem, v.startLat || v.origemLat, v.startLon || v.origemLng);
+        const destino = fmtEndereco(v.endAddress || v.destino, v.endLat || v.destinoLat, v.endLon || v.destinoLng);
+        return `<tr>
+          <td><strong>${d.nome}</strong></td>
+          <td style="color:#888">${i + 1}</td>
+          <td style="white-space:nowrap">${fmtHora(getInicioViagem(v))}</td>
+          <td style="white-space:nowrap">${fmtHora(getFimViagem(v))}</td>
+          <td>${fmtDuracao(getDuracaoMin(v))}</td>
+          <td>${getDistanciaKm(v).toFixed(1)} km</td>
+          <td>${getVelMax(v)} km/h</td>
+          <td style="font-size:10px">${origem}<br>→ ${destino}</td>
+        </tr>`;
+      }).join('')}
+    </tbody></table></div>`;
 }
 
 function renderParadas(lista) {
@@ -375,12 +453,19 @@ function renderParadas(lista) {
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty">Nenhuma parada encontrada.</div>'; return; }
   el.innerHTML = lista.map((p, i) => {
     const d = dispositivosMap[p.deviceId] || { nome: '—' };
+    const endereco = fmtEndereco(p.address || p.endereco, p.lat || p.latitude, p.lon || p.longitude);
+    const inicio = p.startTime || p.inicio;
+    const fim = p.endTime || p.fim;
+    const duracao = p.duracao != null ? p.duracao : (p.duration / 60000);
     return `<div class="parada-card">
-      <div style="display:flex;justify-content:space-between">
-        <div><div style="font-weight:600;font-size:13px"><i class="fa fa-map-marker" style="color:#fab32c"></i> ${d.nome} — Parada ${i+1}</div><div style="font-size:11px;color:#888;margin-top:2px">${p.address || 'Endereço não identificado'}</div></div>
-        <div style="text-align:right;font-size:12px;color:#888"><div><i class="fa fa-clock-o"></i> ${fmtDuracao(p.duration / 60000)}</div>${p.engineHours ? `<div><i class="fa fa-cog"></i> ${Math.round(p.engineHours/3600000)}h motor</div>` : ''}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:600;font-size:13px;text-align:left"><i class="fa fa-map-marker" style="color:#fab32c"></i> ${d.nome} — Parada ${i + 1}</div>
+          <div style="font-size:11px;color:#888;margin-top:2px;text-align:left">${endereco}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;color:#888;white-space:nowrap"><div><i class="fa fa-clock-o"></i> ${fmtDuracao(duracao)}</div></div>
       </div>
-      <div style="font-size:10px;color:#aaa;margin-top:5px">${fmtHora(p.startTime)} → ${fmtHora(p.endTime)}</div>
+      <div style="font-size:10px;color:#aaa;margin-top:5px;text-align:left">${fmtHora(inicio)} → ${fmtHora(fim)}</div>
     </div>`;
   }).join('');
 }

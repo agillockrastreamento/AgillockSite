@@ -192,6 +192,11 @@
     html.dark-theme .rel-content {
       background: #141820;
     }
+    .rel-table--center th,
+    .rel-table--center td {
+      text-align: center;
+      vertical-align: middle;
+    }
 
     /* ── Mapa da rota ── */
     #mapa-rota {
@@ -532,27 +537,27 @@
 
         <!-- Eventos -->
         <div class="tab-pane" id="tab-eventos">
-          <div id="eventos-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+          <div id="eventos-content" class="rel-empty">Selecione pelo menos um veículo para visualizar os eventos.</div>
         </div>
 
         <!-- Viagens -->
         <div class="tab-pane" id="tab-viagens">
-          <div id="viagens-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+          <div id="viagens-content" class="rel-empty">Selecione pelo menos um veículo para visualizar as viagens.</div>
         </div>
 
         <!-- Paradas -->
         <div class="tab-pane" id="tab-paradas">
-          <div id="paradas-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+          <div id="paradas-content" class="rel-empty">Selecione pelo menos um veículo para visualizar as paradas.</div>
         </div>
 
         <!-- Resumo -->
         <div class="tab-pane" id="tab-resumo">
-          <div id="resumo-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+          <div id="resumo-content" class="rel-empty">Selecione pelo menos um veículo para visualizar o resumo.</div>
         </div>
 
         <!-- Gráfico -->
         <div class="tab-pane" id="tab-grafico">
-          <div id="grafico-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div>
+          <div id="grafico-content" class="rel-empty">Selecione pelo menos um veículo para visualizar o gráfico.</div>
         </div>
       </div>
     </div>

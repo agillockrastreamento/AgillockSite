@@ -36,6 +36,42 @@ import {
 const router = Router();
 router.use(authMiddleware);
 
+type RelatorioPosicaoBasica = {
+  id: number;
+  deviceId: number;
+  fixTime: string;
+  latitude: number;
+  longitude: number;
+  address: string | null;
+};
+
+function posicaoMaisProxima(
+  posicoes: RelatorioPosicaoBasica[],
+  deviceId: number,
+  iso?: string | null,
+): RelatorioPosicaoBasica | null {
+  if (!iso) return null;
+  const alvo = new Date(iso).getTime();
+  if (!Number.isFinite(alvo)) return null;
+  let melhor: RelatorioPosicaoBasica | null = null;
+  let menorDelta = Number.POSITIVE_INFINITY;
+  for (const posicao of posicoes) {
+    if (posicao.deviceId !== deviceId) continue;
+    const tempo = new Date(posicao.fixTime).getTime();
+    if (!Number.isFinite(tempo)) continue;
+    const delta = Math.abs(tempo - alvo);
+    if (delta < menorDelta) {
+      melhor = posicao;
+      menorDelta = delta;
+    }
+  }
+  return melhor;
+}
+
+function temEndereco(valor?: string | null): valor is string {
+  return !!(valor && valor.trim() && valor.trim() !== '0.00000, 0.00000');
+}
+
 // ── GET /api/rastreamento/posicoes ────────────────────────────────────────────
 // Snapshot inicial: todos os dispositivos ativos com última posição conhecida.
 // Após esse carregamento inicial, o frontend recebe atualizações via WebSocket.
@@ -614,8 +650,18 @@ router.get('/relatorios/batch/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
     );
     res.json(viagens.map(viagem => {
       const dispositivo = localPorTraccarId.get(viagem.deviceId);
-      if (!dispositivo) return viagem;
-      return aplicarViagensComMedidores(dispositivo, [viagem], historico)[0];
+      const viagemComMedidores = dispositivo ? aplicarViagensComMedidores(dispositivo, [viagem], historico)[0] : viagem;
+      const posInicio = posicaoMaisProxima(historico, viagem.deviceId, viagem.startTime);
+      const posFim = posicaoMaisProxima(historico, viagem.deviceId, viagem.endTime);
+      return {
+        ...viagemComMedidores,
+        startAddress: temEndereco(viagemComMedidores.startAddress) ? viagemComMedidores.startAddress : posInicio?.address ?? viagemComMedidores.startAddress,
+        startLat: viagemComMedidores.startLat || posInicio?.latitude || 0,
+        startLon: viagemComMedidores.startLon || posInicio?.longitude || 0,
+        endAddress: temEndereco(viagemComMedidores.endAddress) ? viagemComMedidores.endAddress : posFim?.address ?? viagemComMedidores.endAddress,
+        endLat: viagemComMedidores.endLat || posFim?.latitude || 0,
+        endLon: viagemComMedidores.endLon || posFim?.longitude || 0,
+      };
     }));
   } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar viagens.' }); }
 });
@@ -632,7 +678,18 @@ router.get('/relatorios/batch/paradas', requireRoles('ADMIN', 'COLABORADOR'), as
       traccarGetStops(ids, new Date(from), new Date(to)),
       traccarGetPositionHistory(ids, new Date(from), new Date(to)).catch(() => []),
     ]);
-    res.json(aplicarParadasComMedidores(paradas, historico));
+    const historicoPorId = new Map(historico.map(p => [p.id, p]));
+    res.json(aplicarParadasComMedidores(paradas, historico).map(parada => {
+      const posicao = historicoPorId.get(parada.positionId)
+        || posicaoMaisProxima(historico, parada.deviceId, parada.startTime)
+        || posicaoMaisProxima(historico, parada.deviceId, parada.endTime);
+      return {
+        ...parada,
+        address: temEndereco(parada.address) ? parada.address : posicao?.address || null,
+        lat: parada.lat || posicao?.latitude || 0,
+        lon: parada.lon || posicao?.longitude || 0,
+      };
+    }));
   } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar paradas.' }); }
 });
 

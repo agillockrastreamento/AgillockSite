@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('btn-carregar').addEventListener('click', carregarRelatorio);
+  document.getElementById('btn-exportar').addEventListener('click', exportarRelatorio);
 
   $('a[href="#tab-rota"]').on('shown.bs.tab', function () {
     if (mapaRota) mapaRota.invalidateSize();
@@ -112,6 +113,21 @@ function isoComFuso(d) {
   const hh = String(Math.floor(abs / 60)).padStart(2, '0');
   const mm = String(abs % 60).padStart(2, '0');
   return d.toISOString().replace('Z', '') + sign + hh + ':' + mm;
+}
+
+function enderecoValido(valor) {
+  return typeof valor === 'string' && valor.trim() && valor.trim() !== '0.00000, 0.00000';
+}
+
+function coordsValidas(lat, lng) {
+  const nLat = Number(lat), nLng = Number(lng);
+  return Number.isFinite(nLat) && Number.isFinite(nLng) && (Math.abs(nLat) > 0.00001 || Math.abs(nLng) > 0.00001);
+}
+
+function fmtEndereco(valor, lat, lng) {
+  if (enderecoValido(valor)) return valor.trim();
+  if (coordsValidas(lat, lng)) return `(${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)})`;
+  return 'Endereço não identificado';
 }
 
 // ── Carregamento ──────────────────────────────────────────────────────────────
@@ -301,7 +317,7 @@ function renderRota(data) {
 function renderEventos(lista) {
   const el = document.getElementById('eventos-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty"><i class="fa fa-bell-slash-o"></i><br>Nenhum evento no período.</div>'; return; }
-  el.innerHTML = `<div class="table-responsive"><table class="rel-table table"><thead><tr><th>Hora</th><th>Tipo</th><th>Detalhes</th></tr></thead><tbody>
+  el.innerHTML = `<div class="table-responsive"><table class="rel-table rel-table--center table"><thead><tr><th>Hora</th><th>Tipo</th><th>Detalhes</th></tr></thead><tbody>
     ${lista.map(e => {
       const info = _EVENTO_LABEL[e.tipo] || { label: e.tipo, cls: 'ev-default' };
       const det = Object.entries(e.atributos || {}).filter(([k]) => !['protocol','alarm'].includes(k)).map(([k,v]) => `${k}: ${v}`).join(', ');
@@ -322,17 +338,22 @@ function renderViagens(lista) {
       <div class="resumo-card" style="min-width:100px"><div class="rc-val">${fmtDuracao(totalMin)}</div><div class="rc-lbl">Tempo total</div></div>
       <div class="resumo-card" style="min-width:100px"><div class="rc-val">${vmax}</div><div class="rc-lbl">km/h máx</div></div>
     </div>
-    <div class="table-responsive"><table class="rel-table table"><thead><tr>
-      <th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th>
+    <div class="table-responsive"><table class="rel-table rel-table--center table"><thead><tr>
+      <th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
     </tr></thead><tbody>
-      ${lista.map((v, i) => `<tr>
-        <td style="color:#888">${i+1}</td>
-        <td style="white-space:nowrap">${fmtHora(v.inicio)}</td>
-        <td style="white-space:nowrap">${fmtHora(v.fim)}</td>
-        <td>${fmtDuracao(v.duracao)}</td>
-        <td>${(v.distancia||0).toFixed(1)} km</td>
-        <td>${v.velocidadeMaxima||0} km/h</td>
-      </tr>`).join('')}
+      ${lista.map((v, i) => {
+        const origem = fmtEndereco(v.origem, v.origemLat, v.origemLng);
+        const destino = fmtEndereco(v.destino, v.destinoLat, v.destinoLng);
+        return `<tr>
+          <td style="color:#888">${i+1}</td>
+          <td style="white-space:nowrap">${fmtHora(v.inicio)}</td>
+          <td style="white-space:nowrap">${fmtHora(v.fim)}</td>
+          <td>${fmtDuracao(v.duracao)}</td>
+          <td>${(v.distancia||0).toFixed(1)} km</td>
+          <td>${v.velocidadeMaxima||0} km/h</td>
+          <td style="font-size:10px">${origem}<br>→ ${destino}</td>
+        </tr>`;
+      }).join('')}
     </tbody></table></div>`;
 }
 
@@ -342,9 +363,9 @@ function renderParadas(lista) {
   el.innerHTML = lista.map((p, i) => `
     <div class="parada-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-weight:600;font-size:12px"><i class="fa fa-map-marker" style="color:#fab32c"></i> Parada ${i+1}</div>
-          <div style="font-size:11px;color:#888;margin-top:2px">${p.endereco||`(${(p.latitude||0).toFixed(5)}, ${(p.longitude||0).toFixed(5)})`}</div>
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:600;font-size:12px;text-align:left"><i class="fa fa-map-marker" style="color:#fab32c"></i> Parada ${i+1}</div>
+          <div style="font-size:11px;color:#888;margin-top:2px;text-align:left">${fmtEndereco(p.endereco, p.latitude, p.longitude)}</div>
         </div>
         <div style="text-align:right;font-size:11px;color:#888"><div>${fmtDuracao(p.duracao)}</div></div>
       </div>
@@ -405,6 +426,37 @@ function renderGrafico(data) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function exportarRelatorio() {
+  const { from, to } = calcularIntervalo();
+  const btn = document.getElementById('btn-exportar');
+  const old = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Exportando...';
+  try {
+    const url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&type=route`;
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + _token } });
+    if (!res.ok) {
+      let msg = 'Erro ao gerar arquivo.';
+      try {
+        const data = await res.json();
+        msg = data.error || msg;
+      } catch {}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = window.URL.createObjectURL(blob);
+    a.download = `relatorio_rota_${Date.now()}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(a.href);
+  } catch (err) {
+    alert(err.message || 'Erro ao exportar relatório.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = old;
+  }
+}
 
 function fmtHora(iso) {
   if (!iso) return '—';
