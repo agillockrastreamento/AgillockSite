@@ -2139,7 +2139,7 @@ function _htmlAcoesCard(dispositivoId) {
   const temRota = !!_rotasIndividuais[dispositivoId];
   return `
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
-      <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">AÇÕES</div>
+      <div class= "dcard-section-title-title">AÇÕES</div>
       <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
         <button class="dcard-acao${temRota ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivo('rota','${dispositivoId}')" title="Rota">
           <div class="dcard-acao-icon"><i class="fa fa-road"></i></div>
