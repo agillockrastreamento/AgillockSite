@@ -597,7 +597,7 @@
     }
     #overlay-titulo { color: #fff; font-size: 15px; font-weight: 700; }
     #btn-overlay-exportar {
-      display: none; margin-left: auto; border: none; border-radius: 6px;
+      display: none; margin-left: auto; border: none; border-radius: 6px; align-items: center; justify-content: center;
       font-size: 12px; font-weight: 700; padding: 7px 12px;
     }
     #overlay-conteudo { flex: 1; overflow: hidden; position: relative; }
@@ -688,7 +688,7 @@
       <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
     </div>
     <ul class="sidebar-nav">
-      <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Rastreamento</span></a></li>
+      <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
       <li id="li-pagamentos" style="display:none;"><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
     </ul>
     <div class="sidebar-footer">
@@ -813,8 +813,8 @@
         <i class="fa fa-arrow-left"></i>
       </button>
       <span id="overlay-titulo" style="font-size:14px;font-weight:600;"></span>
-      <button id="btn-overlay-exportar" class="btn btn-success btn-sm" title="Exportar XML">
-        <i class="fa fa-file-excel-o"></i> Exportar XML
+      <button id="btn-overlay-exportar" class="btn btn-success btn-sm topbar-export-btn" title="Exportar XML">
+        <i style="margin-right: 5px;" class="fa fa-file-excel-o"></i> Exportar XML
       </button>
     </div>
     <div id="overlay-conteudo">

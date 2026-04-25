@@ -72,6 +72,14 @@ function temEndereco(valor?: string | null): valor is string {
   return !!(valor && valor.trim() && valor.trim() !== '0.00000, 0.00000');
 }
 
+function parseDeviceIdsParam(deviceIds: string[] | string): number[] {
+  const valores = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
+  return valores
+    .flatMap(valor => String(valor).split(','))
+    .map(valor => Number(valor.trim()))
+    .filter(id => Number.isInteger(id) && id > 0);
+}
+
 // ── GET /api/rastreamento/posicoes ────────────────────────────────────────────
 // Snapshot inicial: todos os dispositivos ativos com última posição conhecida.
 // Após esse carregamento inicial, o frontend recebe atualizações via WebSocket.
@@ -595,7 +603,8 @@ router.get('/relatorios/batch/historico', requireRoles('ADMIN', 'COLABORADOR'), 
   const deviceIds = (req.query.deviceId as string[] | string);
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
 
-  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  const ids = parseDeviceIdsParam(deviceIds);
+  if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
@@ -633,7 +642,8 @@ router.get('/relatorios/batch/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
   const deviceIds = (req.query.deviceId as string[] | string);
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
 
-  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  const ids = parseDeviceIdsParam(deviceIds);
+  if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
   try {
     const [viagens, traccarDevices, historico] = await Promise.all([
       traccarGetTrips(ids, new Date(from), new Date(to)),
@@ -672,7 +682,8 @@ router.get('/relatorios/batch/paradas', requireRoles('ADMIN', 'COLABORADOR'), as
   const deviceIds = (req.query.deviceId as string[] | string);
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
 
-  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  const ids = parseDeviceIdsParam(deviceIds);
+  if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
   try {
     const [paradas, historico] = await Promise.all([
       traccarGetStops(ids, new Date(from), new Date(to)),
@@ -699,7 +710,8 @@ router.get('/relatorios/batch/eventos', requireRoles('ADMIN', 'COLABORADOR'), as
   const deviceIds = (req.query.deviceId as string[] | string);
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
 
-  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  const ids = parseDeviceIdsParam(deviceIds);
+  if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
   try {
     const eventos = await traccarGetEvents(ids, new Date(from), new Date(to));
     res.json(eventos.map(e => ({
@@ -719,7 +731,8 @@ router.get('/relatorios/batch/resumo', requireRoles('ADMIN', 'COLABORADOR'), asy
   const deviceIds = (req.query.deviceId as string[] | string);
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
 
-  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  const ids = parseDeviceIdsParam(deviceIds);
+  if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
   try {
     const [resumo, traccarDevices, historico] = await Promise.all([
       traccarGetSummary(ids, new Date(from), new Date(to)),
@@ -756,7 +769,8 @@ router.get('/relatorios/exportar', requireRoles('ADMIN', 'COLABORADOR'), async (
     return;
   }
 
-  const ids = Array.isArray(deviceIds) ? deviceIds.map(Number) : [parseInt(deviceIds)];
+  const ids = parseDeviceIdsParam(deviceIds);
+  if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
 
   try {
     const response = await traccarExportReport(

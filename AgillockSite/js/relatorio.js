@@ -19,9 +19,19 @@ const GOOGLE_MAP_TYPES = {
 };
 
 const _COLORS = [
-  '#2980b9', '#e74c3c', '#27ae60', '#f39c12', '#8e44ad', 
+  '#2980b9', '#e74c3c', '#27ae60', '#f39c12', '#8e44ad',
   '#16a085', '#d35400', '#2c3e50', '#c0392b', '#27ae60'
 ];
+
+function normalizarIdsSelecionados(ids) {
+  if (!ids) return [];
+  return (Array.isArray(ids) ? ids : [ids]).map(id => String(id)).filter(Boolean);
+}
+
+function adicionarDeviceIdsQuery(params, ids) {
+  const normalizados = normalizarIdsSelecionados(ids);
+  if (normalizados.length) params.set('deviceId', normalizados.join(','));
+}
 
 // ── Mapeamento de tipos de eventos ────────────────────────────────────────────
 
@@ -64,21 +74,21 @@ document.addEventListener('DOMContentLoaded', async function () {
       const isCustom = periodoAtual === 'custom';
       document.getElementById('custom-datas').style.display = isCustom ? 'flex' : 'none';
 
-      const selecionados = $('#sel-dispositivo').val();
+      const selecionados = normalizarIdsSelecionados($('#sel-dispositivo').val());
       if (!isCustom && selecionados && selecionados.length > 0) carregarRelatorio();
     });
   });
 
   // ── Seletor de dispositivo (Select2 change) ──
   $('#sel-dispositivo').on('change', function () {
-    const selecionados = $(this).val();
-    dispositivoIdsAtuais = selecionados || [];
+    const selecionados = normalizarIdsSelecionados($(this).val());
+    dispositivoIdsAtuais = selecionados;
     if (dispositivoIdsAtuais.length > 0 && periodoAtual !== 'custom') carregarRelatorio();
     else if (dispositivoIdsAtuais.length === 0) renderSemDispositivoSelecionado();
   });
 
   document.getElementById('btn-abrir-exportar').addEventListener('click', function() {
-    const selecionados = $('#sel-dispositivo').val();
+    const selecionados = normalizarIdsSelecionados($('#sel-dispositivo').val());
     if (!selecionados || selecionados.length === 0) {
       AL.showAlert('Selecione pelo menos um dispositivo para exportar.', 'warning');
       return;
@@ -196,8 +206,9 @@ async function carregarRelatorio() {
   document.getElementById('rota-stats').innerHTML = '';
   document.getElementById('mapa-rota-loading').style.display = 'flex';
 
-  let qs = `from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`;
-  dispositivoIdsAtuais.forEach(id => qs += `&deviceId=${id}`);
+  const params = new URLSearchParams({ from: fromIso, to: toIso });
+  adicionarDeviceIdsQuery(params, dispositivoIdsAtuais);
+  const qs = params.toString();
 
   try {
     const [historico, viagens, paradas, eventos, resumo] = await Promise.allSettled([
@@ -633,7 +644,7 @@ function renderGraficoBatch(data) {
 // ── Exportação ────────────────────────────────────────────────────────────────
 
 async function exportarRelatorio() {
-  const selecionados = $('#sel-dispositivo').val();
+  const selecionados = normalizarIdsSelecionados($('#sel-dispositivo').val());
   if (!selecionados || selecionados.length === 0) return;
   const tipo = document.getElementById('export-tipo').value, { from, to } = calcularIntervalo();
   const btn = document.getElementById('btn-confirmar-exportar'), old = btn.innerHTML;
@@ -641,8 +652,13 @@ async function exportarRelatorio() {
   
   try {
     const token = localStorage.getItem('al-token') || localStorage.getItem('al_token');
-    let url = `${window.API_URL}/api/rastreamento/relatorios/exportar?from=${from.toISOString()}&to=${to.toISOString()}&type=${tipo}`;
-    selecionados.forEach(id => url += `&deviceId=${id}`);
+    const params = new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      type: tipo,
+    });
+    adicionarDeviceIdsQuery(params, selecionados);
+    const url = `${window.API_URL}/api/rastreamento/relatorios/exportar?${params.toString()}`;
     
     const res = await fetch(url, { 
       headers: { 'Authorization': `Bearer ${token}` } 

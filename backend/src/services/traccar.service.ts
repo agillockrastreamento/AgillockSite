@@ -79,7 +79,7 @@ export async function traccarGetPositionHistory(
     to: to.toISOString(),
   });
   deviceIds.forEach(id => params.append('deviceId', String(id)));
-  const res = await fetch(`${TRACCAR_URL}/api/positions?${params}`, { headers: defaultHeaders });
+  const res = await fetch(`${TRACCAR_URL}/api/reports/route?${params}`, { headers: defaultHeaders });
   if (!res.ok) throw new Error(`Traccar ${res.status}`);
   return res.json() as Promise<TraccarPosition[]>;
 }

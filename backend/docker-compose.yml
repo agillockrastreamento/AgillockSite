@@ -28,6 +28,7 @@ services:
       DATABASE_URL: postgresql://agillock_user:${POSTGRES_PASSWORD}@postgres:5432/agillock
     volumes:
       - ./cert:/app/cert:ro
+      - uploads_data:/app/uploads
       - traccar_logs:/opt/traccar/logs:ro
     ports:
       - "3000:3000"
@@ -86,3 +87,4 @@ networks:
 volumes:
   postgres_data:
   traccar_logs:
+  uploads_data:
