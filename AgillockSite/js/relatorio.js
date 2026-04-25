@@ -5,6 +5,7 @@ let chartVelocidade = null;
 let periodoAtual = 'hoje';
 let dispositivoIdsAtuais = [];
 let dispositivosMap = {}; // id -> { nome, placa }
+let dispositivoLocalParaTraccar = {}; // dispositivoId local -> traccarId
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
 let _googleMapTypeControl = null;
@@ -49,13 +50,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     width: '100%'
   });
 
-  // Pré-selecionar dispositivo via ?id=
-  const params = new URLSearchParams(window.location.search);
-  const idParam = params.get('id');
-  if (idParam) {
-    $('#sel-dispositivo').val([idParam]).trigger('change');
-  }
-
   configurarPeriodo();
   inicializarMapaRota();
 
@@ -93,6 +87,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('btn-confirmar-exportar').addEventListener('click', exportarRelatorio);
   document.getElementById('btn-carregar').addEventListener('click', carregarRelatorio);
 
+  aplicarDispositivoInicialDaUrl();
+
   $('a[href="#tab-rota"]').on('shown.bs.tab', function () {
     if (mapaRota) mapaRota.invalidateSize();
   });
@@ -104,15 +100,36 @@ async function carregarDispositivos() {
     const sel = document.getElementById('sel-dispositivo');
     lista.sort((a, b) => a.nome.localeCompare(b.nome));
     lista.forEach(v => {
+      if (!v.traccarId) return;
       const opt = document.createElement('option');
       opt.value = v.traccarId;
+      opt.dataset.dispositivoId = v.dispositivoId || '';
       opt.textContent = v.nome + (v.placa ? ` (${v.placa})` : '');
       sel.appendChild(opt);
       dispositivosMap[v.traccarId] = { nome: v.nome, placa: v.placa };
+      if (v.dispositivoId) dispositivoLocalParaTraccar[v.dispositivoId] = String(v.traccarId);
     });
   } catch (err) {
     console.error('Erro dispositivos:', err);
   }
+}
+
+function resolverIdRelatorio(idParam) {
+  if (!idParam) return null;
+  if (dispositivosMap[idParam]) return idParam;
+  return dispositivoLocalParaTraccar[idParam] || null;
+}
+
+function aplicarDispositivoInicialDaUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const idParam = params.get('id');
+  const traccarId = resolverIdRelatorio(idParam);
+  if (!idParam) return;
+  if (!traccarId) {
+    AL.showAlert('Dispositivo informado no link não foi encontrado no rastreador.', 'warning');
+    return;
+  }
+  $('#sel-dispositivo').val([traccarId]).trigger('change');
 }
 
 function configurarPeriodo() {

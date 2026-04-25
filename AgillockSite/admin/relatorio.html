@@ -103,6 +103,17 @@
       border-color: var(--al-primary-hover);
       color: #222;
     }
+    html.dark-theme .periodo-btn.active,
+    html.dark-theme .periodo-btn.active:hover,
+    html.dark-theme .periodo-btn.active:focus,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active:hover,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active:focus {
+      background: var(--al-primary) !important;
+      border-color: var(--al-primary-hover) !important;
+      color: #222 !important;
+      box-shadow: none;
+    }
     html.dark-theme .btn-default {
       background: #252535;
       color: #c9d1d9;
@@ -118,6 +129,11 @@
 
     /* ── Nav tabs ── */
     .rel-tabs { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar-export-btn {
+      margin-left: auto;
+      border-radius: 6px;
+      font-weight: 700;
+    }
 
     #rel-nav {
       margin: 0;
@@ -431,6 +447,9 @@
         <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
         <h2 class="topbar-title">Relatório</h2>
       </div>
+      <button class="btn btn-success btn-sm topbar-export-btn" id="btn-abrir-exportar">
+        <i class="fa fa-file-excel-o"></i> Exportar XML
+      </button>
     </div>
 
     <!-- Toolbar de seleção -->
@@ -455,10 +474,6 @@
           <i class="fa fa-search"></i> Carregar
         </button>
       </div>
-
-      <button class="btn btn-success btn-sm" id="btn-abrir-exportar">
-        <i class="fa fa-file-excel-o"></i> Exportar XML
-      </button>
     </div>
 
     <!-- Modal de Exportação -->
