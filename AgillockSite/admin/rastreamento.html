@@ -76,6 +76,17 @@
         background: rgba(20,20,30,0.92); backdrop-filter: blur(6px);
         box-shadow: 0 8px 20px rgba(0,0,0,.2);
       }
+      .map-control-drawer::after {
+        content: "";
+        position: absolute;
+        top: 9px;
+        right: -7px;
+        width: 0;
+        height: 0;
+        border-top: 7px solid transparent;
+        border-bottom: 7px solid transparent;
+        border-left: 7px solid rgba(20,20,30,0.92);
+      }
       .map-control-option {
         width: 74px; min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: 8px; border: none; border-radius: 10px; background: transparent; color: #fff; cursor: pointer;
@@ -125,10 +136,21 @@
       position: absolute; top: 10px; right: 52px; z-index: 940;
       background: rgba(20,20,30,0.85); backdrop-filter: blur(6px);
       border-radius: 12px; padding: 10px;
-      display: flex; flex-direction: column; gap: 4px;
+      display: flex; flex-direction: row; align-items: center; gap: 8px;
       transform: translateX(8px); opacity: 0;
       transition: transform .2s ease, opacity .2s ease;
       pointer-events: none;
+    }
+    #mapa-tray::after {
+      content: "";
+      position: absolute;
+      top: 10px;
+      right: -7px;
+      width: 0;
+      height: 0;
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+      border-left: 7px solid rgba(20,20,30,0.85);
     }
     #mapa-tray.aberta { transform: translateX(0); opacity: 1; pointer-events: all; }
     .ml-btn {
@@ -408,6 +430,15 @@
       padding-top: 6px; margin-top: 4px; line-height: 1.7;
     }
     html.dark-theme .dcard-section { border-top-color: rgba(255,255,255,.1); }
+    .dcard-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: #888;
+      letter-spacing: .3px;
+      line-height: 1.2;
+      margin-bottom: 5px;
+      text-align: left;
+    }
 
     /* ── Itens de busca ── */
     .veiculo-item {

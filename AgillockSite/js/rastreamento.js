@@ -547,7 +547,7 @@ function _adicionarControleTipoGoogle() {
       L.DomEvent.on(btn, 'click', function (e) {
         L.DomEvent.stop(e);
         const abrindo = menu.style.display === 'none';
-        menu.style.display = abrindo ? 'block' : 'none';
+        menu.style.display = abrindo ? 'flex' : 'none';
         btn.classList.toggle('ativo', abrindo);
       });
       wrap.querySelectorAll('[data-google-map-type]').forEach(function (item) {
@@ -2021,6 +2021,7 @@ function mostrarCardDispositivo(id) {
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
   const horasHtml = p ? `
     <div class="dcard-section dcard-val">
+      <div class="dcard-section-title">Última Atualização</div>
       <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> <span id="dcard-ts-srv">${fmtGPSTimeSec(p.serverTime)}</span></div>
       <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
       <div><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> <span id="dcard-ts-gps">${fmtGPSTimeSec(p.fixTime)}</span></div>
@@ -2065,12 +2066,16 @@ function mostrarCardDispositivo(id) {
       </div>
       <div id="dcard-velocimetro">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
       <hr id="dcard-divider-speed" style="margin:2px 0 6px;border:none;border-top:1px solid rgba(128,128,128,0.15)${p?.velocidade != null ? '' : ';display:none'}">
+      <div class="dcard-section-title">Informações do Dispositivo</div>
       <div id="dcard-status-items" style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:8px">${si.join('')}</div>
       ${horasHtml}
-      ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4;display:flex;align-items:flex-start;gap:6px">
-          <i class="fa fa-map-pin" style="color:#e74c3c;width:13px;flex:0 0 auto;margin-top:2px"></i>
-          <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="flex:1 1 auto">${addrTxt}</span>
-          ${_htmlBotaoStreetView(p.latitude, p.longitude)}
+      ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
+          <div class="dcard-section-title">Endereço</div>
+          <div style="display:flex;align-items:flex-start;gap:6px">
+            <i class="fa fa-map-pin" style="color:#e74c3c;width:13px;flex:0 0 auto;margin-top:2px"></i>
+            <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="flex:1 1 auto">${addrTxt}</span>
+            ${_htmlBotaoStreetView(p.latitude, p.longitude)}
+          </div>
         </div>` : ''}
       <div style="margin-top:10px;display:flex;gap:6px">
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
