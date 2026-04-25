@@ -13,7 +13,20 @@
   <style>
     body { margin: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; font-family: 'Montserrat', sans-serif; }
 
-    /* Toolbar */
+    /* Topbar / Toolbar */
+    .rel-topbar {
+      height: 52px;
+      background: #fff;
+      border-bottom: 1px solid #e8e8e8;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    html.dark-theme .rel-topbar { background: #1e2530; border-color: #2d3748; }
+    .rel-topbar-title { margin: 0; font-size: 16px; font-weight: 700; color: #333; }
+    html.dark-theme .rel-topbar-title { color: #f0f2f5; }
     .rel-toolbar {
       background: #fff; border-bottom: 1px solid #e8e8e8;
       padding: 8px 16px; display: flex; align-items: center;
@@ -159,6 +172,13 @@
 </head>
 <body>
 
+  <div class="rel-topbar">
+    <h2 class="rel-topbar-title">Relatório</h2>
+    <button class="btn btn-success btn-sm rel-export-btn" id="btn-exportar">
+      <i class="fa fa-file-excel-o"></i> Exportar XML
+    </button>
+  </div>
+
   <!-- Toolbar sem sidebar -->
   <div class="rel-toolbar">
     <div class="btn-group">
@@ -173,9 +193,34 @@
       <input type="date" id="dt-ate" class="form-control input-sm" style="width:130px" />
       <button class="btn btn-primary btn-sm" id="btn-carregar"><i class="fa fa-search"></i></button>
     </div>
-    <button class="btn btn-success btn-sm rel-export-btn" id="btn-exportar">
-      <i class="fa fa-file-excel-o"></i> Exportar XML
-    </button>
+  </div>
+
+  <div class="modal fade" id="modal-exportar" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#27ae60; color:#fff; padding:10px 15px">
+          <h5 class="modal-title">Exportar Relatório (XML)</h5>
+        </div>
+        <div class="modal-body" style="padding:15px">
+          <div class="form-group">
+            <label style="font-size:12px; font-weight:600">Tipo de Relatório</label>
+            <select id="export-tipo" class="form-control input-sm">
+              <option value="route">Rota / Trajeto</option>
+              <option value="events">Eventos</option>
+              <option value="trips">Viagens</option>
+              <option value="stops">Paradas</option>
+              <option value="summary">Resumo / Totais</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:10px">
+          <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success btn-sm" id="btn-confirmar-exportar">
+            <i class="fa fa-download"></i> Baixar
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Tabs -->

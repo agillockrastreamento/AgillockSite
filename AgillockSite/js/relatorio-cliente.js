@@ -25,6 +25,7 @@ let periodoAtual = 'hoje';
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
 let _googleMapTypeControl = null;
+const _reverseGeocodeCache = {};
 
 const GOOGLE_MAP_TYPES = {
   roadmap: { label: 'Mapa', icon: 'fa-map-o', lyrs: 'm' },
@@ -69,7 +70,8 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('btn-carregar').addEventListener('click', carregarRelatorio);
-  document.getElementById('btn-exportar').addEventListener('click', exportarRelatorio);
+  document.getElementById('btn-exportar').addEventListener('click', function () { $('#modal-exportar').modal('show'); });
+  document.getElementById('btn-confirmar-exportar').addEventListener('click', exportarRelatorio);
 
   $('a[href="#tab-rota"]').on('shown.bs.tab', function () {
     if (mapaRota) mapaRota.invalidateSize();
@@ -116,7 +118,20 @@ function isoComFuso(d) {
 }
 
 function enderecoValido(valor) {
-  return typeof valor === 'string' && valor.trim() && valor.trim() !== '0.00000, 0.00000';
+  return typeof valor === 'string' && valor.trim() && !enderecoPareceCoordenada(valor);
+}
+
+function enderecoPareceCoordenada(valor) {
+  if (typeof valor !== 'string') return false;
+  const texto = valor.trim();
+  if (!texto || texto === '0.00000, 0.00000') return true;
+  return /^\(?\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*\)?$/.test(texto);
+}
+
+function extrairCoords(valor) {
+  if (typeof valor !== 'string') return null;
+  const m = valor.trim().match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/);
+  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
 }
 
 function coordsValidas(lat, lng) {
@@ -126,8 +141,29 @@ function coordsValidas(lat, lng) {
 
 function fmtEndereco(valor, lat, lng) {
   if (enderecoValido(valor)) return valor.trim();
+  const coordsTexto = extrairCoords(valor);
+  if (coordsTexto) return `(${coordsTexto.lat.toFixed(5)}, ${coordsTexto.lng.toFixed(5)})`;
   if (coordsValidas(lat, lng)) return `(${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)})`;
   return 'Endereço não identificado';
+}
+
+async function resolverEndereco(valor, lat, lng) {
+  if (enderecoValido(valor)) return valor.trim();
+  const coordsTexto = extrairCoords(valor);
+  const finalLat = coordsValidas(lat, lng) ? Number(lat) : coordsTexto?.lat;
+  const finalLng = coordsValidas(lat, lng) ? Number(lng) : coordsTexto?.lng;
+  if (!coordsValidas(finalLat, finalLng)) return 'Endereço não identificado';
+  const chave = `${finalLat.toFixed(5)},${finalLng.toFixed(5)}`;
+  if (_reverseGeocodeCache[chave]) return _reverseGeocodeCache[chave];
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLng)}&accept-language=pt-BR`);
+    const data = await res.json();
+    const end = data.display_name || fmtEndereco(null, finalLat, finalLng);
+    _reverseGeocodeCache[chave] = end;
+    return end;
+  } catch {
+    return fmtEndereco(null, finalLat, finalLng);
+  }
 }
 
 // ── Carregamento ──────────────────────────────────────────────────────────────
@@ -158,8 +194,8 @@ async function carregarRelatorio() {
 
     renderRota(historico.status === 'fulfilled' ? historico.value : null);
     renderEventos(eventos.status === 'fulfilled' ? eventos.value : null);
-    renderViagens(viagens.status === 'fulfilled' ? viagens.value : null);
-    renderParadas(paradas.status === 'fulfilled' ? paradas.value : null);
+    await renderViagens(viagens.status === 'fulfilled' ? viagens.value : null);
+    await renderParadas(paradas.status === 'fulfilled' ? paradas.value : null);
     renderResumo(
       resumo.status === 'fulfilled'  ? resumo.value  : null,
       viagens.status === 'fulfilled' ? viagens.value : null,
@@ -326,7 +362,7 @@ function renderEventos(lista) {
   </tbody></table></div>`;
 }
 
-function renderViagens(lista) {
+async function renderViagens(lista) {
   const el = document.getElementById('viagens-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty"><i class="fa fa-car"></i><br>Nenhuma viagem no período.</div>'; return; }
   let totalKm = 0, totalMin = 0, vmax = 0;
@@ -341,9 +377,9 @@ function renderViagens(lista) {
     <div class="table-responsive"><table class="rel-table rel-table--center table"><thead><tr>
       <th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
     </tr></thead><tbody>
-      ${lista.map((v, i) => {
-        const origem = fmtEndereco(v.origem, v.origemLat, v.origemLng);
-        const destino = fmtEndereco(v.destino, v.destinoLat, v.destinoLng);
+      ${(await Promise.all(lista.map(async (v, i) => {
+        const origem = await resolverEndereco(v.origem, v.origemLat, v.origemLng);
+        const destino = await resolverEndereco(v.destino, v.destinoLat, v.destinoLng);
         return `<tr>
           <td style="color:#888">${i+1}</td>
           <td style="white-space:nowrap">${fmtHora(v.inicio)}</td>
@@ -353,24 +389,24 @@ function renderViagens(lista) {
           <td>${v.velocidadeMaxima||0} km/h</td>
           <td style="font-size:10px">${origem}<br>→ ${destino}</td>
         </tr>`;
-      }).join('')}
+      }))).join('')}
     </tbody></table></div>`;
 }
 
-function renderParadas(lista) {
+async function renderParadas(lista) {
   const el = document.getElementById('paradas-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty"><i class="fa fa-pause-circle-o"></i><br>Nenhuma parada no período.</div>'; return; }
-  el.innerHTML = lista.map((p, i) => `
+  el.innerHTML = (await Promise.all(lista.map(async (p, i) => `
     <div class="parada-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="min-width:0;flex:1">
           <div style="font-weight:600;font-size:12px;text-align:left"><i class="fa fa-map-marker" style="color:#fab32c"></i> Parada ${i+1}</div>
-          <div style="font-size:11px;color:#888;margin-top:2px;text-align:left">${fmtEndereco(p.endereco, p.latitude, p.longitude)}</div>
+          <div style="font-size:11px;color:#888;margin-top:2px;text-align:left">${await resolverEndereco(p.endereco, p.latitude, p.longitude)}</div>
         </div>
         <div style="text-align:right;font-size:11px;color:#888"><div>${fmtDuracao(p.duracao)}</div></div>
       </div>
       <div style="font-size:10px;color:#aaa;margin-top:4px">${fmtHora(p.inicio)} → ${fmtHora(p.fim)}</div>
-    </div>`).join('');
+    </div>`))).join('');
 }
 
 function renderResumo(resumo, viagens, paradas) {
@@ -429,12 +465,13 @@ function renderGrafico(data) {
 
 async function exportarRelatorio() {
   const { from, to } = calcularIntervalo();
-  const btn = document.getElementById('btn-exportar');
+  const tipo = document.getElementById('export-tipo').value;
+  const btn = document.getElementById('btn-confirmar-exportar');
   const old = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Exportando...';
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando...';
   try {
-    const url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&type=route`;
+    const url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&type=${encodeURIComponent(tipo)}`;
     const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + _token } });
     if (!res.ok) {
       let msg = 'Erro ao gerar arquivo.';
@@ -447,9 +484,10 @@ async function exportarRelatorio() {
     const blob = await res.blob();
     const a = document.createElement('a');
     a.href = window.URL.createObjectURL(blob);
-    a.download = `relatorio_rota_${Date.now()}.xlsx`;
+    a.download = `relatorio_${tipo}_${Date.now()}.xlsx`;
     a.click();
     window.URL.revokeObjectURL(a.href);
+    $('#modal-exportar').modal('hide');
   } catch (err) {
     alert(err.message || 'Erro ao exportar relatório.');
   } finally {

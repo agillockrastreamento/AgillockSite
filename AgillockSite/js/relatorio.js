@@ -9,6 +9,7 @@ let dispositivoLocalParaTraccar = {}; // dispositivoId local -> traccarId
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
 let _googleMapTypeControl = null;
+const _reverseGeocodeCache = {};
 
 const GOOGLE_MAP_TYPES = {
   roadmap: { label: 'Mapa', icon: 'fa-map-o', lyrs: 'm' },
@@ -209,8 +210,8 @@ async function carregarRelatorio() {
 
     renderRota(historico.status === 'fulfilled' ? historico.value : null);
     renderEventos(eventos.status === 'fulfilled' ? eventos.value : null);
-    renderViagens(viagens.status === 'fulfilled' ? viagens.value : null);
-    renderParadas(paradas.status === 'fulfilled' ? paradas.value : null);
+    await renderViagens(viagens.status === 'fulfilled' ? viagens.value : null);
+    await renderParadas(paradas.status === 'fulfilled' ? paradas.value : null);
     renderResumoBatch(resumo.status === 'fulfilled' ? resumo.value : null);
     renderGraficoBatch(historico.status === 'fulfilled' ? historico.value : null);
   } catch (err) {
@@ -237,7 +238,20 @@ function renderSemDispositivoSelecionado() {
 }
 
 function enderecoValido(valor) {
-  return typeof valor === 'string' && valor.trim() && valor.trim() !== '0.00000, 0.00000';
+  return typeof valor === 'string' && valor.trim() && !enderecoPareceCoordenada(valor);
+}
+
+function enderecoPareceCoordenada(valor) {
+  if (typeof valor !== 'string') return false;
+  const texto = valor.trim();
+  if (!texto || texto === '0.00000, 0.00000') return true;
+  return /^\(?\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*\)?$/.test(texto);
+}
+
+function extrairCoords(valor) {
+  if (typeof valor !== 'string') return null;
+  const m = valor.trim().match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/);
+  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
 }
 
 function coordsValidas(lat, lng) {
@@ -247,8 +261,29 @@ function coordsValidas(lat, lng) {
 
 function fmtEndereco(valor, lat, lng) {
   if (enderecoValido(valor)) return valor.trim();
+  const coordsTexto = extrairCoords(valor);
+  if (coordsTexto) return `(${coordsTexto.lat.toFixed(5)}, ${coordsTexto.lng.toFixed(5)})`;
   if (coordsValidas(lat, lng)) return `(${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)})`;
   return 'Endereço não identificado';
+}
+
+async function resolverEndereco(valor, lat, lng) {
+  if (enderecoValido(valor)) return valor.trim();
+  const coordsTexto = extrairCoords(valor);
+  const finalLat = coordsValidas(lat, lng) ? Number(lat) : coordsTexto?.lat;
+  const finalLng = coordsValidas(lat, lng) ? Number(lng) : coordsTexto?.lng;
+  if (!coordsValidas(finalLat, finalLng)) return 'Endereço não identificado';
+  const chave = `${finalLat.toFixed(5)},${finalLng.toFixed(5)}`;
+  if (_reverseGeocodeCache[chave]) return _reverseGeocodeCache[chave];
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLng)}&accept-language=pt-BR`);
+    const data = await res.json();
+    const end = data.display_name || fmtEndereco(null, finalLat, finalLng);
+    _reverseGeocodeCache[chave] = end;
+    return end;
+  } catch {
+    return fmtEndereco(null, finalLat, finalLng);
+  }
 }
 
 function getInicioViagem(v) {
@@ -415,7 +450,7 @@ function renderEventos(lista) {
     }).join('')}</tbody></table></div>`;
 }
 
-function renderViagens(lista) {
+async function renderViagens(lista) {
   const el = document.getElementById('viagens-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty">Nenhuma viagem encontrada.</div>'; return; }
   let totalKm = 0, totalMin = 0, vmax = 0;
@@ -430,10 +465,10 @@ function renderViagens(lista) {
     <div class="table-responsive"><table class="rel-table rel-table--center table"><thead><tr>
       <th>Veículo</th><th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
     </tr></thead><tbody>
-      ${lista.map((v, i) => {
+      ${(await Promise.all(lista.map(async (v, i) => {
         const d = dispositivosMap[v.deviceId] || { nome: '—' };
-        const origem = fmtEndereco(v.startAddress || v.origem, v.startLat || v.origemLat, v.startLon || v.origemLng);
-        const destino = fmtEndereco(v.endAddress || v.destino, v.endLat || v.destinoLat, v.endLon || v.destinoLng);
+        const origem = await resolverEndereco(v.startAddress || v.origem, v.startLat || v.origemLat, v.startLon || v.origemLng);
+        const destino = await resolverEndereco(v.endAddress || v.destino, v.endLat || v.destinoLat, v.endLon || v.destinoLng);
         return `<tr>
           <td><strong>${d.nome}</strong></td>
           <td style="color:#888">${i + 1}</td>
@@ -444,16 +479,16 @@ function renderViagens(lista) {
           <td>${getVelMax(v)} km/h</td>
           <td style="font-size:10px">${origem}<br>→ ${destino}</td>
         </tr>`;
-      }).join('')}
+      }))).join('')}
     </tbody></table></div>`;
 }
 
-function renderParadas(lista) {
+async function renderParadas(lista) {
   const el = document.getElementById('paradas-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty">Nenhuma parada encontrada.</div>'; return; }
-  el.innerHTML = lista.map((p, i) => {
+  el.innerHTML = (await Promise.all(lista.map(async (p, i) => {
     const d = dispositivosMap[p.deviceId] || { nome: '—' };
-    const endereco = fmtEndereco(p.address || p.endereco, p.lat || p.latitude, p.lon || p.longitude);
+    const endereco = await resolverEndereco(p.address || p.endereco, p.lat || p.latitude, p.lon || p.longitude);
     const inicio = p.startTime || p.inicio;
     const fim = p.endTime || p.fim;
     const duracao = p.duracao != null ? p.duracao : (p.duration / 60000);
@@ -467,7 +502,7 @@ function renderParadas(lista) {
       </div>
       <div style="font-size:10px;color:#aaa;margin-top:5px;text-align:left">${fmtHora(inicio)} → ${fmtHora(fim)}</div>
     </div>`;
-  }).join('');
+  }))).join('');
 }
 
 function renderResumoBatch(lista) {
@@ -535,7 +570,7 @@ function renderGraficoBatch(data) {
     const d = dispositivosMap[did] || { nome: did }, cor = _COLORS[idx % _COLORS.length];
     datasets.push({ 
       label: d.nome, 
-      data: porDispositivo[did], 
+      data: porDispositivo[did].map(p => ({ x: fmtHora(p.x), y: p.y })),
       borderColor: cor, 
       backgroundColor: cor + (isSingle ? '33' : '15'),
       borderWidth: isSingle ? 3 : 2,
@@ -557,8 +592,7 @@ function renderGraficoBatch(data) {
       maintainAspectRatio: false, 
       scales: { 
         x: { 
-          type: 'time', 
-          time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+          type: 'category',
           ticks: { color: '#888' }
         }, 
         y: { 
