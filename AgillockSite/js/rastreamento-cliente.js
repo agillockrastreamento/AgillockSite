@@ -86,11 +86,19 @@ let _googleMapTypeControl = null;
 let _baseMapControlLayers = {};
 
 const GOOGLE_MAP_TYPES = {
-  roadmap: { label: 'Roadmap', lyrs: 'm' },
-  satellite: { label: 'Satellite', lyrs: 's' },
-  hybrid: { label: 'Hybrid', lyrs: 'y' },
-  terrain: { label: 'Terrain', lyrs: 'p' },
+  roadmap: { label: 'Mapa', icon: 'fa-map-o', lyrs: 'm' },
+  satellite: { label: 'Satélite', icon: 'fa-globe', lyrs: 's' },
+  hybrid: { label: 'Híbrido', icon: 'fa-clone', lyrs: 'y' },
+  terrain: { label: 'Terreno', icon: 'fa-area-chart', lyrs: 'p' },
 };
+
+function _urlStreetView(lat, lng) {
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${encodeURIComponent(`${lat},${lng}`)}`;
+}
+
+function _htmlBotaoStreetView(lat, lng) {
+  return `<a href="${_urlStreetView(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-streetview-btn" title="Abrir no Street View"><i class="fa fa-street-view"></i></a>`;
+}
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -420,14 +428,17 @@ function _adicionarControleTipoGoogle() {
   const GoogleTypeControl = L.Control.extend({
     onAdd() {
       const wrap = L.DomUtil.create('div', 'leaflet-control google-map-type-control');
-      wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;align-items:flex-end;';
+      wrap.style.cssText = 'position:relative;';
       wrap.innerHTML = `
-        <button type="button" class="leaflet-bar" title="Tipo do Google Maps" style="width:35px;height:35px;display:flex;align-items:center;justify-content:center;background:#fff;border:2.5px solid #ccc;border-radius:50%;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3);">
-          <i class="fa fa-map" style="font-size:13px;color:#333"></i>
+        <button type="button" class="map-control-btn map-control-btn--google" title="Tipos de mapa">
+          <i class="fa fa-map" style="font-size:13px;"></i>
         </button>
-        <div class="google-map-type-menu" style="display:none;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.22);overflow:hidden;min-width:112px">
+        <div class="map-control-drawer google-map-type-menu" style="display:none">
           ${Object.keys(GOOGLE_MAP_TYPES).map(function (tipo) {
-            return `<button type="button" data-google-map-type="${tipo}" style="display:block;width:100%;border:0;background:#fff;padding:7px 10px;text-align:left;font-size:12px;cursor:pointer">${GOOGLE_MAP_TYPES[tipo].label}</button>`;
+            return `<button type="button" class="map-control-option" data-google-map-type="${tipo}" title="${GOOGLE_MAP_TYPES[tipo].label}">
+              <i class="fa ${GOOGLE_MAP_TYPES[tipo].icon}"></i>
+              <span>${GOOGLE_MAP_TYPES[tipo].label}</span>
+            </button>`;
           }).join('')}
         </div>`;
       const btn = wrap.querySelector('button');
@@ -461,9 +472,7 @@ function _atualizarControleTipoGoogle() {
   _googleMapTypeControl.style.display = ativo ? 'flex' : 'none';
   _googleMapTypeControl.querySelectorAll('[data-google-map-type]').forEach(function (item) {
     const selecionado = item.getAttribute('data-google-map-type') === _googleMapType;
-    item.style.background = selecionado ? '#e8f4fd' : '#fff';
-    item.style.color = selecionado ? '#2980b9' : '#333';
-    item.style.fontWeight = selecionado ? '700' : '400';
+    item.classList.toggle('ativo', selecionado);
   });
 }
 
@@ -476,18 +485,16 @@ function _adicionarBotoesCamadas() {
   let _toggleBtn = null;
   const BtnTray = L.Control.extend({
     onAdd() {
-      const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+      const btn = L.DomUtil.create('button', 'leaflet-control map-control-btn map-control-btn--tray');
       btn.id = 'mapa-tray-toggle';
       btn.title = 'Camadas do mapa';
-      btn.style.cssText = 'width:35px;height:35px;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;background:#fff;border:2.5px solid #ccc;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,0.3);border-radius:50%;';
-      btn.innerHTML = '<i class="fa fa-database" style="color:#333"></i>';
+      btn.innerHTML = '<i class="fa fa-database"></i>';
       L.DomEvent.disableClickPropagation(btn);
       L.DomEvent.disableScrollPropagation(btn);
       L.DomEvent.on(btn, 'click', function (e) {
         L.DomEvent.stop(e);
         const aberta = tray.classList.toggle('aberta');
-        btn.style.background = aberta ? '#fab32c' : '#fff';
-        btn.querySelector('i').style.color = aberta ? '#222' : '#333';
+        btn.classList.toggle('ativo', aberta);
       });
       _toggleBtn = btn;
       return btn;
@@ -501,7 +508,7 @@ function _adicionarBotoesCamadas() {
   document.addEventListener('click', function (e) {
     if (!tray.contains(e.target) && (!_toggleBtn || !_toggleBtn.contains(e.target))) {
       tray.classList.remove('aberta');
-      if (_toggleBtn) { _toggleBtn.style.background = '#fff'; _toggleBtn.querySelector('i').style.color = '#333'; }
+      if (_toggleBtn) _toggleBtn.classList.remove('ativo');
     }
   });
 
@@ -593,9 +600,9 @@ function _adicionarBotaoLocalizacao(mapInst) {
   let _marcadorUser = null;
   const BtnLoc = L.Control.extend({
     onAdd() {
-      const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control leaflet-loc-btn');
+      const btn = L.DomUtil.create('button', 'leaflet-control leaflet-loc-btn map-control-btn map-control-btn--loc');
       btn.title = 'Minha localização';
-      btn.innerHTML = '<i class="fa fa-map-marker" style="font-size:13px;color:#000000;"></i>';
+      btn.innerHTML = '<i class="fa fa-map-marker" style="font-size:13px;"></i>';
       L.DomEvent.disableClickPropagation(btn);
       L.DomEvent.on(btn, 'click', function () {
         if (!navigator.geolocation) return;

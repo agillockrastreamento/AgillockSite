@@ -10,10 +10,10 @@ let _googleMapType = 'roadmap';
 let _googleMapTypeControl = null;
 
 const GOOGLE_MAP_TYPES = {
-  roadmap: { label: 'Roadmap', lyrs: 'm' },
-  satellite: { label: 'Satellite', lyrs: 's' },
-  hybrid: { label: 'Hybrid', lyrs: 'y' },
-  terrain: { label: 'Terrain', lyrs: 'p' },
+  roadmap: { label: 'Mapa', icon: 'fa-map-o', lyrs: 'm' },
+  satellite: { label: 'Satélite', icon: 'fa-globe', lyrs: 's' },
+  hybrid: { label: 'Híbrido', icon: 'fa-clone', lyrs: 'y' },
+  terrain: { label: 'Terreno', icon: 'fa-area-chart', lyrs: 'p' },
 };
 
 const _COLORS = [
@@ -251,14 +251,17 @@ function _adicionarControleTipoGoogle() {
   const GoogleTypeControl = L.Control.extend({
     onAdd() {
       const wrap = L.DomUtil.create('div', 'leaflet-control google-map-type-control');
-      wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;align-items:flex-end;';
+      wrap.style.cssText = 'position:relative;';
       wrap.innerHTML = `
-        <button type="button" class="leaflet-bar" title="Tipo do Google Maps" style="width:35px;height:35px;display:flex;align-items:center;justify-content:center;background:#fff;border:2.5px solid #ccc;border-radius:50%;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3);">
-          <i class="fa fa-map" style="font-size:13px;color:#333"></i>
+        <button type="button" class="map-control-btn map-control-btn--google" title="Tipos de mapa">
+          <i class="fa fa-map" style="font-size:13px;"></i>
         </button>
-        <div class="google-map-type-menu" style="display:none;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.22);overflow:hidden;min-width:112px">
+        <div class="map-control-drawer google-map-type-menu" style="display:none">
           ${Object.keys(GOOGLE_MAP_TYPES).map(function (tipo) {
-            return `<button type="button" data-google-map-type="${tipo}" style="display:block;width:100%;border:0;background:#fff;padding:7px 10px;text-align:left;font-size:12px;cursor:pointer">${GOOGLE_MAP_TYPES[tipo].label}</button>`;
+            return `<button type="button" class="map-control-option" data-google-map-type="${tipo}" title="${GOOGLE_MAP_TYPES[tipo].label}">
+              <i class="fa ${GOOGLE_MAP_TYPES[tipo].icon}"></i>
+              <span>${GOOGLE_MAP_TYPES[tipo].label}</span>
+            </button>`;
           }).join('')}
         </div>`;
       const btn = wrap.querySelector('button');
@@ -292,9 +295,7 @@ function _atualizarControleTipoGoogle() {
   _googleMapTypeControl.style.display = ativo ? 'flex' : 'none';
   _googleMapTypeControl.querySelectorAll('[data-google-map-type]').forEach(function (item) {
     const selecionado = item.getAttribute('data-google-map-type') === _googleMapType;
-    item.style.background = selecionado ? '#e8f4fd' : '#fff';
-    item.style.color = selecionado ? '#2980b9' : '#333';
-    item.style.fontWeight = selecionado ? '700' : '400';
+    item.classList.toggle('ativo', selecionado);
   });
 }
 

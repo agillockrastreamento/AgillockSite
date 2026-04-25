@@ -42,6 +42,41 @@
          border-radius: 8px !important;
          padding: 10px !important;
        }
+      .dark-theme .leaflet-control-layers,
+      .dark-theme .leaflet-control-layers-toggle,
+      .dark-theme .leaflet-bar,
+      .dark-theme .leaflet-bar a {
+        background: #1e2530 !important;
+        border-color: #3a3a5c !important;
+        color: #c9d1d9 !important;
+      }
+      .dark-theme .leaflet-control-layers-list { background: #1e2530; color: #c9d1d9; }
+      .map-control-btn {
+        width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;
+        border-radius: 50%; border: 2px solid #c2c1c1; background: #fff; color: #333;
+        cursor: pointer; box-shadow: none; padding: 0; line-height: 1;
+      }
+      .map-control-btn.ativo { background: #fab32c; border-color: #fab32c; color: #222; }
+      .dark-theme .map-control-btn { background: #1e2530; border-color: #3a3a5c; color: #c9d1d9; }
+      .dark-theme .map-control-btn.ativo { background: #fab32c; border-color: #fab32c; color: #222; }
+      .map-control-drawer {
+        position: absolute; top: 0; right: 44px;
+        display: flex; gap: 8px; padding: 10px; border-radius: 12px;
+        background: rgba(20,20,30,0.92); backdrop-filter: blur(6px);
+        box-shadow: 0 8px 20px rgba(0,0,0,.2);
+      }
+      .map-control-option {
+        width: 74px; min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 8px; border: none; border-radius: 10px; background: transparent; color: #fff; cursor: pointer;
+        padding: 8px 6px; font-size: 11px; font-weight: 700;
+      }
+      .map-control-option i { font-size: 18px; }
+      .map-control-option.ativo { background: #fab32c; color: #222; }
+      .dcard-streetview-btn {
+        width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 50%; border: 1px solid rgba(41,128,185,.18); background: #eef6fc; color: #2980b9; text-decoration: none;
+      }
+      html.dark-theme .dcard-streetview-btn { background: rgba(41,128,185,.14); border-color: rgba(41,128,185,.3); color: #87c7ff; }
        
 
     .admin-content {
