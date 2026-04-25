@@ -214,11 +214,10 @@
     }
     .map-control-btn {
       width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;
-      border-radius: 50%; border: 2px solid #c2c1c1; background: #fff; color: #333; cursor: pointer; padding: 0; font-size: 15px;
+      border-radius: 50%; border: 2px solid #c2c1c1; background: #fff; color: #555; cursor: pointer; padding: 0; font-size: 15px;
     }
-    .map-control-btn i { color: inherit !important; font-weight: 700; }
+    .map-control-btn i { color: inherit !important; }
     .dark-theme .map-control-btn { background: #1e2530; border-color: #3a3a5c; color: #c9d1d9; }
-    .map-control-btn--google i { font-weight: 900; }
     .map-control-drawer {
       position: absolute; top: 0; right: 44px; display: flex; gap: 8px; padding: 10px;
       border-radius: 12px; background: rgba(20,20,30,0.92); backdrop-filter: blur(6px);
@@ -229,26 +228,25 @@
     }
     .map-control-option i { font-size: 18px; }
     .map-control-option.ativo { background: #fab32c; color: #222; }
-    html.dark-theme .leaflet-control-layers {
-      background: #1e2530 !important;
-      border-color: #3a3a5c !important;
-    }
-    html.dark-theme .leaflet-bar {
-      background: #1e2530;
-      border-color: #3a3a5c;
-    }
-    html.dark-theme .leaflet-control-layers-toggle,
-    html.dark-theme .leaflet-bar a {
-      background-color: #1e2530;
-      color: #c9d1d9;
-      border-color: #3a3a5c;
-    }
-    html.dark-theme .leaflet-bar a:hover { background-color: #2d3748; color: #fff; }
-    html.dark-theme .leaflet-control-attribution { background: rgba(30,32,40,.7); color: #888; }
-    html.dark-theme .leaflet-control-scale-line { background: rgba(30,32,40,.7); color: #aaa; border-color: #555; }
+    html.dark-theme .leaflet-control-layers { background: #1e2530 !important; border-color: #3a3a5c !important; }
     html.dark-theme .leaflet-control-layers-list { background: #1e2530; color: #c9d1d9; }
     html.dark-theme .leaflet-popup-content-wrapper,
     html.dark-theme .leaflet-popup-tip { background: #1e2530; color: #c9d1d9; }
+    /* ── Controles do mapa — visual unificado ── */
+    .leaflet-bar { box-shadow: none !important; background: #fff !important; border-radius: 20px !important; border: 2px solid #c2c1c1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+    .leaflet-bar a { width: 35px !important; height: 35px !important; border-radius: 0 !important; border: none !important; border-bottom: 1px solid #c2c1c1 !important; background: transparent !important; color: #555 !important; font-size: 18px !important; font-weight: 400 !important; font-family: inherit !important; display: flex !important; align-items: center !important; justify-content: center !important; text-decoration: none !important; line-height: 1 !important; }
+    .leaflet-bar a:last-child { border-bottom: none !important; }
+    .leaflet-bar a:hover { background: #f0f0f0 !important; }
+    .leaflet-control-layers-toggle { filter: brightness(0) invert(1) brightness(0.33); }
+    html.dark-theme .leaflet-bar { background: #1e2530 !important; border-color: #3a3a5c !important; }
+    html.dark-theme .leaflet-bar a { color: #c9d1d9 !important; border-bottom-color: #3a3a5c !important; }
+    html.dark-theme .leaflet-bar a:hover { background: #252535 !important; }
+    html.dark-theme .leaflet-control-layers { background: #1e2530 !important; border-color: #3a3a5c !important; }
+    html.dark-theme .leaflet-control-layers-toggle { filter: brightness(0) invert(1) brightness(0.82); }
+    html.dark-theme .leaflet-control-attribution { background: rgba(30,32,40,.7) !important; color: #888 !important; }
+    html.dark-theme .leaflet-control-scale-line { background: rgba(30,32,40,.7) !important; color: #aaa !important; border-color: #555 !important; }
+    .map-control-btn:not(.ativo):hover { background: #f0f0f0 !important; }
+    html.dark-theme .map-control-btn:not(.ativo):hover { background: #252535 !important; }
 
     /* ── Tabelas ── */
     .rel-table { width: 100%; font-size: 13px; }

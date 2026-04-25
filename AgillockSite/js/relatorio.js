@@ -270,16 +270,19 @@ function _adicionarControleTipoGoogle() {
       L.DomEvent.disableScrollPropagation(wrap);
       L.DomEvent.on(btn, 'click', function (e) {
         L.DomEvent.stop(e);
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        const abrindo = menu.style.display === 'none';
+        menu.style.display = abrindo ? 'block' : 'none';
+        btn.classList.toggle('ativo', abrindo);
       });
       wrap.querySelectorAll('[data-google-map-type]').forEach(function (item) {
         L.DomEvent.on(item, 'click', function (e) {
           L.DomEvent.stop(e);
           _trocarTipoGoogle(item.getAttribute('data-google-map-type'));
           menu.style.display = 'none';
+          btn.classList.remove('ativo');
         });
       });
-      document.addEventListener('click', function () { menu.style.display = 'none'; });
+      document.addEventListener('click', function () { menu.style.display = 'none'; btn.classList.remove('ativo'); });
       _googleMapTypeControl = wrap;
       setTimeout(_atualizarControleTipoGoogle, 0);
       return wrap;
