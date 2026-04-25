@@ -93,7 +93,7 @@ const GOOGLE_MAP_TYPES = {
 };
 
 function _urlStreetView(lat, lng) {
-  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${encodeURIComponent(`${lat},${lng}`)}`;
+  return `https://www.google.com/maps?q=&layer=c&cbll=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
 function _htmlBotaoStreetView(lat, lng) {

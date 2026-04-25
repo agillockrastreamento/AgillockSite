@@ -105,7 +105,7 @@ function _intervaloHoje() {
 }
 
 function _urlStreetView(lat, lng) {
-  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${encodeURIComponent(`${lat},${lng}`)}`;
+  return `https://www.google.com/maps?q=&layer=c&cbll=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
 function _htmlBotaoStreetView(lat, lng) {
@@ -471,6 +471,14 @@ function inicializarMapa() {
   });
   map.on('baselayerchange', function () {
     _atualizarControleTipoGoogle();
+  });
+  requestAnimationFrame(function () {
+    map.invalidateSize();
+    setTimeout(function () { map.invalidateSize(); }, 120);
+    setTimeout(function () { map.invalidateSize(); }, 320);
+  });
+  window.addEventListener('resize', function () {
+    if (map) map.invalidateSize();
   });
 }
 
