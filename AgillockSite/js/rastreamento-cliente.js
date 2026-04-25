@@ -100,6 +100,21 @@ function _htmlBotaoStreetView(lat, lng) {
   return `<a href="${_urlStreetView(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-streetview-btn" title="Abrir no Street View"><i class="fa fa-street-view"></i></a>`;
 }
 
+function _ajustarAlturaCardDispositivo() {
+  const card = document.getElementById('device-detail-card');
+  const mapaEl = document.getElementById('mapa');
+  const area = document.getElementById('mapa-area') || mapaEl;
+  if (!card || !mapaEl || !area || card.style.display === 'none') return;
+  const mapRect = mapaEl.getBoundingClientRect();
+  const areaRect = area.getBoundingClientRect();
+  const topGap = 12;
+  const escalaClearance = 54;
+  const top = Math.max(topGap, mapRect.top - areaRect.top + topGap);
+  const maxHeight = Math.max(220, mapRect.height - topGap - escalaClearance);
+  card.style.top = `${top}px`;
+  card.style.maxHeight = `${maxHeight}px`;
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -186,7 +201,10 @@ function inicializarEventosPanel() {
     panel.classList.toggle('minimizado');
     try { localStorage.setItem(EVENTOS_PANEL_STORAGE_KEY, panel.classList.contains('minimizado') ? '1' : '0'); } catch {}
     this.title = panel.classList.contains('minimizado') ? 'Expandir eventos' : 'Minimizar eventos';
-    if (map) setTimeout(() => map.invalidateSize(), 220);
+    if (map) setTimeout(() => {
+      map.invalidateSize();
+      _ajustarAlturaCardDispositivo();
+    }, 220);
   });
 }
 
@@ -215,7 +233,10 @@ function inicializarBarraVeiculos() {
       const barra = document.getElementById('barra-veiculos');
       if (barra && barra.scrollTop < 0) barra.scrollTop = 0;
     }
-    if (map) setTimeout(() => map.invalidateSize(), 220);
+    if (map) setTimeout(() => {
+      map.invalidateSize();
+      _ajustarAlturaCardDispositivo();
+    }, 220);
   });
 }
 
@@ -387,7 +408,10 @@ function inicializarMapa() {
     setTimeout(function () { map.invalidateSize(); }, 120);
     setTimeout(function () { map.invalidateSize(); }, 320);
   });
-  window.addEventListener('resize', function () { if (map) map.invalidateSize(); });
+  window.addEventListener('resize', function () {
+    if (map) map.invalidateSize();
+    _ajustarAlturaCardDispositivo();
+  });
 }
 
 function _criarCamadasGoogle() {
@@ -1368,6 +1392,7 @@ function mostrarCardDispositivo(id) {
   `;
   
   card.style.display = 'flex';
+  _ajustarAlturaCardDispositivo();
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
   _carregarResumoHojeCliente(id);
 

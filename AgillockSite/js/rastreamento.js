@@ -112,6 +112,21 @@ function _htmlBotaoStreetView(lat, lng) {
   return `<a href="${_urlStreetView(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-streetview-btn" title="Abrir no Street View"><i class="fa fa-street-view"></i></a>`;
 }
 
+function _ajustarAlturaCardDispositivo() {
+  const card = document.getElementById('device-detail-card');
+  const mapaEl = document.getElementById('mapa');
+  const area = document.getElementById('mapa-area') || mapaEl;
+  if (!card || !mapaEl || !area || card.style.display === 'none') return;
+  const mapRect = mapaEl.getBoundingClientRect();
+  const areaRect = area.getBoundingClientRect();
+  const topGap = 12;
+  const escalaClearance = 54;
+  const top = Math.max(topGap, mapRect.top - areaRect.top + topGap);
+  const maxHeight = Math.max(220, mapRect.height - topGap - escalaClearance);
+  card.style.top = `${top}px`;
+  card.style.maxHeight = `${maxHeight}px`;
+}
+
 function _salvarFocoAdmin(dispositivoId) {
   if (!dispositivoId) return;
   try { sessionStorage.setItem(ADMIN_FOCUS_STORAGE_KEY, dispositivoId); } catch {}
@@ -479,6 +494,8 @@ function inicializarMapa() {
   });
   window.addEventListener('resize', function () {
     if (map) map.invalidateSize();
+    _ajustarAlturaCardDispositivo();
+    _posicionarBotaoTrayAtributos();
   });
 }
 
@@ -2107,6 +2124,7 @@ function mostrarCardDispositivo(id) {
 
   card.style.display = 'block';
   card.style.display = 'flex';
+  _ajustarAlturaCardDispositivo();
 
   if (_cardAdminExpandido) {
     const body = card.querySelector('.dcard-body');
