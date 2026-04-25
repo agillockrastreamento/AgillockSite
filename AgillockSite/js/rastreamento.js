@@ -2102,7 +2102,7 @@ function mostrarCardDispositivo(id) {
     if (acoesSection && !body.querySelector(`#dcard-resumo-hoje-${id}`)) {
       acoesSection.insertAdjacentHTML('afterend', `
         <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
-          <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">RESUMO DE HOJE</div>
+          <div class= "dcard-section-title-title">RESUMO DE HOJE</div>
           <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
           <div style="margin-top:10px">
             <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="width:100%;text-align:center; border-radius:10px;">

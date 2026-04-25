@@ -1345,7 +1345,7 @@ function mostrarCardDispositivo(id) {
       </div>
       ${_htmlAcoesCard(id)}
       <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
-        <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">RESUMO DE HOJE</div>
+        <div class= "dcard-section-title-title">RESUMO DE HOJE</div>
         <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
       </div>
     </div>
@@ -1826,7 +1826,7 @@ function _htmlAcoesCard(dispositivoId) {
   const rotaAtiva = !!_rotasIndividuais[dispositivoId];
   return `
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
-      <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-align:center;letter-spacing:.5px">AÇÕES</div>
+      <div class= "dcard-section-title-title">AÇÕES</div>
       <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
         <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivoCliente('rota','${dispositivoId}')" title="Rota">
           <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
