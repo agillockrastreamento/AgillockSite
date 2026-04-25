@@ -2,7 +2,7 @@
 
 // Lê token e dispositivoId da URL — passados pelo overlay do rastreamento
 const _urlParams = new URLSearchParams(window.location.search);
-const _token     = _urlParams.get('token') || '';
+const _token     = _urlParams.get('token') || (window.AL_CLIENTE ? AL_CLIENTE.getToken() : '');
 const _did       = _urlParams.get('id')    || '';
 const _BASE      = window.API_URL || 'http://localhost:3000';
 
@@ -25,6 +25,9 @@ let periodoAtual = 'hoje';
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
 let _googleMapTypeControl = null;
+let dispositivoIdsAtuais = [];
+let dispositivosMap = {};
+let dispositivoLocalParaTraccar = {};
 const _reverseGeocodeCache = {};
 
 const GOOGLE_MAP_TYPES = {
@@ -51,13 +54,27 @@ const _EVENTO_LABEL = {
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function () {
-  if (!_did) {
+  if (!_did && !document.getElementById('sel-dispositivo')) {
     document.body.innerHTML = '<p style="padding:24px;color:#e74c3c;">Dispositivo não informado.</p>';
     return;
   }
 
   configurarPeriodo();
   inicializarMapaRota();
+  if (document.getElementById('sel-dispositivo')) {
+    carregarDispositivosCliente().then(function () {
+      $('#sel-dispositivo').select2({ placeholder: 'Selecione os dispositivos...', allowClear: true, width: '100%' });
+      $('#sel-dispositivo').on('change', function () {
+        dispositivoIdsAtuais = normalizarIdsSelecionados($(this).val());
+        if (dispositivoIdsAtuais.length > 0 && periodoAtual !== 'custom') carregarRelatorio();
+        else if (dispositivoIdsAtuais.length === 0) renderSemDispositivoSelecionado();
+      });
+      aplicarSelecaoInicialCliente();
+      if (!dispositivoIdsAtuais.length) renderSemDispositivoSelecionado();
+    });
+  } else {
+    dispositivoIdsAtuais = [_did];
+  }
 
   document.querySelectorAll('.periodo-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -65,24 +82,76 @@ document.addEventListener('DOMContentLoaded', function () {
       this.classList.add('active');
       periodoAtual = this.dataset.periodo;
       document.getElementById('custom-datas').style.display = periodoAtual === 'custom' ? 'flex' : 'none';
-      if (periodoAtual !== 'custom') carregarRelatorio();
+      document.getElementById('btn-carregar').style.display = periodoAtual === 'custom' ? 'inline-flex' : 'none';
+      if (periodoAtual !== 'custom' && dispositivoIdsAtuais.length > 0) carregarRelatorio();
     });
   });
 
   document.getElementById('btn-carregar').addEventListener('click', carregarRelatorio);
   document.getElementById('btn-confirmar-exportar').addEventListener('click', exportarRelatorio);
+  const btnAbrirExportar = document.getElementById('btn-abrir-exportar');
+  if (btnAbrirExportar) {
+    btnAbrirExportar.addEventListener('click', function () {
+      if (!dispositivoIdsAtuais.length) {
+        if (window.AL_CLIENTE) AL_CLIENTE.showAlert('Selecione pelo menos um dispositivo para exportar.', 'warning');
+        return;
+      }
+      $('#modal-exportar').modal('show');
+    });
+  }
 
   $('a[href="#tab-rota"]').on('shown.bs.tab', function () {
     if (mapaRota) mapaRota.invalidateSize();
   });
 
   // Carrega imediatamente
-  carregarRelatorio();
+  if (!document.getElementById('sel-dispositivo')) carregarRelatorio();
 });
 
 window.abrirModalExportarRelatorioCliente = function () {
   $('#modal-exportar').modal('show');
 };
+
+function normalizarIdsSelecionados(ids) {
+  if (!ids) return [];
+  return (Array.isArray(ids) ? ids : [ids]).map(id => String(id)).filter(Boolean);
+}
+
+function adicionarDeviceIdsQuery(params, ids) {
+  const normalizados = normalizarIdsSelecionados(ids);
+  if (normalizados.length) params.set('deviceId', normalizados.join(','));
+}
+
+async function carregarDispositivosCliente() {
+  const lista = await apiGet('/api/cliente/rastreamento/posicoes');
+  const sel = document.getElementById('sel-dispositivo');
+  sel.innerHTML = '';
+  lista.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  lista.forEach(v => {
+    if (!v.traccarId) return;
+    const opt = document.createElement('option');
+    opt.value = v.dispositivoId;
+    opt.textContent = v.nome + (v.placa ? ` (${v.placa})` : '');
+    sel.appendChild(opt);
+    dispositivosMap[v.traccarId] = { nome: v.nome, placa: v.placa };
+    dispositivoLocalParaTraccar[v.dispositivoId] = String(v.traccarId);
+  });
+}
+
+function aplicarSelecaoInicialCliente() {
+  const opcoes = Array.from(document.querySelectorAll('#sel-dispositivo option')).map(opt => opt.value);
+  const inicial = _did && opcoes.includes(_did) ? [_did] : (opcoes.length === 1 ? [opcoes[0]] : []);
+  if (inicial.length) $('#sel-dispositivo').val(inicial).trigger('change');
+}
+
+function renderSemDispositivoSelecionado() {
+  ['eventos-content','viagens-content','paradas-content','resumo-content','grafico-content'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="rel-empty">Selecione pelo menos um veículo.</div>';
+  });
+  const rotaStats = document.getElementById('rota-stats');
+  if (rotaStats) rotaStats.innerHTML = '';
+}
 
 function configurarPeriodo() {
   const hoje = new Date();
@@ -163,6 +232,21 @@ function fmtEndereco(valor, lat, lng) {
   return 'Endereço não identificado';
 }
 
+function getInicioViagem(v) { return v.startTime || v.inicio; }
+function getFimViagem(v) { return v.endTime || v.fim; }
+function getDuracaoMin(v) {
+  if (v.duracao != null) return Number(v.duracao) || 0;
+  return Math.round((Number(v.duration) || 0) / 60000);
+}
+function getDistanciaKm(v) {
+  if (v.distancia != null) return Number(v.distancia) || 0;
+  return (Number(v.distance) || 0) / 1000;
+}
+function getVelMax(v) {
+  if (v.velocidadeMaxima != null) return Number(v.velocidadeMaxima) || 0;
+  return Math.round((Number(v.maxSpeed) || 0) * 1.852);
+}
+
 async function resolverEndereco(valor, lat, lng) {
   if (enderecoValido(valor)) return valor.trim();
   const coordsTexto = extrairCoords(valor);
@@ -184,6 +268,10 @@ async function resolverEndereco(valor, lat, lng) {
 // ── Carregamento ──────────────────────────────────────────────────────────────
 
 async function carregarRelatorio() {
+  if (!dispositivoIdsAtuais.length) {
+    renderSemDispositivoSelecionado();
+    return;
+  }
   const { from, to } = calcularIntervalo();
   const fromIso = isoComFuso(from);
   const toIso   = isoComFuso(to);
@@ -195,8 +283,11 @@ async function carregarRelatorio() {
   document.getElementById('rota-stats').innerHTML = '';
   document.getElementById('mapa-rota-loading').style.display = 'flex';
 
-  const qs = `from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`;
-  const base = `/api/cliente/rastreamento/dispositivos/${_did}`;
+  const params = new URLSearchParams({ from: fromIso, to: toIso });
+  adicionarDeviceIdsQuery(params, dispositivoIdsAtuais);
+  const qs = params.toString();
+  const multi = !!document.getElementById('sel-dispositivo');
+  const base = multi ? '/api/cliente/rastreamento/relatorios/batch' : `/api/cliente/rastreamento/dispositivos/${_did}`;
 
   try {
     const [historico, viagens, paradas, eventos, resumo] = await Promise.allSettled([
@@ -211,7 +302,8 @@ async function carregarRelatorio() {
     renderEventos(eventos.status === 'fulfilled' ? eventos.value : null);
     await renderViagens(viagens.status === 'fulfilled' ? viagens.value : null);
     await renderParadas(paradas.status === 'fulfilled' ? paradas.value : null);
-    renderResumo(
+    if (multi) renderResumoBatch(resumo.status === 'fulfilled' ? resumo.value : null);
+    else renderResumo(
       resumo.status === 'fulfilled'  ? resumo.value  : null,
       viagens.status === 'fulfilled' ? viagens.value : null,
       paradas.status === 'fulfilled' ? paradas.value : null,
@@ -345,6 +437,33 @@ function renderRota(data) {
   const posicoes = data.posicoes.filter(p => p.valida !== false);
   if (!posicoes.length) { document.getElementById('rota-stats').innerHTML = 'Nenhuma posição válida.'; return; }
 
+  const porDispositivo = {};
+  posicoes.forEach(p => {
+    const did = p.deviceId || 'unico';
+    if (!porDispositivo[did]) porDispositivo[did] = [];
+    porDispositivo[did].push(p);
+  });
+  if (Object.keys(porDispositivo).length > 1) {
+    const group = L.featureGroup();
+    let idx = 0;
+    const cores = ['#2980b9', '#e74c3c', '#27ae60', '#f39c12', '#8e44ad', '#16a085'];
+    Object.keys(porDispositivo).forEach(did => {
+      const pontos = porDispositivo[did];
+      const cor = cores[idx % cores.length];
+      const info = dispositivosMap[did] || { nome: did };
+      const coordsDisp = pontos.map(p => [p.latitude, p.longitude]);
+      const poly = L.polyline(coordsDisp, { color: cor, weight: 3, opacity: 0.8 }).bindTooltip(`<b>${info.nome}</b>`).addTo(mapaRota);
+      group.addLayer(poly);
+      idx++;
+    });
+    mapaRota.fitBounds(group.getBounds().pad(0.1));
+    mapaRota.invalidateSize();
+    const vmaxMulti = posicoes.reduce((m, p) => Math.max(m, p.velocidade || 0), 0);
+    document.getElementById('rota-stats').innerHTML =
+      `<i class="fa fa-info-circle"></i> Exibindo trajeto de <strong>${Object.keys(porDispositivo).length}</strong> veículos &nbsp;·&nbsp; Vel. máx: <strong>${vmaxMulti} km/h</strong>`;
+    return;
+  }
+
   const coords = posicoes.map(p => [p.latitude, p.longitude]);
   L.polyline(coords, { color: '#2980b9', weight: 3, opacity: 0.8 }).addTo(mapaRota);
   const ini = posicoes[0];
@@ -381,7 +500,8 @@ async function renderViagens(lista) {
   const el = document.getElementById('viagens-content');
   if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty"><i class="fa fa-car"></i><br>Nenhuma viagem no período.</div>'; return; }
   let totalKm = 0, totalMin = 0, vmax = 0;
-  lista.forEach(v => { totalKm += v.distancia || 0; totalMin += v.duracao || 0; vmax = Math.max(vmax, v.velocidadeMaxima || 0); });
+  lista.forEach(v => { totalKm += getDistanciaKm(v); totalMin += getDuracaoMin(v); vmax = Math.max(vmax, getVelMax(v)); });
+  const multi = !!document.getElementById('sel-dispositivo');
   el.innerHTML = `
     <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <div class="resumo-card" style="min-width:100px"><div class="rc-val">${lista.length}</div><div class="rc-lbl">Viagens</div></div>
@@ -393,15 +513,17 @@ async function renderViagens(lista) {
       <th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
     </tr></thead><tbody>
       ${(await Promise.all(lista.map(async (v, i) => {
-        const origem = await resolverEndereco(v.origem, v.origemLat, v.origemLng);
-        const destino = await resolverEndereco(v.destino, v.destinoLat, v.destinoLng);
+        const d = dispositivosMap[v.deviceId] || { nome: '—' };
+        const origem = await resolverEndereco(v.startAddress || v.origem, v.startLat || v.origemLat, v.startLon || v.origemLng);
+        const destino = await resolverEndereco(v.endAddress || v.destino, v.endLat || v.destinoLat, v.endLon || v.destinoLng);
         return `<tr>
+          ${multi ? `<td><strong>${d.nome}</strong></td>` : ''}
           <td style="color:#888">${i+1}</td>
-          <td style="white-space:nowrap">${fmtHora(v.inicio)}</td>
-          <td style="white-space:nowrap">${fmtHora(v.fim)}</td>
-          <td>${fmtDuracao(v.duracao)}</td>
-          <td>${(v.distancia||0).toFixed(1)} km</td>
-          <td>${v.velocidadeMaxima||0} km/h</td>
+          <td style="white-space:nowrap">${fmtHora(getInicioViagem(v))}</td>
+          <td style="white-space:nowrap">${fmtHora(getFimViagem(v))}</td>
+          <td>${fmtDuracao(getDuracaoMin(v))}</td>
+          <td>${getDistanciaKm(v).toFixed(1)} km</td>
+          <td>${getVelMax(v)} km/h</td>
           <td style="font-size:10px">${origem}<br>→ ${destino}</td>
         </tr>`;
       }))).join('')}
@@ -416,9 +538,9 @@ async function renderParadas(lista) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="min-width:0;flex:1">
           <div style="font-weight:600;font-size:12px;text-align:left"><i class="fa fa-map-marker" style="color:#fab32c"></i> Parada ${i+1}</div>
-          <div style="font-size:11px;color:#888;margin-top:2px;text-align:left">${await resolverEndereco(p.endereco, p.latitude, p.longitude)}</div>
+          <div style="font-size:11px;color:#888;margin-top:2px;text-align:left">${await resolverEndereco(p.address || p.endereco, p.lat || p.latitude, p.lon || p.longitude)}</div>
         </div>
-        <div style="text-align:right;font-size:11px;color:#888"><div>${fmtDuracao(p.duracao)}</div></div>
+        <div style="text-align:right;font-size:11px;color:#888"><div>${fmtDuracao(p.duracao != null ? p.duracao : (p.duration / 60000))}</div></div>
       </div>
       <div style="font-size:10px;color:#aaa;margin-top:4px">${fmtHora(p.inicio)} → ${fmtHora(p.fim)}</div>
     </div>`))).join('');
@@ -442,6 +564,22 @@ function renderResumo(resumo, viagens, paradas) {
   </div>`;
 }
 
+function renderResumoBatch(lista) {
+  const el = document.getElementById('resumo-content');
+  if (!lista || !lista.length) { el.innerHTML = '<div class="rel-empty">Sem dados de resumo.</div>'; return; }
+  el.innerHTML = `<div class="resumo-grid">${lista.map(r => {
+    const d = dispositivosMap[r.deviceId] || { nome: '—' };
+    return `<div class="resumo-card">
+      <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-transform:uppercase">${d.nome}</div>
+      <div class="rc-val" style="font-size:22px">${(r.distance / 1000).toFixed(1)} <small style="font-size:12px">km</small></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px;font-size:11px;color:#666">
+        <div>Média: <strong>${Math.round(r.averageSpeed * 1.852)}</strong></div><div>Máxima: <strong>${Math.round(r.maxSpeed * 1.852)}</strong></div>
+        <div>Motor: <strong>${(r.engineHours / 3600000).toFixed(1)}h</strong></div><div>Gasto: <strong>${r.spentFuel || 0}L</strong></div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function renderGrafico(data) {
   const el = document.getElementById('grafico-content');
   if (!data || !data.posicoes || !data.posicoes.length) { el.innerHTML = '<div class="rel-empty">Nenhum dado de velocidade disponível.</div>'; return; }
@@ -453,7 +591,7 @@ function renderGrafico(data) {
   const textColor = isDark ? '#adb5bd' : '#555';
   const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
 
-  el.innerHTML = '<canvas id="canvas-grafico"></canvas>';
+  el.innerHTML = '<div style="height:350px"><canvas id="canvas-grafico"></canvas></div>';
   if (chartVelocidade) { chartVelocidade.destroy(); chartVelocidade = null; }
   const ctx = document.getElementById('canvas-grafico').getContext('2d');
   chartVelocidade = new Chart(ctx, {
@@ -465,7 +603,7 @@ function renderGrafico(data) {
         borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true }],
     },
     options: {
-      responsive: true, maintainAspectRatio: true,
+      responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.parsed.y} km/h` } } },
       scales: {
@@ -486,7 +624,14 @@ async function exportarRelatorio() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando...';
   try {
-    const url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&type=${encodeURIComponent(tipo)}`;
+    let url;
+    if (document.getElementById('sel-dispositivo')) {
+      const params = new URLSearchParams({ from: from.toISOString(), to: to.toISOString(), type: tipo });
+      adicionarDeviceIdsQuery(params, dispositivoIdsAtuais);
+      url = `${_BASE}/api/cliente/rastreamento/relatorios/exportar?${params.toString()}`;
+    } else {
+      url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&type=${encodeURIComponent(tipo)}`;
+    }
     const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + _token } });
     if (!res.ok) {
       let msg = 'Erro ao gerar arquivo.';

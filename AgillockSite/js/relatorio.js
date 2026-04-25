@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       const isCustom = periodoAtual === 'custom';
       document.getElementById('custom-datas').style.display = isCustom ? 'flex' : 'none';
+      document.getElementById('btn-carregar').style.display = isCustom ? 'inline-flex' : 'none';
 
       const selecionados = normalizarIdsSelecionados($('#sel-dispositivo').val());
       if (!isCustom && selecionados && selecionados.length > 0) carregarRelatorio();

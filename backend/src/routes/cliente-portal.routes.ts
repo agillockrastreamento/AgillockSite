@@ -74,6 +74,11 @@ function temEndereco(valor?: string | null): valor is string {
   return !!(valor && valor.trim() && valor.trim() !== '0.00000, 0.00000');
 }
 
+function parseDeviceIdsParam(deviceIds: string[] | string): string[] {
+  const valores = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
+  return [...new Set(valores.flatMap(valor => String(valor).split(',')).map(valor => valor.trim()).filter(Boolean))];
+}
+
 function formatarEnderecoNominatim(address: Record<string, unknown> = {}): string {
   const partes: string[] = [];
   const texto = (valor: unknown) => typeof valor === 'string' && valor.trim() ? valor.trim() : '';
@@ -126,6 +131,30 @@ async function responderReverseGeocode(req: ClienteRequest, res: Response): Prom
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Erro ao buscar endereço: ${msg}` });
   }
+}
+
+async function resolverDispositivosCliente(clienteId: string, idsParam: string[] | string) {
+  const ids = parseDeviceIdsParam(idsParam);
+  if (!ids.length) return { dispositivos: [], traccarDevices: [], traccarIds: [] as number[] };
+  const dispositivos = await prisma.dispositivo.findMany({
+    where: {
+      id: { in: ids },
+      ativo: true,
+      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+    },
+    select: { id: true, nome: true, placa: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
+  });
+  if (!dispositivos.length) return { dispositivos: [], traccarDevices: [], traccarIds: [] as number[] };
+  const traccarDevices = await traccarGetDevices();
+  const traccarByImei = new Map(traccarDevices.map(d => [d.uniqueId, d]));
+  const vinculados = dispositivos
+    .map(dispositivo => ({ dispositivo, traccar: traccarByImei.get(dispositivo.identificador) }))
+    .filter((item): item is { dispositivo: typeof dispositivos[number]; traccar: typeof traccarDevices[number] } => !!item.traccar);
+  return {
+    dispositivos: vinculados.map(item => item.dispositivo),
+    traccarDevices: vinculados.map(item => item.traccar),
+    traccarIds: vinculados.map(item => item.traccar.id),
+  };
 }
 
 // ── Upload de foto do veículo ─────────────────────────────────────────────────
@@ -532,6 +561,129 @@ router.get('/rastreamento/dispositivos/:id/resumo', async (req: ClienteRequest, 
   });
 });
 
+router.get('/rastreamento/relatorios/batch/historico', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const { from, to } = req.query as { from?: string; to?: string };
+  const deviceIds = req.query.deviceId as string[] | string;
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+  try {
+    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
+    const localPorIdentificador = new Map(dispositivos.map(d => [d.identificador, d]));
+    const identificadorPorTraccarId = new Map(traccarDevices.map(d => [d.id, d.uniqueId]));
+    const historico = await traccarGetPositionHistory(traccarIds, new Date(from), new Date(to));
+    res.json({
+      dispositivos,
+      posicoes: historico.map(p => ({
+        deviceId: p.deviceId,
+        ...decorarPosicaoComMedidores(
+          localPorIdentificador.get(identificadorPorTraccarId.get(p.deviceId) || '') || { odometroSistemaMetros: null, horimetroSistemaSegundos: 0 },
+          p,
+        ),
+      })),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao buscar histórico: ${msg}` });
+  }
+});
+
+router.get('/rastreamento/relatorios/batch/viagens', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const { from, to } = req.query as { from?: string; to?: string };
+  const deviceIds = req.query.deviceId as string[] | string;
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+  try {
+    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
+    const localPorTraccarId = new Map(traccarDevices.map(device => [device.id, dispositivos.find(local => local.identificador === device.uniqueId)]));
+    const [viagens, historico] = await Promise.all([
+      traccarGetTrips(traccarIds, new Date(from), new Date(to)),
+      traccarGetPositionHistory(traccarIds, new Date(from), new Date(to)).catch(() => []),
+    ]);
+    res.json(viagens.map(viagem => {
+      const dispositivo = localPorTraccarId.get(viagem.deviceId);
+      const viagemComMedidores = dispositivo ? aplicarViagensComMedidores(dispositivo, [viagem], historico)[0] : viagem;
+      const posInicio = posicaoMaisProxima(historico, viagem.deviceId, viagem.startTime);
+      const posFim = posicaoMaisProxima(historico, viagem.deviceId, viagem.endTime);
+      return {
+        ...viagemComMedidores,
+        startAddress: temEndereco(viagemComMedidores.startAddress) ? viagemComMedidores.startAddress : posInicio?.address ?? viagemComMedidores.startAddress,
+        startLat: viagemComMedidores.startLat || posInicio?.latitude || 0,
+        startLon: viagemComMedidores.startLon || posInicio?.longitude || 0,
+        endAddress: temEndereco(viagemComMedidores.endAddress) ? viagemComMedidores.endAddress : posFim?.address ?? viagemComMedidores.endAddress,
+        endLat: viagemComMedidores.endLat || posFim?.latitude || 0,
+        endLon: viagemComMedidores.endLon || posFim?.longitude || 0,
+      };
+    }));
+  } catch { res.status(502).json({ error: 'Erro ao buscar viagens.' }); }
+});
+
+router.get('/rastreamento/relatorios/batch/paradas', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const { from, to } = req.query as { from?: string; to?: string };
+  const deviceIds = req.query.deviceId as string[] | string;
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+  try {
+    const { traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
+    const [paradas, historico] = await Promise.all([
+      traccarGetStops(traccarIds, new Date(from), new Date(to)),
+      traccarGetPositionHistory(traccarIds, new Date(from), new Date(to)).catch(() => []),
+    ]);
+    const historicoPorId = new Map(historico.map(p => [p.id, p]));
+    res.json(aplicarParadasComMedidores(paradas, historico).map(parada => {
+      const posicao = historicoPorId.get(parada.positionId)
+        || posicaoMaisProxima(historico, parada.deviceId, parada.startTime)
+        || posicaoMaisProxima(historico, parada.deviceId, parada.endTime);
+      return {
+        ...parada,
+        address: temEndereco(parada.address) ? parada.address : posicao?.address || null,
+        lat: parada.lat || posicao?.latitude || 0,
+        lon: parada.lon || posicao?.longitude || 0,
+      };
+    }));
+  } catch { res.status(502).json({ error: 'Erro ao buscar paradas.' }); }
+});
+
+router.get('/rastreamento/relatorios/batch/eventos', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const { from, to } = req.query as { from?: string; to?: string };
+  const deviceIds = req.query.deviceId as string[] | string;
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+  try {
+    const { traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
+    const eventos = await traccarGetEvents(traccarIds, new Date(from), new Date(to));
+    res.json(eventos.map(e => ({ id: e.id, deviceId: e.deviceId, tipo: e.type, tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type, hora: e.eventTime, atributos: e.attributes })));
+  } catch { res.status(502).json({ error: 'Erro ao buscar eventos.' }); }
+});
+
+router.get('/rastreamento/relatorios/batch/resumo', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const { from, to } = req.query as { from?: string; to?: string };
+  const deviceIds = req.query.deviceId as string[] | string;
+  if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+  try {
+    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
+    const localPorTraccarId = new Map(traccarDevices.map(device => [device.id, dispositivos.find(local => local.identificador === device.uniqueId)]));
+    const [resumo, historico] = await Promise.all([
+      traccarGetSummary(traccarIds, new Date(from), new Date(to)),
+      traccarGetPositionHistory(traccarIds, new Date(from), new Date(to)).catch(() => []),
+    ]);
+    res.json(resumo.map(item => {
+      const dispositivo = localPorTraccarId.get(item.deviceId);
+      return dispositivo ? aplicarResumoComMedidores(dispositivo, item, historico.filter(posicao => posicao.deviceId === item.deviceId)) : item;
+    }));
+  } catch { res.status(502).json({ error: 'Erro ao buscar resumo.' }); }
+});
+
 router.get('/rastreamento/dispositivos/:id/exportar', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const dispositivoId = param(req, 'id');
@@ -570,6 +722,34 @@ router.get('/rastreamento/dispositivos/:id/exportar', async (req: ClienteRequest
 
   try {
     const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', [traccarDevice.id], new Date(from), new Date(to));
+    const buffer = await response.arrayBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);
+    res.send(Buffer.from(buffer));
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro na exportação: ${msg}` });
+  }
+});
+
+router.get('/rastreamento/relatorios/exportar', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+  const type = query(req.query.type) || 'route';
+  const deviceIds = req.query.deviceId as string[] | string;
+  if (!from || !to || !deviceIds || !['route', 'events', 'trips', 'stops', 'summary'].includes(type)) {
+    res.status(400).json({ error: 'Parâmetros incompletos.' });
+    return;
+  }
+  if (await verificarBloqueio(clienteId)) {
+    res.status(403).json({ error: 'acesso_bloqueado' });
+    return;
+  }
+  try {
+    const { traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
+    const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', traccarIds, new Date(from), new Date(to));
     const buffer = await response.arrayBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);

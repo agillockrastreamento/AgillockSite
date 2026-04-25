@@ -1589,6 +1589,10 @@ function ajustarBounds() {
 
 window.abrirOverlay = function (did, tipo) {
   const v = veiculosMap[did]; if (!v) return;
+  if (tipo === 'relatorio') {
+    window.location.href = `relatorio.html?id=${encodeURIComponent(did)}`;
+    return;
+  }
   document.getElementById('overlay-titulo').textContent = `${v.nome}${v.placa ? ` — ${v.placa}` : ''}`;
   const base = window.location.href.replace(/\/cliente\/rastreamento\.html.*/, '');
   const token = AL_CLIENTE.getToken();

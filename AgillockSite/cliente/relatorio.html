@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <title>Relatório — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="../css/select2.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { margin: 0; overflow: hidden; height: 100vh; font-family: 'Montserrat', sans-serif; }
+    .admin-content { height: 100vh; padding: 0 !important; display: flex; flex-direction: column; overflow: hidden; }
+    .rel-page-body { margin-top: 56px; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+    /* Toolbar */
+    .rel-toolbar {
+      background: #fff; border-bottom: 1px solid #e8e8e8;
+      padding: 8px 16px; display: flex; align-items: center;
+      gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+    }
+    html.dark-theme .rel-toolbar { background: #1e2530; border-color: #2d3748; }
+    .rel-toolbar .form-control, .rel-toolbar .btn { margin: 0; }
+    .periodo-btn.active { background: #fab32c; border-color: #e09520; color: #222; }
+    html.dark-theme .periodo-btn.active,
+    html.dark-theme .periodo-btn.active:hover,
+    html.dark-theme .periodo-btn.active:focus,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active:hover,
+    html.dark-theme .btn-group .btn-default.periodo-btn.active:focus {
+      background: #fab32c !important;
+      border-color: #e09520 !important;
+      color: #222 !important;
+      box-shadow: none;
+    }
+    html.dark-theme .btn-default { background: #252535; color: #c9d1d9; border-color: #3a3a5c; }
+    html.dark-theme .btn-default:hover { background: #2d3748; color: #fff; }
+
+    /* Tabs */
+    .rel-tabs { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #rel-nav { margin: 0; padding: 0 16px; background: #fff; border-bottom: 2px solid #e8e8e8 !important; flex-shrink: 0; }
+    html.dark-theme #rel-nav { background: #1e2530; border-bottom-color: #2d3748 !important; }
+    #rel-nav > li > a { color: #555; font-size: 12px; }
+    html.dark-theme #rel-nav > li > a { color: #adb5bd; background: transparent; }
+    #rel-nav > li.active > a, #rel-nav > li.active > a:focus, #rel-nav > li.active > a:hover {
+      background: #fff; color: #fab32c; border-color: #e8e8e8 #e8e8e8 #fff; border-bottom-color: #fff !important;
+    }
+    html.dark-theme #rel-nav > li.active > a { background: #1e2530; color: #fab32c; border-color: #2d3748 #2d3748 #1e2530; border-bottom-color: #1e2530 !important; }
+
+    .rel-content { padding: 16px; flex: 1; overflow-y: auto; background: #f5f6fa; }
+    html.dark-theme .rel-content { background: #141820; }
+
+    #mapa-rota { height: calc(100vh - 300px); min-height: 260px; border-radius: 8px; overflow: hidden; }
+    #tab-rota { position: relative; }
+    #mapa-rota-loading {
+      position: absolute; inset: 0; background: rgba(255,255,255,.75); z-index: 1000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 15px; color: #555; gap: 10px; pointer-events: none;
+    }
+    html.dark-theme #mapa-rota-loading { background: rgba(20,24,32,.8); color: #adb5bd; }
+
+    .rel-table { width: 100%; font-size: 12px; }
+    .rel-table th { background: #f5f6fa; color: #555; font-weight: 600; padding: 7px 10px; border-bottom: 2px solid #e8e8e8; }
+    html.dark-theme .rel-table th { background: #1e2530; color: #adb5bd; border-color: #2d3748; }
+    .rel-table td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; color: #333; }
+    html.dark-theme .rel-table td { border-color: #2a2a3e; color: #c9d1d9; }
+    .rel-table--center th,
+    .rel-table--center td { text-align: center; vertical-align: middle; }
+
+    .resumo-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(130px,1fr)); gap: 12px; }
+    .resumo-card { background: #fff; border-radius: 10px; padding: 16px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); text-align: center; }
+    html.dark-theme .resumo-card { background: #1e2530; }
+    .resumo-card .rc-val { font-size: 24px; font-weight: 700; color: #fab32c; }
+    .resumo-card .rc-lbl { font-size: 11px; color: #888; margin-top: 4px; }
+
+    .parada-card { background: #fff; border-radius: 8px; border-left: 4px solid #fab32c; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    html.dark-theme .parada-card { background: #1e2530; color: #c9d1d9; }
+
+    .ev-badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .ev-online    { background:#d4edda;color:#155724; }  .ev-offline  { background:#f8d7da;color:#721c24; }
+    .ev-moving    { background:#cce5ff;color:#004085; }  .ev-stopped  { background:#fff3cd;color:#856404; }
+    .ev-overspeed { background:#f8d7da;color:#721c24; }  .ev-ignition { background:#d1ecf1;color:#0c5460; }
+    .ev-alarm     { background:#f8d7da;color:#721c24; }  .ev-default  { background:#e2e3e5;color:#383d41; }
+    html.dark-theme .ev-online  { background:#1a3a2a;color:#5dbd7a; }
+    html.dark-theme .ev-offline { background:#3a1a1a;color:#e87070; }
+    html.dark-theme .ev-moving  { background:#1a2a3e;color:#6aabdb; }
+    html.dark-theme .ev-stopped { background:#3a2e10;color:#d4a853; }
+    html.dark-theme .ev-default { background:#2a2a3e;color:#adb5bd; }
+
+    .rel-loading { padding: 30px; text-align: center; color: #aaa; font-size: 13px; }
+    .rel-empty   { padding: 30px; text-align: center; color: #aaa; font-size: 13px; }
+    #rota-stats  { color: #888; }
+    html.dark-theme #rota-stats { color: #adb5bd; }
+    .leaflet-grab { cursor: crosshair !important; }
+    .leaflet-drag-target { cursor: grabbing !important; }
+
+    .leaflet-control-layers {
+      width: 35px !important;
+      height: 35px !important;
+      background-color: #fff !important;
+      border-radius: 50% !important;
+      border: 2px solid #c2c1c1 !important;
+      box-shadow: none !important;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 !important;
+    }
+    .leaflet-control-layers-toggle {
+      width: 35px !important;
+      height: 35px !important;
+      background-size: 20px 20px !important;
+      margin: 0 !important;
+    }
+    .leaflet-control-layers-expanded {
+      width: auto !important;
+      height: auto !important;
+      border-radius: 8px !important;
+      padding: 10px !important;
+    }
+    .map-control-btn {
+      width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; border: 2px solid #c2c1c1; background: #fff; color: #555; cursor: pointer; padding: 0; font-size: 15px;
+    }
+    .map-control-btn i { color: inherit !important; }
+    .dark-theme .map-control-btn { background: #1e2530; border-color: #3a3a5c; color: #c9d1d9; }
+    .map-control-drawer {
+      position: absolute; top: 0; right: 44px; display: flex; gap: 8px; padding: 10px;
+      border-radius: 12px; background: rgba(20,20,30,0.92); backdrop-filter: blur(6px);
+    }
+    .map-control-option {
+      width: 74px; min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; border: none; border-radius: 10px; background: transparent; color: #fff; cursor: pointer; padding: 8px 6px; font-size: 11px; font-weight: 700;
+    }
+    .map-control-option i { font-size: 18px; }
+    .map-control-option.ativo { background: #fab32c; color: #222; }
+    html.dark-theme .leaflet-control-layers-list { background: #1e2530; color: #c9d1d9; }
+    /* ── Controles do mapa — visual unificado ── */
+    .leaflet-bar { box-shadow: none !important; background: #fff !important; border-radius: 20px !important; border: 2px solid #c2c1c1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+    .leaflet-bar a { width: 35px !important; height: 35px !important; border-radius: 0 !important; border: none !important; border-bottom: 1px solid #c2c1c1 !important; background: transparent !important; color: #555 !important; font-size: 18px !important; font-weight: 400 !important; font-family: inherit !important; display: flex !important; align-items: center !important; justify-content: center !important; text-decoration: none !important; line-height: 1 !important; }
+    .leaflet-bar a:last-child { border-bottom: none !important; }
+    .leaflet-bar a:hover { background: #f0f0f0 !important; }
+    .leaflet-control-layers-toggle { filter: brightness(0) invert(1) brightness(0.33); }
+    html.dark-theme .leaflet-bar { background: #1e2530 !important; border-color: #3a3a5c !important; }
+    html.dark-theme .leaflet-bar a { color: #c9d1d9 !important; border-bottom-color: #3a3a5c !important; }
+    html.dark-theme .leaflet-bar a:hover { background: #252535 !important; }
+    html.dark-theme .leaflet-control-layers { background: #1e2530 !important; border-color: #3a3a5c !important; }
+    html.dark-theme .leaflet-control-layers-toggle { filter: brightness(0) invert(1) brightness(0.82); }
+    html.dark-theme .leaflet-control-attribution { background: rgba(30,32,40,.7) !important; color: #888 !important; }
+    html.dark-theme .leaflet-control-scale-line { background: rgba(30,32,40,.7) !important; color: #aaa !important; border-color: #555 !important; }
+    .map-control-btn:not(.ativo):hover { background: #f0f0f0 !important; }
+    html.dark-theme .map-control-btn:not(.ativo):hover { background: #252535 !important; }
+
+    html.dark-theme .form-control { background: #252535; color: #c9d1d9; border-color: #3a3a5c; }
+    html.dark-theme .form-control:focus { background: #2a2a40; border-color: #fab32c; box-shadow: none; }
+    #grafico-content > div { height: 350px !important; }
+    .select2-container { min-width: 260px; }
+  </style>
+</head>
+<body>
+
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
+      <li class="active"><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> <span>Relatório</span></a></li>
+      <li id="li-pagamentos" style="display:none;"><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span class="al-badge badge-ativo" style="margin-top:4px;">CLIENTE</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Relatório</h2>
+      </div>
+      <button class="btn btn-success btn-sm topbar-export-btn" id="btn-abrir-exportar">
+        <i class="fa fa-file-excel-o"></i> Exportar XML
+      </button>
+    </div>
+
+  <div class="rel-page-body">
+  <div class="rel-toolbar">
+    <select id="sel-dispositivo" class="form-control" multiple="multiple" style="width:100%"></select>
+    <div class="btn-group">
+      <button class="btn btn-default btn-sm periodo-btn active" data-periodo="hoje">Hoje</button>
+      <button class="btn btn-default btn-sm periodo-btn" data-periodo="ontem">Ontem</button>
+      <button class="btn btn-default btn-sm periodo-btn" data-periodo="7dias">7 dias</button>
+      <button class="btn btn-default btn-sm periodo-btn" data-periodo="custom">Personalizado</button>
+    </div>
+    <div id="custom-datas" style="display:none;gap:6px;align-items:center">
+      <input type="date" id="dt-de"  class="form-control input-sm" style="width:130px" />
+      <span style="color:#888;font-size:12px">até</span>
+      <input type="date" id="dt-ate" class="form-control input-sm" style="width:130px" />
+    </div>
+    <button class="btn btn-primary btn-sm" id="btn-carregar" style="display:none" title="Carregar"><i class="fa fa-search"></i></button>
+  </div>
+
+  <div class="modal fade" id="modal-exportar" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#27ae60; color:#fff; padding:10px 15px">
+          <h5 class="modal-title">Exportar Relatório (XML)</h5>
+        </div>
+        <div class="modal-body" style="padding:15px">
+          <div class="form-group">
+            <label style="font-size:12px; font-weight:600">Tipo de Relatório</label>
+            <select id="export-tipo" class="form-control input-sm">
+              <option value="route">Rota / Trajeto</option>
+              <option value="events">Eventos</option>
+              <option value="trips">Viagens</option>
+              <option value="stops">Paradas</option>
+              <option value="summary">Resumo / Totais</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:10px">
+          <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success btn-sm" id="btn-confirmar-exportar">
+            <i class="fa fa-download"></i> Baixar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="rel-tabs">
+    <ul class="nav nav-tabs" id="rel-nav">
+      <li class="active"><a href="#tab-rota"    data-toggle="tab"><i class="fa fa-road"></i> Rota</a></li>
+      <li><a href="#tab-eventos"  data-toggle="tab"><i class="fa fa-bell"></i> Eventos</a></li>
+      <li><a href="#tab-viagens"  data-toggle="tab"><i class="fa fa-car"></i> Viagens</a></li>
+      <li><a href="#tab-paradas"  data-toggle="tab"><i class="fa fa-pause-circle"></i> Paradas</a></li>
+      <li><a href="#tab-resumo"   data-toggle="tab"><i class="fa fa-list-alt"></i> Resumo</a></li>
+      <li><a href="#tab-grafico"  data-toggle="tab"><i class="fa fa-area-chart"></i> Gráfico</a></li>
+    </ul>
+    <div class="tab-content rel-content">
+      <div class="tab-pane active" id="tab-rota" style="padding:0">
+        <div id="mapa-rota-loading" style="display:none">
+          <i class="fa fa-spinner fa-spin" style="font-size:24px;color:#fab32c;"></i>
+          <span>Carregando...</span>
+        </div>
+        <div id="mapa-rota"></div>
+        <div id="rota-stats" style="padding:8px 14px;font-size:12px"></div>
+      </div>
+      <div class="tab-pane" id="tab-eventos"><div id="eventos-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div></div>
+      <div class="tab-pane" id="tab-viagens"><div id="viagens-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div></div>
+      <div class="tab-pane" id="tab-paradas"><div id="paradas-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div></div>
+      <div class="tab-pane" id="tab-resumo"><div id="resumo-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div></div>
+      <div class="tab-pane" id="tab-grafico"><div id="grafico-content" class="rel-loading"><i class="fa fa-spin fa-spinner"></i> Aguardando...</div></div>
+    </div>
+  </div>
+  </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/select2.min.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var user = AL_CLIENTE.requireAuth();
+      if (!user) return;
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      if (user.tipo === 'responsavel') {
+        document.getElementById('li-pagamentos').style.display = 'block';
+      }
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+    })();
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="../js/relatorio-cliente.js"></script>
+</body>
+</html>
