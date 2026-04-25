@@ -23,13 +23,42 @@ import { UPLOADS_DIR } from './utils/upload-paths';
 const app = express();
 
 // CORS
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5500').split(',');
+const configuredOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = new Set([
+  ...(isProduction ? [] : [
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ]),
+  ...configuredOrigins,
+]);
+function isAllowedCorsOrigin(origin: string) {
+  if (allowedOrigins.has(origin)) return true;
+  if (isProduction) return false;
+  try {
+    const url = new URL(origin);
+    return url.protocol === 'http:' && (
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1' ||
+      url.hostname.startsWith('192.168.') ||
+      url.hostname.startsWith('10.')
+    );
+  } catch {
+    return false;
+  }
+}
 app.use(cors({
   origin: (origin, callback) => {
     // Permite requisições sem origin (Postman, curl) em desenvolvimento
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || (!isProduction && origin === 'null') || isAllowedCorsOrigin(origin)) {
       callback(null, true);
     } else {
+      console.warn(`[CORS] Origem bloqueada: ${origin}`);
       callback(new Error('Bloqueado pelo CORS'));
     }
   },

@@ -13,20 +13,7 @@
   <style>
     body { margin: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; font-family: 'Montserrat', sans-serif; }
 
-    /* Topbar / Toolbar */
-    .rel-topbar {
-      height: 52px;
-      background: #fff;
-      border-bottom: 1px solid #e8e8e8;
-      padding: 0 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    html.dark-theme .rel-topbar { background: #1e2530; border-color: #2d3748; }
-    .rel-topbar-title { margin: 0; font-size: 16px; font-weight: 700; color: #333; }
-    html.dark-theme .rel-topbar-title { color: #f0f2f5; }
+    /* Toolbar */
     .rel-toolbar {
       background: #fff; border-bottom: 1px solid #e8e8e8;
       padding: 8px 16px; display: flex; align-items: center;
@@ -167,17 +154,9 @@
 
     html.dark-theme .form-control { background: #252535; color: #c9d1d9; border-color: #3a3a5c; }
     html.dark-theme .form-control:focus { background: #2a2a40; border-color: #fab32c; box-shadow: none; }
-    .rel-export-btn { margin-left: auto; border-radius: 6px; font-weight: 700; }
   </style>
 </head>
 <body>
-
-  <div class="rel-topbar">
-    <h2 class="rel-topbar-title">Relatório</h2>
-    <button class="btn btn-success btn-sm rel-export-btn" id="btn-exportar">
-      <i class="fa fa-file-excel-o"></i> Exportar XML
-    </button>
-  </div>
 
   <!-- Toolbar sem sidebar -->
   <div class="rel-toolbar">

@@ -70,7 +70,6 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('btn-carregar').addEventListener('click', carregarRelatorio);
-  document.getElementById('btn-exportar').addEventListener('click', function () { $('#modal-exportar').modal('show'); });
   document.getElementById('btn-confirmar-exportar').addEventListener('click', exportarRelatorio);
 
   $('a[href="#tab-rota"]').on('shown.bs.tab', function () {
@@ -80,6 +79,10 @@ document.addEventListener('DOMContentLoaded', function () {
   // Carrega imediatamente
   carregarRelatorio();
 });
+
+window.abrirModalExportarRelatorioCliente = function () {
+  $('#modal-exportar').modal('show');
+};
 
 function configurarPeriodo() {
   const hoje = new Date();
@@ -125,13 +128,26 @@ function enderecoPareceCoordenada(valor) {
   if (typeof valor !== 'string') return false;
   const texto = valor.trim();
   if (!texto || texto === '0.00000, 0.00000') return true;
-  return /^\(?\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*\)?$/.test(texto);
+  return !!extrairCoords(texto);
 }
 
 function extrairCoords(valor) {
   if (typeof valor !== 'string') return null;
-  const m = valor.trim().match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/);
-  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
+  const texto = valor.trim();
+  const padroes = [
+    /^\(?\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*\)?$/,
+    /^\(?\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)?$/,
+    /^lat(?:itude)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)\D+lon(?:gitude)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)$/i,
+  ];
+  for (const padrao of padroes) {
+    const m = texto.match(padrao);
+    if (!m) continue;
+    const lat = Number(m[1]), lng = Number(m[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+  return null;
 }
 
 function coordsValidas(lat, lng) {

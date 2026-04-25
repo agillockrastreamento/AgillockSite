@@ -141,6 +141,15 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btn-fechar-evt-popup').addEventListener('click', function () {
       document.getElementById('evento-popup-mapa').style.display = 'none';
     });
+
+    const btnOverlayExportar = document.getElementById('btn-overlay-exportar');
+    if (btnOverlayExportar) {
+      btnOverlayExportar.addEventListener('click', function () {
+        const iframe = document.getElementById('overlay-iframe');
+        const abrirModal = iframe?.contentWindow?.abrirModalExportarRelatorioCliente;
+        if (typeof abrirModal === 'function') abrirModal();
+      });
+    }
   });
 });
 
@@ -1592,6 +1601,8 @@ window.abrirOverlay = function (did, tipo) {
   const base = window.location.href.replace(/\/cliente\/rastreamento\.html.*/, '');
   const token = AL_CLIENTE.getToken();
   let iframeSrc = tipo === 'relatorio' ? `${base}/cliente/relatorio-iframe.html?id=${did}&token=${encodeURIComponent(token)}` : `${base}/cliente/detalhe-iframe.html?id=${did}&token=${token}&modo=historico`;
+  const btnExportar = document.getElementById('btn-overlay-exportar');
+  if (btnExportar) btnExportar.style.display = tipo === 'relatorio' ? 'inline-flex' : 'none';
   document.getElementById('overlay-iframe').src = iframeSrc;
   document.getElementById('overlay-historico').classList.add('ativo');
   history.pushState({ overlay: true }, '');
@@ -1886,10 +1897,16 @@ setInterval(() => { AL_CLIENTE.apiGet('/api/cliente/rastreamento/status-acesso')
 window.fecharOverlay = function () {
   document.getElementById('overlay-historico').classList.remove('ativo');
   document.getElementById('overlay-iframe').src = '';
+  const btnExportar = document.getElementById('btn-overlay-exportar');
+  if (btnExportar) btnExportar.style.display = 'none';
   if (history.state?.overlay) history.back();
 };
 
 window.addEventListener('popstate', (e) => {
   const overlay = document.getElementById('overlay-historico');
-  if (overlay && overlay.classList.contains('ativo')) overlay.classList.remove('ativo');
+  if (overlay && overlay.classList.contains('ativo')) {
+    overlay.classList.remove('ativo');
+    const btnExportar = document.getElementById('btn-overlay-exportar');
+    if (btnExportar) btnExportar.style.display = 'none';
+  }
 });

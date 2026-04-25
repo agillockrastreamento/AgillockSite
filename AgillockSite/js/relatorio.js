@@ -245,13 +245,26 @@ function enderecoPareceCoordenada(valor) {
   if (typeof valor !== 'string') return false;
   const texto = valor.trim();
   if (!texto || texto === '0.00000, 0.00000') return true;
-  return /^\(?\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*\)?$/.test(texto);
+  return !!extrairCoords(texto);
 }
 
 function extrairCoords(valor) {
   if (typeof valor !== 'string') return null;
-  const m = valor.trim().match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/);
-  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
+  const texto = valor.trim();
+  const padroes = [
+    /^\(?\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*\)?$/,
+    /^\(?\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)?$/,
+    /^lat(?:itude)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)\D+lon(?:gitude)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)$/i,
+  ];
+  for (const padrao of padroes) {
+    const m = texto.match(padrao);
+    if (!m) continue;
+    const lat = Number(m[1]), lng = Number(m[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+  return null;
 }
 
 function coordsValidas(lat, lng) {
@@ -555,28 +568,37 @@ function renderGraficoBatch(data) {
   const el = document.getElementById('grafico-content');
   if (!data || !data.posicoes || !data.posicoes.length) { el.innerHTML = '<div class="rel-empty">Sem dados para o gráfico.</div>'; return; }
   
-  const datasets = [];
+  const labels = [];
+  const labelsSet = new Set();
   const porDispositivo = {};
   data.posicoes.forEach(p => { 
     if (!porDispositivo[p.deviceId]) porDispositivo[p.deviceId] = []; 
-    porDispositivo[p.deviceId].push({ x: new Date(p.fixTime), y: p.velocidade }); 
+    const label = fmtHora(p.fixTime);
+    if (!labelsSet.has(label)) {
+      labelsSet.add(label);
+      labels.push(label);
+    }
+    porDispositivo[p.deviceId].push({ label, velocidade: p.velocidade || 0 });
   });
 
   const ids = Object.keys(porDispositivo);
   const isSingle = ids.length === 1;
+  const datasets = [];
 
   let idx = 0;
   for (const did in porDispositivo) {
     const d = dispositivosMap[did] || { nome: did }, cor = _COLORS[idx % _COLORS.length];
+    const porHorario = new Map(porDispositivo[did].map(p => [p.label, p.velocidade]));
     datasets.push({ 
       label: d.nome, 
-      data: porDispositivo[did].map(p => ({ x: fmtHora(p.x), y: p.y })),
+      data: labels.map(label => porHorario.has(label) ? porHorario.get(label) : null),
       borderColor: cor, 
       backgroundColor: cor + (isSingle ? '33' : '15'),
       borderWidth: isSingle ? 3 : 2,
       pointRadius: 0, 
       tension: 0.3, 
-      fill: true 
+      fill: true,
+      spanGaps: true
     });
     idx++;
   }
@@ -586,13 +608,13 @@ function renderGraficoBatch(data) {
   
   chartVelocidade = new Chart(document.getElementById('canvas-grafico').getContext('2d'), {
     type: 'line', 
-    data: { datasets },
+    data: { labels, datasets },
     options: { 
       responsive: true, 
       maintainAspectRatio: false, 
+      interaction: { mode: 'index', intersect: false },
       scales: { 
         x: { 
-          type: 'category',
           ticks: { color: '#888' }
         }, 
         y: { 
@@ -601,7 +623,8 @@ function renderGraficoBatch(data) {
         } 
       },
       plugins: {
-        legend: { display: !isSingle }
+        legend: { display: !isSingle },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y} km/h` } }
       }
     }
   });
