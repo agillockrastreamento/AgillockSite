@@ -2127,7 +2127,7 @@ function mostrarCardDispositivo(id) {
                 ${_htmlBotaoStreetView(p.latitude, p.longitude)}
               </div>
             </div>
-            <div id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="font-size:11px;color:#555">${addrTxt}</div>
+            <div id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="font-size:11px">${addrTxt}</div>
           </div>` : ''}
       <div style="margin-top:10px;display:flex;gap:6px">
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">

@@ -1399,7 +1399,7 @@ function mostrarCardDispositivo(id) {
             ${_htmlBotaoStreetView(p.latitude, p.longitude)}
           </div>
         </div>
-        <div id="${addrId}" style="font-size:11px;color:#555">${addrTxt}</div>
+        <div id="${addrId}" style="font-size:11px">${addrTxt}</div>
       </div>` : ''}
       <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:12px;border-top:1px solid rgba(128,128,128,0.1)">
         <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
