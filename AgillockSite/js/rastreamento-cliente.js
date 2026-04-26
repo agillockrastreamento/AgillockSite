@@ -403,11 +403,14 @@ function renderEventosLista() {
     const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
     const nomeDev = _nomeDispositivo(e.dispositivoId);
+    // Usa e.mensagem se disponível, caso contrário cai para e.tipoLabel ou o tipo bruto
+    const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
+
     return `<div class="evento-item ${style.cls}" onclick="clicarEvento(${_eventos.indexOf(e)})">
       <div class="evt-icon-wrap"><i class="fa ${style.icon}"></i></div>
       <div class="evt-content">
         <div class="evt-dispositivo">${nomeDev}</div>
-        <div class="evt-desc">${e.tipoLabel || e.tipo}</div>
+        <div class="evt-desc">${textoMensagem}</div>
         <div class="evt-footer">
           <span class="evt-tempo">há ${tempo}</span>
           <i class="fa fa-map-marker evt-ico-pin"></i>
@@ -420,7 +423,7 @@ function renderEventosLista() {
 function _nomeDispositivo(dispositivoId) {
   const v = veiculosMap[dispositivoId];
   if (!v) return dispositivoId || '—';
-  return v.placa ? `${v.nome} ${v.placa}` : v.nome;
+  return v.placa ? `${v.nome} (${v.placa})` : v.nome;
 }
 
 window.clicarEvento = function (idx) {
@@ -435,6 +438,7 @@ window.clicarEvento = function (idx) {
 
   const popup = document.getElementById('evento-popup-mapa');
   document.getElementById('ep-titulo').textContent = e.tipoLabel || e.tipo;
+  document.getElementById('ep-desc').textContent = e.mensagem || ''; // Adiciona a mensagem completa no popup se houver o elemento
 
   const dt = e.serverTime ? new Date(e.serverTime) : null;
   document.getElementById('ep-data').textContent = dt

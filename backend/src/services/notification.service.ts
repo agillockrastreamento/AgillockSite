@@ -4,7 +4,8 @@ import EmailService from './email.service';
 type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string };
 
 class NotificationService {
-  private _lastOverspeedAt = new Map<string, number>(); // Cache em memória para evitar spam de velocidade
+  private _lastOverspeedAt = new Map<string, number>(); // Cache para cooldown de velocidade
+  private _lastIgnitionState = new Map<string, boolean>(); // Cache para evitar alertas duplicados de ignição
 
   async verificarEventosPosicao(identificador: string, dispositivo: any, dados: any): Promise<any[]> {
     const eventosDetectados: any[] = [];
@@ -15,18 +16,32 @@ class NotificationService {
         if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, vinculo.cliente as any);
       }
 
+      // 1. Verificar Ignição (Nível de Dispositivo para todos os clientes)
+      let mudouIgnicao = false;
+      let tipoIgn: 'ignitionOn' | 'ignitionOff' | null = null;
+
+      if (dados.ignicao !== null) {
+        const chaveIgnicao = `${dispositivo.id}_ignicao`;
+        const ultimoEstadoConhecido = this._lastIgnitionState.get(chaveIgnicao) ?? dispositivo.telemetriaUltimaIgnicao;
+        
+        if (ultimoEstadoConhecido !== null && dados.ignicao !== ultimoEstadoConhecido) {
+          tipoIgn = dados.ignicao ? 'ignitionOn' : 'ignitionOff';
+          console.log(`[Notif] Mudança de ignição detectada para ${identificador}: ${ultimoEstadoConhecido} -> ${dados.ignicao}`);
+          mudouIgnicao = true;
+          this._lastIgnitionState.set(chaveIgnicao, dados.ignicao);
+        } else if (ultimoEstadoConhecido === null) {
+          this._lastIgnitionState.set(chaveIgnicao, dados.ignicao);
+        }
+      }
+
       for (const cliente of clientesMap.values()) {
         const clienteLogin = cliente.login;
         if (!clienteLogin || !clienteLogin.ativo) continue;
 
-        // 1. Verificar Ignição (se mudou)
-        if (dados.ignicao !== null && dispositivo.telemetriaUltimaIgnicao !== null) {
-          if (dados.ignicao !== dispositivo.telemetriaUltimaIgnicao) {
-            const tipoIgn = dados.ignicao ? 'ignitionOn' : 'ignitionOff';
-            console.log(`[Notif] Detectada mudança de ignição (${tipoIgn}) para ${identificador}`);
-            const result = await this.processarEvento(identificador, tipoIgn, dados, clienteLogin.id);
-            if (result) eventosDetectados.push(result);
-          }
+        // Processar Mudança de Ignição para este cliente
+        if (mudouIgnicao && tipoIgn) {
+          const result = await this.processarEvento(identificador, tipoIgn, dados, clienteLogin.id);
+          if (result) eventosDetectados.push(result);
         }
 
         // 2. Verificar Velocidade (Limite do Cliente)
