@@ -437,22 +437,33 @@ window.clicarEvento = function (idx) {
   }
 
   const popup = document.getElementById('evento-popup-mapa');
-  document.getElementById('ep-titulo').textContent = e.tipoLabel || e.tipo;
-  document.getElementById('ep-desc').textContent = e.mensagem || ''; // Adiciona a mensagem completa no popup se houver o elemento
+  if (!popup) return;
 
+  const elTitulo = document.getElementById('ep-titulo');
+  if (elTitulo) elTitulo.textContent = e.tipoLabel || e.tipo;
+  
+  const elDesc = document.getElementById('ep-desc');
+  if (elDesc) elDesc.textContent = e.mensagem || '';
+
+  const elData = document.getElementById('ep-data');
   const dt = e.serverTime ? new Date(e.serverTime) : null;
-  document.getElementById('ep-data').textContent = dt
-    ? `${dt.toLocaleDateString('pt-BR')} | ${dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}`
-    : '';
+  if (elData) {
+    elData.textContent = dt
+      ? `${dt.toLocaleDateString('pt-BR')} | ${dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}`
+      : '';
+  }
 
   const pos = veiculosMap[e.dispositivoId]?.posicao;
-  if (pos) {
-    const addrId = 'ep-end-addr';
-    document.getElementById('ep-end').id = addrId;
-    document.getElementById('ep-end').textContent = 'Buscando endereço...';
-    geocodificarCoordenadas(pos.latitude, pos.longitude, addrId);
-  } else {
-    document.getElementById('ep-end').textContent = _nomeDispositivo(e.dispositivoId);
+  const elEnd = document.getElementById('ep-end');
+  if (elEnd) {
+    if (pos) {
+      const addrId = 'ep-end-addr';
+      elEnd.id = addrId;
+      elEnd.textContent = 'Buscando endereço...';
+      geocodificarCoordenadas(pos.latitude, pos.longitude, addrId);
+    } else {
+      elEnd.textContent = _nomeDispositivo(e.dispositivoId);
+    }
   }
 
   popup.style.display = 'block';
@@ -917,11 +928,15 @@ function processarMensagemWs(msg) {
   if (msg.events?.length) {
     msg.events.forEach(function (e) {
       const did = traccarIdParaDispositivoId[e.deviceId];
-      const pos = did ? veiculosMap[did]?.posicao : null;
+      // Trava de segurança: só processa o evento se o veículo estiver no mapa deste cliente
+      if (!did || !veiculosMap[did]) return;
+
+      const pos = veiculosMap[did]?.posicao;
       adicionarEvento({
         dispositivoId: did || null,
         tipo: e.type,
         tipoLabel: e.tipoLabel,
+        mensagem: e.mensagem, // Garante o uso da mensagem detalhada
         serverTime: e.serverTime,
         lat: pos?.latitude ?? null,
         lng: pos?.longitude ?? null, 

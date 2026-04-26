@@ -423,7 +423,9 @@ window.clicarEvento = function (idx) {
 
   // Mostrar popup de evento no mapa
   const popup = document.getElementById('evento-popup-mapa');
-  document.getElementById('ep-titulo').textContent = e.tipoLabel || e.tipo;
+  if (document.getElementById('ep-titulo')) document.getElementById('ep-titulo').textContent = e.tipoLabel || e.tipo;
+  const elDesc = document.getElementById('ep-desc');
+  if (elDesc) elDesc.textContent = e.mensagem || '';
 
   const dt = e.serverTime ? new Date(e.serverTime) : null;
   document.getElementById('ep-data').textContent = dt
