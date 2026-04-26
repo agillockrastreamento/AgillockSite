@@ -400,6 +400,9 @@ function renderEventosLista() {
     }
   };
 
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  const descColor = isDark ? '#ccc' : '#555';
+
   lista.innerHTML = filtrados.map(function (e) {
     const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
@@ -412,7 +415,7 @@ function renderEventosLista() {
       <div class="evt-icon-wrap" style="color: ${style.color}"><i class="fa ${style.icon}"></i></div>
       <div class="evt-content">
         <div class="evt-dispositivo" style="color: ${style.color}; font-weight: 700;">${nomeDev} ${placaDev}</div>
-        <div class="evt-desc" style="color: #555; font-size: 11px; margin: 2px 0;">${textoMensagem}</div>
+        <div class="evt-desc" style="color: ${descColor}; font-size: 11px; margin: 2px 0;">${textoMensagem}</div>
         <div class="evt-footer" style="display:flex; justify-content: space-between; align-items: center;">
           <span class="evt-tempo" style="font-size: 10px; color: #999;">há ${tempo}</span>
           <i class="fa fa-map-marker" style="color: ${style.color}; font-size: 12px;"></i>
@@ -452,19 +455,25 @@ window.clicarEvento = function (idx) {
 
       const addrId = `evt-addr-admin-${idx}`;
       const v = veiculosMap[e.dispositivoId];
+      const isDark = document.documentElement.classList.contains('dark-theme');
+      const bgAddr = isDark ? '#2d3748' : '#f8f9fa';
+      const colorMain = isDark ? '#f0f2f5' : '#333';
+      const colorMuted = isDark ? '#adb5bd' : '#666';
+      const borderCol = isDark ? '#4a5568' : '#eee';
+
       const content = `
         <div style="padding: 4px; min-width: 220px;">
-          <h6 style="margin: 0 0 6px; color: ${style.color}; font-weight: 700; font-size: 13px; border-bottom: 1px solid #eee; padding-bottom: 4px;">${e.tipoLabel || 'Notificação'}</h6>
-          <div style="font-size: 11px; color: #333; line-height: 1.4; margin-bottom: 8px; font-weight: 500;">${e.mensagem || ''}</div>
+          <h6 style="margin: 0 0 6px; color: ${style.color}; font-weight: 700; font-size: 13px; border-bottom: 1px solid ${borderCol}; padding-bottom: 4px;">${e.tipoLabel || 'Notificação'}</h6>
+          <div style="font-size: 11px; color: ${colorMain}; line-height: 1.4; margin-bottom: 8px; font-weight: 500;">${e.mensagem || ''}</div>
           
-          <div style="background: #f8f9fa; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
-            <div id="${addrId}" style="font-size: 10px; color: #666; margin-bottom: 4px;"><i class="fa fa-map-marker"></i> Buscando endereço...</div>
+          <div style="background: ${bgAddr}; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
+            <div id="${addrId}" style="font-size: 10px; color: ${colorMuted}; margin-bottom: 4px;"><i class="fa fa-map-marker"></i> Buscando endereço...</div>
             <div style="font-size: 9px; color: #999;">Lat: ${v.posicao.latitude.toFixed(5)} | Lng: ${v.posicao.longitude.toFixed(5)}</div>
           </div>
 
           <div style="display: flex; gap: 6px; margin-bottom: 6px;">
             <a href="${_urlGoogleMaps(v.posicao.latitude, v.posicao.longitude)}" target="_blank" class="btn btn-xs btn-default" style="flex:1; font-size: 9px; padding: 4px;"><i class="fa fa-google"></i> Maps</a>
-            <a href="${_urlStreetView(v.posicao.latitude, v.posicao.longitude)}" target="_blank" class="btn btn-xs btn-primary" style="flex:1; font-size: 9px; padding: 4px;"><i class="fa fa-street-view"></i> StreetView</a>
+            <a href="${_urlStreetView(v.posicao.latitude, v.posicao.longitude)}" target="_blank" class="btn btn-xs btn-primary" style="flex:1; font-size: 9px; padding: 4px; color: #fff !important;"><i class="fa fa-street-view"></i> StreetView</a>
           </div>
 
           <div style="font-size: 9px; color: #aaa; text-align: right;">
@@ -1700,10 +1709,30 @@ function atualizarMarcador(dispositivoId) {
     marcadoresIconeKey[dispositivoId] = iconKey;
   }
 
-  if (_mostrarPopup && marcadores[dispositivoId].getPopup()?.isOpen()) {
+  const isOpen = marcadores[dispositivoId].getPopup()?.isOpen();
+  const isEventPopup = marcadores[dispositivoId].getPopup()?.options?.className === 'popup-evento-moderno';
+  if (_mostrarPopup && isOpen && !isEventPopup) {
     marcadores[dispositivoId].getPopup().setContent(criarPopupSimples(v));
   }
 }
+
+// ── Injeção de estilos para tema escuro ─────────────────────────────────────
+(function injectTrackingDarkStyles() {
+  const id = 'tracking-dark-styles';
+  if (document.getElementById(id)) return;
+  const style = document.createElement('style');
+  style.id = id;
+  style.innerHTML = `
+    .dark-theme .btn-evt-periodo { background: #2d3748 !important; color: #adb5bd !important; border-color: #4a5568 !important; }
+    .dark-theme .btn-evt-periodo.active { background: #2980b9 !important; color: #fff !important; border-color: #2980b9 !important; }
+    .dark-theme #evt-tipo-btn, .dark-theme #evt-btn-notif, .dark-theme #evt-btn-limpar { background: #2d3748; color: #adb5bd; border: 1px solid #4a5568; }
+    .dark-theme #evt-btn-notif.ativo { color: #f39c12; }
+    .dark-theme .evt-tipo-dropdown { background: #1a202c; border-color: #2d3748; }
+    .dark-theme .evt-tipo-item { color: #c9d1d9; }
+    .dark-theme .evt-tipo-item:hover { background: #2d3748; }
+  `;
+  document.head.appendChild(style);
+})();
 
 function _corMarcador(v) {
   if (!v.posicao || v.status !== 'online') return '#95a5a6';
@@ -1993,7 +2022,10 @@ function _agendarAtualizacaoAtributos(dispositivoId) {
 }
 
 function _latLngComOffset(posicao) {
-  const offset = _cardAdminExpandido && _attrsTrayOpen ? _cardFocusOffsetPx : 0;
+  let offset = 0;
+  if (ativoId) {
+    offset = (_cardAdminExpandido && _attrsTrayOpen) ? _cardFocusOffsetPx : 250;
+  }
   if (!offset || !map || !posicao) return [posicao.latitude, posicao.longitude];
   const zoom = map.getZoom() || 16;
   const point = map.project([posicao.latitude, posicao.longitude], zoom);
@@ -2122,28 +2154,18 @@ function mostrarCardDispositivo(id) {
     </div>` : '';
 
   const card = document.getElementById('device-detail-card');
-  const linkVerMais = '';
-  const botoesAcao = _cardAdminExpandido
-    ? `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn" style="border-radius:10px;">
-         <i class="fa fa-bar-chart"></i>  Relatório
-       </a>`
-    : `<div style="margin-top:10px;display:flex;gap:6px">
-         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
-           <i class="fa fa-bar-chart"></i>  Relatório
-         </a>
-         <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center; border-radius:10px;">
-           <i class="fa fa-history"></i> Histórico
-         </a>
-       </div>`;
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  const tagBg = isDark ? '#2d3748' : '#f0f2f5';
+  const tagColor = isDark ? '#adb5bd' : '#666';
+
   card.innerHTML = `
     ${imgHtml}
-    ${linkVerMais}
     <div class="dcard-header">
       <div style="flex:1;min-width:0">
         <div class="v-nome">${v.nome}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
           ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
-          ${v.identificador ? `<span class="v-placa" style="font-family:monospace;background:#f0f2f5;color:#666">${v.identificador}</span>` : ''}
+          ${v.identificador ? `<span class="v-placa" style="font-family:monospace;background:${tagBg};color:${tagColor}">${v.identificador}</span>` : ''}
           <a href="dispositivo-detalhe.html?id=${v.dispositivoId}" title="Mais detalhes" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#e8f4fd;border-radius:50%;color:#2980b9;font-size:11px;text-decoration:none;" class="btn-dcard-gear">
             <i class="fa fa-cog"></i>
           </a>
@@ -2177,7 +2199,7 @@ function mostrarCardDispositivo(id) {
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
           <i class="fa fa-bar-chart"></i>  Relatório
         </a>
-        <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
+        <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center; border-radius:10px;">
           <i class="fa fa-history"></i> Histórico
         </a>
       </div>
@@ -2193,7 +2215,7 @@ function mostrarCardDispositivo(id) {
     const body = card.querySelector('.dcard-body');
     const acoesRapidas = body ? Array.from(body.children).find(el => el.tagName === 'DIV' && el.getAttribute('style') && el.getAttribute('style').indexOf('display:flex;gap:6px') !== -1) : null;
     if (acoesRapidas) {
-      acoesRapidas.outerHTML = botoesAcao;
+      acoesRapidas.outerHTML = `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn" style="border-radius:10px;"><i class="fa fa-bar-chart"></i>  Relatório</a>`;
     }
     const acoesSection = body ? Array.from(body.children).find(el => el.innerHTML && el.innerHTML.indexOf('A') !== -1 && el.innerHTML.indexOf('dcard-acao') !== -1) : null;
     if (acoesSection && !body.querySelector(`#dcard-resumo-hoje-${id}`)) {
@@ -2412,7 +2434,7 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
 
   if (cacheKey in _geocodeCache) {
     const cached = _geocodeCache[cacheKey];
-    el.textContent = cached ? `${cached} ${coords}` : coords;
+    el.innerHTML = `<i class="fa fa-map-marker"></i> ${cached ? `${cached} ${coords}` : coords}`;
     updateLink(cached);
     return;
   }
@@ -2421,10 +2443,10 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
     const data = await window.AL.apiGet(`/api/rastreamento/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
     const end = data.endereco || '';
     _geocodeCache[cacheKey] = end;
-    el.textContent = end ? `${end} ${coords}` : coords;
+    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end ? `${end} ${coords}` : coords}`;
     updateLink(end);
   } catch {
-    el.textContent = coords;
+    el.innerHTML = `<i class="fa fa-map-marker"></i> ${coords}`;
     updateLink(null);
   }
 };
