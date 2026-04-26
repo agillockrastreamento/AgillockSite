@@ -8,11 +8,11 @@ class NotificationService {
    * @param tipo ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut, alarm, deviceLocked, deviceUnlocked
    * @param dados Dados extras (velocidade, latitude, longitude, etc)
    */
-  async processarEvento(dispositivoTraccarId: number, tipo: string, dados: any) {
+  async processarEvento(identificador: string, tipo: string, dados: any) {
     try {
       // 1. Encontrar o dispositivo e TODOS os clientes associados (dono direto + vinculados)
       const dispositivo = await prisma.dispositivo.findFirst({
-        where: { traccarId: dispositivoTraccarId },
+        where: { identificador },
         include: {
           cliente: {
             include: { login: true },

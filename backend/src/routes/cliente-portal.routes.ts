@@ -949,7 +949,7 @@ router.post('/dispositivos/:dispositivoId/comandos', async (req: ClienteRequest,
 
     if (tipo === 'engineStop' || tipo === 'engineResume') {
       const evtTipo = tipo === 'engineStop' ? 'deviceLocked' : 'deviceUnlocked';
-      NotificationService.processarEvento(traccarDevice.id, evtTipo, {
+      NotificationService.processarEvento(dispositivo.identificador, evtTipo, {
         latitude: null, longitude: null, velocidade: null, endereco: null,
       }).catch(err => console.error('[Notificações] Erro notif comando:', err.message));
     }

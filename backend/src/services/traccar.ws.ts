@@ -278,6 +278,8 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
     (msg.positions || []).forEach(p => posicaoPorDeviceId.set(p.deviceId, p));
 
     for (const evt of realtimeEvents.concat(syntheticEvents)) {
+      const identificador = traccarIdToUniqueId.get(evt.deviceId);
+      if (!identificador) continue;
       const pos = posicaoPorDeviceId.get(evt.deviceId);
       const norm = pos ? normalizeAttributes(pos.attributes ?? {}) : {};
       const dados = {
@@ -287,7 +289,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         endereco: pos?.address ?? null,
         alarme: (norm as any).alarme ?? null,
       };
-      NotificationService.processarEvento(evt.deviceId, evt.type, dados).catch(err => {
+      NotificationService.processarEvento(identificador, evt.type, dados).catch(err => {
         console.error('[Notificações] Erro ao processar evento:', err.message);
       });
     }
