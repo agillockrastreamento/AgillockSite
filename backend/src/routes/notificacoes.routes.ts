@@ -87,6 +87,7 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
 
     let dateFilter = {};
     const agora = new Date();
+    const { de, ate } = req.query as { de?: string; ate?: string };
 
     if (periodo === 'hoje') {
       dateFilter = { gte: new Date(agora.setHours(0, 0, 0, 0)) };
@@ -101,6 +102,14 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
       const seteDias = new Date(agora);
       seteDias.setDate(agora.getDate() - 7);
       dateFilter = { gte: seteDias };
+    } else if (periodo === 'custom' && de && ate) {
+      const inicio = new Date(de as string);
+      inicio.setHours(0, 0, 0, 0);
+      const fim = new Date(ate as string);
+      fim.setHours(23, 59, 59, 999);
+      if (!isNaN(inicio.getTime()) && !isNaN(fim.getTime())) {
+        dateFilter = { gte: inicio, lte: fim };
+      }
     }
 
     const eventos = await prisma.eventoNotificacao.findMany({

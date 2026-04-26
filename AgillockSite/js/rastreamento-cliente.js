@@ -233,23 +233,40 @@ function inicializarEventosPanel() {
       document.querySelectorAll('.btn-evt-periodo').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
       const periodo = this.dataset.periodo;
+      const customRange = document.getElementById('evt-custom-range');
       if (periodo === 'custom') {
-        // Futura implementação de modal de data
-        AL_CLIENTE.showAlert('Selecione um intervalo no relatório para histórico avançado.', 'info');
+        customRange.style.display = 'block';
+        const hoje = new Date().toISOString().slice(0, 10);
+        const deInput = document.getElementById('evt-custom-de');
+        const ateInput = document.getElementById('evt-custom-ate');
+        if (!deInput.value) deInput.value = hoje;
+        if (!ateInput.value) ateInput.value = hoje;
       } else {
+        customRange.style.display = 'none';
         carregarHistoricoEventos(periodo);
       }
     });
   });
+
+  document.getElementById('evt-custom-buscar').addEventListener('click', function() {
+    const de = document.getElementById('evt-custom-de').value;
+    const ate = document.getElementById('evt-custom-ate').value;
+    if (!de || !ate) {
+      AL_CLIENTE.showAlert('Preencha as duas datas.', 'warning');
+      return;
+    }
+    carregarHistoricoEventos('custom', de, ate);
+  });
 }
 
-async function carregarHistoricoEventos(periodo) {
+async function carregarHistoricoEventos(periodo, de, ate) {
   const lista = document.getElementById('eventos-lista');
   lista.innerHTML = '<div style="padding:20px;text-align:center;color:#999"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
-  
+
   try {
-    // Rota que precisará ser implementada no Backend
-    const data = await AL_CLIENTE.apiGet(`/api/cliente/notificacoes/eventos?periodo=${periodo}`);
+    let url = `/api/cliente/notificacoes/eventos?periodo=${periodo}`;
+    if (periodo === 'custom' && de && ate) url += `&de=${de}&ate=${ate}`;
+    const data = await AL_CLIENTE.apiGet(url);
     _eventos.length = 0;
     if (data && data.length) {
       data.forEach(e => _eventos.push(e));

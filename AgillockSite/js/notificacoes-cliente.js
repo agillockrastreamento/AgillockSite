@@ -57,14 +57,10 @@
 
   async function carregarPreferencias(dispositivoId) {
     try {
-      // Simulando chamada de API — No backend real, precisaremos criar esta rota
-      // const prefs = await AL_CLIENTE.apiGet(`/api/cliente/notificacoes/preferencias/${dispositivoId}`);
-      
-      // Mock inicial
-      const prefs = {}; 
-      preferenciasAtivas = prefs;
+      const data = await AL_CLIENTE.apiGet(`/api/cliente/notificacoes/preferencias/${dispositivoId}`);
+      preferenciasAtivas = data?.preferencias || {};
+      if (data?.overspeedLimit) preferenciasAtivas.overspeedLimit = data.overspeedLimit;
       renderGrid();
-      
       document.getElementById('notif-container').style.display = 'block';
       document.getElementById('notif-vazio').style.display = 'none';
     } catch (err) {

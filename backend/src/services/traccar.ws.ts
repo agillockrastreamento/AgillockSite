@@ -13,6 +13,7 @@ import {
   sincronizarDispositivosComPosicoes,
   decorarPosicaoComMedidores,
 } from './medidores.service';
+import NotificationService from './notification.service';
 
 const TRACCAR_URL = process.env.TRACCAR_URL || 'http://traccar:8082';
 const WS_TRACCAR_URL = TRACCAR_URL.replace('http://', 'ws://').replace('https://', 'wss://');
@@ -270,6 +271,24 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       positionId: e.positionId,
     }));
     result.events = realtimeEvents.concat(syntheticEvents);
+
+    // Disparar notificações para cada evento (fire-and-forget)
+    type TraccarPos = NonNullable<TraccarWsMessage['positions']>[number];
+    const posicaoPorDeviceId = new Map<number, TraccarPos>();
+    (msg.positions || []).forEach(p => posicaoPorDeviceId.set(p.deviceId, p));
+
+    for (const evt of realtimeEvents.concat(syntheticEvents)) {
+      const pos = posicaoPorDeviceId.get(evt.deviceId);
+      const dados = {
+        latitude: pos?.latitude ?? null,
+        longitude: pos?.longitude ?? null,
+        velocidade: pos != null ? Math.round(pos.speed * 1.852) : null,
+        endereco: pos?.address ?? null,
+      };
+      NotificationService.processarEvento(evt.deviceId, evt.type, dados).catch(err => {
+        console.error('[Notificações] Erro ao processar evento:', err.message);
+      });
+    }
   }
 
   if (Object.keys(result).length === 0) return null;

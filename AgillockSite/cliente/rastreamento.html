@@ -699,6 +699,7 @@
       <li class="active"><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
       <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> <span>Relatório</span></a></li>
       <li id="li-pagamentos" style="display:none;"><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+      <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> <span>Notificações</span></a></li>
     </ul>
     <div class="sidebar-footer">
       <div class="sidebar-user">
@@ -786,11 +787,20 @@
           </div>
           <h5>Eventos</h5>
           
-          <div id="evt-data-filtros" style="display:flex;gap:4px;margin-bottom:10px;">
+          <div id="evt-data-filtros" style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;">
             <button class="btn btn-default btn-xs btn-evt-periodo active" data-periodo="hoje">Hoje</button>
             <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="ontem">Ontem</button>
             <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="7dias">7 dias</button>
             <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="custom" title="Personalizado"><i class="fa fa-calendar"></i></button>
+          </div>
+          <div id="evt-custom-range" style="display:none;margin-bottom:10px;">
+            <div style="display:flex;gap:4px;margin-bottom:4px;">
+              <input type="date" id="evt-custom-de" class="form-control input-xs" style="flex:1;font-size:11px;padding:3px 5px;height:26px;" title="Data inicial">
+              <input type="date" id="evt-custom-ate" class="form-control input-xs" style="flex:1;font-size:11px;padding:3px 5px;height:26px;" title="Data final">
+            </div>
+            <button id="evt-custom-buscar" class="btn btn-primary btn-xs btn-block">
+              <i class="fa fa-search"></i> Buscar
+            </button>
           </div>
 
           <div id="eventos-filtros">
