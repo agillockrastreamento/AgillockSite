@@ -1389,7 +1389,7 @@ function mostrarCardDispositivo(id) {
         <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
       </div>
       <div style="margin-top:12px;display:flex;gap:6px">
-        <button onclick="abrirOverlay('${id}', 'relatorio')" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-bar-chart"></i> Relatório</button>
+        <button onclick="window.location.href='relatorio.html?id=${encodeURIComponent(id)}'" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-bar-chart"></i> Relatório</button>
         <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-history"></i> Histórico</button>
       </div>
       ${_htmlAcoesCard(id)}
@@ -1596,7 +1596,7 @@ window.abrirOverlay = function (did, tipo) {
   document.getElementById('overlay-titulo').textContent = `${v.nome}${v.placa ? ` — ${v.placa}` : ''}`;
   const base = window.location.href.replace(/\/cliente\/rastreamento\.html.*/, '');
   const token = AL_CLIENTE.getToken();
-  let iframeSrc = tipo === 'relatorio' ? `${base}/cliente/relatorio-iframe.html?id=${did}&token=${encodeURIComponent(token)}` : `${base}/cliente/detalhe-iframe.html?id=${did}&token=${token}&modo=historico`;
+  let iframeSrc = `${base}/cliente/detalhe-iframe.html?id=${did}&token=${token}&modo=historico`;
   const btnExportar = document.getElementById('btn-overlay-exportar');
   if (btnExportar) btnExportar.style.display = tipo === 'relatorio' ? 'inline-flex' : 'none';
   document.getElementById('overlay-iframe').src = iframeSrc;

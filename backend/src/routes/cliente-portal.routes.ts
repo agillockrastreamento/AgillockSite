@@ -104,21 +104,43 @@ async function reverseGeocode(lat: number, lon: number): Promise<string> {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
     throw new Error('Coordenadas inválidas.');
   }
+  const googleKey = process.env.GOOGLE_MAPS_GEOCODING_API_KEY || process.env.GOOGLE_MAPS_JS_API_KEY;
+  if (googleKey) {
+    try {
+      const googleParams = new URLSearchParams({
+        latlng: `${lat},${lon}`,
+        language: 'pt-BR',
+        key: googleKey,
+      });
+      const googleRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${googleParams.toString()}`);
+      if (googleRes.ok) {
+        const googleData = await googleRes.json() as { status?: string; results?: Array<{ formatted_address?: string }> };
+        const enderecoGoogle = googleData.status === 'OK' ? googleData.results?.[0]?.formatted_address : '';
+        if (enderecoGoogle) return enderecoGoogle;
+      }
+    } catch {
+      // fallback abaixo
+    }
+  }
   const params = new URLSearchParams({
     format: 'jsonv2',
     lat: String(lat),
     lon: String(lon),
     'accept-language': 'pt-BR',
   });
-  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
-    headers: {
-      'User-Agent': 'AgilLockRastreamento/1.0 (https://agillock.com.br)',
-      'Accept': 'application/json',
-    },
-  });
-  if (!res.ok) throw new Error(`Nominatim ${res.status}`);
-  const data = await res.json() as { display_name?: string; address?: Record<string, unknown> };
-  return formatarEnderecoNominatim(data.address) || data.display_name || '';
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+      headers: {
+        'User-Agent': 'AgilLockRastreamento/1.0 (https://agillock.com.br)',
+        'Accept': 'application/json',
+      },
+    });
+    if (!res.ok) return '';
+    const data = await res.json() as { display_name?: string; address?: Record<string, unknown> };
+    return formatarEnderecoNominatim(data.address) || data.display_name || '';
+  } catch {
+    return '';
+  }
 }
 
 async function responderReverseGeocode(req: ClienteRequest, res: Response): Promise<void> {
@@ -129,7 +151,7 @@ async function responderReverseGeocode(req: ClienteRequest, res: Response): Prom
     res.json({ endereco });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    res.status(502).json({ error: `Erro ao buscar endereço: ${msg}` });
+    res.status(400).json({ error: msg });
   }
 }
 
@@ -962,6 +984,35 @@ router.get('/rastreamento/cercas', async (req: ClienteRequest, res: Response): P
   }
 
   res.json(todasCercas);
+});
+
+router.get('/rastreamento/dispositivos/:dispositivoId/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'dispositivoId');
+
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: {
+      id: dispositivoId,
+      OR: [
+        { clienteId },
+        { clientesVinculados: { some: { clienteId } } },
+      ],
+    },
+    select: { identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.json([]); return; }
+
+  try {
+    const cercas = await traccarGetGeofences(traccarDevice.id);
+    res.json(cercas);
+  } catch {
+    res.json([]);
+  }
 });
 
 // ── POST /api/cliente/rastreamento/cercas ─────────────────────────────────────
