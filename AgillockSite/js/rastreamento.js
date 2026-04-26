@@ -2120,13 +2120,15 @@ function mostrarCardDispositivo(id) {
       <div id="dcard-status-items" style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:8px">${si.join('')}</div>
       ${horasHtml}
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
-          <div class="dcard-section-title">Endereço</div>
-          <div style="display:flex;align-items:center;gap:6px">
-            ${_htmlBotaoGoogleMaps(p.latitude, p.longitude, hasCached ? cachedAddr : null)}
-            <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="flex:1 1 auto;text-align:center;font-size:11px">${addrTxt}</span>
-            ${_htmlBotaoStreetView(p.latitude, p.longitude)}
-          </div>
-        </div>` : ''}
+            <div class="dcard-section-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              Endereço
+              <div style="display:flex;gap:4px">
+                ${_htmlBotaoGoogleMaps(p.latitude, p.longitude, hasCached ? cachedAddr : null)}
+                ${_htmlBotaoStreetView(p.latitude, p.longitude)}
+              </div>
+            </div>
+            <div id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="font-size:11px;color:#555">${addrTxt}</div>
+          </div>` : ''}
       <div style="margin-top:10px;display:flex;gap:6px">
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
           <i class="fa fa-bar-chart"></i>  Relatório

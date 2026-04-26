@@ -1392,12 +1392,14 @@ function mostrarCardDispositivo(id) {
       </div>
       <div id="dcard-horas">${horasHtml}</div>
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
-        <div class="dcard-section-title">Endereço</div>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${_htmlBotaoGoogleMaps(p.latitude, p.longitude, hasCached ? cachedAddr : null)}
-          <span id="${addrId}" style="flex:1 1 auto;text-align:center;font-size:11px">${addrTxt}</span>
-          ${_htmlBotaoStreetView(p.latitude, p.longitude)}
+        <div class="dcard-section-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          Endereço
+          <div style="display:flex;gap:4px">
+            ${_htmlBotaoGoogleMaps(p.latitude, p.longitude, hasCached ? cachedAddr : null)}
+            ${_htmlBotaoStreetView(p.latitude, p.longitude)}
+          </div>
         </div>
+        <div id="${addrId}" style="font-size:11px;color:#555">${addrTxt}</div>
       </div>` : ''}
       <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:12px;border-top:1px solid rgba(128,128,128,0.1)">
         <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
