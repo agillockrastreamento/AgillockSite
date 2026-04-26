@@ -292,10 +292,14 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
 
     for (const evt of realtimeEvents.concat(syntheticEvents)) {
       const identificador = traccarIdToUniqueId.get(evt.deviceId);
-      if (!identificador) continue;
+      if (!identificador) {
+        console.warn(`[WS Traccar] Evento "${evt.type}" recebido para deviceId ${evt.deviceId}, mas identificador não encontrado no cache.`);
+        continue;
+      }
       const pos = posicaoPorDeviceId.get(evt.deviceId);
       const norm = pos ? normalizeAttributes(pos.attributes ?? {}) : {};
       const dados = {
+        traccarDeviceId: evt.deviceId,
         latitude: pos?.latitude ?? null,
         longitude: pos?.longitude ?? null,
         velocidade: pos != null ? Math.round(pos.speed * 1.852) : null,
