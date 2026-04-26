@@ -24,8 +24,8 @@ const _geocodeCache = {};
 const _resumoHojeClienteCache = {};
 const _resumoHojeClientePendentes = {};
 const CLIENT_FOCUS_STORAGE_KEY = 'rastreamento_cliente_foco';
-const _focusOffsetPx = 140;
-const _eventPopupOffsetPx = 90;
+const _focusOffsetPx = 0;
+const _eventPopupOffsetPx = 70;
 
 // ── Camadas de overlay ────────────────────────────────────────────────────────
 const _overlay = {
@@ -90,6 +90,7 @@ const _eventos = [];
 const MAX_EVENTOS = 100;
 const EVENTOS_PANEL_STORAGE_KEY = 'rastreamento_cliente_eventos_min';
 const BARRA_VEICULOS_STORAGE_KEY = 'rastreamento_cliente_barra_min';
+let _eventoPopupAtualIdx = null;
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
 let _googleMapTypeControl = null;
@@ -154,6 +155,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
     new MutationObserver(function () {
       if (ativoId) atualizarCardAtivo(ativoId);
+      renderEventosLista();
+      if (_eventoPopupAtualIdx != null) clicarEvento(_eventoPopupAtualIdx);
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
     // Fechar busca ao clicar fora
@@ -407,7 +410,11 @@ function renderEventosLista() {
   };
 
   const isDark = document.documentElement.classList.contains('dark-theme');
-  const descColor = isDark ? '#e6edf3' : '#555';
+  const descColor = isDark ? '#f4f7fb' : '#555';
+  const hexToRgba = (hex, alpha) => {
+    const n = parseInt(hex.replace('#', ''), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+  };
 
   lista.innerHTML = filtrados.map(function (e) {
     const style = getEventoStyle(e.tipo);
@@ -417,7 +424,7 @@ function renderEventosLista() {
     const placaDev = v?.placa ? `(${v.placa})` : '';
     const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
 
-    return `<div class="evento-item" style="border-left:none !important;" onclick="clicarEvento(${_eventos.indexOf(e)})">
+    return `<div class="evento-item" style="border-left:none !important; --evt-color:${style.color}; --evt-hover-bg:${hexToRgba(style.color, isDark ? 0.24 : 0.12)};" onclick="clicarEvento(${_eventos.indexOf(e)})">
       <div class="evt-icon-wrap" style="color: ${style.color}"><i class="fa ${style.icon}"></i></div>
       <div class="evt-content">
         <div class="evt-dispositivo" style="color: ${style.color}; font-weight: 700;">${nomeDev} ${placaDev}</div>
@@ -444,6 +451,7 @@ function _latLngComOffset(posicao, offsetOverride) {
 window.clicarEvento = function (idx) {
   const e = _eventos[idx];
   if (!e) return;
+  _eventoPopupAtualIdx = idx;
 
   const style = (() => {
     switch (e.tipo) {
@@ -458,6 +466,7 @@ window.clicarEvento = function (idx) {
   if (v?.posicao) {
     focar(e.dispositivoId, { abrirPopup: false, offsetPx: _eventPopupOffsetPx });
     
+    if (!marcadores[e.dispositivoId]) renderMarcadores();
     const marker = marcadores[e.dispositivoId];
     if (marker) {
       if (!marker._eventOriginalPopup) marker._eventOriginalPopup = marker.getPopup();
@@ -520,6 +529,7 @@ window.clicarEvento = function (idx) {
         if (marker._eventOriginalPopup) {
           marker.bindPopup(marker._eventOriginalPopup);
           marker._eventOriginalPopup = null;
+          _eventoPopupAtualIdx = null;
         }
       });
     }
@@ -1130,9 +1140,14 @@ function atualizarMarcador(did) {
   const style = document.createElement('style');
   style.id = id;
   style.innerHTML = `
+    #eventos-lista .evento-item { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
+    #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
+    #eventos-lista .evento-item:hover .evt-icon-wrap { background: var(--evt-hover-bg) !important; }
     .dark-theme .btn-evt-periodo { background: #2d3748 !important; color: #adb5bd !important; border-color: #4a5568 !important; }
     .dark-theme .btn-evt-periodo.active { background: #2980b9 !important; color: #fff !important; border-color: #2980b9 !important; }
     .dark-theme #eventos-lista .evento-item { background: #111827 !important; border-color: #263244 !important; color: #e6edf3 !important; }
+    .dark-theme #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
+    .dark-theme #eventos-lista .evt-desc { color: #f8fafc !important; }
     .dark-theme #eventos-lista .evt-tempo { color: #b8c1cc !important; }
     .dark-theme #eventos-vazio { color: #d7dde6 !important; }
     .dark-theme #eventos-vazio .fa { color: #d7dde6 !important; }
