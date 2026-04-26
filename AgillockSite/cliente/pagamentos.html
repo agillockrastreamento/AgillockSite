@@ -127,10 +127,6 @@
       <!-- Cards de resumo -->
       <div class="resumo-grid" id="resumo-cards">
         <div class="resumo-card orange">
-          <div class="resumo-valor" id="res-vl-aberto">—</div>
-          <div class="resumo-label">Em Aberto</div>
-        </div>
-        <div class="resumo-card orange">
           <div class="resumo-valor" id="res-qtd-aberto">—</div>
           <div class="resumo-label">Qtd. em Aberto</div>
         </div>
@@ -144,8 +140,8 @@
           <div class="resumo-label">Qtd. em Atraso</div>
         </div>
         <div class="resumo-card green">
-          <div class="resumo-valor" id="res-pago">—</div>
-          <div class="resumo-label">Pago no período</div>
+          <div class="resumo-valor" id="res-qtd-pago">—</div>
+          <div class="resumo-label">Qtd. paga no período</div>
         </div>
       </div>
 
@@ -223,13 +219,10 @@
         var atraso   = boletos.filter(function (b) { return b.status === 'ATRASADO'; });
         var pago     = boletos.filter(function (b) { return b.status === 'PAGO'; });
 
-        var vlAberto = aberto.reduce(function (s, b) { return s + Number(b.valor); }, 0);
         var vlAtraso = atraso.reduce(function (s, b) { return s + Number(b.valor); }, 0);
-        var vlPago   = pago.reduce(function (s, b) { return s + Number(b.valorPago || b.valor); }, 0);
 
-        document.getElementById('res-vl-aberto').textContent   = AL_CLIENTE.fmtMoney(vlAberto);
         document.getElementById('res-qtd-aberto').textContent  = aberto.length;
-        document.getElementById('res-pago').textContent        = AL_CLIENTE.fmtMoney(vlPago);
+        document.getElementById('res-qtd-pago').textContent    = pago.length;
 
         // Cards de atraso só aparecem se houver boletos atrasados
         var temAtraso = atraso.length > 0;
