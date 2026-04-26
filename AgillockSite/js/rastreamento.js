@@ -52,7 +52,7 @@ const _podeEditarMedidores = !!(_usuarioRastreamento && _usuarioRastreamento.rol
 const _cardAdminExpandido = _podeEditarMedidores;
 const _cardFocusOffsetPx = _cardAdminExpandido ? 310 : 0;
 const _focusOffsetPx = 0;
-const _eventPopupOffsetPx = 80;
+const _eventPopupOffsetPx = 0;
 const _detalheDispositivoCache = {};
 const _detalheDispositivoPendentes = {};
 const _detalheAtributosThrottle = {};
@@ -242,7 +242,6 @@ document.addEventListener('DOMContentLoaded', function () {
   new MutationObserver(function () {
     if (ativoId) mostrarCardDispositivo(ativoId);
     renderEventosLista();
-    if (_eventoPopupAtualIdx != null) clicarEvento(_eventoPopupAtualIdx);
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
   // Fechar busca ao clicar fora
@@ -512,7 +511,7 @@ window.clicarEvento = function (idx) {
       `;
 
       marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 }).openPopup();
-      map.flyTo(_latLngComOffset(v.posicao, _eventPopupOffsetPx), 16, { animate: true, duration: 0.55 });
+      _centralizarDispositivo(v.posicao, 16, _eventPopupOffsetPx);
       if (enderecoInicial) {
         const addrEl = document.getElementById(addrId);
         if (addrEl) addrEl.innerHTML = enderecoHtml;
@@ -1767,6 +1766,16 @@ function atualizarMarcador(dispositivoId) {
     #eventos-lista .evento-item { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
     #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
     #eventos-lista .evento-item:hover .evt-icon-wrap { background: var(--evt-hover-bg) !important; }
+    #eventos-lista .evt-desc { color: #555 !important; }
+    #eventos-lista .evt-tempo { color: #999 !important; }
+    .popup-evento-moderno .leaflet-popup-content-wrapper,
+    .popup-evento-moderno .leaflet-popup-tip { background: #fff !important; color: #333 !important; }
+    .popup-evento-moderno .leaflet-popup-content { color: #333 !important; }
+    .popup-evento-moderno .evt-popup-content div { color: #333 !important; }
+    .popup-evento-moderno .evt-popup-address { background: #f8f9fa !important; border-color: #eee !important; }
+    .popup-evento-moderno .evt-popup-maps-btn { background: #fff !important; color: #333 !important; border-color: #ccc !important; }
+    .popup-evento-moderno .btn-primary { color: #fff !important; }
+    .popup-evento-moderno .leaflet-popup-close-button { color: #333 !important; }
     .dark-theme .btn-evt-periodo { background: #2d3748 !important; color: #adb5bd !important; border-color: #4a5568 !important; }
     .dark-theme .btn-evt-periodo.active { background: #2980b9 !important; color: #fff !important; border-color: #2980b9 !important; }
     .dark-theme #eventos-lista .evento-item { background: #111827 !important; border-color: #263244 !important; color: #e6edf3 !important; }
@@ -1784,6 +1793,8 @@ function atualizarMarcador(dispositivoId) {
     .dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
     .dark-theme .popup-evento-moderno .leaflet-popup-tip { background: #0f172a; color: #f8fafc; }
     .dark-theme .popup-evento-moderno .leaflet-popup-content { color: #f8fafc; }
+    .dark-theme .popup-evento-moderno .evt-popup-content div { color: #f8fafc !important; }
+    .dark-theme .popup-evento-moderno .evt-popup-address { background: #172033 !important; border-color: #334155 !important; }
     .dark-theme .popup-evento-moderno .evt-popup-maps-btn { background: #243044 !important; color: #f8fafc !important; border-color: #3d4b63 !important; }
     .dark-theme .popup-evento-moderno .btn-primary { color: #fff !important; }
     .dark-theme .popup-evento-moderno .leaflet-popup-close-button { color: #d7dde6 !important; }
@@ -2089,6 +2100,14 @@ function _latLngComOffset(posicao, offsetOverride) {
   const centerPoint = L.point(point.x - offset, point.y);
   const target = map.unproject(centerPoint, zoom);
   return [target.lat, target.lng];
+}
+
+function _centralizarDispositivo(posicao, zoom = 16, offsetPx = 0) {
+  if (!map || !posicao) return;
+  const destino = offsetPx ? _latLngComOffset(posicao, offsetPx) : [posicao.latitude, posicao.longitude];
+  map.stop();
+  map.invalidateSize();
+  map.setView(destino, zoom, { animate: false });
 }
 
 function _fmtResumoDuracao(minutos) {
@@ -2416,6 +2435,7 @@ function ativarFoco(id) {
   Object.keys(marcadores).forEach(mid => {
     if (mid !== id && map.hasLayer(marcadores[mid])) map.removeLayer(marcadores[mid]);
   });
+  if (!marcadores[id]) renderMarcadores();
   if (marcadores[id] && !map.hasLayer(marcadores[id])) marcadores[id].addTo(map);
 }
 
@@ -2435,7 +2455,7 @@ window.focar = function (dispositivoId, opts = {}) {
   if (!v?.posicao) return;
 
   ativarFoco(dispositivoId);
-  map.flyTo(_latLngComOffset(v.posicao, opts.offsetPx), 16, { animate: true, duration: 0.8 });
+  _centralizarDispositivo(v.posicao, 16, opts.offsetPx || 0);
 
   setTimeout(() => {
     if (opts.abrirPopup === false) return;
