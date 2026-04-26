@@ -456,7 +456,9 @@ window.clicarEvento = function (idx) {
 
   // Focar no dispositivo se tiver posição
   if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
-    focar(e.dispositivoId, { abrirPopup: false, offsetPx: _eventPopupOffsetPx });
+    const jaEstavaFocado = modoFoco && ativoId === e.dispositivoId;
+    const offsetNotificacao = jaEstavaFocado ? _eventPopupOffsetPx : 24;
+    focar(e.dispositivoId, { abrirPopup: false, offsetPx: offsetNotificacao });
 
     // Criar popup nativo do Leaflet que segue o marcador
     if (!marcadores[e.dispositivoId]) renderMarcadores();
@@ -511,7 +513,7 @@ window.clicarEvento = function (idx) {
       `;
 
       marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 }).openPopup();
-      _centralizarDispositivo(v.posicao, 16, _eventPopupOffsetPx);
+      _centralizarDispositivo(v.posicao, 16, offsetNotificacao);
       if (enderecoInicial) {
         const addrEl = document.getElementById(addrId);
         if (addrEl) addrEl.innerHTML = enderecoHtml;

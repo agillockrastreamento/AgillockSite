@@ -472,7 +472,9 @@ window.clicarEvento = function (idx) {
 
   const v = veiculosMap[e.dispositivoId];
   if (v?.posicao) {
-    focar(e.dispositivoId, { abrirPopup: false, offsetPx: _eventPopupOffsetPx });
+    const jaEstavaFocado = modoFoco && ativoId === e.dispositivoId;
+    const offsetNotificacao = jaEstavaFocado ? _eventPopupOffsetPx : 20;
+    focar(e.dispositivoId, { abrirPopup: false, offsetPx: offsetNotificacao });
     
     if (!marcadores[e.dispositivoId]) renderMarcadores();
     const marker = marcadores[e.dispositivoId];
@@ -527,10 +529,10 @@ window.clicarEvento = function (idx) {
       const barraExpandida = !!document.getElementById('barra-veiculos')?.classList.contains('expandida');
       marker.bindPopup(content, {
         className: `popup-evento-moderno${barraExpandida ? ' popup-evento-rodape-aberto' : ''}`,
-        offset: [0, barraExpandida ? 34 : -10],
+        offset: [0, barraExpandida ? 76 : -10],
         maxWidth: 250,
       }).openPopup();
-      _centralizarDispositivo(v.posicao, 16, _eventPopupOffsetPx);
+      _centralizarDispositivo(v.posicao, 16, offsetNotificacao);
       if (enderecoInicial) {
         const addrEl = document.getElementById(addrId);
         if (addrEl) addrEl.innerHTML = enderecoHtml;
@@ -1161,7 +1163,7 @@ function atualizarMarcador(did) {
     #eventos-lista .evt-tempo { color: #999 !important; }
     .popup-evento-moderno .leaflet-popup-content-wrapper,
     .popup-evento-moderno .leaflet-popup-tip { background: #fff !important; color: #333 !important; }
-    .popup-evento-rodape-aberto { margin-top: 34px !important; }
+    .popup-evento-rodape-aberto { margin-top: 76px !important; }
     .popup-evento-moderno .leaflet-popup-content { color: #333 !important; }
     .popup-evento-moderno .evt-popup-content div { color: #333 !important; }
     .popup-evento-moderno .evt-popup-address { background: #f8f9fa !important; border-color: #eee !important; }
