@@ -2,15 +2,15 @@
 
 (function () {
   const TIPOS_NOTIF = [
-    { id: 'ignitionOn',    label: 'Ignição Ligada',          icon: 'fa-key' },
-    { id: 'ignitionOff',   label: 'Ignição Desligada',       icon: 'fa-power-off' },
-    { id: 'geofenceEnter', label: 'Entrada na Cerca',        icon: 'fa-sign-in' },
-    { id: 'geofenceExit',  label: 'Saída da Cerca',          icon: 'fa-sign-out' },
-    { id: 'overspeed',     label: 'Excesso de Velocidade',   icon: 'fa-tachometer' },
-    { id: 'powerCut',      label: 'Alimentação Cortada',     icon: 'fa-bolt' },
-    { id: 'alarm',         label: 'Alarme',                  icon: 'fa-exclamation-triangle' },
-    { id: 'deviceLocked',  label: 'Veículo Bloqueado',       icon: 'fa-lock' },
-    { id: 'deviceUnlocked',label: 'Veículo Desbloqueado',    icon: 'fa-unlock' },
+    { id: 'ignitionOn',    label: 'Ignição Ligada',          icon: 'fa-key',                  iconClass: 'ic-ignition' },
+    { id: 'ignitionOff',   label: 'Ignição Desligada',       icon: 'fa-power-off',            iconClass: 'ic-ignition' },
+    { id: 'geofenceEnter', label: 'Entrada na Cerca',        icon: 'fa-sign-in',              iconClass: 'ic-geofence' },
+    { id: 'geofenceExit',  label: 'Saída da Cerca',          icon: 'fa-sign-out',             iconClass: 'ic-geofence' },
+    { id: 'overspeed',     label: 'Excesso de Velocidade',   icon: 'fa-tachometer',           iconClass: 'ic-speed' },
+    { id: 'powerCut',      label: 'Alimentação Cortada',     icon: 'fa-bolt',                 iconClass: 'ic-power' },
+    { id: 'alarm',         label: 'Alarme',                  icon: 'fa-exclamation-triangle', iconClass: 'ic-alarm' },
+    { id: 'deviceLocked',  label: 'Veículo Bloqueado',       icon: 'fa-lock',                 iconClass: 'ic-lock' },
+    { id: 'deviceUnlocked',label: 'Veículo Desbloqueado',    icon: 'fa-unlock',               iconClass: 'ic-lock' },
   ];
 
   const CANAIS = [
@@ -76,11 +76,14 @@
     grid.innerHTML = TIPOS_NOTIF.map(tipo => {
       return `
         <div class="notif-card" data-tipo="${tipo.id}">
-          <span class="notif-type-label"><i class="fa ${tipo.icon} fa-fw"></i> ${tipo.label}</span>
+          <div class="notif-card-header">
+            <div class="notif-card-icon ${tipo.iconClass}"><i class="fa ${tipo.icon}"></i></div>
+            <span class="notif-card-label">${tipo.label}</span>
+          </div>
           <div class="channel-toggles">
             ${CANAIS.map(canal => {
               const ativo = preferenciasAtivas[tipo.id]?.[canal.id] || false;
-              return `<div class="btn-channel ${ativo ? 'active' : ''}" 
+              return `<div class="btn-channel ${ativo ? 'active' : ''}"
                            onclick="toggleChannel(this, '${tipo.id}', '${canal.id}')"
                            title="Habilitar via ${canal.label}">
                 <i class="fa ${canal.icon}"></i>

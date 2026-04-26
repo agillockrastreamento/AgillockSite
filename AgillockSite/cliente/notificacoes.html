@@ -8,26 +8,339 @@
     if(localStorage.getItem('al-sidebar-state')==='collapsed')document.documentElement.classList.add('al-sb-collapsed');
   </script>
   <link rel="icon" href="../favicon.ico" type="image/x-icon" />
-  <title>Configurar Notificações — AgilLock</title>
+  <title>Notificações — AgilLock</title>
   <link rel="stylesheet" href="../css/bootstrap.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
   <style>
-    .notif-toggle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; padding: 10px 0; }
-    .notif-card { background: var(--al-bg-card, #fff); border: 1px solid var(--al-border, #eee); border-radius: 10px; padding: 12px; transition: all 0.2s; }
-    .notif-card:hover { border-color: #2980b9; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .notif-type-label { font-weight: 700; font-size: 13px; margin-bottom: 8px; display: block; color: var(--al-text-main, #333); }
-    .channel-toggles { display: flex; gap: 10px; }
-    .btn-channel { 
-      flex: 1; border: 1px solid #ddd; background: #f9f9f9; border-radius: 6px; padding: 5px; 
-      font-size: 11px; text-align: center; cursor: pointer; color: #777; transition: all 0.2s;
+    /* ── Layout ── */
+    .notif-page-body {
+      padding: 24px 28px;
+      max-width: 1100px;
     }
-    .btn-channel.active { background: #2980b9; color: #fff; border-color: #2980b9; }
-    .btn-channel i { display: block; font-size: 14px; margin-bottom: 2px; }
-    
-    html.dark-theme .notif-card { background: #1e1e2d; border-color: #2d2d3f; }
-    html.dark-theme .btn-channel { background: #252535; border-color: #3a3a5c; color: #999; }
+
+    /* ── Barra de filtro ── */
+    .notif-filter-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 14px;
+      flex-wrap: wrap;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    html.dark-theme .notif-filter-bar {
+      background: #1e2530;
+      border-color: #2d3748;
+      box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    }
+    .notif-filter-bar label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: #888;
+      margin-bottom: 5px;
+      display: block;
+    }
+    html.dark-theme .notif-filter-bar label { color: #6c7a8f; }
+    .notif-filter-bar .form-control {
+      border-radius: 7px;
+      border: 1px solid #ddd;
+      font-size: 13px;
+      height: 36px;
+    }
+    html.dark-theme .notif-filter-bar .form-control {
+      background: #252535;
+      border-color: #3a3a5c;
+      color: #e0e6f0;
+    }
+    html.dark-theme .notif-filter-bar .form-control option { background: #252535; }
+    .notif-filter-bar .btn-salvar {
+      height: 36px;
+      padding: 0 20px;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 7px;
+      white-space: nowrap;
+    }
+
+    /* ── Seção do veículo selecionado ── */
+    .notif-veiculo-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .notif-veiculo-title .notif-veiculo-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(41,128,185,.12);
+      color: #2980b9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    html.dark-theme .notif-veiculo-title .notif-veiculo-icon {
+      background: rgba(41,128,185,.2);
+    }
+    .notif-veiculo-title h5 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #2c3e50;
+    }
+    html.dark-theme .notif-veiculo-title h5 { color: #e0e6f0; }
+    .notif-veiculo-title small {
+      font-size: 11px;
+      color: #888;
+      display: block;
+      margin-top: 1px;
+    }
+    html.dark-theme .notif-veiculo-title small { color: #6c7a8f; }
+
+    /* ── Grid de cards ── */
+    .notif-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    /* ── Card individual ── */
+    .notif-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 10px;
+      padding: 16px;
+      transition: box-shadow .2s, border-color .2s;
+    }
+    .notif-card:hover {
+      border-color: #2980b9;
+      box-shadow: 0 4px 14px rgba(41,128,185,.1);
+    }
+    html.dark-theme .notif-card {
+      background: #1e2530;
+      border-color: #2d3748;
+    }
+    html.dark-theme .notif-card:hover {
+      border-color: #2980b9;
+      box-shadow: 0 4px 14px rgba(41,128,185,.15);
+    }
+
+    .notif-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .notif-card-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .notif-card-icon.ic-ignition  { background: rgba(39,174,96,.12);  color: #27ae60; }
+    .notif-card-icon.ic-geofence  { background: rgba(230,126,34,.12); color: #e67e22; }
+    .notif-card-icon.ic-speed     { background: rgba(231,76,60,.12);  color: #e74c3c; }
+    .notif-card-icon.ic-power     { background: rgba(243,156,18,.12); color: #f39c12; }
+    .notif-card-icon.ic-alarm     { background: rgba(231,76,60,.12);  color: #e74c3c; }
+    .notif-card-icon.ic-lock      { background: rgba(142,68,173,.12); color: #8e44ad; }
+    html.dark-theme .notif-card-icon.ic-ignition  { background: rgba(39,174,96,.18);  }
+    html.dark-theme .notif-card-icon.ic-geofence  { background: rgba(230,126,34,.18); }
+    html.dark-theme .notif-card-icon.ic-speed     { background: rgba(231,76,60,.18);  }
+    html.dark-theme .notif-card-icon.ic-power     { background: rgba(243,156,18,.18); }
+    html.dark-theme .notif-card-icon.ic-alarm     { background: rgba(231,76,60,.18);  }
+    html.dark-theme .notif-card-icon.ic-lock      { background: rgba(142,68,173,.18); }
+
+    .notif-card-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2c3e50;
+      line-height: 1.3;
+    }
+    html.dark-theme .notif-card-label { color: #e0e6f0; }
+
+    /* ── Botões de canal ── */
+    .channel-toggles {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-channel {
+      flex: 1;
+      border: 1px solid #dde3ea;
+      background: #f7f9fb;
+      border-radius: 7px;
+      padding: 7px 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      color: #8a9ab0;
+      transition: all .18s;
+      user-select: none;
+      line-height: 1.2;
+    }
+    .btn-channel i {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 3px;
+    }
+    .btn-channel:hover {
+      border-color: #2980b9;
+      color: #2980b9;
+      background: rgba(41,128,185,.06);
+    }
+    .btn-channel.active {
+      background: #2980b9;
+      border-color: #2980b9;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(41,128,185,.3);
+    }
+    html.dark-theme .btn-channel {
+      background: #252535;
+      border-color: #3a3a5c;
+      color: #6c7a8f;
+    }
+    html.dark-theme .btn-channel:hover {
+      border-color: #2980b9;
+      color: #5dade2;
+      background: rgba(41,128,185,.1);
+    }
+    html.dark-theme .btn-channel.active {
+      background: #2980b9;
+      border-color: #2980b9;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(41,128,185,.25);
+    }
+
+    /* ── Seção de velocidade ── */
+    .notif-speed-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+    html.dark-theme .notif-speed-card {
+      background: #1e2530;
+      border-color: #2d3748;
+    }
+    .notif-speed-card h6 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2c3e50;
+      margin: 0 0 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    html.dark-theme .notif-speed-card h6 { color: #e0e6f0; }
+    .notif-speed-card .help-text {
+      font-size: 11px;
+      color: #8a9ab0;
+      margin: 0 0 14px;
+    }
+    html.dark-theme .notif-speed-card .help-text { color: #6c7a8f; }
+    .notif-speed-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 240px;
+    }
+    .notif-speed-input-wrap .form-control {
+      border-radius: 7px;
+      border: 1px solid #dde3ea;
+      height: 36px;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+    }
+    html.dark-theme .notif-speed-input-wrap .form-control {
+      background: #252535;
+      border-color: #3a3a5c;
+      color: #e0e6f0;
+    }
+    .notif-speed-unit {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e67e22;
+      white-space: nowrap;
+    }
+
+    /* ── Estado vazio ── */
+    .notif-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 20px;
+      text-align: center;
+    }
+    .notif-empty-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #f0f4f8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      color: #c0c8d4;
+      margin-bottom: 18px;
+    }
+    html.dark-theme .notif-empty-icon {
+      background: #252535;
+      color: #3a4458;
+    }
+    .notif-empty h6 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #4a5568;
+      margin: 0 0 6px;
+    }
+    html.dark-theme .notif-empty h6 { color: #8892a4; }
+    .notif-empty p {
+      font-size: 13px;
+      color: #8a9ab0;
+      margin: 0;
+      max-width: 280px;
+    }
+    html.dark-theme .notif-empty p { color: #6c7a8f; }
+
+    /* ── Legenda dos canais ── */
+    .notif-channel-legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .notif-channel-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #8a9ab0;
+    }
+    html.dark-theme .notif-channel-legend-item { color: #6c7a8f; }
+    .notif-channel-legend-item i { font-size: 12px; }
+
+    /* ── Botão salvar flutuante ── */
+    #btn-salvar-geral {
+      transition: opacity .2s;
+    }
+    #btn-salvar-geral:disabled { opacity: .65; }
   </style>
 </head>
 <body>
@@ -35,7 +348,7 @@
   <!-- Sidebar -->
   <div class="admin-sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" />
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
     </div>
     <ul class="sidebar-nav">
       <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
@@ -43,10 +356,10 @@
       <li id="li-pagamentos" style="display:none;"><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
       <li class="active"><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> <span>Notificações</span></a></li>
     </ul>
-    <div class="sidebar-user">
-      <div class="user-info">
-        <span class="user-name" id="user-nome">Carregando...</span>
-        <span class="user-role" style="margin-top:4px;">CLIENTE</span>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span class="al-badge badge-ativo" style="margin-top:4px;">CLIENTE</span>
       </div>
       <button id="btn-tema" class="btn-tema-sidebar"></button>
       <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
@@ -54,54 +367,79 @@
   </div>
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
+  <!-- Conteúdo principal -->
   <div class="admin-content">
     <div class="admin-topbar">
       <div style="display:flex;align-items:center;gap:12px;">
         <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
-        <h2 class="topbar-title">Configurar Notificações</h2>
+        <h2 class="topbar-title">Notificações</h2>
       </div>
     </div>
 
-    <div class="filter-bar" style="justify-content: flex-start; gap: 15px;">
-      <div class="filter-group">
-        <label>Dispositivo</label>
-        <select id="filtro-dispositivo" class="form-control input-sm" style="width: 250px;">
-          <option value="">Selecione um veículo...</option>
-        </select>
-      </div>
-      <div style="align-self: flex-end; margin-bottom: 4px;">
-        <button class="btn btn-primary btn-sm" id="btn-salvar-geral" style="font-weight:700">
-          <i class="fa fa-save"></i> SALVAR CONFIGURAÇÕES
-        </button>
-      </div>
-    </div>
+    <div class="notif-page-body">
 
-    <div class="admin-table-wrap" style="padding: 20px;">
-      <div id="notif-container" style="display:none;">
-        <h4 style="margin-bottom: 20px; font-weight: 700; color: #2980b9;">Tipos de Alerta para: <span id="nome-veiculo-selecionado">---</span></h4>
-        
-        <div class="notif-toggle-grid" id="grid-notificacoes">
-          <!-- Gerado via JS -->
+      <!-- Barra de filtro + salvar -->
+      <div class="notif-filter-bar">
+        <div style="flex:1;min-width:200px;max-width:340px;">
+          <label for="filtro-dispositivo"><i class="fa fa-car" style="margin-right:4px;"></i>Dispositivo</label>
+          <select id="filtro-dispositivo" class="form-control">
+            <option value="">Selecione um veículo...</option>
+          </select>
         </div>
+        <div>
+          <button class="btn btn-primary btn-salvar" id="btn-salvar-geral">
+            <i class="fa fa-save"></i> Salvar configurações
+          </button>
+        </div>
+      </div>
 
-        <div id="config-velocidade" style="margin-top: 25px; padding: 20px; border-radius: 10px; background: rgba(41,128,185,0.05); border: 1px dashed #2980b9; display: none;">
-          <div class="row">
-            <div class="col-sm-4">
-              <label style="font-weight: 700;">Limite de Velocidade para Alerta (km/h)</label>
-              <div class="input-group">
-                <input type="number" id="input-vel-limite" class="form-control" placeholder="Ex: 100" min="20" max="250">
-                <span class="input-group-addon">km/h</span>
-              </div>
-              <small class="text-muted">Este limite é exclusivo para suas notificações e não altera o cadastro do veículo.</small>
-            </div>
+      <!-- Conteúdo quando dispositivo selecionado -->
+      <div id="notif-container" style="display:none;">
+
+        <!-- Cabeçalho do veículo -->
+        <div class="notif-veiculo-title">
+          <div class="notif-veiculo-icon">
+            <i class="fa fa-car"></i>
+          </div>
+          <div>
+            <h5 id="nome-veiculo-selecionado">—</h5>
+            <small>Configure os canais de notificação para cada tipo de evento</small>
           </div>
         </div>
+
+        <!-- Legenda dos canais -->
+        <div class="notif-channel-legend">
+          <span class="notif-channel-legend-item"><i class="fa fa-desktop"></i> Web — notificação no navegador</span>
+          <span class="notif-channel-legend-item"><i class="fa fa-mobile"></i> App — push no aplicativo (em breve)</span>
+          <span class="notif-channel-legend-item"><i class="fa fa-envelope-o"></i> E-mail — mensagem no e-mail de acesso</span>
+        </div>
+
+        <!-- Grid de tipos de evento -->
+        <div class="notif-grid" id="grid-notificacoes">
+          <!-- Preenchido via notificacoes-cliente.js -->
+        </div>
+
+        <!-- Configuração de velocidade -->
+        <div id="config-velocidade" class="notif-speed-card" style="display:none;">
+          <h6><i class="fa fa-tachometer" style="color:#e67e22;"></i> Limite de velocidade para alerta</h6>
+          <p class="help-text">Este limite é exclusivo para suas notificações e não altera o cadastro do veículo.</p>
+          <div class="notif-speed-input-wrap">
+            <input type="number" id="input-vel-limite" class="form-control" placeholder="100" min="20" max="250" style="width:90px;" />
+            <span class="notif-speed-unit"><i class="fa fa-dashboard"></i> km/h</span>
+          </div>
+        </div>
+
       </div>
 
-      <div id="notif-vazio" style="text-align: center; padding: 80px 20px; color: #999;">
-        <i class="fa fa-bell-slash-o" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
-        <p>Selecione um dispositivo acima para configurar as notificações.</p>
+      <!-- Estado vazio -->
+      <div id="notif-vazio" class="notif-empty">
+        <div class="notif-empty-icon">
+          <i class="fa fa-bell-o"></i>
+        </div>
+        <h6>Nenhum veículo selecionado</h6>
+        <p>Selecione um veículo acima para configurar as notificações de eventos.</p>
       </div>
+
     </div>
   </div>
 
@@ -109,6 +447,26 @@
   <script src="../js/bootstrap.min.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var user = AL_CLIENTE.requireAuth();
+      if (!user) return;
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      if (user.tipo === 'responsavel') {
+        document.getElementById('li-pagamentos').style.display = 'block';
+      }
+      AL_CLIENTE.initThemeToggle('btn-tema');
+      document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+    })();
+  </script>
   <script src="../js/notificacoes-cliente.js"></script>
 </body>
 </html>
