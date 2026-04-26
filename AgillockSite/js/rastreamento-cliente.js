@@ -436,15 +436,15 @@ function inicializarMapa() {
 
   const tilesCartoDB = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxNativeZoom: 19, maxZoom: 21 }
+    { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxNativeZoom: 19, maxZoom: 21, detectRetina: true }
   );
   const tilesOsm = L.tileLayer(
     'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { attribution: '© OpenStreetMap', maxNativeZoom: 19, maxZoom: 21 }
+    { attribution: '© OpenStreetMap', maxNativeZoom: 19, maxZoom: 21, detectRetina: true }
   );
   const tilesEsri = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Tiles © Esri', maxNativeZoom: 19, maxZoom: 21 }
+    { attribution: 'Tiles © Esri', maxNativeZoom: 19, maxZoom: 21, detectRetina: true }
   );
   _googleMapLayers = _criarCamadasGoogle();
   _baseMapControlLayers = {
@@ -488,15 +488,18 @@ function inicializarMapa() {
 }
 
 function _criarCamadasGoogle() {
+  const scale = window.devicePixelRatio >= 2 ? 2 : 1;
   const opts = {
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     attribution: 'Map data © Google',
     maxNativeZoom: 20,
     maxZoom: 21,
+    tileSize: scale === 2 ? 512 : 256,
+    zoomOffset: scale === 2 ? -1 : 0,
   };
   return Object.keys(GOOGLE_MAP_TYPES).reduce(function (acc, tipo) {
     acc[tipo] = L.tileLayer(
-      'https://{s}.google.com/vt/lyrs=' + GOOGLE_MAP_TYPES[tipo].lyrs + '&x={x}&y={y}&z={z}',
+      'https://{s}.google.com/vt/lyrs=' + GOOGLE_MAP_TYPES[tipo].lyrs + '&x={x}&y={y}&z={z}&scale=' + scale,
       opts
     );
     return acc;
