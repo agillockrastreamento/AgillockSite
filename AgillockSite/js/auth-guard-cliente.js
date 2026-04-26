@@ -86,6 +86,7 @@
 
   function apiGet(endpoint) { return apiRequest('GET', endpoint, null); }
   function apiPost(endpoint, body) { return apiRequest('POST', endpoint, body); }
+  function apiPatch(endpoint, body) { return apiRequest('PATCH', endpoint, body); }
   function apiDelete(endpoint) { return apiRequest('DELETE', endpoint, null); }
 
   // ─── Upload de foto (multipart) ───────────────────────────────────────────
@@ -267,6 +268,7 @@
     logout: logout,
     apiGet: apiGet,
     apiPost: apiPost,
+    apiPatch: apiPatch,
     apiDelete: apiDelete,
     uploadFoto: uploadFoto,
     showAlert: showAlert,

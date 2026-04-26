@@ -76,6 +76,38 @@ router.post('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
   }
 });
 
+// Atualizar apenas o intervalo de km de troca de óleo (chamado direto do card de rastreamento)
+router.patch('/km-troca-oleo/:dispositivoId', clienteAuthMiddleware, async (req: any, res) => {
+  try {
+    const { dispositivoId } = req.params;
+    const clienteLoginId = req.cliente.sub;
+    const { kmTrocaOleo } = req.body;
+
+    if (!kmTrocaOleo || typeof kmTrocaOleo !== 'number' || kmTrocaOleo < 1) {
+      return res.status(400).json({ message: 'Informe um intervalo válido em km.' });
+    }
+
+    await prisma.preferenciaNotificacao.upsert({
+      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo' } },
+      update: { kmTrocaOleo },
+      create: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo', web: false, app: false, email: false, kmTrocaOleo },
+    });
+
+    // Resetar o estado para iniciar contagem do km atual
+    const dispositivo = await prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { odometroSistemaMetros: true } });
+    await prisma.estadoKmNotificacao.upsert({
+      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo' } },
+      update: { kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false },
+      create: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo', kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false },
+    });
+
+    res.json({ message: 'Intervalo atualizado com sucesso!', kmTrocaOleo });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao atualizar intervalo.' });
+  }
+});
+
 // Configuração de km para exibir no card de rastreamento (troca de óleo)
 router.get('/km-config/:dispositivoId', clienteAuthMiddleware, async (req: any, res) => {
   try {

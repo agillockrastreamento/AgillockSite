@@ -1342,7 +1342,7 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
     const kmPercorrido = (p.odometro - kmConfig.trocaOleo.kmBaseMetros) / 1000;
     const kmRestante = Math.max(0, Math.round(kmConfig.trocaOleo.kmIntervalo - kmPercorrido));
     const cor = kmRestante < 500 ? '#e74c3c' : kmRestante < 1000 ? '#f39c12' : '#27ae60';
-    si.push(`<span style="color:${cor}"><i class="fa fa-tint"></i> Falta ${kmRestante.toLocaleString('pt-BR')} km para troca de óleo</span>`);
+    si.push(`<span style="color:${cor};display:flex;align-items:center;gap:6px;"><i class="fa fa-tint"></i> Falta ${kmRestante.toLocaleString('pt-BR')} km para troca de óleo<button onclick="abrirModalTrocaOleo(ativoId)" style="background:none;border:none;padding:0 2px;cursor:pointer;color:#7f8c8d;font-size:11px;line-height:1;" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span>`);
   }
 
   if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
@@ -1422,6 +1422,48 @@ function _carregarKmConfig(id) {
     }
   }).catch(function () { v._kmConfigCarregado = false; });
 }
+
+window.abrirModalTrocaOleo = function (dispositivoId) {
+  const v = veiculosMap[dispositivoId]; if (!v) return;
+  const kmAtual = v._kmConfig?.trocaOleo?.kmIntervalo || '';
+  document.getElementById('oleo-intervalo-atual').textContent = kmAtual || '—';
+  document.getElementById('oleo-input-km').value = kmAtual;
+
+  var modal = document.getElementById('modal-troca-oleo');
+  $(modal).modal('show');
+
+  document.getElementById('btn-oleo-salvar').onclick = function () {
+    const novoKm = parseInt(document.getElementById('oleo-input-km').value);
+    if (!novoKm || novoKm < 100) {
+      AL_CLIENTE.showAlert('Informe um intervalo mínimo de 100 km.');
+      return;
+    }
+    const btn = document.getElementById('btn-oleo-salvar');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+    AL_CLIENTE.apiPatch('/api/cliente/notificacoes/km-troca-oleo/' + dispositivoId, { kmTrocaOleo: novoKm })
+      .then(function () {
+        $(modal).modal('hide');
+        if (!v._kmConfig) v._kmConfig = {};
+        if (!v._kmConfig.trocaOleo) v._kmConfig.trocaOleo = {};
+        v._kmConfig.trocaOleo.kmIntervalo = novoKm;
+        // Resetar base para o odômetro atual para reiniciar a contagem
+        const p = v.posicao;
+        if (p?.odometro != null) v._kmConfig.trocaOleo.kmBaseMetros = p.odometro;
+        v._kmConfigCarregado = false; // força reload na próxima abertura
+        if (ativoId === dispositivoId) atualizarCardAtivo(dispositivoId);
+        AL_CLIENTE.showAlert('Intervalo atualizado!', 'success');
+      })
+      .catch(function (err) {
+        AL_CLIENTE.showAlert('Erro ao salvar: ' + (err.message || 'tente novamente.'));
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-check"></i> Salvar';
+      });
+  };
+};
 
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id]; if (!v) return;
