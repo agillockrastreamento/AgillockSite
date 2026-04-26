@@ -101,13 +101,15 @@ class NotificationService {
   }
 
   private getLabelTipo(tipo: string) {
-    const labels: any = {
-      ignitionOn: 'Ignição Ligada',
-      ignitionOff: 'Ignição Desligada',
+    const labels: Record<string, string> = {
+      ignitionOn:    'Ignição Ligada',
+      ignitionOff:   'Ignição Desligada',
       geofenceEnter: 'Entrada em Cerca',
-      geofenceExit: 'Saída de Cerca',
-      overspeed: 'Excesso de Velocidade',
-      powerCut: 'Alimentação Cortada'
+      geofenceExit:  'Saída de Cerca',
+      overspeed:     'Excesso de Velocidade',
+      powerCut:      'Alimentação Cortada',
+      deviceLocked:  'Veículo Bloqueado',
+      deviceUnlocked:'Veículo Desbloqueado',
     };
     return labels[tipo] || tipo;
   }
@@ -115,13 +117,15 @@ class NotificationService {
   private gerarMensagem(tipo: string, nome: string, placa: string | null, dados: any) {
     const p = placa ? `(${placa})` : '';
     switch (tipo) {
-      case 'ignitionOn': return `Ignição Ligada: O veículo ${nome} ${p} foi ligado.`;
-      case 'ignitionOff': return `Ignição Desligada: O veículo ${nome} ${p} foi desligado.`;
+      case 'ignitionOn':    return `Ignição Ligada: O veículo ${nome} ${p} foi ligado.`;
+      case 'ignitionOff':   return `Ignição Desligada: O veículo ${nome} ${p} foi desligado.`;
       case 'geofenceEnter': return `Cerca Virtual: O veículo ${nome} ${p} entrou em uma área monitorada.`;
-      case 'geofenceExit': return `Cerca Virtual: O veículo ${nome} ${p} saiu de uma área monitorada.`;
-      case 'overspeed': return `Velocidade: O veículo ${nome} ${p} excedeu o limite definido (${dados.velocidade} km/h).`;
-      case 'powerCut': return `Alerta de Energia: A alimentação do rastreador no veículo ${nome} ${p} foi cortada.`;
-      default: return `Evento: ${tipo} no veículo ${nome} ${p}`;
+      case 'geofenceExit':  return `Cerca Virtual: O veículo ${nome} ${p} saiu de uma área monitorada.`;
+      case 'overspeed':     return `Velocidade: O veículo ${nome} ${p} excedeu o limite definido (${dados.velocidade} km/h).`;
+      case 'powerCut':      return `Alerta de Energia: A alimentação do rastreador no veículo ${nome} ${p} foi cortada.`;
+      case 'deviceLocked':  return `Bloqueio: O motor do veículo ${nome} ${p} foi bloqueado remotamente.`;
+      case 'deviceUnlocked':return `Desbloqueio: O motor do veículo ${nome} ${p} foi desbloqueado remotamente.`;
+      default:              return `Evento: ${tipo} no veículo ${nome} ${p}`;
     }
   }
 }

@@ -762,6 +762,10 @@
           <input type="text" id="cerca-nome" placeholder="Ex: Garagem, Área restrita..." />
           <label for="cerca-raio">Raio (metros)</label>
           <input type="number" id="cerca-raio" value="200" min="50" max="50000" />
+          <label style="display:flex;align-items:center;gap:6px;font-weight:normal;font-size:12px;cursor:pointer;margin-top:6px;margin-bottom:2px;">
+            <input type="checkbox" id="cerca-notificar" checked style="width:14px;height:14px;cursor:pointer;">
+            Notificar ao entrar/sair desta cerca
+          </label>
           <div id="dlg-cerca-btns">
             <button id="btn-cerca-confirmar" type="button"><i class="fa fa-check"></i> Criar</button>
             <button id="btn-cerca-cancelar" type="button">Cancelar</button>

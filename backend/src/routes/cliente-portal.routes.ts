@@ -25,6 +25,7 @@ import {
   normalizeAttributes,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
+import NotificationService from '../services/notification.service';
 import {
   DISPOSITIVO_MEDIDORES_SELECT,
   sincronizarDispositivosComPosicoes,
@@ -945,6 +946,14 @@ router.post('/dispositivos/:dispositivoId/comandos', async (req: ClienteRequest,
 
   try {
     await traccarSendCommand(traccarDevice.id, tipo, atributos || {});
+
+    if (tipo === 'engineStop' || tipo === 'engineResume') {
+      const evtTipo = tipo === 'engineStop' ? 'deviceLocked' : 'deviceUnlocked';
+      NotificationService.processarEvento(traccarDevice.id, evtTipo, {
+        latitude: null, longitude: null, velocidade: null, endereco: null,
+      }).catch(err => console.error('[Notificações] Erro notif comando:', err.message));
+    }
+
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Erro ao enviar comando.' });

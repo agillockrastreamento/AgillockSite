@@ -2,12 +2,14 @@
 
 (function () {
   const TIPOS_NOTIF = [
-    { id: 'ignitionOn',   label: 'Ignição Ligada',          icon: 'fa-key' },
-    { id: 'ignitionOff',  label: 'Ignição Desligada',        icon: 'fa-power-off' },
-    { id: 'geofenceEnter',label: 'Entrada na Cerca',        icon: 'fa-sign-in' },
-    { id: 'geofenceExit', label: 'Saída da Cerca',          icon: 'fa-sign-out' },
-    { id: 'overspeed',    label: 'Excesso de Velocidade',   icon: 'fa-tachometer' },
-    { id: 'powerCut',     label: 'Alimentação Cortada',     icon: 'fa-bolt' },
+    { id: 'ignitionOn',    label: 'Ignição Ligada',          icon: 'fa-key' },
+    { id: 'ignitionOff',   label: 'Ignição Desligada',       icon: 'fa-power-off' },
+    { id: 'geofenceEnter', label: 'Entrada na Cerca',        icon: 'fa-sign-in' },
+    { id: 'geofenceExit',  label: 'Saída da Cerca',          icon: 'fa-sign-out' },
+    { id: 'overspeed',     label: 'Excesso de Velocidade',   icon: 'fa-tachometer' },
+    { id: 'powerCut',      label: 'Alimentação Cortada',     icon: 'fa-bolt' },
+    { id: 'deviceLocked',  label: 'Veículo Bloqueado',       icon: 'fa-lock' },
+    { id: 'deviceUnlocked',label: 'Veículo Desbloqueado',    icon: 'fa-unlock' },
   ];
 
   const CANAIS = [

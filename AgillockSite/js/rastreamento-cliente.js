@@ -68,12 +68,14 @@ function _restaurarFocoCliente() {
 
 // ── Eventos (cliente: expandido) ─────────────────────────────────────────────
 const TIPOS_EVENTO_CLIENTE = [
-  { tipo: 'ignitionOn',   label: 'Ignição Ligada',          css: 'tipo-ignition' },
-  { tipo: 'ignitionOff',  label: 'Ignição Desligada',        css: 'tipo-ignition' },
-  { tipo: 'geofenceEnter',label: 'Entrada na Cerca',        css: 'tipo-geofence' },
-  { tipo: 'geofenceExit', label: 'Saída da Cerca',          css: 'tipo-geofence' },
-  { tipo: 'overspeed',    label: 'Excesso de Velocidade',   css: 'tipo-overspeed' },
-  { tipo: 'powerCut',     label: 'Alimentação Cortada',     css: 'tipo-alarm' },
+  { tipo: 'ignitionOn',    label: 'Ignição Ligada',          css: 'tipo-ignition' },
+  { tipo: 'ignitionOff',   label: 'Ignição Desligada',       css: 'tipo-ignition' },
+  { tipo: 'geofenceEnter', label: 'Entrada na Cerca',        css: 'tipo-geofence' },
+  { tipo: 'geofenceExit',  label: 'Saída da Cerca',          css: 'tipo-geofence' },
+  { tipo: 'overspeed',     label: 'Excesso de Velocidade',   css: 'tipo-overspeed' },
+  { tipo: 'powerCut',      label: 'Alimentação Cortada',     css: 'tipo-alarm' },
+  { tipo: 'deviceLocked',  label: 'Veículo Bloqueado',       css: 'tipo-alarm' },
+  { tipo: 'deviceUnlocked',label: 'Veículo Desbloqueado',    css: 'tipo-ignition' },
 ];
 
 let _evtFiltros = new Set();
@@ -1516,6 +1518,17 @@ window.enviarComandoDaSidebar = async function(did, tipo) {
   try {
     await AL_CLIENTE.apiPost(`/api/cliente/dispositivos/${did}/comandos`, { tipo, atributos: cfg.atributos || {} });
     AL_CLIENTE.showAlert('Comando enviado!', 'success');
+    if (tipo === 'engineStop' || tipo === 'engineResume') {
+      const evtTipo = tipo === 'engineStop' ? 'deviceLocked' : 'deviceUnlocked';
+      adicionarEvento({
+        dispositivoId: did,
+        tipo: evtTipo,
+        tipoLabel: tipo === 'engineStop' ? 'Veículo Bloqueado' : 'Veículo Desbloqueado',
+        serverTime: new Date().toISOString(),
+        lat: veiculosMap[did]?.posicao?.latitude ?? null,
+        lng: veiculosMap[did]?.posicao?.longitude ?? null,
+      });
+    }
   } catch (err) { AL_CLIENTE.showAlert('Erro: ' + err.message, 'danger'); }
   finally { if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; } }
 };
@@ -1893,16 +1906,28 @@ function _mostrarDialogoCerca() {
       
       try {
         await AL_CLIENTE.apiPost('/api/cliente/rastreamento/cercas', { nome, area, dispositivoId: devId });
+
+        const notificar = document.getElementById('cerca-notificar')?.checked;
+        if (notificar && devId) {
+          await AL_CLIENTE.apiPost('/api/cliente/notificacoes/preferencias', {
+            dispositivoId: devId,
+            preferencias: {
+              geofenceEnter: { web: true, app: true, email: true },
+              geofenceExit:  { web: true, app: true, email: true },
+            },
+          }).catch(() => {});
+        }
+
         _cancelarDesenhoCirculo();
         AL_CLIENTE.showAlert('Cerca criada!', 'success');
-        
+
         // Ativa a visualização de cercas globalmente se estiver desligada
         if (!_overlay.cercas) {
           _overlay.cercas = true;
           const btnCercas = document.getElementById('ml-cercas');
           if (btnCercas) btnCercas.classList.add('ativo');
         }
-        
+
         // Garante que o botão do card fique ativo
         const btnCard = document.querySelector('.dcard-acao[data-acao="cerca"]');
         if (btnCard) btnCard.classList.add('ativo');
