@@ -49,10 +49,10 @@ class NotificationService {
               const agora = Date.now();
               const ultimoAlerta = this._lastOverspeedAt.get(chaveSpam) || 0;
               
-              // Evita enviar alerta de velocidade mais de uma vez a cada 5 minutos para o mesmo veículo
-              if (agora - ultimoAlerta > 5 * 60 * 1000) {
-                console.log(`[Notif] Detectado excesso de velocidade (${dados.velocidade} km/h > ${limite}) para ${identificador}`);
-                await this.processarEvento(identificador, 'overspeed', dados);
+              // Evita enviar alerta de velocidade mais de uma vez a cada 1 minuto para o mesmo veículo (facilitando testes)
+              if (agora - ultimoAlerta > 1 * 60 * 1000) {
+                console.log(`[Notif] Detectado excesso de velocidade (${dados.velocidade} km/h > ${limite}) para ${identificador} (Cliente: ${cliente.nome})`);
+                await this.processarEvento(identificador, 'overspeed', dados, clienteLogin.id);
                 this._lastOverspeedAt.set(chaveSpam, agora);
               }
             }
@@ -67,7 +67,7 @@ class NotificationService {
           if (dados.alarme === 'sos') tipoAlarme = 'alarm';
 
           console.log(`[Notif] Detectado alarme de hardware (${dados.alarme}) para ${identificador} -> ${tipoAlarme}`);
-          await this.processarEvento(identificador, tipoAlarme, dados);
+          await this.processarEvento(identificador, tipoAlarme, dados, clienteLogin.id);
         }
       }
     } catch (error: any) {
@@ -75,7 +75,7 @@ class NotificationService {
     }
   }
 
-  async processarEvento(identificador: string, tipo: string, dados: any) {
+  async processarEvento(identificador: string, tipo: string, dados: any, targetClienteLoginId?: string) {
     try {
       // Normalização exaustiva de tipos de evento
       const tipoOriginal = tipo;
@@ -121,9 +121,16 @@ class NotificationService {
         return;
       }
 
-      console.log(`[Notif] Evento "${tipo}" (original: ${tipoOriginal}) para ${identificador} — ${clientesMap.size} cliente(s)`);
+      // Filtra apenas o cliente alvo, se especificado (vindo da verificação proativa)
+      const clientesParaProcessar = targetClienteLoginId 
+        ? Array.from(clientesMap.values()).filter(c => c.login?.id === targetClienteLoginId)
+        : Array.from(clientesMap.values());
 
-      for (const cliente of clientesMap.values()) {
+      if (clientesParaProcessar.length > 0) {
+        console.log(`[Notif] Evento "${tipo}" (original: ${tipoOriginal}) para ${identificador} — ${clientesParaProcessar.length} cliente(s)`);
+      }
+
+      for (const cliente of clientesParaProcessar) {
         try {
           const clienteLogin = cliente.login;
           if (!clienteLogin || !clienteLogin.ativo) {

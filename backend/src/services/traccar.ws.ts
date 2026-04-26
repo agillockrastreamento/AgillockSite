@@ -182,6 +182,10 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       const identificador = traccarIdToUniqueId.get(position.deviceId);
       if (identificador) posicaoPorIdentificador.set(identificador, position);
     });
+
+    // Mapeia o estado ANTERIOR dos dispositivos para comparação de alertas (ignição)
+    const estadoAnteriorMap = new Map(dispositivos.map(d => [d.identificador, { ...d }]));
+
     const atualizados = await sincronizarDispositivosComPosicoes(
       dispositivos,
       posicaoPorIdentificador as unknown as Map<string, any>,
@@ -191,17 +195,17 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
 
     atualizados.forEach((dispositivo, identificador) => {
       // Tentar preservar campos que o Traccar omite em alguns pacotes
-      const anterior = localPorIdentificador.get(identificador);
+      const anterior = estadoAnteriorMap.get(identificador);
       if (anterior) {
         if (dispositivo.odometroSistemaMetros == null) {
-          dispositivo.odometroSistemaMetros = anterior.odometroSistemaMetros;
+          dispositivo.odometroSistemaMetros = (anterior as any).odometroSistemaMetros;
         }
       }
       localPorIdentificador.set(identificador, dispositivo);
 
-      // Verificação proativa de alertas (ignição, velocidade, etc)
+      // Verificação proativa de alertas usando o estado ANTERIOR para comparação
       const pos = posicaoPorIdentificador.get(identificador);
-      if (pos) {
+      if (pos && anterior) {
         const norm = normalizeAttributes(pos.attributes ?? {});
         const dados = {
           traccarDeviceId: pos.deviceId,
@@ -212,7 +216,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
           ignicao: norm.ignicao,
           alarme: norm.alarme
         };
-        NotificationService.verificarEventosPosicao(identificador, dispositivo, dados)
+        NotificationService.verificarEventosPosicao(identificador, anterior, dados)
           .catch(err => console.error(`[Notif] Erro na verificação proativa (${identificador}):`, err.message));
       }
     });
