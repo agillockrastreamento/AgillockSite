@@ -183,6 +183,7 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
       serverTime: e.createdAt,
       lat: e.latitude,
       lng: e.longitude,
+      endereco: e.endereco,
       velocidade: e.velocidade,
       dispositivoNome: e.dispositivo.nome,
       dispositivoPlaca: e.dispositivo.placa,

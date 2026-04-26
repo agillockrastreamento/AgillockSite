@@ -1,11 +1,25 @@
 import prisma from '../utils/prisma';
 import EmailService from './email.service';
+import { reverseGeocode } from '../utils/reverse-geocode';
 
 type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string };
 
 class NotificationService {
   private _lastOverspeedAt = new Map<string, number>(); // Cache para cooldown de velocidade
+  private _enderecoCache = new Map<string, string>();
   private _lastIgnitionState = new Map<string, boolean>(); // Cache para evitar alertas duplicados de ignição
+
+  private async resolverEnderecoEvento(dados: any): Promise<string | null> {
+    if (dados.endereco) return dados.endereco;
+    const lat = Number(dados.latitude);
+    const lon = Number(dados.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const cacheKey = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+    if (this._enderecoCache.has(cacheKey)) return this._enderecoCache.get(cacheKey) || null;
+    const endereco = await reverseGeocode(lat, lon).catch(() => '');
+    this._enderecoCache.set(cacheKey, endereco);
+    return endereco || null;
+  }
 
   async verificarEventosPosicao(identificador: string, dispositivo: any, dados: any): Promise<any[]> {
     const eventosDetectados: any[] = [];
@@ -182,6 +196,7 @@ class NotificationService {
 
           const mensagem = this.gerarMensagem(tipo, dispositivo.nome, dispositivo.placa, dados);
           const label = this.getLabelTipo(tipo);
+          const enderecoEvento = await this.resolverEnderecoEvento(dados);
 
           // Canal Web/App (Banco de Dados)
           if (pref.web || pref.app) {
@@ -194,6 +209,7 @@ class NotificationService {
                   mensagem,
                   latitude: dados.latitude ?? null,
                   longitude: dados.longitude ?? null,
+                  endereco: enderecoEvento,
                   velocidade: dados.velocidade ?? null,
                 },
               });
@@ -205,6 +221,9 @@ class NotificationService {
                 tipoLabel: label,
                 serverTime: new Date().toISOString(),
                 mensagem,
+                lat: dados.latitude ?? null,
+                lng: dados.longitude ?? null,
+                endereco: enderecoEvento,
               };
 
               console.log(`[Notif] Evento "${tipo}" salvo no banco para ${cliente.nome}`);
@@ -222,7 +241,7 @@ class NotificationService {
                 dispositivo.placa || '',
                 label,
                 new Date().toLocaleString('pt-BR'),
-                dados.endereco ?? null,
+                enderecoEvento ?? undefined,
               );
               await EmailService.enviarEmail(
                 clienteLogin.email,

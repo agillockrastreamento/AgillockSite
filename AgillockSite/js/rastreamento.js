@@ -51,6 +51,8 @@ const _usuarioRastreamento = (window.AL && typeof window.AL.getUser === 'functio
 const _podeEditarMedidores = !!(_usuarioRastreamento && _usuarioRastreamento.role === 'ADMIN');
 const _cardAdminExpandido = _podeEditarMedidores;
 const _cardFocusOffsetPx = _cardAdminExpandido ? 310 : 0;
+const _focusOffsetPx = _cardAdminExpandido ? 170 : 130;
+const _eventPopupOffsetPx = 110;
 const _detalheDispositivoCache = {};
 const _detalheDispositivoPendentes = {};
 const _detalheAtributosThrottle = {};
@@ -401,7 +403,8 @@ function renderEventosLista() {
   };
 
   const isDark = document.documentElement.classList.contains('dark-theme');
-  const descColor = isDark ? '#ccc' : '#555';
+  const descColor = isDark ? '#e6edf3' : '#555';
+  const timeColor = isDark ? '#b8c1cc' : '#999';
 
   lista.innerHTML = filtrados.map(function (e) {
     const style = getEventoStyle(e.tipo);
@@ -446,47 +449,73 @@ window.clicarEvento = function (idx) {
 
   // Focar no dispositivo se tiver posição
   if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
-    focar(e.dispositivoId);
+    focar(e.dispositivoId, { abrirPopup: false, offsetPx: _eventPopupOffsetPx });
 
     // Criar popup nativo do Leaflet que segue o marcador
     const marker = marcadores[e.dispositivoId];
     if (marker) {
-      if (!marker._originalPopup) marker._originalPopup = marker.getPopup();
+      if (!marker._eventOriginalPopup) marker._eventOriginalPopup = marker.getPopup();
 
       const addrId = `evt-addr-admin-${idx}`;
       const v = veiculosMap[e.dispositivoId];
+      const eventoLat = e.lat != null ? Number(e.lat) : v.posicao.latitude;
+      const eventoLng = e.lng != null ? Number(e.lng) : v.posicao.longitude;
+      const eventoTemCoords = Number.isFinite(eventoLat) && Number.isFinite(eventoLng);
+      const mesmaPosicaoAtual = eventoTemCoords
+        && Math.abs(eventoLat - v.posicao.latitude) < 0.00001
+        && Math.abs(eventoLng - v.posicao.longitude) < 0.00001;
+      const enderecoInicial = e.endereco || (mesmaPosicaoAtual ? (v.posicao.endereco || v.endereco || '') : '');
+      const enderecoHtml = enderecoInicial
+        ? `<i class="fa fa-map-marker"></i> ${esc(enderecoInicial)} <span class="evt-popup-coords">(${eventoLat.toFixed(5)}, ${eventoLng.toFixed(5)})</span>`
+        : eventoTemCoords
+          ? '<i class="fa fa-map-marker"></i> Buscando endereco...'
+          : '<i class="fa fa-map-marker"></i> Localizacao do evento indisponivel';
+      const coordsHtml = eventoTemCoords
+        ? `Lat: ${eventoLat.toFixed(5)} | Lng: ${eventoLng.toFixed(5)}`
+        : 'Sem coordenadas do evento';
+      const acoesMapaHtml = eventoTemCoords ? `
+          <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+            <a href="${_urlGoogleMaps(eventoLat, eventoLng, enderecoInicial)}" target="_blank" class="btn btn-xs btn-default evt-popup-maps-btn" style="flex:1; font-size: 9px; padding: 4px;" id="btn-maps-${eventoLat}-${eventoLng}"><i class="fa fa-google"></i> Maps</a>
+            <a href="${_urlStreetView(eventoLat, eventoLng)}" target="_blank" class="btn btn-xs btn-primary" style="flex:1; font-size: 9px; padding: 4px; color: #fff !important;"><i class="fa fa-street-view"></i> StreetView</a>
+          </div>` : '';
       const isDark = document.documentElement.classList.contains('dark-theme');
-      const bgAddr = isDark ? '#2d3748' : '#f8f9fa';
-      const colorMain = isDark ? '#f0f2f5' : '#333';
-      const colorMuted = isDark ? '#adb5bd' : '#666';
-      const borderCol = isDark ? '#4a5568' : '#eee';
+      const bgAddr = isDark ? '#172033' : '#f8f9fa';
+      const colorMain = isDark ? '#f8fafc' : '#333';
+      const colorMuted = isDark ? '#d7dde6' : '#666';
+      const coordColor = isDark ? '#aab4c0' : '#777';
+      const borderCol = isDark ? '#334155' : '#eee';
 
       const content = `
-        <div style="padding: 4px; min-width: 220px;">
+        <div class="evt-popup-content" style="padding: 4px; min-width: 220px;">
           <h6 style="margin: 0 0 6px; color: ${style.color}; font-weight: 700; font-size: 13px; border-bottom: 1px solid ${borderCol}; padding-bottom: 4px;">${e.tipoLabel || 'Notificação'}</h6>
-          <div style="font-size: 11px; color: ${colorMain}; line-height: 1.4; margin-bottom: 8px; font-weight: 500;">${e.mensagem || ''}</div>
+          <div style="font-size: 11px; color: ${colorMain}; line-height: 1.4; margin-bottom: 8px; font-weight: 500;">${esc(e.mensagem || '')}</div>
           
-          <div style="background: ${bgAddr}; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
-            <div id="${addrId}" style="font-size: 10px; color: ${colorMuted}; margin-bottom: 4px;"><i class="fa fa-map-marker"></i> Buscando endereço...</div>
-            <div style="font-size: 9px; color: #999;">Lat: ${v.posicao.latitude.toFixed(5)} | Lng: ${v.posicao.longitude.toFixed(5)}</div>
+          <div class="evt-popup-address" style="background: ${bgAddr}; border: 1px solid ${borderCol}; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
+            <div id="${addrId}" style="font-size: 10px; color: ${colorMuted}; margin-bottom: 4px;">${enderecoHtml}</div>
+            <div style="font-size: 9px; color: ${coordColor};">${coordsHtml}</div>
           </div>
+          ${acoesMapaHtml}
 
-          <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-            <a href="${_urlGoogleMaps(v.posicao.latitude, v.posicao.longitude)}" target="_blank" class="btn btn-xs btn-default" style="flex:1; font-size: 9px; padding: 4px;"><i class="fa fa-google"></i> Maps</a>
-            <a href="${_urlStreetView(v.posicao.latitude, v.posicao.longitude)}" target="_blank" class="btn btn-xs btn-primary" style="flex:1; font-size: 9px; padding: 4px; color: #fff !important;"><i class="fa fa-street-view"></i> StreetView</a>
-          </div>
-
-          <div style="font-size: 9px; color: #aaa; text-align: right;">
+          <div style="font-size: 9px; color: ${coordColor}; text-align: right;">
             <i class="fa fa-clock-o"></i> ${fmtGPSTimeSec(e.serverTime)}
           </div>
         </div>
       `;
 
       marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 }).openPopup();
-      geocodificarCoordenadas(v.posicao.latitude, v.posicao.longitude, addrId);
+      map.flyTo(_latLngComOffset(v.posicao, _eventPopupOffsetPx), 16, { animate: true, duration: 0.55 });
+      if (enderecoInicial) {
+        const addrEl = document.getElementById(addrId);
+        if (addrEl) addrEl.innerHTML = enderecoHtml;
+      } else if (eventoTemCoords) {
+        geocodificarCoordenadas(eventoLat, eventoLng, addrId);
+      }
 
       marker.once('popupclose', function() {
-        if (marker._originalPopup) marker.bindPopup(marker._originalPopup);
+        if (marker._eventOriginalPopup) {
+          marker.bindPopup(marker._eventOriginalPopup);
+          marker._eventOriginalPopup = null;
+        }
       });
     }
   } else if (e.lat != null && e.lng != null) {
@@ -1517,10 +1546,12 @@ function processarMensagemWs(msg) {
         dispositivoId: dispositivoId || null,
         tipo: e.type,
         tipoLabel: e.tipoLabel,
+        mensagem: e.mensagem,
         serverTime: e.serverTime,
         positionId: e.positionId,
-        lat: pos?.latitude ?? null,
-        lng: pos?.longitude ?? null,
+        lat: e.lat ?? pos?.latitude ?? null,
+        lng: e.lng ?? pos?.longitude ?? null,
+        endereco: e.endereco ?? null,
       });
     });
   }
@@ -1725,11 +1756,22 @@ function atualizarMarcador(dispositivoId) {
   style.innerHTML = `
     .dark-theme .btn-evt-periodo { background: #2d3748 !important; color: #adb5bd !important; border-color: #4a5568 !important; }
     .dark-theme .btn-evt-periodo.active { background: #2980b9 !important; color: #fff !important; border-color: #2980b9 !important; }
-    .dark-theme #evt-tipo-btn, .dark-theme #evt-btn-notif, .dark-theme #evt-btn-limpar { background: #2d3748; color: #adb5bd; border: 1px solid #4a5568; }
-    .dark-theme #evt-btn-notif.ativo { color: #f39c12; }
+    .dark-theme #eventos-lista .evento-item { background: #111827 !important; border-color: #263244 !important; color: #e6edf3 !important; }
+    .dark-theme #eventos-lista .evt-tempo { color: #b8c1cc !important; }
+    .dark-theme #eventos-vazio { color: #d7dde6 !important; }
+    .dark-theme #eventos-vazio .fa { color: #d7dde6 !important; }
+    .dark-theme #evt-tipo-btn, .dark-theme #evt-btn-notif, .dark-theme #evt-btn-limpar { background: #2d3748; color: #d7dde6; border: 1px solid #4a5568; }
+    .dark-theme #evt-btn-notif.ativo { background: #f39c12 !important; color: #fff !important; border-color: #f39c12 !important; }
+    .dark-theme #evt-btn-notif.ativo .fa { color: #fff !important; }
     .dark-theme .evt-tipo-dropdown { background: #1a202c; border-color: #2d3748; }
     .dark-theme .evt-tipo-item { color: #c9d1d9; }
     .dark-theme .evt-tipo-item:hover { background: #2d3748; }
+    .dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
+    .dark-theme .popup-evento-moderno .leaflet-popup-tip { background: #0f172a; color: #f8fafc; }
+    .dark-theme .popup-evento-moderno .leaflet-popup-content { color: #f8fafc; }
+    .dark-theme .popup-evento-moderno .evt-popup-maps-btn { background: #243044 !important; color: #f8fafc !important; border-color: #3d4b63 !important; }
+    .dark-theme .popup-evento-moderno .btn-primary { color: #fff !important; }
+    .dark-theme .popup-evento-moderno .leaflet-popup-close-button { color: #d7dde6 !important; }
   `;
   document.head.appendChild(style);
 })();
@@ -2021,10 +2063,10 @@ function _agendarAtualizacaoAtributos(dispositivoId) {
   }, 1200);
 }
 
-function _latLngComOffset(posicao) {
+function _latLngComOffset(posicao, offsetOverride) {
   let offset = 0;
   if (ativoId) {
-    offset = (_cardAdminExpandido && _attrsTrayOpen) ? _cardFocusOffsetPx : 250;
+    offset = Number.isFinite(offsetOverride) ? offsetOverride : ((_cardAdminExpandido && _attrsTrayOpen) ? _cardFocusOffsetPx : _focusOffsetPx);
   }
   if (!offset || !map || !posicao) return [posicao.latitude, posicao.longitude];
   const zoom = map.getZoom() || 16;
@@ -2370,7 +2412,7 @@ function desativarFoco() {
 
 // ── Foco / Interações ─────────────────────────────────────────────────────────
 
-window.focar = function (dispositivoId) {
+window.focar = function (dispositivoId, opts = {}) {
   _salvarFocoAdmin(dispositivoId);
   mostrarCardDispositivo(dispositivoId);
 
@@ -2378,9 +2420,10 @@ window.focar = function (dispositivoId) {
   if (!v?.posicao) return;
 
   ativarFoco(dispositivoId);
-  map.flyTo(_latLngComOffset(v.posicao), 16, { animate: true, duration: 0.8 });
+  map.flyTo(_latLngComOffset(v.posicao, opts.offsetPx), 16, { animate: true, duration: 0.8 });
 
   setTimeout(() => {
+    if (opts.abrirPopup === false) return;
     if (_mostrarPopup && marcadores[dispositivoId] && map.hasLayer(marcadores[dispositivoId])) {
       marcadores[dispositivoId].openPopup();
     }

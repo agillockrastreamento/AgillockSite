@@ -404,6 +404,7 @@ model EventoNotificacao {
   mensagem       String
   latitude       Float?
   longitude      Float?
+  endereco       String?
   velocidade     Float?
   lido           Boolean  @default(false)
   createdAt      DateTime @default(now())

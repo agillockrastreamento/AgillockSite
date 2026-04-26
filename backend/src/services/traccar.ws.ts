@@ -14,6 +14,7 @@ import {
   decorarPosicaoComMedidores,
 } from './medidores.service';
 import NotificationService from './notification.service';
+import { reverseGeocode } from '../utils/reverse-geocode';
 
 const TRACCAR_URL = process.env.TRACCAR_URL || 'http://traccar:8082';
 const WS_TRACCAR_URL = TRACCAR_URL.replace('http://', 'ws://').replace('https://', 'wss://');
@@ -27,6 +28,7 @@ const traccarIdToUniqueId = new Map<number, string>();
 const lastGeofenceState = new Map<number, string[]>();
 const geofenceCache = new Map<number, { at: number; items: Array<{ id: number; area: string }> }>();
 const GEOFENCE_CACHE_TTL_MS = 30_000;
+const eventAddressCache = new Map<string, string>();
 
 // ── Iniciar o servidor WebSocket para o frontend ──────────────────────────────
 
@@ -327,6 +329,9 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       tipoLabel: string;
       serverTime: string;
       positionId?: number;
+      lat?: number | null;
+      lng?: number | null;
+      endereco?: string | null;
     }> = (msg.events || []).map(e => ({
       deviceId: e.deviceId,
       type: e.type,
@@ -334,33 +339,42 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       serverTime: e.eventTime || e.serverTime,
       positionId: e.positionId,
     }));
-    result.events = realtimeEvents.concat(syntheticEvents);
+    const eventosComLocal = realtimeEvents.concat(syntheticEvents);
 
     // Disparar notificações para cada evento (fire-and-forget)
     type TraccarPos = NonNullable<TraccarWsMessage['positions']>[number];
     const posicaoPorDeviceId = new Map<number, TraccarPos>();
-    (msg.positions || []).forEach(p => posicaoPorDeviceId.set(p.deviceId, p));
+    const posicaoPorPositionId = new Map<number, TraccarPos>();
+    (msg.positions || []).forEach(p => {
+      posicaoPorDeviceId.set(p.deviceId, p);
+      if (p.id != null) posicaoPorPositionId.set(p.id, p);
+    });
 
-    for (const evt of realtimeEvents.concat(syntheticEvents)) {
+    for (const evt of eventosComLocal) {
       const identificador = traccarIdToUniqueId.get(evt.deviceId);
       if (!identificador) {
         console.warn(`[WS Traccar] Evento "${evt.type}" recebido para deviceId ${evt.deviceId}, mas identificador não encontrado no cache.`);
         continue;
       }
-      const pos = posicaoPorDeviceId.get(evt.deviceId);
+      const pos = (evt.positionId != null ? posicaoPorPositionId.get(evt.positionId) : undefined) ?? posicaoPorDeviceId.get(evt.deviceId);
+      const enderecoEvento = await resolverEnderecoEvento(pos);
+      evt.lat = pos?.latitude ?? null;
+      evt.lng = pos?.longitude ?? null;
+      evt.endereco = enderecoEvento;
       const norm = pos ? normalizeAttributes(pos.attributes ?? {}) : {};
       const dados = {
         traccarDeviceId: evt.deviceId,
         latitude: pos?.latitude ?? null,
         longitude: pos?.longitude ?? null,
         velocidade: pos != null ? Math.round(pos.speed * 1.852) : null,
-        endereco: pos?.address ?? null,
+        endereco: enderecoEvento,
         alarme: (norm as any).alarme ?? null,
       };
       NotificationService.processarEvento(identificador, evt.type, dados).catch(err => {
         console.error('[Notificações] Erro ao processar evento:', err.message);
       });
     }
+    result.events = eventosComLocal;
   }
 
   if (Object.keys(result).length === 0) return null;
@@ -415,6 +429,19 @@ async function detectPositionGeofences(position: {
   return geofences
     .filter(geofence => pointInsideGeofence(position.latitude, position.longitude, geofence.area))
     .map(geofence => String(geofence.id));
+}
+
+async function resolverEnderecoEvento(pos?: { latitude: number; longitude: number; address?: string | null }): Promise<string | null> {
+  if (!pos) return null;
+  if (pos.address) return pos.address;
+  const lat = Number(pos.latitude);
+  const lon = Number(pos.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const cacheKey = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+  if (eventAddressCache.has(cacheKey)) return eventAddressCache.get(cacheKey) || null;
+  const endereco = await reverseGeocode(lat, lon).catch(() => '');
+  eventAddressCache.set(cacheKey, endereco);
+  return endereco || null;
 }
 
 function extractGeofenceKeys(attributes: Record<string, unknown> | undefined): string[] {
