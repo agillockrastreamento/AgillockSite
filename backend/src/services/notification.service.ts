@@ -4,11 +4,85 @@ import EmailService from './email.service';
 type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string };
 
 class NotificationService {
+  private _lastOverspeedAt = new Map<string, number>(); // Cache em memória para evitar spam de velocidade
+
+  async verificarEventosPosicao(identificador: string, dispositivo: any, dados: any) {
+    try {
+      const clientesMap = new Map<string, { id: string; nome: string; login: { id: string; email: string; ativo: boolean } | null }>();
+      if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, dispositivo.cliente as any);
+      for (const vinculo of dispositivo.clientesVinculados || []) {
+        if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, vinculo.cliente as any);
+      }
+
+      for (const cliente of clientesMap.values()) {
+        const clienteLogin = cliente.login;
+        if (!clienteLogin || !clienteLogin.ativo) continue;
+
+        // 1. Verificar Ignição (se mudou)
+        // dispositivo.telemetriaUltimaIgnicao é o estado ANTERIOR se chamado antes de salvar, 
+        // ou o atual se chamado depois. Vamos comparar com dados.ignicao.
+        if (dados.ignicao !== null && dispositivo.telemetriaUltimaIgnicao !== null) {
+          if (dados.ignicao !== dispositivo.telemetriaUltimaIgnicao) {
+            const tipoIgn = dados.ignicao ? 'ignitionOn' : 'ignitionOff';
+            console.log(`[Notif] Detectada mudança de ignição (${tipoIgn}) para ${identificador}`);
+            await this.processarEvento(identificador, tipoIgn, dados);
+          }
+        }
+
+        // 2. Verificar Velocidade (Limite do Cliente)
+        if (dados.velocidade !== null) {
+          const prefVel = await prisma.preferenciaNotificacao.findUnique({
+            where: {
+              clienteLoginId_dispositivoId_tipoEvento: {
+                clienteLoginId: clienteLogin.id,
+                dispositivoId: dispositivo.id,
+                tipoEvento: 'overspeed',
+              },
+            },
+            select: { web: true, app: true, email: true, overspeedLimit: true },
+          });
+
+          if (prefVel && (prefVel.web || prefVel.app || prefVel.email)) {
+            const limite = prefVel.overspeedLimit ?? 100;
+            if (dados.velocidade > limite) {
+              const chaveSpam = `${clienteLogin.id}_${dispositivo.id}_overspeed`;
+              const agora = Date.now();
+              const ultimoAlerta = this._lastOverspeedAt.get(chaveSpam) || 0;
+              
+              // Evita enviar alerta de velocidade mais de uma vez a cada 5 minutos para o mesmo veículo
+              if (agora - ultimoAlerta > 5 * 60 * 1000) {
+                console.log(`[Notif] Detectado excesso de velocidade (${dados.velocidade} km/h > ${limite}) para ${identificador}`);
+                await this.processarEvento(identificador, 'overspeed', dados);
+                this._lastOverspeedAt.set(chaveSpam, agora);
+              }
+            }
+          }
+        }
+        // 3. Verificar Alarmes de Hardware (se presentes nos atributos)
+        if (dados.alarme) {
+          // Mapeia alarmes comuns para nossos tipos de evento
+          let tipoAlarme = 'alarm';
+          if (dados.alarme === 'powerCut' || dados.alarme === 'powerRestored') tipoAlarme = 'powerCut';
+          if (dados.alarme === 'vibration') tipoAlarme = 'alarm';
+          if (dados.alarme === 'sos') tipoAlarme = 'alarm';
+
+          console.log(`[Notif] Detectado alarme de hardware (${dados.alarme}) para ${identificador} -> ${tipoAlarme}`);
+          await this.processarEvento(identificador, tipoAlarme, dados);
+        }
+      }
+    } catch (error: any) {
+      console.error(`[Notif] Erro ao verificar eventos de posição para ${identificador}:`, error.message);
+    }
+  }
+
   async processarEvento(identificador: string, tipo: string, dados: any) {
     try {
-      // Normalização de tipos de evento do Traccar para o nosso padrão
+      // Normalização exaustiva de tipos de evento
       const tipoOriginal = tipo;
       if (tipo === 'deviceOverspeed') tipo = 'overspeed';
+      if (tipo === 'ignitionOn' || tipo === 'ignitionOff') { /* ok */ }
+      if (tipo === 'geofenceEnter' || tipo === 'geofenceExit') { /* ok */ }
+      if (tipo === 'deviceLocked' || tipo === 'deviceUnlocked') { /* ok */ }
 
       const dispositivo = await prisma.dispositivo.findFirst({
         where: {

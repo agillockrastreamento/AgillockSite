@@ -72,6 +72,7 @@ async function connectToTraccar() {
     const devices = await traccarGetDevices();
     traccarIdToUniqueId.clear();
     devices.forEach(device => traccarIdToUniqueId.set(device.id, device.uniqueId));
+    console.log(`[WS Traccar] Cache de dispositivos atualizado: ${devices.length} dispositivos.`);
   } catch (err) {
     console.warn('[WS Traccar] Falha ao atualizar cache de dispositivos.', err);
   }
@@ -80,13 +81,16 @@ async function connectToTraccar() {
   });
 
   traccarWs.on('open', () => {
-    console.log('[WS Traccar] Conectado.');
+    console.log('[WS Traccar] Conectado ao servidor.');
   });
 
   traccarWs.on('message', async (data: Buffer) => {
     const raw = data.toString();
 
     if (raw === '{}' || raw.trim() === '') return;
+    
+    // Log para debug de volume (pode ser removido depois)
+    // console.log(`[WS Traccar] Dados brutos recebidos: ${raw.substring(0, 100)}...`);
 
     let msg: TraccarWsMessage;
     try {
@@ -148,7 +152,13 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
   const dispositivos = identificadores.length
     ? await prisma.dispositivo.findMany({
       where: { identificador: { in: identificadores } },
-      select: { identificador: true, id: true, ...DISPOSITIVO_MEDIDORES_SELECT },
+      select: { 
+        identificador: true, 
+        id: true, 
+        ...DISPOSITIVO_MEDIDORES_SELECT,
+        cliente: { include: { login: true } },
+        clientesVinculados: { include: { cliente: { include: { login: true } } } },
+      },
     })
     : [];
   const localPorIdentificador = new Map(dispositivos.map(dispositivo => [dispositivo.identificador, dispositivo]));
@@ -176,6 +186,9 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       dispositivos,
       posicaoPorIdentificador as unknown as Map<string, any>,
     );
+
+    console.log(`[WS Traccar] Processadas ${atualizados.size} posições.`);
+
     atualizados.forEach((dispositivo, identificador) => {
       // Tentar preservar campos que o Traccar omite em alguns pacotes
       const anterior = localPorIdentificador.get(identificador);
@@ -183,9 +196,25 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         if (dispositivo.odometroSistemaMetros == null) {
           dispositivo.odometroSistemaMetros = anterior.odometroSistemaMetros;
         }
-        // Se quisermos preservar outros campos da última posição conhecida no objeto do dispositivo
       }
       localPorIdentificador.set(identificador, dispositivo);
+
+      // Verificação proativa de alertas (ignição, velocidade, etc)
+      const pos = posicaoPorIdentificador.get(identificador);
+      if (pos) {
+        const norm = normalizeAttributes(pos.attributes ?? {});
+        const dados = {
+          traccarDeviceId: pos.deviceId,
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          velocidade: Math.round(pos.speed * 1.852),
+          endereco: pos.address,
+          ignicao: norm.ignicao,
+          alarme: norm.alarme
+        };
+        NotificationService.verificarEventosPosicao(identificador, dispositivo, dados)
+          .catch(err => console.error(`[Notif] Erro na verificação proativa (${identificador}):`, err.message));
+      }
     });
 
     for (const [identificador, disp] of atualizados) {
