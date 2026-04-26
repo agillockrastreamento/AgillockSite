@@ -601,7 +601,7 @@ router.get('/rastreamento/relatorios/batch/historico', async (req: ClienteReques
       posicoes: historico.map(p => ({
         deviceId: p.deviceId,
         ...decorarPosicaoComMedidores(
-          localPorIdentificador.get(identificadorPorTraccarId.get(p.deviceId) || '') || { odometroSistemaMetros: null, horimetroSistemaSegundos: 0 },
+          localPorIdentificador.get(identificadorPorTraccarId.get(p.deviceId) || '') || { odometroSistemaMetros: null, horimetroSistemaSegundos: 0, telemetriaUltimaIgnicao: null },
           p,
         ),
       })),
