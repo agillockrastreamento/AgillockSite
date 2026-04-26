@@ -116,6 +116,15 @@ function _htmlBotaoGoogleMaps(lat, lng) {
   return `<a href="${_urlGoogleMaps(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-maps-btn" title="Abrir no Google Maps"><i class="fa fa-map-pin" style="color:#e74c3c"></i></a>`;
 }
 
+function _urlGoogleMaps(lat, lng, endereco) {
+  const query = endereco ? endereco : `${lat},${lng}`;
+  return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
+}
+
+function _htmlBotaoGoogleMaps(lat, lng, endereco) {
+  return `<a href="${_urlGoogleMaps(lat, lng, endereco)}" target="_blank" rel="noopener noreferrer" class="dcard-maps-btn" title="Abrir no Google Maps" id="btn-maps-${lat}-${lng}"><i class="fa fa-map-pin" style="color:#e74c3c"></i></a>`;
+}
+
 function _htmlBotaoStreetView(lat, lng) {
   return `<a href="${_urlStreetView(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-streetview-btn" title="Abrir no Street View"><i class="fa fa-street-view"></i></a>`;
 }
@@ -2112,9 +2121,9 @@ function mostrarCardDispositivo(id) {
       ${horasHtml}
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
           <div class="dcard-section-title">Endereço</div>
-          <div style="display:flex;align-items:flex-start;gap:6px">
-            ${_htmlBotaoGoogleMaps(p.latitude, p.longitude)}
-            <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="flex:1 1 auto;margin-top:2px">${addrTxt}</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${_htmlBotaoGoogleMaps(p.latitude, p.longitude, hasCached ? cachedAddr : null)}
+            <span id="${addrId}" data-lat="${p.latitude}" data-lng="${p.longitude}" style="flex:1 1 auto;text-align:center;font-size:11px">${addrTxt}</span>
             ${_htmlBotaoStreetView(p.latitude, p.longitude)}
           </div>
         </div>` : ''}
@@ -2350,9 +2359,15 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const coords = `(${lat.toFixed(5)}, ${lng.toFixed(5)})`;
   const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`;
 
+  const updateLink = (endereco) => {
+    const btnMaps = document.getElementById(`btn-maps-${lat}-${lng}`);
+    if (btnMaps) btnMaps.href = _urlGoogleMaps(lat, lng, endereco);
+  };
+
   if (cacheKey in _geocodeCache) {
     const cached = _geocodeCache[cacheKey];
     el.textContent = cached ? `${cached} ${coords}` : coords;
+    updateLink(cached);
     return;
   }
 
@@ -2361,7 +2376,9 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
     const end = data.endereco || '';
     _geocodeCache[cacheKey] = end;
     el.textContent = end ? `${end} ${coords}` : coords;
+    updateLink(end);
   } catch {
     el.textContent = coords;
+    updateLink(null);
   }
 };

@@ -96,12 +96,13 @@ function _urlStreetView(lat, lng) {
   return `https://www.google.com/maps?q=&layer=c&cbll=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
-function _urlGoogleMaps(lat, lng) {
-  return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}`;
+function _urlGoogleMaps(lat, lng, endereco) {
+  const query = endereco ? endereco : `${lat},${lng}`;
+  return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
 }
 
-function _htmlBotaoGoogleMaps(lat, lng) {
-  return `<a href="${_urlGoogleMaps(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-maps-btn" title="Abrir no Google Maps"><i class="fa fa-map-pin" style="color:#e74c3c"></i></a>`;
+function _htmlBotaoGoogleMaps(lat, lng, endereco) {
+  return `<a href="${_urlGoogleMaps(lat, lng, endereco)}" target="_blank" rel="noopener noreferrer" class="dcard-maps-btn" title="Abrir no Google Maps" id="btn-maps-${lat}-${lng}"><i class="fa fa-map-pin" style="color:#e74c3c"></i></a>`;
 }
 
 function _htmlBotaoStreetView(lat, lng) {
@@ -1392,9 +1393,9 @@ function mostrarCardDispositivo(id) {
       <div id="dcard-horas">${horasHtml}</div>
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <div class="dcard-section-title">Endereço</div>
-        <div style="display:flex;align-items:flex-start;gap:6px">
-          ${_htmlBotaoGoogleMaps(p.latitude, p.longitude)}
-          <span id="${addrId}" style="flex:1 1 auto;margin-top:2px">${addrTxt}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${_htmlBotaoGoogleMaps(p.latitude, p.longitude, hasCached ? cachedAddr : null)}
+          <span id="${addrId}" style="flex:1 1 auto;text-align:center;font-size:11px">${addrTxt}</span>
           ${_htmlBotaoStreetView(p.latitude, p.longitude)}
         </div>
       </div>` : ''}
@@ -1550,13 +1551,25 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const el = document.getElementById(elementId); if (!el) return;
   const coords = `(${lat.toFixed(5)}, ${lng.toFixed(5)})`;
   const ck = `${lat.toFixed(3)},${lng.toFixed(3)}`;
-  if (ck in _geocodeCache) { el.textContent = _geocodeCache[ck] ? `${_geocodeCache[ck]} ${coords}` : coords; return; }
+  
+  const updateLink = (endereco) => {
+    const btnMaps = document.getElementById(`btn-maps-${lat}-${lng}`);
+    if (btnMaps) btnMaps.href = _urlGoogleMaps(lat, lng, endereco);
+  };
+
+  if (ck in _geocodeCache) {
+    const end = _geocodeCache[ck];
+    el.textContent = end ? `${end} ${coords}` : coords;
+    updateLink(end);
+    return;
+  }
   try {
     const data = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
     const end = data.endereco || '';
     _geocodeCache[ck] = end;
     el.textContent = end ? `${end} ${coords}` : coords;
-  } catch { el.textContent = coords; }
+    updateLink(end);
+  } catch { el.textContent = coords; updateLink(null); }
 };
 
 function ativarFoco(id) {
