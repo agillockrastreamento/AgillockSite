@@ -456,7 +456,7 @@ function renderRota(data) {
     idx++;
   }
   if (group.getLayers().length > 0) mapaRota.fitBounds(group.getBounds().pad(0.1));
-  document.getElementById('rota-stats').innerHTML = `<i class="fa fa-info-circle"></i> Exibindo trajeto de <strong>${Object.keys(porDispositivo).length}</strong> dispositivos.`;
+  document.getElementById('rota-stats').innerHTML = `<i class="fa fa-info-circle"></i> Exibindo trajeto de <strong>${Object.keys(porDispositivo).length}</strong> dispositivo(s).`;
 }
 
 // ── Renderização das Tabelas e Cards ──────────────────────────────────────────

@@ -485,7 +485,7 @@ function renderRota(data) {
     mapaRota.fitBounds(group.getBounds().pad(0.1));
     mapaRota.invalidateSize();
   }
-  document.getElementById('rota-stats').innerHTML = `<i class="fa fa-info-circle"></i> Exibindo trajeto de <strong>${Object.keys(porDispositivo).length}</strong> dispositivos.`;
+  document.getElementById('rota-stats').innerHTML = `<i class="fa fa-info-circle"></i> Exibindo trajeto de <strong>${Object.keys(porDispositivo).length}</strong> dispositivo(s)`;
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -550,7 +550,7 @@ async function renderParadas(lista) {
         <div style="min-width:0;flex:1">
           <div style="font-weight:600;font-size:13px;text-align:left"><i class="fa fa-map-marker" style="color:#fab32c"></i> ${d.nome} — Parada ${i + 1}</div>
           <div style="font-size:11px;color:#888;margin-top:2px;text-align:left">${endereco}</div>
-        </div>
+        </div> 
         <div style="text-align:right;font-size:12px;color:#888;white-space:nowrap"><div><i class="fa fa-clock-o"></i> ${fmtDuracao(duracao)}</div></div>
       </div>
       <div style="font-size:10px;color:#aaa;margin-top:5px;text-align:left">${fmtHora(inicio)} → ${fmtHora(fim)}</div>
@@ -768,7 +768,6 @@ function fmtHora(iso) {
 
 function fmtDuracao(mins) {
   if (!mins && mins !== 0) return '—';
-  if (mins < 60) return mins + ' min';
-  const h = Math.floor(mins / 60), m = mins % 60;
-  return h + 'h' + (m ? ' ' + m + 'min' : '');
+  const h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
