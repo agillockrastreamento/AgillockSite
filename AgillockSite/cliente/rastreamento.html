@@ -785,6 +785,14 @@
             </button>
           </div>
           <h5>Eventos</h5>
+          
+          <div id="evt-data-filtros" style="display:flex;gap:4px;margin-bottom:10px;">
+            <button class="btn btn-default btn-xs btn-evt-periodo active" data-periodo="hoje">Hoje</button>
+            <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="ontem">Ontem</button>
+            <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="7dias">7 dias</button>
+            <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="custom" title="Personalizado"><i class="fa fa-calendar"></i></button>
+          </div>
+
           <div id="eventos-filtros">
             <div id="evt-tipo-wrap">
               <button id="evt-tipo-btn" type="button">

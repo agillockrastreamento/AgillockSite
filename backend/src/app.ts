@@ -18,6 +18,7 @@ import rastreamentoRoutes from './routes/rastreamento.routes';
 import motoristasRoutes from './routes/motoristas.routes';
 import clienteLoginRoutes from './routes/cliente-login.routes';
 import clientePortalRoutes from './routes/cliente-portal.routes';
+import notificacoesRoutes from './routes/notificacoes.routes';
 import { UPLOADS_DIR } from './utils/upload-paths';
 
 const app = express();
@@ -98,6 +99,7 @@ app.use('/api', adminRoutes);              // rotas admin utilitárias
 app.use('/api/rastreamento', rastreamentoRoutes);
 app.use('/api/motoristas', motoristasRoutes);
 app.use('/api/clientes', clienteLoginRoutes);   // CRUD do login do cliente (admin/colaborador)
+app.use('/api/cliente/notificacoes', notificacoesRoutes); // Notificações do cliente
 app.use('/api/cliente', clientePortalRoutes);   // portal do cliente (JWT role=CLIENTE)
 
 // Rota não encontrada

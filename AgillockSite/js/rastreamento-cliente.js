@@ -66,12 +66,14 @@ function _restaurarFocoCliente() {
   focarCliente(dispositivoId);
 }
 
-// ── Eventos (cliente: apenas 4 tipos) ────────────────────────────────────────
+// ── Eventos (cliente: expandido) ─────────────────────────────────────────────
 const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'ignitionOn',   label: 'Ignição Ligada',          css: 'tipo-ignition' },
   { tipo: 'ignitionOff',  label: 'Ignição Desligada',        css: 'tipo-ignition' },
-  { tipo: 'geofenceEnter',label: 'Entrada na Cerca Virtual', css: 'tipo-geofence' },
-  { tipo: 'geofenceExit', label: 'Saída da Cerca Virtual',   css: 'tipo-geofence' },
+  { tipo: 'geofenceEnter',label: 'Entrada na Cerca',        css: 'tipo-geofence' },
+  { tipo: 'geofenceExit', label: 'Saída da Cerca',          css: 'tipo-geofence' },
+  { tipo: 'overspeed',    label: 'Excesso de Velocidade',   css: 'tipo-overspeed' },
+  { tipo: 'powerCut',     label: 'Alimentação Cortada',     css: 'tipo-alarm' },
 ];
 
 let _evtFiltros = new Set();
@@ -224,6 +226,39 @@ function inicializarEventosPanel() {
       _ajustarAlturaCardDispositivo();
     }, 220);
   });
+
+  // Listeners para botões de período de eventos
+  document.querySelectorAll('.btn-evt-periodo').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.btn-evt-periodo').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const periodo = this.dataset.periodo;
+      if (periodo === 'custom') {
+        // Futura implementação de modal de data
+        AL_CLIENTE.showAlert('Selecione um intervalo no relatório para histórico avançado.', 'info');
+      } else {
+        carregarHistoricoEventos(periodo);
+      }
+    });
+  });
+}
+
+async function carregarHistoricoEventos(periodo) {
+  const lista = document.getElementById('eventos-lista');
+  lista.innerHTML = '<div style="padding:20px;text-align:center;color:#999"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
+  
+  try {
+    // Rota que precisará ser implementada no Backend
+    const data = await AL_CLIENTE.apiGet(`/api/cliente/notificacoes/eventos?periodo=${periodo}`);
+    _eventos.length = 0;
+    if (data && data.length) {
+      data.forEach(e => _eventos.push(e));
+    }
+    renderEventosLista();
+  } catch (err) {
+    console.error('Erro ao carregar histórico de eventos', err);
+    lista.innerHTML = '<div style="padding:20px;text-align:center;color:#e74c3c">Erro ao carregar histórico.</div>';
+  }
 }
 
 function _aplicarEstadoPainelEventos() {

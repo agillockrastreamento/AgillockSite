@@ -202,6 +202,7 @@ model BoletoDispositivo {
 
 model Dispositivo {
   id               String   @id @default(uuid())
+  traccarId        Int?     @unique
   nome             String
   identificador    String   @unique
   categoria        String?
@@ -257,6 +258,8 @@ model Dispositivo {
   boletosUnificados  BoletoDispositivo[]
   clientesVinculados DispositivoCliente[]
   motoristasVinculados MotoristaDispositivo[]
+  preferenciasNotificacoes PreferenciaNotificacao[]
+  eventosNotificacoes      EventoNotificacao[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -347,6 +350,42 @@ model ClienteLogin {
   updatedAt DateTime @updatedAt
 
   cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  preferenciasNotificacoes PreferenciaNotificacao[]
+  eventosNotificacoes      EventoNotificacao[]
+}
+
+model PreferenciaNotificacao {
+  id             String   @id @default(uuid())
+  clienteLoginId String
+  dispositivoId  String
+  tipoEvento     String   // ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut
+  web            Boolean  @default(false)
+  app            Boolean  @default(false)
+  email          Boolean  @default(false)
+  overspeedLimit Int?     @default(100)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
+  dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteLoginId, dispositivoId, tipoEvento])
+}
+
+model EventoNotificacao {
+  id             String   @id @default(uuid())
+  clienteLoginId String
+  dispositivoId  String
+  tipoEvento     String
+  mensagem       String
+  latitude       Float?
+  longitude      Float?
+  velocidade     Float?
+  lido           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
+  dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
 }
 
 model Contrato {
