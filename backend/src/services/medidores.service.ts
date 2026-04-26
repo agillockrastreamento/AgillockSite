@@ -168,10 +168,23 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
 }
 
 export function decorarPosicaoComMedidores(
-  dispositivo: Pick<DispositivoMedidores, 'odometroSistemaMetros' | 'horimetroSistemaSegundos'>,
+  dispositivo: Pick<DispositivoMedidores, 'odometroSistemaMetros' | 'horimetroSistemaSegundos' | 'telemetriaUltimaIgnicao'>,
   posicao: TraccarPosition,
 ): PosicaoDecorada {
   const normalizado = normalizeAttributes(posicao.attributes ?? {});
+  
+  // Garantir que campos cruciais não fiquem nulos se o dispositivo tiver a informação no banco
+  const odometro = usaOdometroSistema(dispositivo) 
+    ? dispositivo.odometroSistemaMetros 
+    : (normalizado.odometro ?? (dispositivo as any).odometro_snapshot);
+
+  const horas_motor = Math.round(((dispositivo.horimetroSistemaSegundos ?? 0) / 3600) * 10) / 10;
+  
+  // O Traccar pode não enviar 'blocked' em todos os pacotes de movimento.
+  // Se estiver nulo na posição atual, podemos manter o que está no banco (se tivéssemos essa coluna)
+  // Como 'bloqueado' não está no DISPOSITIVO_MEDIDORES_SELECT, ele depende do 'normalizado'.
+  // Para resolver o "sumir e voltar", o ideal é que o frontend ou o backend mantenham o último estado.
+
   return {
     latitude: posicao.latitude,
     longitude: posicao.longitude,
@@ -184,8 +197,10 @@ export function decorarPosicaoComMedidores(
     valida: posicao.valid,
     endereco: posicao.address,
     ...normalizado,
-    odometro: usaOdometroSistema(dispositivo) ? dispositivo.odometroSistemaMetros : normalizado.odometro,
-    horas_motor: Math.round(((dispositivo.horimetroSistemaSegundos ?? 0) / 3600) * 10) / 10,
+    odometro,
+    horas_motor,
+    // Se o 'ignicao' veio nulo no normalizado (Traccar não enviou no pacote), usamos o do sistema
+    ignicao: normalizado.ignicao !== null ? normalizado.ignicao : dispositivo.telemetriaUltimaIgnicao,
   };
 }
 

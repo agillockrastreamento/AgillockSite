@@ -177,6 +177,14 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       posicaoPorIdentificador as unknown as Map<string, any>,
     );
     atualizados.forEach((dispositivo, identificador) => {
+      // Tentar preservar campos que o Traccar omite em alguns pacotes
+      const anterior = localPorIdentificador.get(identificador);
+      if (anterior) {
+        if (dispositivo.odometroSistemaMetros == null) {
+          dispositivo.odometroSistemaMetros = anterior.odometroSistemaMetros;
+        }
+        // Se quisermos preservar outros campos da última posição conhecida no objeto do dispositivo
+      }
       localPorIdentificador.set(identificador, dispositivo);
     });
 

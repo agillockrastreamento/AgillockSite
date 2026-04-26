@@ -848,19 +848,31 @@ function processarMensagemWs(msg) {
     msg.positions.forEach(pos => {
       const did = traccarIdParaDispositivoId[pos.deviceId];
       if (!did || !veiculosMap[did]) return;
+      const v = veiculosMap[did];
+      const antiga = v.posicao || {};
+      
       const _emMov = pos.emMovimento ?? null;
       const _est = _estadoSince[did];
       if (!_est || _est.emMovimento !== _emMov) {
         _estadoSince[did] = { emMovimento: _emMov, desde: Date.now() };
       }
-      veiculosMap[did].posicao = {
+      
+      v.posicao = {
         latitude: pos.latitude, longitude: pos.longitude, velocidade: pos.velocidade,
         curso: pos.curso, altitude: pos.altitude, fixTime: pos.fixTime,
         deviceTime: pos.deviceTime, serverTime: pos.serverTime, valida: pos.valida,
-        ignicao: pos.ignicao, emMovimento: pos.emMovimento, satelites: pos.satelites,
-        bateria_nivel: pos.bateria_nivel, alarme: pos.alarme, alarme_codigo: pos.alarme_codigo,
-        tensao: pos.tensao, sinal: pos.sinal, odometro: pos.odometro,
-        horas_motor: pos.horas_motor, bloqueado: pos.bloqueado, endereco: pos.endereco,
+        ignicao: pos.ignicao !== null ? pos.ignicao : (antiga.ignicao ?? null), 
+        emMovimento: pos.emMovimento, 
+        satelites: pos.satelites ?? (antiga.satelites ?? null),
+        bateria_nivel: pos.bateria_nivel ?? (antiga.bateria_nivel ?? null), 
+        alarme: pos.alarme ?? (antiga.alarme ?? null), 
+        alarme_codigo: pos.alarme_codigo ?? (antiga.alarme_codigo ?? null),
+        tensao: pos.tensao ?? (antiga.tensao ?? null), 
+        sinal: pos.sinal ?? (antiga.sinal ?? null), 
+        odometro: pos.odometro ?? (antiga.odometro ?? null),
+        horas_motor: pos.horas_motor ?? (antiga.horas_motor ?? null), 
+        bloqueado: pos.bloqueado !== null ? pos.bloqueado : (antiga.bloqueado ?? null), 
+        endereco: pos.endereco ?? (antiga.endereco ?? null),
       };
       atualizarMarcador(did); atualizarCardAtivo(did); atualizarCardBarra(did);
       if (_overlay.alarmes) _renderAlarmeBadge(did, veiculosMap[did]);
@@ -886,7 +898,7 @@ function processarMensagemWs(msg) {
         tipoLabel: e.tipoLabel,
         serverTime: e.serverTime,
         lat: pos?.latitude ?? null,
-        lng: pos?.longitude ?? null,
+        lng: pos?.longitude ?? null, 
       });
     });
   }

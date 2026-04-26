@@ -50,78 +50,88 @@ class NotificationService {
       console.log(`[Notif] Evento "${tipo}" (original: ${tipoOriginal}) para ${identificador} — ${clientesMap.size} cliente(s)`);
 
       for (const cliente of clientesMap.values()) {
-        const clienteLogin = cliente.login;
-        if (!clienteLogin || !clienteLogin.ativo) {
-          console.log(`[Notif] Cliente ${cliente.nome} sem login ativo.`);
-          continue;
-        }
-
-        const pref = await prisma.preferenciaNotificacao.findUnique({
-          where: {
-            clienteLoginId_dispositivoId_tipoEvento: {
-              clienteLoginId: clienteLogin.id,
-              dispositivoId: dispositivo.id,
-              tipoEvento: tipo,
-            },
-          },
-          select: { web: true, app: true, email: true, overspeedLimit: true },
-        });
-
-        if (!pref || (!pref.web && !pref.app && !pref.email)) {
-          console.log(`[Notif] Sem preferência ativa para "${tipo}" — cliente ${clienteLogin.id} (${cliente.nome})`);
-          continue;
-        }
-
-        if (tipo === 'overspeed') {
-          const limiteCliente = pref.overspeedLimit ?? 100;
-          const velocidadeAtual = dados.velocidade ?? 0;
-          
-          if (dados.velocidade !== null && velocidadeAtual <= limiteCliente) {
-            console.log(`[Notif] Overspeed ignorado: ${velocidadeAtual} km/h <= limite ${limiteCliente} (cliente: ${cliente.nome})`);
+        try {
+          const clienteLogin = cliente.login;
+          if (!clienteLogin || !clienteLogin.ativo) {
+            console.log(`[Notif] Cliente ${cliente.nome} sem login ativo.`);
             continue;
           }
-        }
 
-        const mensagem = this.gerarMensagem(tipo, dispositivo.nome, dispositivo.placa, dados);
-
-        if (pref.web || pref.app) {
-          await prisma.eventoNotificacao.create({
-            data: {
-              clienteLoginId: clienteLogin.id,
-              dispositivoId: dispositivo.id,
-              tipoEvento: tipo,
-              mensagem,
-              latitude: dados.latitude ?? null,
-              longitude: dados.longitude ?? null,
-              velocidade: dados.velocidade ?? null,
+          const pref = await prisma.preferenciaNotificacao.findUnique({
+            where: {
+              clienteLoginId_dispositivoId_tipoEvento: {
+                clienteLoginId: clienteLogin.id,
+                dispositivoId: dispositivo.id,
+                tipoEvento: tipo,
+              },
             },
+            select: { web: true, app: true, email: true, overspeedLimit: true },
           });
-          console.log(`[Notif] Evento "${tipo}" salvo no banco para ${cliente.nome}`);
-        }
 
-        if (pref.email && clienteLogin.email) {
-          try {
-            const html = EmailService.gerarTemplateAlerta(
-              cliente.nome,
-              dispositivo.nome,
-              dispositivo.placa || '',
-              this.getLabelTipo(tipo),
-              new Date().toLocaleString('pt-BR'),
-              dados.endereco ?? null,
-            );
-            await EmailService.enviarEmail(
-              clienteLogin.email,
-              `Alerta: ${this.getLabelTipo(tipo)} — ${dispositivo.nome}`,
-              html,
-            );
-            console.log(`[Notif] E-mail "${tipo}" enviado para ${clienteLogin.email}`);
-          } catch (emailErr: any) {
-            console.error(`[Notif] Erro ao enviar e-mail para ${clienteLogin.email}:`, emailErr.message);
+          if (!pref || (!pref.web && !pref.app && !pref.email)) {
+            console.log(`[Notif] Sem preferência ativa para "${tipo}" — cliente ${clienteLogin.id} (${cliente.nome})`);
+            continue;
           }
-        }
 
-        if (pref.app) {
-          console.log(`[APP NOTIF] Enviando para ${cliente.nome}: ${mensagem}`);
+          if (tipo === 'overspeed') {
+            const limiteCliente = pref.overspeedLimit ?? 100;
+            const velocidadeAtual = dados.velocidade ?? 0;
+            
+            if (dados.velocidade !== null && velocidadeAtual <= limiteCliente) {
+              console.log(`[Notif] Overspeed ignorado: ${velocidadeAtual} km/h <= limite ${limiteCliente} (cliente: ${cliente.nome})`);
+              continue;
+            }
+          }
+
+          const mensagem = this.gerarMensagem(tipo, dispositivo.nome, dispositivo.placa, dados);
+
+          // Canal Web/App (Banco de Dados)
+          if (pref.web || pref.app) {
+            try {
+              await prisma.eventoNotificacao.create({
+                data: {
+                  clienteLoginId: clienteLogin.id,
+                  dispositivoId: dispositivo.id,
+                  tipoEvento: tipo,
+                  mensagem,
+                  latitude: dados.latitude ?? null,
+                  longitude: dados.longitude ?? null,
+                  velocidade: dados.velocidade ?? null,
+                },
+              });
+              console.log(`[Notif] Evento "${tipo}" salvo no banco para ${cliente.nome}`);
+            } catch (dbErr: any) {
+              console.error(`[Notif] Erro ao salvar evento no banco para ${cliente.nome}:`, dbErr.message);
+            }
+          }
+
+          // Canal E-mail
+          if (pref.email && clienteLogin.email) {
+            try {
+              const html = EmailService.gerarTemplateAlerta(
+                cliente.nome,
+                dispositivo.nome,
+                dispositivo.placa || '',
+                this.getLabelTipo(tipo),
+                new Date().toLocaleString('pt-BR'),
+                dados.endereco ?? null,
+              );
+              await EmailService.enviarEmail(
+                clienteLogin.email,
+                `Alerta: ${this.getLabelTipo(tipo)} — ${dispositivo.nome}`,
+                html,
+              );
+              console.log(`[Notif] E-mail "${tipo}" enviado para ${clienteLogin.email}`);
+            } catch (emailErr: any) {
+              console.error(`[Notif] Erro ao enviar e-mail para ${clienteLogin.email}:`, emailErr.message);
+            }
+          }
+
+          if (pref.app) {
+            console.log(`[APP NOTIF] Enviando para ${cliente.nome}: ${mensagem}`);
+          }
+        } catch (clienteErr: any) {
+          console.error(`[Notif] Erro ao processar notificações para o cliente ${cliente.nome}:`, clienteErr.message);
         }
       }
     } catch (error: any) {
