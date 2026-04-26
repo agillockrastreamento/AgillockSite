@@ -510,7 +510,7 @@ async function renderViagens(lista) {
       <div class="resumo-card" style="min-width:100px"><div class="rc-val">${vmax}</div><div class="rc-lbl">km/h máx</div></div>
     </div>
     <div class="table-responsive"><table class="rel-table rel-table--center table"><thead><tr>
-      <th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
+      ${multi ? '<th>Veículo</th>' : ''}<th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
     </tr></thead><tbody>
       ${(await Promise.all(lista.map(async (v, i) => {
         const d = dispositivosMap[v.deviceId] || { nome: '—' };

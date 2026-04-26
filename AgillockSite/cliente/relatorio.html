@@ -6,15 +6,47 @@
   <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
   <title>Relatório — AgilLock</title>
   <link rel="stylesheet" href="../css/bootstrap.min.css" />
-  <link rel="stylesheet" href="../css/select2.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
   <style>
     body { margin: 0; overflow: hidden; height: 100vh; font-family: 'Montserrat', sans-serif; }
     .admin-content { height: 100vh; padding: 0 !important; display: flex; flex-direction: column; overflow: hidden; }
     .rel-page-body { margin-top: 56px; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+    /* Select2 */
+    .select2-container--default .select2-selection--multiple {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      min-height: 34px;
+      padding-top: 1px;
+    }
+    html.dark-theme .select2-container--default .select2-selection--multiple {
+      background-color: #252535;
+      border-color: #3a3a5c;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-top: 4px;
+      color: #333;
+    }
+    html.dark-theme .select2-container--default .select2-selection--multiple .select2-selection__choice {
+      background-color: #3a3a5c;
+      border-color: #444;
+      color: #e0e6f0;
+    }
+    html.dark-theme .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+      color: #e87070;
+    }
+    html.dark-theme .select2-dropdown { background-color: #1e2530; border-color: #3a3a5c; color: #adb5bd; }
+    html.dark-theme .select2-results__option--highlighted[aria-selected] { background-color: #2980b9; color: #fff; }
+    .select2-container { flex: 1; max-width: 400px !important; min-width: 250px; }
+    .select2-search__field { font-size: 12px !important; }
 
     /* Toolbar */
     .rel-toolbar {
@@ -158,8 +190,7 @@
     html.dark-theme .form-control { background: #252535; color: #c9d1d9; border-color: #3a3a5c; }
     html.dark-theme .form-control:focus { background: #2a2a40; border-color: #fab32c; box-shadow: none; }
     #grafico-content > div { height: 350px !important; }
-    #sel-dispositivo { min-width: 260px; max-width: 360px; }
-    .rel-toolbar .select2-container { min-width: 260px; max-width: 360px; flex: 1 1 320px; }
+    #sel-dispositivo { min-width: 200px; max-width: 280px; }
     .sidebar-user-nome, .sidebar-user .al-badge { font-weight: 700; }
   </style>
 </head>
@@ -198,19 +229,21 @@
 
   <div class="rel-page-body">
   <div class="rel-toolbar">
-    <select id="sel-dispositivo" class="form-control" multiple="multiple" style="width:100%"></select>
-    <div class="btn-group">
-      <button class="btn btn-default btn-sm periodo-btn active" data-periodo="hoje">Hoje</button>
-      <button class="btn btn-default btn-sm periodo-btn" data-periodo="ontem">Ontem</button>
-      <button class="btn btn-default btn-sm periodo-btn" data-periodo="7dias">7 dias</button>
-      <button class="btn btn-default btn-sm periodo-btn" data-periodo="custom">Personalizado</button>
+    <div style="flex:1;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <select id="sel-dispositivo" class="form-control" multiple="multiple" style="width:100%"></select>
+      <div class="btn-group">
+        <button class="btn btn-default btn-sm periodo-btn active" data-periodo="hoje">Hoje</button>
+        <button class="btn btn-default btn-sm periodo-btn" data-periodo="ontem">Ontem</button>
+        <button class="btn btn-default btn-sm periodo-btn" data-periodo="7dias">7 dias</button>
+        <button class="btn btn-default btn-sm periodo-btn" data-periodo="custom">Personalizado</button>
+      </div>
+      <div id="custom-datas" style="display:none;gap:6px;align-items:center">
+        <input type="date" id="dt-de"  class="form-control input-sm" style="width:130px" />
+        <span style="color:#888;font-size:12px">até</span>
+        <input type="date" id="dt-ate" class="form-control input-sm" style="width:130px" />
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-carregar" style="display:none" title="Carregar"><i class="fa fa-search"></i></button>
     </div>
-    <div id="custom-datas" style="display:none;gap:6px;align-items:center">
-      <input type="date" id="dt-de"  class="form-control input-sm" style="width:130px" />
-      <span style="color:#888;font-size:12px">até</span>
-      <input type="date" id="dt-ate" class="form-control input-sm" style="width:130px" />
-    </div>
-    <button class="btn btn-primary btn-sm" id="btn-carregar" style="display:none" title="Carregar"><i class="fa fa-search"></i></button>
   </div>
 
   <div class="modal fade" id="modal-exportar" tabindex="-1">
@@ -273,7 +306,7 @@
   <script src="../js/jquery.js"></script>
   <script src="../js/bootstrap.min.js"></script>
   <script src="../js/config.js"></script>
-  <script src="../js/select2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script src="../js/auth-guard-cliente.js"></script>
   <script>
     (function () {
