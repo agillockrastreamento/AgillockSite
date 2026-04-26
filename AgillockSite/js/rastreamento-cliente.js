@@ -1347,35 +1347,40 @@ function mostrarCardDispositivo(id) {
     : '';
 
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
-  const horasHtml = p ? `
+  const horasHtml = `
     <div class="dcard-section dcard-val" style="font-size:10px">
       <div class="dcard-section-title">Última Atualização</div>
-      <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> <span id="dcard-ts-srv">${fmtGPSTimeSec(p.serverTime)}</span></div>
-      <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
-      <div><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> <span id="dcard-ts-gps">${fmtGPSTimeSec(p.fixTime)}</span></div>
-    </div>` : '';
+      <div style="margin-bottom:4px">
+        <span id="dcard-status-text" style="color:${corStatus};font-size:10px">
+          <i class="fa fa-circle" style="font-size:8px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}
+        </span>
+        <span id="dcard-status-warning">${!p ? '&nbsp;<span style="color:#e67e22;font-size:10px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}</span>
+      </div>
+      ${p ? `
+        <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> <span id="dcard-ts-srv">${fmtGPSTimeSec(p.serverTime)}</span></div>
+        <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
+        <div style="margin-bottom:2px"><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> <span id="dcard-ts-gps">${fmtGPSTimeSec(p.fixTime)}</span></div>
+      ` : ''}
+    </div>`;
 
   const card = document.getElementById('device-detail-card');
   card.innerHTML = `
     ${imgHtml}
     <div class="dcard-header">
       <div style="flex:1;min-width:0">
-        <div class="v-nome">${v.nome}</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
+        <div class="v-nome" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${v.nome}
+          ${v.placa ? `<span class="v-placa" style="margin:0">${v.placa}</span>` : ''}
         </div>
       </div>
       <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
     </div>
     <div class="dcard-body">
-      <div style="margin-bottom:6px">
-        <span id="dcard-status-text" style="color:${corStatus}"><i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}</span>
-        <span id="dcard-status-warning">${!p ? '&nbsp;<span style="color:#e67e22;font-size:11px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}</span>
-      </div>
-      <div id="dcard-velocimetro">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
-      ${p?.velocidade != null ? `<hr style="margin:2px 0 6px;border:none;border-top:1px solid rgba(128,128,128,0.15)">` : ''}
       <div class="dcard-section-title">Informações do Dispositivo</div>
-      <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:4px">${buildStatusHtmlCliente(p, bat, batFa, batCor)}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px">
+        <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1">${buildStatusHtmlCliente(p, bat, batFa, batCor)}</div>
+        <div id="dcard-velocimetro" style="flex-shrink:0;margin-top:-4px">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
+      </div>
       <div id="dcard-horas">${horasHtml}</div>
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <div class="dcard-section-title">Endereço</div>
@@ -1473,7 +1478,11 @@ function atualizarCardAtivo(did) {
     const txtStatus = isMoving ? 'Em movimento' : isOnline ? 'Parado' : (p ? 'Offline' : 'Sem posição');
     const desde = _estadoSince[did]?.desde || null;
     elStatus.style.color = corStatus;
-    elStatus.innerHTML = `<i class="fa fa-circle" style="font-size:9px;vertical-align:middle"></i> ${txtStatus}${desde ? ` — há ${fmtTempoDecorridoMs(desde)}` : ''}`;
+    elStatus.innerHTML = `<i class="fa fa-circle" style="font-size:8px;vertical-align:middle"></i> ${txtStatus}${desde ? ` — há ${fmtTempoDecorridoMs(desde)}` : ''}`;
+  }
+  const elStatusWarning = document.getElementById('dcard-status-warning');
+  if (elStatusWarning) {
+    elStatusWarning.innerHTML = !p ? '&nbsp;<span style="color:#e67e22;font-size:10px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : '';
   }
   const elVel = document.getElementById('dcard-velocimetro');
   if (elVel) elVel.innerHTML = p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : '';
@@ -1502,7 +1511,7 @@ function svgVelocimetro(vel, limite) {
   const cor = limite && vel > limite ? '#e74c3c' : vel > 80 ? '#f39c12' : '#27ae60';
   const tr = isDark ? '#2d3748' : '#e9ecef', nc = isDark ? '#f0f2f5' : '#333', lc = isDark ? '#adb5bd' : '#555';
   const arc = f > 0.01 ? `<path d="M 10 45 A 30 30 0 ${f>0.5?1:0} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>` : '';
-  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:4px auto 8px"><path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="${tr}" stroke-width="7" stroke-linecap="round"/>${arc}<text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="${nc}">${vel}</text><text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="${lc}">km/h</text></svg>`;
+  return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:0"><path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="${tr}" stroke-width="7" stroke-linecap="round"/>${arc}<text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="${nc}">${vel}</text><text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="${lc}">km/h</text></svg>`;
 }
 
 function fmtGPSTimeSec(iso) {
