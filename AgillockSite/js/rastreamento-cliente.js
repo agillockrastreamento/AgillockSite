@@ -387,86 +387,71 @@ function renderEventosLista() {
 
   const getEventoStyle = (tipo) => {
     switch (tipo) {
-      case 'ignitionOn': case 'deviceUnlocked': return { cls: 'tipo-success', icon: 'fa-key' };
-      case 'ignitionOff': return { cls: 'tipo-warning', icon: 'fa-power-off' };
-      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': return { cls: 'tipo-danger', icon: 'fa-exclamation-triangle' };
-      case 'geofenceEnter': return { cls: 'tipo-info', icon: 'fa-sign-in' };
-      case 'geofenceExit': return { cls: 'tipo-warning', icon: 'fa-sign-out' };
-      case 'trocaOleo': return { cls: 'tipo-warning', icon: 'fa-tint' };
-      case 'kmExcedida': return { cls: 'tipo-danger', icon: 'fa-road' };
-      case 'kmReduzida': return { cls: 'tipo-info', icon: 'fa-road' };
-      default: return { cls: 'tipo-info', icon: 'fa-bell' };
+      case 'ignitionOn': case 'deviceUnlocked': return { cls: 'success', color: '#27ae60', icon: 'fa-key' };
+      case 'ignitionOff': return { cls: 'warning', color: '#e67e22', icon: 'fa-power-off' };
+      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { cls: 'danger', color: '#e74c3c', icon: 'fa-exclamation-triangle' };
+      case 'geofenceEnter': case 'kmReduzida': return { cls: 'info', color: '#2980b9', icon: 'fa-sign-in' };
+      case 'geofenceExit': case 'trocaOleo': return { cls: 'warning', color: '#e67e22', icon: 'fa-sign-out' };
+      default: return { cls: 'info', color: '#2980b9', icon: 'fa-bell' };
     }
   };
 
   lista.innerHTML = filtrados.map(function (e) {
     const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
-    const nomeDev = _nomeDispositivo(e.dispositivoId);
-    // Usa e.mensagem se disponível, caso contrário cai para e.tipoLabel ou o tipo bruto
+    const v = veiculosMap[e.dispositivoId];
+    const nomeDev = v ? v.nome : (e.dispositivoId || '—');
+    const placaDev = v?.placa ? `(${v.placa})` : '';
     const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
 
-    return `<div class="evento-item ${style.cls}" onclick="clicarEvento(${_eventos.indexOf(e)})">
-      <div class="evt-icon-wrap"><i class="fa ${style.icon}"></i></div>
+    return `<div class="evento-item" style="border-left:none !important;" onclick="clicarEvento(${_eventos.indexOf(e)})">
+      <div class="evt-icon-wrap" style="background: ${style.color}15; color: ${style.color}"><i class="fa ${style.icon}"></i></div>
       <div class="evt-content">
-        <div class="evt-dispositivo">${nomeDev}</div>
-        <div class="evt-desc">${textoMensagem}</div>
-        <div class="evt-footer">
-          <span class="evt-tempo">há ${tempo}</span>
-          <i class="fa fa-map-marker evt-ico-pin"></i>
+        <div class="evt-dispositivo" style="color: ${style.color}; font-weight: 700;">${nomeDev} ${placaDev}</div>
+        <div class="evt-desc" style="color: #555; font-size: 11px; margin: 2px 0;">${textoMensagem}</div>
+        <div class="evt-footer" style="display:flex; justify-content: space-between; align-items: center;">
+          <span class="evt-tempo" style="font-size: 10px; color: #999;">há ${tempo}</span>
+          <i class="fa fa-map-marker" style="color: ${style.color}; font-size: 12px;"></i>
         </div>
       </div>
     </div>`;
   }).join('');
 }
 
-function _nomeDispositivo(dispositivoId) {
-  const v = veiculosMap[dispositivoId];
-  if (!v) return dispositivoId || '—';
-  return v.placa ? `${v.nome} (${v.placa})` : v.nome;
-}
-
 window.clicarEvento = function (idx) {
   const e = _eventos[idx];
   if (!e) return;
 
-  if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
+  const style = (() => {
+    switch (e.tipo) {
+      case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60' };
+      case 'ignitionOff': return { color: '#e67e22' };
+      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c' };
+      default: return { color: '#2980b9' };
+    }
+  })();
+
+  const v = veiculosMap[e.dispositivoId];
+  if (v?.posicao) {
     focar(e.dispositivoId);
+    
+    // Criar popup nativo do Leaflet que segue o marcador
+    const marker = marcadores[e.dispositivoId];
+    if (marker) {
+      const content = `
+        <div style="padding: 5px; min-width: 150px;">
+          <h6 style="margin: 0 0 5px; color: ${style.color}; font-weight: 700; font-size: 13px;">${e.tipoLabel || 'Alerta'}</h6>
+          <div style="font-size: 11px; color: #333; line-height: 1.3; margin-bottom: 5px;">${e.mensagem || ''}</div>
+          <div style="font-size: 10px; color: #999; border-top: 1px solid #eee; pt: 3px;">
+            <i class="fa fa-clock-o"></i> ${fmtGPSTimeSec(e.serverTime)}
+          </div>
+        </div>
+      `;
+      marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10] }).openPopup();
+    }
   } else if (e.lat != null && e.lng != null) {
     map.flyTo([e.lat, e.lng], 16, { animate: true, duration: 0.8 });
   }
-
-  const popup = document.getElementById('evento-popup-mapa');
-  if (!popup) return;
-
-  const elTitulo = document.getElementById('ep-titulo');
-  if (elTitulo) elTitulo.textContent = e.tipoLabel || e.tipo;
-  
-  const elDesc = document.getElementById('ep-desc');
-  if (elDesc) elDesc.textContent = e.mensagem || '';
-
-  const elData = document.getElementById('ep-data');
-  const dt = e.serverTime ? new Date(e.serverTime) : null;
-  if (elData) {
-    elData.textContent = dt
-      ? `${dt.toLocaleDateString('pt-BR')} | ${dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}`
-      : '';
-  }
-
-  const pos = veiculosMap[e.dispositivoId]?.posicao;
-  const elEnd = document.getElementById('ep-end');
-  if (elEnd) {
-    if (pos) {
-      const addrId = 'ep-end-addr';
-      elEnd.id = addrId;
-      elEnd.textContent = 'Buscando endereço...';
-      geocodificarCoordenadas(pos.latitude, pos.longitude, addrId);
-    } else {
-      elEnd.textContent = _nomeDispositivo(e.dispositivoId);
-    }
-  }
-
-  popup.style.display = 'block';
 };
 
 // ── Mapa ──────────────────────────────────────────────────────────────────────

@@ -389,16 +389,34 @@ function renderEventosLista() {
     return;
   }
 
-  lista.innerHTML = filtrados.map(function (e, idx) {
-    const css = _cssEvento(e.tipo);
+  const getEventoStyle = (tipo) => {
+    switch (tipo) {
+      case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60', icon: 'fa-key' };
+      case 'ignitionOff': return { color: '#e67e22', icon: 'fa-power-off' };
+      case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c', icon: 'fa-exclamation-triangle' };
+      case 'geofenceEnter': case 'kmReduzida': return { color: '#2980b9', icon: 'fa-sign-in' };
+      case 'geofenceExit': case 'trocaOleo': return { color: '#e67e22', icon: 'fa-sign-out' };
+      default: return { color: '#2980b9', icon: 'fa-bell' };
+    }
+  };
+
+  lista.innerHTML = filtrados.map(function (e) {
+    const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
-    const nomeDev = _nomeDispositivo(e.dispositivoId);
-    return `<div class="evento-item ${css}" onclick="clicarEvento(${_eventos.indexOf(e)})">
-      <div class="evt-dispositivo">${nomeDev}</div>
-      <div class="evt-desc">${e.tipoLabel || e.tipo}</div>
-      <div class="evt-footer">
-        <span class="evt-tempo">há ${tempo}</span>
-        <i class="fa fa-map-marker evt-ico-pin"></i>
+    const v = veiculosMap[e.dispositivoId];
+    const nomeDev = v ? v.nome : (e.dispositivoId || '—');
+    const placaDev = v?.placa ? `(${v.placa})` : '';
+    const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
+
+    return `<div class="evento-item" style="border-left:none !important;" onclick="clicarEvento(${_eventos.indexOf(e)})">
+      <div class="evt-icon-wrap" style="background: ${style.color}15; color: ${style.color}"><i class="fa ${style.icon}"></i></div>
+      <div class="evt-content">
+        <div class="evt-dispositivo" style="color: ${style.color}; font-weight: 700;">${nomeDev} ${placaDev}</div>
+        <div class="evt-desc" style="color: #555; font-size: 11px; margin: 2px 0;">${textoMensagem}</div>
+        <div class="evt-footer" style="display:flex; justify-content: space-between; align-items: center;">
+          <span class="evt-tempo" style="font-size: 10px; color: #999;">há ${tempo}</span>
+          <i class="fa fa-map-marker" style="color: ${style.color}; font-size: 12px;"></i>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -407,43 +425,43 @@ function renderEventosLista() {
 function _nomeDispositivo(dispositivoId) {
   const v = veiculosMap[dispositivoId];
   if (!v) return dispositivoId || '—';
-  return v.placa ? `${v.nome} ${v.placa}` : v.nome;
+  return v.placa ? `${v.nome} (${v.placa})` : v.nome;
 }
 
 window.clicarEvento = function (idx) {
   const e = _eventos[idx];
   if (!e) return;
 
+  const style = (() => {
+    switch (e.tipo) {
+      case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60' };
+      case 'ignitionOff': return { color: '#e67e22' };
+      case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c' };
+      default: return { color: '#2980b9' };
+    }
+  })();
+
   // Focar no dispositivo se tiver posição
   if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
     focar(e.dispositivoId);
+
+    // Criar popup nativo do Leaflet que segue o marcador
+    const marker = marcadores[e.dispositivoId];
+    if (marker) {
+      const content = `
+        <div style="padding: 5px; min-width: 150px;">
+          <h6 style="margin: 0 0 5px; color: ${style.color}; font-weight: 700; font-size: 13px;">${e.tipoLabel || 'Alerta'}</h6>
+          <div style="font-size: 11px; color: #333; line-height: 1.3; margin-bottom: 5px;">${e.mensagem || ''}</div>
+          <div style="font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 3px;">
+            <i class="fa fa-clock-o"></i> ${fmtGPSTimeSec(e.serverTime)}
+          </div>
+        </div>
+      `;
+      marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10] }).openPopup();
+    }
   } else if (e.lat != null && e.lng != null) {
     map.flyTo([e.lat, e.lng], 16, { animate: true, duration: 0.8 });
   }
-
-  // Mostrar popup de evento no mapa
-  const popup = document.getElementById('evento-popup-mapa');
-  if (document.getElementById('ep-titulo')) document.getElementById('ep-titulo').textContent = e.tipoLabel || e.tipo;
-  const elDesc = document.getElementById('ep-desc');
-  if (elDesc) elDesc.textContent = e.mensagem || '';
-
-  const dt = e.serverTime ? new Date(e.serverTime) : null;
-  document.getElementById('ep-data').textContent = dt
-    ? `${dt.toLocaleDateString('pt-BR')} | ${dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}`
-    : '';
-
-  const nomeDev = _nomeDispositivo(e.dispositivoId);
-  const pos = veiculosMap[e.dispositivoId]?.posicao;
-  const addrId = 'ep-end-addr';
-  if (pos) {
-    document.getElementById('ep-end').id = addrId;
-    document.getElementById('ep-end').textContent = 'Buscando endereço...';
-    geocodificarCoordenadas(pos.latitude, pos.longitude, addrId);
-  } else {
-    document.getElementById('ep-end').textContent = nomeDev;
-  }
-
-  popup.style.display = 'block';
 };
 
 // ── Mapa ──────────────────────────────────────────────────────────────────────
