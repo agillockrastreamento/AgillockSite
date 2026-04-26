@@ -52,7 +52,7 @@ const _podeEditarMedidores = !!(_usuarioRastreamento && _usuarioRastreamento.rol
 const _cardAdminExpandido = _podeEditarMedidores;
 const _cardFocusOffsetPx = _cardAdminExpandido ? 310 : 0;
 const _focusOffsetPx = 0;
-const _eventPopupOffsetPx = 0;
+const _eventPopupOffsetPx = 70;
 const _detalheDispositivoCache = {};
 const _detalheDispositivoPendentes = {};
 const _detalheAtributosThrottle = {};
@@ -1765,7 +1765,8 @@ function atualizarMarcador(dispositivoId) {
   style.innerHTML = `
     #eventos-lista .evento-item { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
     #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
-    #eventos-lista .evento-item:hover .evt-icon-wrap { background: var(--evt-hover-bg) !important; }
+    #eventos-lista .evt-icon-wrap,
+    #eventos-lista .evento-item:hover .evt-icon-wrap { background: transparent !important; }
     #eventos-lista .evt-desc { color: #555 !important; }
     #eventos-lista .evt-tempo { color: #999 !important; }
     .popup-evento-moderno .leaflet-popup-content-wrapper,
@@ -1776,6 +1777,7 @@ function atualizarMarcador(dispositivoId) {
     .popup-evento-moderno .evt-popup-maps-btn { background: #fff !important; color: #333 !important; border-color: #ccc !important; }
     .popup-evento-moderno .btn-primary { color: #fff !important; }
     .popup-evento-moderno .leaflet-popup-close-button { color: #333 !important; }
+    .popup-evento-moderno .evt-popup-content h6 { border-bottom-color: #eee !important; }
     .dark-theme .btn-evt-periodo { background: #2d3748 !important; color: #adb5bd !important; border-color: #4a5568 !important; }
     .dark-theme .btn-evt-periodo.active { background: #2980b9 !important; color: #fff !important; border-color: #2980b9 !important; }
     .dark-theme #eventos-lista .evento-item { background: #111827 !important; border-color: #263244 !important; color: #e6edf3 !important; }
@@ -1790,14 +1792,24 @@ function atualizarMarcador(dispositivoId) {
     .dark-theme .evt-tipo-dropdown { background: #1a202c; border-color: #2d3748; }
     .dark-theme .evt-tipo-item { color: #c9d1d9; }
     .dark-theme .evt-tipo-item:hover { background: #2d3748; }
+    html.dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
+    html.dark-theme .popup-evento-moderno .leaflet-popup-tip,
     .dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
-    .dark-theme .popup-evento-moderno .leaflet-popup-tip { background: #0f172a; color: #f8fafc; }
-    .dark-theme .popup-evento-moderno .leaflet-popup-content { color: #f8fafc; }
+    .dark-theme .popup-evento-moderno .leaflet-popup-tip { background: #0f172a !important; color: #f8fafc !important; }
+    html.dark-theme .popup-evento-moderno .leaflet-popup-content,
+    .dark-theme .popup-evento-moderno .leaflet-popup-content { color: #f8fafc !important; }
+    html.dark-theme .popup-evento-moderno .evt-popup-content div,
     .dark-theme .popup-evento-moderno .evt-popup-content div { color: #f8fafc !important; }
+    html.dark-theme .popup-evento-moderno .evt-popup-address,
     .dark-theme .popup-evento-moderno .evt-popup-address { background: #172033 !important; border-color: #334155 !important; }
+    html.dark-theme .popup-evento-moderno .evt-popup-maps-btn,
     .dark-theme .popup-evento-moderno .evt-popup-maps-btn { background: #243044 !important; color: #f8fafc !important; border-color: #3d4b63 !important; }
+    html.dark-theme .popup-evento-moderno .btn-primary,
     .dark-theme .popup-evento-moderno .btn-primary { color: #fff !important; }
+    html.dark-theme .popup-evento-moderno .leaflet-popup-close-button,
     .dark-theme .popup-evento-moderno .leaflet-popup-close-button { color: #d7dde6 !important; }
+    html.dark-theme .popup-evento-moderno .evt-popup-content h6,
+    .dark-theme .popup-evento-moderno .evt-popup-content h6 { border-bottom-color: #334155 !important; }
   `;
   document.head.appendChild(style);
 })();
@@ -2102,12 +2114,13 @@ function _latLngComOffset(posicao, offsetOverride) {
   return [target.lat, target.lng];
 }
 
-function _centralizarDispositivo(posicao, zoom = 16, offsetPx = 0) {
+function _centralizarDispositivo(posicao, zoom = 16, offsetPx = 0, animate = true) {
   if (!map || !posicao) return;
   const destino = offsetPx ? _latLngComOffset(posicao, offsetPx) : [posicao.latitude, posicao.longitude];
   map.stop();
   map.invalidateSize();
-  map.setView(destino, zoom, { animate: false });
+  if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.45 });
+  else map.setView(destino, zoom, { animate: false });
 }
 
 function _fmtResumoDuracao(minutos) {
