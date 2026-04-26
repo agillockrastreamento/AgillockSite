@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <script>
+    if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');
+  </script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
   <title>Relatório — AgilLock</title>
   <link rel="stylesheet" href="../css/bootstrap.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
@@ -12,9 +15,7 @@
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
   <style>
-    body { margin: 0; overflow: hidden; height: 100vh; font-family: 'Montserrat', sans-serif; }
-    .admin-content { height: 100vh; padding: 0 !important; display: flex; flex-direction: column; overflow: hidden; }
-    .rel-page-body { margin-top: 56px; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    body { overflow: hidden; }
 
     /* Select2 */
     .select2-container--default .select2-selection--multiple {
@@ -317,6 +318,7 @@
         document.getElementById('li-pagamentos').style.display = 'block';
       }
       AL_CLIENTE.initThemeToggle('btn-tema');
+      document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
       document.getElementById('sidebar-toggle').addEventListener('click', function () {
         document.getElementById('sidebar').classList.toggle('open');
         document.getElementById('sidebar-overlay').classList.toggle('open');
