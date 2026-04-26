@@ -68,15 +68,18 @@ function _restaurarFocoCliente() {
 
 // ── Eventos (cliente: expandido) ─────────────────────────────────────────────
 const TIPOS_EVENTO_CLIENTE = [
-  { tipo: 'ignitionOn',    label: 'Ignição Ligada',          css: 'tipo-ignition' },
-  { tipo: 'ignitionOff',   label: 'Ignição Desligada',       css: 'tipo-ignition' },
-  { tipo: 'geofenceEnter', label: 'Entrada na Cerca',        css: 'tipo-geofence' },
-  { tipo: 'geofenceExit',  label: 'Saída da Cerca',          css: 'tipo-geofence' },
-  { tipo: 'overspeed',     label: 'Excesso de Velocidade',   css: 'tipo-overspeed' },
-  { tipo: 'powerCut',      label: 'Alimentação Cortada',     css: 'tipo-alarm' },
-  { tipo: 'alarm',         label: 'Alarme',                  css: 'tipo-alarm' },
-  { tipo: 'deviceLocked',  label: 'Veículo Bloqueado',       css: 'tipo-alarm' },
-  { tipo: 'deviceUnlocked',label: 'Veículo Desbloqueado',    css: 'tipo-ignition' },
+  { tipo: 'ignitionOn',    label: 'Ignição Ligada',              css: 'tipo-ignition' },
+  { tipo: 'ignitionOff',   label: 'Ignição Desligada',           css: 'tipo-ignition' },
+  { tipo: 'geofenceEnter', label: 'Entrada na Cerca',            css: 'tipo-geofence' },
+  { tipo: 'geofenceExit',  label: 'Saída da Cerca',              css: 'tipo-geofence' },
+  { tipo: 'overspeed',     label: 'Excesso de Velocidade',       css: 'tipo-overspeed' },
+  { tipo: 'powerCut',      label: 'Alimentação Cortada',         css: 'tipo-alarm' },
+  { tipo: 'alarm',         label: 'Alarme',                      css: 'tipo-alarm' },
+  { tipo: 'deviceLocked',  label: 'Veículo Bloqueado',           css: 'tipo-alarm' },
+  { tipo: 'deviceUnlocked',label: 'Veículo Desbloqueado',        css: 'tipo-ignition' },
+  { tipo: 'kmExcedida',    label: 'Km Excedida (Período)',       css: 'tipo-overspeed' },
+  { tipo: 'kmReduzida',    label: 'Km Reduzida (Período)',       css: 'tipo-geofence' },
+  { tipo: 'trocaOleo',     label: 'Troca de Óleo',               css: 'tipo-alarm' },
 ];
 
 let _evtFiltros = new Set();
@@ -1318,14 +1321,14 @@ const _CMD_CONFIG = {
   custom:             { label: 'Personalizado',            icon: 'fa-terminal',            style: 'neutral' },
 };
 
-function buildStatusHtmlCliente(p, bat, batFa, batCor) {
+function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
   if (!p) return '';
   const si = [];
   if (p.ignicao === true)  si.push(`<span style="color:#27ae60"><i class="fa fa-key"></i> Ignição: Ligado</span>`);
   if (p.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
   if (bat != null)         si.push(`<span style="color:${batCor}"><i class="fa ${batFa}"></i> Bateria: ${bat}%</span>`);
   if (p.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
-  
+
   if (p.odometro != null) {
     const km = Math.round(p.odometro / 1000).toLocaleString('pt-BR');
     si.push(`<span><i class="fa fa-dashboard" style="color:#7f8c8d"></i> Odômetro: ${km} km</span>`);
@@ -1333,7 +1336,15 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor) {
   if (p.horas_motor != null) {
     si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
   }
-  
+
+  const kmConfig = v?._kmConfig;
+  if (kmConfig?.trocaOleo && p.odometro != null && kmConfig.trocaOleo.kmBaseMetros != null) {
+    const kmPercorrido = (p.odometro - kmConfig.trocaOleo.kmBaseMetros) / 1000;
+    const kmRestante = Math.max(0, Math.round(kmConfig.trocaOleo.kmIntervalo - kmPercorrido));
+    const cor = kmRestante < 500 ? '#e74c3c' : kmRestante < 1000 ? '#f39c12' : '#27ae60';
+    si.push(`<span style="color:${cor}"><i class="fa fa-tint"></i> Falta ${kmRestante.toLocaleString('pt-BR')} km para troca de óleo</span>`);
+  }
+
   if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
   return si.join('');
 }
@@ -1393,10 +1404,30 @@ function _carregarResumoHojeCliente(id) {
     });
 }
 
+function _carregarKmConfig(id) {
+  const v = veiculosMap[id]; if (!v) return;
+  if (v._kmConfigCarregado) return;
+  v._kmConfigCarregado = true;
+  AL_CLIENTE.apiGet('/api/cliente/notificacoes/km-config/' + id).then(function (data) {
+    v._kmConfig = data || {};
+    if (ativoId === id) {
+      const elStatusItems = document.getElementById('dcard-status');
+      const p = v.posicao;
+      if (elStatusItems && p) {
+        const bat2 = p.bateria_nivel != null ? p.bateria_nivel : null;
+        const batCor2 = bat2 >= 40 ? '#27ae60' : bat2 >= 20 ? '#f39c12' : '#e74c3c';
+        const batFa2 = bat2 >= 80 ? 'fa-battery-full' : bat2 >= 60 ? 'fa-battery-3' : bat2 >= 40 ? 'fa-battery-2' : bat2 >= 20 ? 'fa-battery-1' : 'fa-battery-0';
+        elStatusItems.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2, v);
+      }
+    }
+  }).catch(function () { v._kmConfigCarregado = false; });
+}
+
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id]; if (!v) return;
   ativoId = id;
   _salvarFocoCliente(id);
+  _carregarKmConfig(id);
   const p = v.posicao;
   const isOnline = v.status === 'online', isMoving = isOnline && p?.emMovimento;
   const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
@@ -1450,7 +1481,7 @@ function mostrarCardDispositivo(id) {
     <div class="dcard-body">
       <div class="dcard-section-title">Informações do Dispositivo</div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px">
-        <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1">${buildStatusHtmlCliente(p, bat, batFa, batCor)}</div>
+        <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1">${buildStatusHtmlCliente(p, bat, batFa, batCor, v)}</div>
         <div id="dcard-velocimetro" style="flex-shrink:0;margin-top:-4px">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
       </div>
       <div id="dcard-horas">${horasHtml}</div>
@@ -1580,7 +1611,7 @@ function atualizarCardAtivo(did) {
     const bat2 = p?.bateria_nivel != null ? p.bateria_nivel : null;
     const batCor2 = bat2 >= 40 ? '#27ae60' : bat2 >= 20 ? '#f39c12' : '#e74c3c';
     const batFa2 = bat2 >= 80 ? 'fa-battery-full' : bat2 >= 60 ? 'fa-battery-3' : bat2 >= 40 ? 'fa-battery-2' : bat2 >= 20 ? 'fa-battery-1' : 'fa-battery-0';
-    elStatusItems.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2);
+    elStatusItems.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2, v);
   }
   const tsSrv = document.getElementById('dcard-ts-srv'), tsDev = document.getElementById('dcard-ts-dev'), tsGps = document.getElementById('dcard-ts-gps');
   if (tsSrv && p) tsSrv.textContent = fmtGPSTimeSec(p.serverTime);

@@ -173,6 +173,13 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
     atualizados.forEach((dispositivo, identificador) => {
       localPorIdentificador.set(identificador, dispositivo);
     });
+
+    for (const [identificador, disp] of atualizados) {
+      if (disp.odometroSistemaMetros != null) {
+        NotificationService.verificarKmNotificacoes(identificador, disp.odometroSistemaMetros)
+          .catch(err => console.error('[KM Notif] Erro:', err.message));
+      }
+    }
   }
 
   if (msg.positions?.length) {

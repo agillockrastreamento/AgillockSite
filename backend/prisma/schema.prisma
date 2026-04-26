@@ -260,6 +260,7 @@ model Dispositivo {
   motoristasVinculados MotoristaDispositivo[]
   preferenciasNotificacoes PreferenciaNotificacao[]
   eventosNotificacoes      EventoNotificacao[]
+  estadosKmNotificacao     EstadoKmNotificacao[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -352,19 +353,42 @@ model ClienteLogin {
   cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   preferenciasNotificacoes PreferenciaNotificacao[]
   eventosNotificacoes      EventoNotificacao[]
+  estadosKmNotificacao     EstadoKmNotificacao[]
 }
 
 model PreferenciaNotificacao {
   id             String   @id @default(uuid())
   clienteLoginId String
   dispositivoId  String
-  tipoEvento     String   // ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut
+  tipoEvento     String   // ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut, kmExcedida, kmReduzida, trocaOleo
   web            Boolean  @default(false)
   app            Boolean  @default(false)
   email          Boolean  @default(false)
-  overspeedLimit Int?     @default(100)
+  overspeedLimit     Int?     @default(100)
+  kmMaximo30Dias     Int?
+  diaRenovacaoMes    Int?
+  kmMinimo7Dias      Int?
+  diaSemanaRenovacao Int?
+  kmTrocaOleo        Int?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
+  dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteLoginId, dispositivoId, tipoEvento])
+}
+
+model EstadoKmNotificacao {
+  id                 String   @id @default(uuid())
+  clienteLoginId     String
+  dispositivoId      String
+  tipoEvento         String   // kmExcedida, kmReduzida, trocaOleo
+  kmBaseMetros       Float    @default(0)
+  dataBase           DateTime @default(now())
+  notificacaoEnviada Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
   dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)

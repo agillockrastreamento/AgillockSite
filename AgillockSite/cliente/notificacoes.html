@@ -157,12 +157,16 @@
     .notif-card-icon.ic-power     { background: rgba(243,156,18,.12); color: #f39c12; }
     .notif-card-icon.ic-alarm     { background: rgba(231,76,60,.12);  color: #e74c3c; }
     .notif-card-icon.ic-lock      { background: rgba(142,68,173,.12); color: #8e44ad; }
+    .notif-card-icon.ic-km        { background: rgba(52,152,219,.12); color: #2980b9; }
+    .notif-card-icon.ic-oleo      { background: rgba(39,174,96,.12);  color: #27ae60; }
     html.dark-theme .notif-card-icon.ic-ignition  { background: rgba(39,174,96,.18);  }
     html.dark-theme .notif-card-icon.ic-geofence  { background: rgba(230,126,34,.18); }
     html.dark-theme .notif-card-icon.ic-speed     { background: rgba(231,76,60,.18);  }
     html.dark-theme .notif-card-icon.ic-power     { background: rgba(243,156,18,.18); }
     html.dark-theme .notif-card-icon.ic-alarm     { background: rgba(231,76,60,.18);  }
     html.dark-theme .notif-card-icon.ic-lock      { background: rgba(142,68,173,.18); }
+    html.dark-theme .notif-card-icon.ic-km        { background: rgba(52,152,219,.18); }
+    html.dark-theme .notif-card-icon.ic-oleo      { background: rgba(39,174,96,.18);  }
 
     .notif-card-label {
       font-size: 13px;
@@ -277,6 +281,67 @@
       font-weight: 700;
       color: #e67e22;
       white-space: nowrap;
+    }
+
+    /* ── Seção km por período ── */
+    .notif-km-sub {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(128,128,128,.15);
+    }
+    .notif-km-sub:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+    html.dark-theme .notif-km-sub { border-top-color: #2d3748; }
+    .notif-km-sub-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #2c3e50;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-bottom: 4px;
+    }
+    html.dark-theme .notif-km-sub-title { color: #c0cfe0; }
+    .notif-km-inputs {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .notif-km-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .notif-km-input-group label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #8a9ab0;
+    }
+    html.dark-theme .notif-km-input-group label { color: #6c7a8f; }
+    .notif-km-input-group .form-control {
+      border-radius: 7px;
+      border: 1px solid #dde3ea;
+      height: 36px;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+      width: 110px;
+    }
+    html.dark-theme .notif-km-input-group .form-control {
+      background: #252535;
+      border-color: #3a3a5c;
+      color: #e0e6f0;
+    }
+    html.dark-theme .notif-km-input-group .form-control option { background: #252535; }
+    .notif-km-unit {
+      display: inline-flex;
+      align-items: center;
+      height: 36px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #2980b9;
+      padding-left: 6px;
     }
 
     /* ── Estado vazio ── */
@@ -426,6 +491,67 @@
           <div class="notif-speed-input-wrap">
             <input type="number" id="input-vel-limite" class="form-control" placeholder="100" min="20" max="250" style="width:90px;" />
             <span class="notif-speed-unit"><i class="fa fa-dashboard"></i> km/h</span>
+          </div>
+        </div>
+
+        <!-- Configuração de quilometragem por período -->
+        <div id="config-km-periodo" class="notif-speed-card" style="display:none;">
+          <h6><i class="fa fa-road" style="color:#2980b9;"></i> Alerta de Quilometragem por Período</h6>
+
+          <!-- Excedida -->
+          <div class="notif-km-sub">
+            <div class="notif-km-sub-title"><i class="fa fa-arrow-up" style="color:#e74c3c;margin-right:5px;"></i> Quilometragem Excedida (mensal)</div>
+            <p class="help-text">Notifica quando o veículo ultrapassar o km máximo no período mensal configurado.</p>
+            <div class="notif-km-inputs">
+              <div class="notif-km-input-group">
+                <label>Km máximo em 30 dias</label>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input type="number" id="input-km-max" class="form-control" placeholder="2000" min="1" max="99999" />
+                  <span class="notif-km-unit">km</span>
+                </div>
+              </div>
+              <div class="notif-km-input-group">
+                <label>Dia do mês que renova</label>
+                <input type="number" id="input-dia-mes" class="form-control" placeholder="1" min="1" max="31" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Reduzida -->
+          <div class="notif-km-sub">
+            <div class="notif-km-sub-title"><i class="fa fa-arrow-down" style="color:#2980b9;margin-right:5px;"></i> Quilometragem Reduzida (semanal)</div>
+            <p class="help-text">Notifica ao fim da semana se o veículo não atingir o km mínimo configurado.</p>
+            <div class="notif-km-inputs">
+              <div class="notif-km-input-group">
+                <label>Km mínimo em 7 dias</label>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input type="number" id="input-km-min" class="form-control" placeholder="500" min="1" max="99999" />
+                  <span class="notif-km-unit">km</span>
+                </div>
+              </div>
+              <div class="notif-km-input-group">
+                <label>Dia da semana que renova</label>
+                <select id="select-dia-semana" class="form-control">
+                  <option value="0">Domingo</option>
+                  <option value="1">Segunda-feira</option>
+                  <option value="2">Terça-feira</option>
+                  <option value="3">Quarta-feira</option>
+                  <option value="4">Quinta-feira</option>
+                  <option value="5">Sexta-feira</option>
+                  <option value="6">Sábado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuração de troca de óleo -->
+        <div id="config-troca-oleo" class="notif-speed-card" style="display:none;">
+          <h6><i class="fa fa-tint" style="color:#27ae60;"></i> Alerta de Troca de Óleo</h6>
+          <p class="help-text">Defina de quantos em quantos km o sistema lembrará de trocar o óleo. O contador reinicia automaticamente após a notificação.</p>
+          <div class="notif-speed-input-wrap">
+            <input type="number" id="input-km-oleo" class="form-control" placeholder="5000" min="100" max="99999" style="width:110px;" />
+            <span class="notif-speed-unit"><i class="fa fa-road"></i> km</span>
           </div>
         </div>
 
