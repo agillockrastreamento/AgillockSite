@@ -51,8 +51,6 @@ const _usuarioRastreamento = (window.AL && typeof window.AL.getUser === 'functio
 const _podeEditarMedidores = !!(_usuarioRastreamento && _usuarioRastreamento.role === 'ADMIN');
 const _cardAdminExpandido = _podeEditarMedidores;
 const _cardFocusOffsetPx = _cardAdminExpandido ? 310 : 0;
-const _focusOffsetPx = 0;
-const _eventPopupOffsetPx = 70;
 const _detalheDispositivoCache = {};
 const _detalheDispositivoPendentes = {};
 const _detalheAtributosThrottle = {};
@@ -229,7 +227,6 @@ let _evtNotif = true;        // notificação sonora ativa
 const _eventos = [];
 const MAX_EVENTOS = 200;
 const EVENTOS_PANEL_STORAGE_KEY = 'rastreamento_admin_eventos_min';
-let _eventoPopupAtualIdx = null;
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
@@ -241,7 +238,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   new MutationObserver(function () {
     if (ativoId) mostrarCardDispositivo(ativoId);
-    renderEventosLista();
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
   // Fechar busca ao clicar fora
@@ -393,42 +389,16 @@ function renderEventosLista() {
     return;
   }
 
-  const getEventoStyle = (tipo) => {
-    switch (tipo) {
-      case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60', icon: 'fa-key' };
-      case 'ignitionOff': return { color: '#e67e22', icon: 'fa-power-off' };
-      case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c', icon: 'fa-exclamation-triangle' };
-      case 'geofenceEnter': case 'kmReduzida': return { color: '#2980b9', icon: 'fa-sign-in' };
-      case 'geofenceExit': case 'trocaOleo': return { color: '#e67e22', icon: 'fa-sign-out' };
-      default: return { color: '#2980b9', icon: 'fa-bell' };
-    }
-  };
-
-  const isDark = document.documentElement.classList.contains('dark-theme');
-  const descColor = isDark ? '#f4f7fb' : '#555';
-  const timeColor = isDark ? '#b8c1cc' : '#999';
-  const hexToRgba = (hex, alpha) => {
-    const n = parseInt(hex.replace('#', ''), 16);
-    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-  };
-
-  lista.innerHTML = filtrados.map(function (e) {
-    const style = getEventoStyle(e.tipo);
+  lista.innerHTML = filtrados.map(function (e, idx) {
+    const css = _cssEvento(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
-    const v = veiculosMap[e.dispositivoId];
-    const nomeDev = v ? v.nome : (e.dispositivoId || '—');
-    const placaDev = v?.placa ? `(${v.placa})` : '';
-    const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
-
-    return `<div class="evento-item" style="border-left:none !important; --evt-color:${style.color}; --evt-hover-bg:${hexToRgba(style.color, isDark ? 0.24 : 0.12)};" onclick="clicarEvento(${_eventos.indexOf(e)})">
-      <div class="evt-icon-wrap" style="color: ${style.color}"><i class="fa ${style.icon}"></i></div>
-      <div class="evt-content">
-        <div class="evt-dispositivo" style="color: ${style.color}; font-weight: 700;">${nomeDev} ${placaDev}</div>
-        <div class="evt-desc" style="color: ${descColor}; font-size: 11px; margin: 2px 0;">${textoMensagem}</div>
-        <div class="evt-footer" style="display:flex; justify-content: space-between; align-items: center;">
-          <span class="evt-tempo" style="font-size: 10px; color: #999;">há ${tempo}</span>
-          <i class="fa fa-map-marker" style="color: ${style.color}; font-size: 12px;"></i>
-        </div>
+    const nomeDev = _nomeDispositivo(e.dispositivoId);
+    return `<div class="evento-item ${css}" onclick="clicarEvento(${_eventos.indexOf(e)})">
+      <div class="evt-dispositivo">${nomeDev}</div>
+      <div class="evt-desc">${e.tipoLabel || e.tipo}</div>
+      <div class="evt-footer">
+        <span class="evt-tempo">há ${tempo}</span>
+        <i class="fa fa-map-marker evt-ico-pin"></i>
       </div>
     </div>`;
   }).join('');
@@ -437,99 +407,43 @@ function renderEventosLista() {
 function _nomeDispositivo(dispositivoId) {
   const v = veiculosMap[dispositivoId];
   if (!v) return dispositivoId || '—';
-  return v.placa ? `${v.nome} (${v.placa})` : v.nome;
+  return v.placa ? `${v.nome} ${v.placa}` : v.nome;
 }
 
 window.clicarEvento = function (idx) {
   const e = _eventos[idx];
   if (!e) return;
-  _eventoPopupAtualIdx = idx;
-
-  const style = (() => {
-    switch (e.tipo) {
-      case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60' };
-      case 'ignitionOff': return { color: '#e67e22' };
-      case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c' };
-      default: return { color: '#2980b9' };
-    }
-  })();
 
   // Focar no dispositivo se tiver posição
   if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
-    // Offset extra para garantir que o popup de notificação caiba bem
-    focar(e.dispositivoId, { abrirPopup: false, extraX: 50, extraY: 20 });
-
-    // Criar popup nativo do Leaflet que segue o marcador
-    if (!marcadores[e.dispositivoId]) renderMarcadores();
-    const marker = marcadores[e.dispositivoId];
-    if (marker) {
-      if (!marker._eventOriginalPopup) marker._eventOriginalPopup = marker.getPopup();
-
-      const addrId = `evt-addr-admin-${idx}`;
-      const v = veiculosMap[e.dispositivoId];
-      const eventoLat = e.lat != null ? Number(e.lat) : v.posicao.latitude;
-      const eventoLng = e.lng != null ? Number(e.lng) : v.posicao.longitude;
-      const eventoTemCoords = Number.isFinite(eventoLat) && Number.isFinite(eventoLng);
-      const mesmaPosicaoAtual = eventoTemCoords
-        && Math.abs(eventoLat - v.posicao.latitude) < 0.00001
-        && Math.abs(eventoLng - v.posicao.longitude) < 0.00001;
-      const enderecoInicial = e.endereco || (mesmaPosicaoAtual ? (v.posicao.endereco || v.endereco || '') : '');
-      const enderecoHtml = enderecoInicial
-        ? `<i class="fa fa-map-marker"></i> ${esc(enderecoInicial)} <span class="evt-popup-coords">(${eventoLat.toFixed(5)}, ${eventoLng.toFixed(5)})</span>`
-        : eventoTemCoords
-          ? '<i class="fa fa-map-marker"></i> Buscando endereco...'
-          : '<i class="fa fa-map-marker"></i> Localizacao do evento indisponivel';
-      const coordsHtml = eventoTemCoords
-        ? `Lat: ${eventoLat.toFixed(5)} | Lng: ${eventoLng.toFixed(5)}`
-        : 'Sem coordenadas do evento';
-      const acoesMapaHtml = eventoTemCoords ? `
-          <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-            <a href="${_urlGoogleMaps(eventoLat, eventoLng, enderecoInicial)}" target="_blank" class="btn btn-xs btn-default evt-popup-maps-btn" style="flex:1; font-size: 9px; padding: 4px;" id="btn-maps-${eventoLat}-${eventoLng}"><i class="fa fa-google"></i> Maps</a>
-            <a href="${_urlStreetView(eventoLat, eventoLng)}" target="_blank" class="btn btn-xs btn-primary" style="flex:1; font-size: 9px; padding: 4px; color: #fff !important;"><i class="fa fa-street-view"></i> StreetView</a>
-          </div>` : '';
-      const isDark = document.documentElement.classList.contains('dark-theme');
-      const bgAddr = isDark ? '#172033' : '#f8f9fa';
-      const colorMain = isDark ? '#f8fafc' : '#333';
-      const colorMuted = isDark ? '#d7dde6' : '#666';
-      const coordColor = isDark ? '#aab4c0' : '#777';
-      const borderCol = isDark ? '#334155' : '#eee';
-
-      const content = `
-        <div class="evt-popup-content" style="padding: 4px; min-width: 220px;">
-          <h6 style="margin: 0 0 6px; color: ${style.color}; font-weight: 700; font-size: 13px; border-bottom: 1px solid ${borderCol}; padding-bottom: 4px;">${e.tipoLabel || 'Notificação'}</h6>
-          <div style="font-size: 11px; color: ${colorMain}; line-height: 1.4; margin-bottom: 8px; font-weight: 500;">${esc(e.mensagem || '')}</div>
-          
-          <div class="evt-popup-address" style="background: ${bgAddr}; border: 1px solid ${borderCol}; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
-            <div id="${addrId}" style="font-size: 10px; color: ${colorMuted}; margin-bottom: 4px;">${enderecoHtml}</div>
-            <div style="font-size: 9px; color: ${coordColor};">${coordsHtml}</div>
-          </div>
-          ${acoesMapaHtml}
-
-          <div style="font-size: 9px; color: ${coordColor}; text-align: right;">
-            <i class="fa fa-clock-o"></i> ${fmtGPSTimeSec(e.serverTime)}
-          </div>
-        </div>
-      `;
-
-      marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 }).openPopup();
-      if (enderecoInicial) {
-        const addrEl = document.getElementById(addrId);
-        if (addrEl) addrEl.innerHTML = enderecoHtml;
-      } else if (eventoTemCoords) {
-        geocodificarCoordenadas(eventoLat, eventoLng, addrId);
-      }
-
-      marker.once('popupclose', function() {
-        if (marker._eventOriginalPopup) {
-          marker.bindPopup(marker._eventOriginalPopup);
-          marker._eventOriginalPopup = null;
-          _eventoPopupAtualIdx = null;
-        }
-      });
-    }
+    focar(e.dispositivoId);
   } else if (e.lat != null && e.lng != null) {
     map.flyTo([e.lat, e.lng], 16, { animate: true, duration: 0.8 });
   }
+
+  // Mostrar popup de evento no mapa
+  const popup = document.getElementById('evento-popup-mapa');
+  if (document.getElementById('ep-titulo')) document.getElementById('ep-titulo').textContent = e.tipoLabel || e.tipo;
+  const elDesc = document.getElementById('ep-desc');
+  if (elDesc) elDesc.textContent = e.mensagem || '';
+
+  const dt = e.serverTime ? new Date(e.serverTime) : null;
+  document.getElementById('ep-data').textContent = dt
+    ? `${dt.toLocaleDateString('pt-BR')} | ${dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}`
+    : '';
+
+  const nomeDev = _nomeDispositivo(e.dispositivoId);
+  const pos = veiculosMap[e.dispositivoId]?.posicao;
+  const addrId = 'ep-end-addr';
+  if (pos) {
+    document.getElementById('ep-end').id = addrId;
+    document.getElementById('ep-end').textContent = 'Buscando endereço...';
+    geocodificarCoordenadas(pos.latitude, pos.longitude, addrId);
+  } else {
+    document.getElementById('ep-end').textContent = nomeDev;
+  }
+
+  popup.style.display = 'block';
 };
 
 // ── Mapa ──────────────────────────────────────────────────────────────────────
@@ -1555,12 +1469,10 @@ function processarMensagemWs(msg) {
         dispositivoId: dispositivoId || null,
         tipo: e.type,
         tipoLabel: e.tipoLabel,
-        mensagem: e.mensagem,
         serverTime: e.serverTime,
         positionId: e.positionId,
-        lat: e.lat ?? pos?.latitude ?? null,
-        lng: e.lng ?? pos?.longitude ?? null,
-        endereco: e.endereco ?? null,
+        lat: pos?.latitude ?? null,
+        lng: pos?.longitude ?? null,
       });
     });
   }
@@ -1749,70 +1661,10 @@ function atualizarMarcador(dispositivoId) {
     marcadoresIconeKey[dispositivoId] = iconKey;
   }
 
-  const isOpen = marcadores[dispositivoId].getPopup()?.isOpen();
-  const isEventPopup = marcadores[dispositivoId].getPopup()?.options?.className === 'popup-evento-moderno';
-  if (_mostrarPopup && isOpen && !isEventPopup) {
+  if (_mostrarPopup && marcadores[dispositivoId].getPopup()?.isOpen()) {
     marcadores[dispositivoId].getPopup().setContent(criarPopupSimples(v));
   }
 }
-
-// ── Injeção de estilos para tema escuro ─────────────────────────────────────
-(function injectTrackingDarkStyles() {
-  const id = 'tracking-dark-styles';
-  if (document.getElementById(id)) return;
-  const style = document.createElement('style');
-  style.id = id;
-  style.innerHTML = `
-    #eventos-lista .evento-item { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
-    #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
-    #eventos-lista .evt-icon-wrap,
-    #eventos-lista .evento-item:hover .evt-icon-wrap { background: transparent !important; }
-    #eventos-lista .evt-desc { color: #555 !important; }
-    #eventos-lista .evt-tempo { color: #999 !important; }
-    .popup-evento-moderno .leaflet-popup-content-wrapper,
-    .popup-evento-moderno .leaflet-popup-tip { background: #fff !important; color: #333 !important; }
-    .popup-evento-moderno .leaflet-popup-content { color: #333 !important; }
-    .popup-evento-moderno .evt-popup-content div { color: #333 !important; }
-    .popup-evento-moderno .evt-popup-address { background: #f8f9fa !important; border-color: #eee !important; }
-    .popup-evento-moderno .evt-popup-maps-btn { background: #fff !important; color: #333 !important; border-color: #ccc !important; }
-    .popup-evento-moderno .btn-primary { color: #fff !important; }
-    .popup-evento-moderno .leaflet-popup-close-button { color: #333 !important; }
-    .popup-evento-moderno .evt-popup-content h6 { border-bottom-color: #eee !important; }
-    .dark-theme .btn-evt-periodo { background: #2d3748 !important; color: #adb5bd !important; border-color: #4a5568 !important; }
-    .dark-theme .btn-evt-periodo.active { background: #2980b9 !important; color: #fff !important; border-color: #2980b9 !important; }
-    .dark-theme #eventos-lista .evento-item { background: #111827 !important; border-color: #263244 !important; color: #e6edf3 !important; }
-    .dark-theme #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
-    .dark-theme #eventos-lista .evt-desc { color: #f8fafc !important; }
-    .dark-theme #eventos-lista .evt-tempo { color: #b8c1cc !important; }
-    .dark-theme #eventos-vazio { color: #d7dde6 !important; }
-    .dark-theme #eventos-vazio .fa { color: #d7dde6 !important; }
-    .dark-theme #evt-tipo-btn, .dark-theme #evt-btn-notif, .dark-theme #evt-btn-limpar { background: #2d3748; color: #d7dde6; border: 1px solid #4a5568; }
-    .dark-theme #evt-btn-notif.ativo { background: #f39c12 !important; color: #fff !important; border-color: #f39c12 !important; }
-    .dark-theme #evt-btn-notif.ativo .fa { color: #fff !important; }
-    .dark-theme .evt-tipo-dropdown { background: #1a202c; border-color: #2d3748; }
-    .dark-theme .evt-tipo-item { color: #c9d1d9; }
-    .dark-theme .evt-tipo-item:hover { background: #2d3748; }
-    html.dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
-    html.dark-theme .popup-evento-moderno .leaflet-popup-tip,
-    .dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
-    .dark-theme .popup-evento-moderno .leaflet-popup-tip { background: #0f172a !important; color: #f8fafc !important; }
-    html.dark-theme .popup-evento-moderno .leaflet-popup-content,
-    .dark-theme .popup-evento-moderno .leaflet-popup-content { color: #f8fafc !important; }
-    html.dark-theme .popup-evento-moderno .evt-popup-content div,
-    .dark-theme .popup-evento-moderno .evt-popup-content div { color: #f8fafc !important; }
-    html.dark-theme .popup-evento-moderno .evt-popup-address,
-    .dark-theme .popup-evento-moderno .evt-popup-address { background: #172033 !important; border-color: #334155 !important; }
-    html.dark-theme .popup-evento-moderno .evt-popup-maps-btn,
-    .dark-theme .popup-evento-moderno .evt-popup-maps-btn { background: #243044 !important; color: #f8fafc !important; border-color: #3d4b63 !important; }
-    html.dark-theme .popup-evento-moderno .btn-primary,
-    .dark-theme .popup-evento-moderno .btn-primary { color: #fff !important; }
-    html.dark-theme .popup-evento-moderno .leaflet-popup-close-button,
-    .dark-theme .popup-evento-moderno .leaflet-popup-close-button { color: #d7dde6 !important; }
-    html.dark-theme .popup-evento-moderno .evt-popup-content h6,
-    .dark-theme .popup-evento-moderno .evt-popup-content h6 { border-bottom-color: #334155 !important; }
-  `;
-  document.head.appendChild(style);
-})();
 
 function _corMarcador(v) {
   if (!v.posicao || v.status !== 'online') return '#95a5a6';
@@ -2101,42 +1953,14 @@ function _agendarAtualizacaoAtributos(dispositivoId) {
   }, 1200);
 }
 
-function _latLngComOffset(posicao, extraX = 0, extraY = 0) {
-  if (!map || !posicao) return [posicao.latitude, posicao.longitude];
-  
-  let offsetX = 0;
-  let offsetY = 0;
-
-  // No admin, o card lateral está sempre à esquerda quando ativoId existe
-  const card = document.getElementById('device-detail-card');
-  if (card && card.style.display !== 'none' && window.innerWidth > 768) {
-    if (_cardAdminExpandido && _attrsTrayOpen) {
-       offsetX = _cardFocusOffsetPx; // 310
-    } else {
-       offsetX = 145; // Meio do card lateral (~290px / 2)
-    }
-  }
-
-  // Adiciona offsets extras solicitados
-  offsetX += extraX;
-  offsetY += extraY;
-
+function _latLngComOffset(posicao) {
+  const offset = _cardAdminExpandido && _attrsTrayOpen ? _cardFocusOffsetPx : 0;
+  if (!offset || !map || !posicao) return [posicao.latitude, posicao.longitude];
   const zoom = map.getZoom() || 16;
   const point = map.project([posicao.latitude, posicao.longitude], zoom);
-  const centerPoint = L.point(point.x - offsetX, point.y - offsetY);
-  return map.unproject(centerPoint, zoom);
-}
-
-function _centralizarDispositivo(posicao, zoom = 16, extraX = 0, extraY = 0, animate = true) {
-  if (!map || !posicao) return;
-  
-  map.stop();
-  map.invalidateSize();
-  
-  const destino = _latLngComOffset(posicao, extraX, extraY);
-  
-  if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.5 });
-  else map.setView(destino, zoom, { animate: false });
+  const centerPoint = L.point(point.x - offset, point.y);
+  const target = map.unproject(centerPoint, zoom);
+  return [target.lat, target.lng];
 }
 
 function _fmtResumoDuracao(minutos) {
@@ -2259,18 +2083,28 @@ function mostrarCardDispositivo(id) {
     </div>` : '';
 
   const card = document.getElementById('device-detail-card');
-  const isDark = document.documentElement.classList.contains('dark-theme');
-  const tagBg = isDark ? '#2d3748' : '#f0f2f5';
-  const tagColor = isDark ? '#adb5bd' : '#666';
-
+  const linkVerMais = '';
+  const botoesAcao = _cardAdminExpandido
+    ? `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn" style="border-radius:10px;">
+         <i class="fa fa-bar-chart"></i>  Relatório
+       </a>`
+    : `<div style="margin-top:10px;display:flex;gap:6px">
+         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
+           <i class="fa fa-bar-chart"></i>  Relatório
+         </a>
+         <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center; border-radius:10px;">
+           <i class="fa fa-history"></i> Histórico
+         </a>
+       </div>`;
   card.innerHTML = `
     ${imgHtml}
+    ${linkVerMais}
     <div class="dcard-header">
       <div style="flex:1;min-width:0">
         <div class="v-nome">${v.nome}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
           ${v.placa ? `<span class="v-placa">${v.placa}</span>` : ''}
-          ${v.identificador ? `<span class="v-placa" style="font-family:monospace;background:${tagBg};color:${tagColor}">${v.identificador}</span>` : ''}
+          ${v.identificador ? `<span class="v-placa" style="font-family:monospace;background:#f0f2f5;color:#666">${v.identificador}</span>` : ''}
           <a href="dispositivo-detalhe.html?id=${v.dispositivoId}" title="Mais detalhes" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#e8f4fd;border-radius:50%;color:#2980b9;font-size:11px;text-decoration:none;" class="btn-dcard-gear">
             <i class="fa fa-cog"></i>
           </a>
@@ -2304,7 +2138,7 @@ function mostrarCardDispositivo(id) {
         <a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="flex:1;text-align:center;color:#fff; border-radius:10px;">
           <i class="fa fa-bar-chart"></i>  Relatório
         </a>
-        <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center; border-radius:10px;">
+        <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="flex:1;text-align:center">
           <i class="fa fa-history"></i> Histórico
         </a>
       </div>
@@ -2320,7 +2154,7 @@ function mostrarCardDispositivo(id) {
     const body = card.querySelector('.dcard-body');
     const acoesRapidas = body ? Array.from(body.children).find(el => el.tagName === 'DIV' && el.getAttribute('style') && el.getAttribute('style').indexOf('display:flex;gap:6px') !== -1) : null;
     if (acoesRapidas) {
-      acoesRapidas.outerHTML = `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn" style="border-radius:10px;"><i class="fa fa-bar-chart"></i>  Relatório</a>`;
+      acoesRapidas.outerHTML = botoesAcao;
     }
     const acoesSection = body ? Array.from(body.children).find(el => el.innerHTML && el.innerHTML.indexOf('A') !== -1 && el.innerHTML.indexOf('dcard-acao') !== -1) : null;
     if (acoesSection && !body.querySelector(`#dcard-resumo-hoje-${id}`)) {
@@ -2464,7 +2298,6 @@ function ativarFoco(id) {
   Object.keys(marcadores).forEach(mid => {
     if (mid !== id && map.hasLayer(marcadores[mid])) map.removeLayer(marcadores[mid]);
   });
-  if (!marcadores[id]) renderMarcadores();
   if (marcadores[id] && !map.hasLayer(marcadores[id])) marcadores[id].addTo(map);
 }
 
@@ -2476,7 +2309,7 @@ function desativarFoco() {
 
 // ── Foco / Interações ─────────────────────────────────────────────────────────
 
-window.focar = function (dispositivoId, opts = {}) {
+window.focar = function (dispositivoId) {
   _salvarFocoAdmin(dispositivoId);
   mostrarCardDispositivo(dispositivoId);
 
@@ -2484,10 +2317,9 @@ window.focar = function (dispositivoId, opts = {}) {
   if (!v?.posicao) return;
 
   ativarFoco(dispositivoId);
-  _centralizarDispositivo(v.posicao, 16, opts.extraX || 0, opts.extraY || 0);
+  map.flyTo(_latLngComOffset(v.posicao), 16, { animate: true, duration: 0.8 });
 
   setTimeout(() => {
-    if (opts.abrirPopup === false) return;
     if (_mostrarPopup && marcadores[dispositivoId] && map.hasLayer(marcadores[dispositivoId])) {
       marcadores[dispositivoId].openPopup();
     }
@@ -2541,7 +2373,7 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
 
   if (cacheKey in _geocodeCache) {
     const cached = _geocodeCache[cacheKey];
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${cached ? `${cached} ${coords}` : coords}`;
+    el.textContent = cached ? `${cached} ${coords}` : coords;
     updateLink(cached);
     return;
   }
@@ -2550,10 +2382,10 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
     const data = await window.AL.apiGet(`/api/rastreamento/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
     const end = data.endereco || '';
     _geocodeCache[cacheKey] = end;
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end ? `${end} ${coords}` : coords}`;
+    el.textContent = end ? `${end} ${coords}` : coords;
     updateLink(end);
   } catch {
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${coords}`;
+    el.textContent = coords;
     updateLink(null);
   }
 };

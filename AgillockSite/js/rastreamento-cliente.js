@@ -24,8 +24,6 @@ const _geocodeCache = {};
 const _resumoHojeClienteCache = {};
 const _resumoHojeClientePendentes = {};
 const CLIENT_FOCUS_STORAGE_KEY = 'rastreamento_cliente_foco';
-const _focusOffsetPx = 0;
-const _eventPopupOffsetPx = 60;
 
 // ── Camadas de overlay ────────────────────────────────────────────────────────
 const _overlay = {
@@ -90,7 +88,6 @@ const _eventos = [];
 const MAX_EVENTOS = 100;
 const EVENTOS_PANEL_STORAGE_KEY = 'rastreamento_cliente_eventos_min';
 const BARRA_VEICULOS_STORAGE_KEY = 'rastreamento_cliente_barra_min';
-let _eventoPopupAtualIdx = null;
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
 let _googleMapTypeControl = null;
@@ -120,14 +117,6 @@ function _htmlBotaoStreetView(lat, lng) {
   return `<a href="${_urlStreetView(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-streetview-btn" title="Abrir no Street View"><i class="fa fa-street-view"></i></a>`;
 }
 
-function esc(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function _ajustarAlturaCardDispositivo() {
   const card = document.getElementById('device-detail-card');
   const mapaEl = document.getElementById('mapa');
@@ -155,7 +144,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
     new MutationObserver(function () {
       if (ativoId) atualizarCardAtivo(ativoId);
-      renderEventosLista();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
     // Fechar busca ao clicar fora
@@ -399,179 +387,86 @@ function renderEventosLista() {
 
   const getEventoStyle = (tipo) => {
     switch (tipo) {
-      case 'ignitionOn': case 'deviceUnlocked': return { cls: 'success', color: '#27ae60', icon: 'fa-key' };
-      case 'ignitionOff': return { cls: 'warning', color: '#e67e22', icon: 'fa-power-off' };
-      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { cls: 'danger', color: '#e74c3c', icon: 'fa-exclamation-triangle' };
-      case 'geofenceEnter': case 'kmReduzida': return { cls: 'info', color: '#2980b9', icon: 'fa-sign-in' };
-      case 'geofenceExit': case 'trocaOleo': return { cls: 'warning', color: '#e67e22', icon: 'fa-sign-out' };
-      default: return { cls: 'info', color: '#2980b9', icon: 'fa-bell' };
+      case 'ignitionOn': case 'deviceUnlocked': return { cls: 'tipo-success', icon: 'fa-key' };
+      case 'ignitionOff': return { cls: 'tipo-warning', icon: 'fa-power-off' };
+      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': return { cls: 'tipo-danger', icon: 'fa-exclamation-triangle' };
+      case 'geofenceEnter': return { cls: 'tipo-info', icon: 'fa-sign-in' };
+      case 'geofenceExit': return { cls: 'tipo-warning', icon: 'fa-sign-out' };
+      case 'trocaOleo': return { cls: 'tipo-warning', icon: 'fa-tint' };
+      case 'kmExcedida': return { cls: 'tipo-danger', icon: 'fa-road' };
+      case 'kmReduzida': return { cls: 'tipo-info', icon: 'fa-road' };
+      default: return { cls: 'tipo-info', icon: 'fa-bell' };
     }
-  };
-
-  const isDark = document.documentElement.classList.contains('dark-theme');
-  const descColor = isDark ? '#f4f7fb' : '#555';
-  const hexToRgba = (hex, alpha) => {
-    const n = parseInt(hex.replace('#', ''), 16);
-    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
   };
 
   lista.innerHTML = filtrados.map(function (e) {
     const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
-    const v = veiculosMap[e.dispositivoId];
-    const nomeDev = v ? v.nome : (e.dispositivoId || '—');
-    const placaDev = v?.placa ? `(${v.placa})` : '';
+    const nomeDev = _nomeDispositivo(e.dispositivoId);
+    // Usa e.mensagem se disponível, caso contrário cai para e.tipoLabel ou o tipo bruto
     const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
 
-    return `<div class="evento-item" style="border-left:none !important; --evt-color:${style.color}; --evt-hover-bg:${hexToRgba(style.color, isDark ? 0.24 : 0.12)};" onclick="clicarEvento(${_eventos.indexOf(e)})">
-      <div class="evt-icon-wrap" style="color: ${style.color}"><i class="fa ${style.icon}"></i></div>
+    return `<div class="evento-item ${style.cls}" onclick="clicarEvento(${_eventos.indexOf(e)})">
+      <div class="evt-icon-wrap"><i class="fa ${style.icon}"></i></div>
       <div class="evt-content">
-        <div class="evt-dispositivo" style="color: ${style.color}; font-weight: 700;">${nomeDev} ${placaDev}</div>
-        <div class="evt-desc" style="color: ${descColor}; font-size: 11px; margin: 2px 0;">${textoMensagem}</div>
-        <div class="evt-footer" style="display:flex; justify-content: space-between; align-items: center;">
-          <span class="evt-tempo" style="font-size: 10px; color: #999;">há ${tempo}</span>
-          <i class="fa fa-map-marker" style="color: ${style.color}; font-size: 12px;"></i>
+        <div class="evt-dispositivo">${nomeDev}</div>
+        <div class="evt-desc">${textoMensagem}</div>
+        <div class="evt-footer">
+          <span class="evt-tempo">há ${tempo}</span>
+          <i class="fa fa-map-marker evt-ico-pin"></i>
         </div>
       </div>
     </div>`;
   }).join('');
 }
 
-function _latLngComOffset(posicao, extraX = 0, extraY = 0) {
-  if (!map || !posicao) return [posicao.latitude, posicao.longitude];
-  
-  let offsetX = 0;
-  let offsetY = 0;
-
-  // Se o card de detalhes estiver aberto (está à esquerda)
-  const card = document.getElementById('device-detail-card');
-  if (card && card.style.display !== 'none' && window.innerWidth > 768) {
-    offsetX = 145; // Meio do card (~290px / 2)
-  }
-
-  // Se o rodapé estiver aberto, compensa verticalmente para evitar clipping no topo
-  const barra = document.getElementById('barra-veiculos');
-  if (barra && barra.classList.contains('expandida')) {
-    offsetY = 110; // Move o veículo para baixo para dar espaço ao popup no topo
-  }
-
-  // Adiciona offsets extras solicitados (ex: por notificação)
-  offsetX += extraX;
-  offsetY += extraY;
-
-  const zoom = map.getZoom() || 16;
-  const point = map.project([posicao.latitude, posicao.longitude], zoom);
-  // centerPoint é o pixel que FICARÁ no centro da tela.
-  const centerPoint = L.point(point.x - offsetX, point.y - offsetY);
-  return map.unproject(centerPoint, zoom);
-}
-
-function _centralizarDispositivo(posicao, zoom = 16, extraX = 0, extraY = 0, animate = true) {
-  if (!map || !posicao) return;
-  
-  map.stop();
-  map.invalidateSize();
-  
-  const destino = _latLngComOffset(posicao, extraX, extraY);
-  
-  if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.5 });
-  else map.setView(destino, zoom, { animate: false });
+function _nomeDispositivo(dispositivoId) {
+  const v = veiculosMap[dispositivoId];
+  if (!v) return dispositivoId || '—';
+  return v.placa ? `${v.nome} (${v.placa})` : v.nome;
 }
 
 window.clicarEvento = function (idx) {
   const e = _eventos[idx];
   if (!e) return;
-  _eventoPopupAtualIdx = idx;
 
-  const style = (() => {
-    switch (e.tipo) {
-      case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60' };
-      case 'ignitionOff': return { color: '#e67e22' };
-      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c' };
-      default: return { color: '#2980b9' };
-    }
-  })();
-
-  const v = veiculosMap[e.dispositivoId];
-  if (v?.posicao) {
-    // Foca o dispositivo com offset extra para caber o popup largo
-    focar(e.dispositivoId, { abrirPopup: false, extraX: 50, extraY: 20 });
-    
-    if (!marcadores[e.dispositivoId]) renderMarcadores();
-    const marker = marcadores[e.dispositivoId];
-    if (marker) {
-      if (!marker._eventOriginalPopup) marker._eventOriginalPopup = marker.getPopup();
-
-      const addrId = `evt-addr-${idx}`;
-      const eventoLat = e.lat != null ? Number(e.lat) : v.posicao.latitude;
-      const eventoLng = e.lng != null ? Number(e.lng) : v.posicao.longitude;
-      const eventoTemCoords = Number.isFinite(eventoLat) && Number.isFinite(eventoLng);
-      const mesmaPosicaoAtual = eventoTemCoords
-        && Math.abs(eventoLat - v.posicao.latitude) < 0.00001
-        && Math.abs(eventoLng - v.posicao.longitude) < 0.00001;
-      const enderecoInicial = e.endereco || (mesmaPosicaoAtual ? (v.posicao.endereco || v.endereco || '') : '');
-      const enderecoHtml = enderecoInicial
-        ? `<i class="fa fa-map-marker"></i> ${esc(enderecoInicial)} <span class="evt-popup-coords">(${eventoLat.toFixed(5)}, ${eventoLng.toFixed(5)})</span>`
-        : eventoTemCoords
-          ? '<i class="fa fa-map-marker"></i> Buscando endereco...'
-          : '<i class="fa fa-map-marker"></i> Localizacao do evento indisponivel';
-      const coordsHtml = eventoTemCoords
-        ? `Lat: ${eventoLat.toFixed(5)} | Lng: ${eventoLng.toFixed(5)}`
-        : 'Sem coordenadas do evento';
-      const acoesMapaHtml = eventoTemCoords ? `
-          <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-            <a href="${_urlGoogleMaps(eventoLat, eventoLng, enderecoInicial)}" target="_blank" class="btn btn-xs btn-default evt-popup-maps-btn" style="flex:1; font-size: 9px; padding: 4px;" id="btn-maps-${eventoLat}-${eventoLng}"><i class="fa fa-google"></i> Maps</a>
-            <a href="${_urlStreetView(eventoLat, eventoLng)}" target="_blank" class="btn btn-xs btn-primary" style="flex:1; font-size: 9px; padding: 4px; color: #fff !important;"><i class="fa fa-street-view"></i> StreetView</a>
-          </div>` : '';
-      const isDark = document.documentElement.classList.contains('dark-theme');
-      const bgAddr = isDark ? '#172033' : '#f8f9fa';
-      const colorMain = isDark ? '#f8fafc' : '#333';
-      const colorMuted = isDark ? '#d7dde6' : '#666';
-      const coordColor = isDark ? '#aab4c0' : '#777';
-      const borderCol = isDark ? '#334155' : '#eee';
-
-      const content = `
-        <div class="evt-popup-content" style="padding: 4px; min-width: 200px;">
-          <h6 style="margin: 0 0 6px; color: ${style.color}; font-weight: 700; font-size: 13px; border-bottom: 1px solid ${borderCol}; padding-bottom: 4px;">${e.tipoLabel || 'Notificação'}</h6>
-          <div style="font-size: 11px; color: ${colorMain}; line-height: 1.4; margin-bottom: 8px; font-weight: 500;">${esc(e.mensagem || '')}</div>
-          
-          <div class="evt-popup-address" style="background: ${bgAddr}; border: 1px solid ${borderCol}; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
-            <div id="${addrId}" style="font-size: 10px; color: ${colorMuted}; margin-bottom: 4px;">${enderecoHtml}</div>
-            <div style="font-size: 9px; color: ${coordColor};">${coordsHtml}</div>
-          </div>
-          ${acoesMapaHtml}
-
-          <div style="font-size: 9px; color: ${coordColor}; text-align: right;">
-            <i class="fa fa-clock-o"></i> ${fmtGPSTimeSec(e.serverTime)}
-          </div>
-        </div>
-      `;
-
-      const barraExpandida = !!document.getElementById('barra-veiculos')?.classList.contains('expandida');
-      marker.bindPopup(content, {
-        className: `popup-evento-moderno${barraExpandida ? ' popup-evento-rodape-aberto' : ''}`,
-        offset: [0, barraExpandida ? 76 : -10],
-        maxWidth: 250,
-      }).openPopup();
-
-      if (enderecoInicial) {
-        const addrEl = document.getElementById(addrId);
-        if (addrEl) addrEl.innerHTML = enderecoHtml;
-      } else if (eventoTemCoords) {
-        geocodificarCoordenadas(eventoLat, eventoLng, addrId);
-      }
-
-      marker.once('popupclose', function() {
-        if (marker._eventOriginalPopup) {
-          marker.bindPopup(marker._eventOriginalPopup);
-          marker._eventOriginalPopup = null;
-          _eventoPopupAtualIdx = null;
-        }
-      });
-    }
+  if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
+    focar(e.dispositivoId);
   } else if (e.lat != null && e.lng != null) {
     map.flyTo([e.lat, e.lng], 16, { animate: true, duration: 0.8 });
   }
+
+  const popup = document.getElementById('evento-popup-mapa');
+  if (!popup) return;
+
+  const elTitulo = document.getElementById('ep-titulo');
+  if (elTitulo) elTitulo.textContent = e.tipoLabel || e.tipo;
+  
+  const elDesc = document.getElementById('ep-desc');
+  if (elDesc) elDesc.textContent = e.mensagem || '';
+
+  const elData = document.getElementById('ep-data');
+  const dt = e.serverTime ? new Date(e.serverTime) : null;
+  if (elData) {
+    elData.textContent = dt
+      ? `${dt.toLocaleDateString('pt-BR')} | ${dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}`
+      : '';
+  }
+
+  const pos = veiculosMap[e.dispositivoId]?.posicao;
+  const elEnd = document.getElementById('ep-end');
+  if (elEnd) {
+    if (pos) {
+      const addrId = 'ep-end-addr';
+      elEnd.id = addrId;
+      elEnd.textContent = 'Buscando endereço...';
+      geocodificarCoordenadas(pos.latitude, pos.longitude, addrId);
+    } else {
+      elEnd.textContent = _nomeDispositivo(e.dispositivoId);
+    }
+  }
+
+  popup.style.display = 'block';
 };
 
 // ── Mapa ──────────────────────────────────────────────────────────────────────
@@ -1043,9 +938,8 @@ function processarMensagemWs(msg) {
         tipoLabel: e.tipoLabel,
         mensagem: e.mensagem, // Garante o uso da mensagem detalhada
         serverTime: e.serverTime,
-        lat: e.lat ?? pos?.latitude ?? null,
-        lng: e.lng ?? pos?.longitude ?? null,
-        endereco: e.endereco ?? null,
+        lat: pos?.latitude ?? null,
+        lng: pos?.longitude ?? null, 
       });
     });
   }
@@ -1161,72 +1055,8 @@ function atualizarMarcador(did) {
   marcadores[did].setLatLng([latitude, longitude]);
   const ik = _iconeKey(did);
   if (marcadoresIconeKey[did] !== ik) { marcadores[did].setIcon(criarIcone(v)); marcadoresIconeKey[did] = ik; }
-  
-  const isOpen = marcadores[did].getPopup()?.isOpen();
-  const isEventPopup = marcadores[did].getPopup()?.options?.className === 'popup-evento-moderno';
-  if (_mostrarPopup && isOpen && !isEventPopup) {
-    marcadores[did].getPopup().setContent(criarPopupSimples(v));
-  }
+  if (_mostrarPopup && marcadores[did].getPopup()?.isOpen()) marcadores[did].getPopup().setContent(criarPopupSimples(v));
 }
-
-// ── Injeção de estilos para tema escuro ─────────────────────────────────────
-(function injectTrackingDarkStyles() {
-  const id = 'tracking-dark-styles';
-  if (document.getElementById(id)) return;
-  const style = document.createElement('style');
-  style.id = id;
-  style.innerHTML = `
-    #eventos-lista .evento-item { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
-    #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
-    #eventos-lista .evt-icon-wrap,
-    #eventos-lista .evento-item:hover .evt-icon-wrap { background: transparent !important; }
-    #eventos-lista .evt-desc { color: #555 !important; }
-    #eventos-lista .evt-tempo { color: #999 !important; }
-    .popup-evento-moderno .leaflet-popup-content-wrapper,
-    .popup-evento-moderno .leaflet-popup-tip { background: #fff !important; color: #333 !important; }
-    .popup-evento-rodape-aberto { margin-top: 76px !important; }
-    .popup-evento-moderno .leaflet-popup-content { color: #333 !important; }
-    .popup-evento-moderno .evt-popup-content div { color: #333 !important; }
-    .popup-evento-moderno .evt-popup-address { background: #f8f9fa !important; border-color: #eee !important; }
-    .popup-evento-moderno .evt-popup-maps-btn { background: #fff !important; color: #333 !important; border-color: #ccc !important; }
-    .popup-evento-moderno .btn-primary { color: #fff !important; }
-    .popup-evento-moderno .leaflet-popup-close-button { color: #333 !important; }
-    .popup-evento-moderno .evt-popup-content h6 { border-bottom-color: #eee !important; }
-    .dark-theme .btn-evt-periodo { background: #2d3748 !important; color: #adb5bd !important; border-color: #4a5568 !important; }
-    .dark-theme .btn-evt-periodo.active { background: #2980b9 !important; color: #fff !important; border-color: #2980b9 !important; }
-    .dark-theme #eventos-lista .evento-item { background: #111827 !important; border-color: #263244 !important; color: #e6edf3 !important; }
-    .dark-theme #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
-    .dark-theme #eventos-lista .evt-desc { color: #f8fafc !important; }
-    .dark-theme #eventos-lista .evt-tempo { color: #b8c1cc !important; }
-    .dark-theme #eventos-vazio { color: #d7dde6 !important; }
-    .dark-theme #eventos-vazio .fa { color: #d7dde6 !important; }
-    .dark-theme #evt-tipo-btn, .dark-theme #evt-btn-notif, .dark-theme #evt-btn-limpar { background: #2d3748; color: #d7dde6; border: 1px solid #4a5568; }
-    .dark-theme #evt-btn-notif.ativo { background: #f39c12 !important; color: #fff !important; border-color: #f39c12 !important; }
-    .dark-theme #evt-btn-notif.ativo .fa { color: #fff !important; }
-    .dark-theme .evt-tipo-dropdown { background: #1a202c; border-color: #2d3748; }
-    .dark-theme .evt-tipo-item { color: #c9d1d9; }
-    .dark-theme .evt-tipo-item:hover { background: #2d3748; }
-    html.dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
-    html.dark-theme .popup-evento-moderno .leaflet-popup-tip,
-    .dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
-    .dark-theme .popup-evento-moderno .leaflet-popup-tip { background: #0f172a !important; color: #f8fafc !important; }
-    html.dark-theme .popup-evento-moderno .leaflet-popup-content,
-    .dark-theme .popup-evento-moderno .leaflet-popup-content { color: #f8fafc !important; }
-    html.dark-theme .popup-evento-moderno .evt-popup-content div,
-    .dark-theme .popup-evento-moderno .evt-popup-content div { color: #f8fafc !important; }
-    html.dark-theme .popup-evento-moderno .evt-popup-address,
-    .dark-theme .popup-evento-moderno .evt-popup-address { background: #172033 !important; border-color: #334155 !important; }
-    html.dark-theme .popup-evento-moderno .evt-popup-maps-btn,
-    .dark-theme .popup-evento-moderno .evt-popup-maps-btn { background: #243044 !important; color: #f8fafc !important; border-color: #3d4b63 !important; }
-    html.dark-theme .popup-evento-moderno .btn-primary,
-    .dark-theme .popup-evento-moderno .btn-primary { color: #fff !important; }
-    html.dark-theme .popup-evento-moderno .leaflet-popup-close-button,
-    .dark-theme .popup-evento-moderno .leaflet-popup-close-button { color: #d7dde6 !important; }
-    html.dark-theme .popup-evento-moderno .evt-popup-content h6,
-    .dark-theme .popup-evento-moderno .evt-popup-content h6 { border-bottom-color: #334155 !important; }
-  `;
-  document.head.appendChild(style);
-})();
 
 function _corMarcador(v) {
   if (!v.posicao || v.status !== 'online') return '#95a5a6'; // cinza: offline ou sem dados
@@ -1883,7 +1713,7 @@ function atualizarCardAtivo(did) {
   if (tsDev && p) tsDev.textContent = fmtGPSTimeSec(p.deviceTime);
   if (tsGps && p) tsGps.textContent = fmtGPSTimeSec(p.fixTime);
 
-  if (modoFoco && v?.posicao) map.panTo(_latLngComOffset(v.posicao), { animate: true, duration: 0.5 });
+  if (modoFoco && v?.posicao) map.panTo([v.posicao.latitude, v.posicao.longitude], { animate: true, duration: 0.5 });
 }
 
 function svgVelocimetro(vel, limite) {
@@ -1931,7 +1761,7 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
 
   if (ck in _geocodeCache) {
     const end = _geocodeCache[ck];
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end ? `${end} ${coords}` : coords}`;
+    el.textContent = end ? `${end} ${coords}` : coords;
     updateLink(end);
     return;
   }
@@ -1939,16 +1769,15 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
     const data = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
     const end = data.endereco || '';
     _geocodeCache[ck] = end;
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end ? `${end} ${coords}` : coords}`;
+    el.textContent = end ? `${end} ${coords}` : coords;
     updateLink(end);
-  } catch { el.innerHTML = `<i class="fa fa-map-marker"></i> ${coords}`; updateLink(null); }
+  } catch { el.textContent = coords; updateLink(null); }
 };
 
 function ativarFoco(id) {
   modoFoco = true; _fecharSpider();
   Object.values(_clusterBadges).forEach(b => { if (map.hasLayer(b)) map.removeLayer(b); });
   Object.keys(marcadores).forEach(mid => { if (mid !== id && map.hasLayer(marcadores[mid])) map.removeLayer(marcadores[mid]); });
-  if (!marcadores[id]) renderMarcadores();
   if (marcadores[id] && !map.hasLayer(marcadores[id])) marcadores[id].addTo(map);
 }
 
@@ -1964,17 +1793,14 @@ function moverCardParaInicio(did) {
   barra.scrollTop = 0;
 }
 
-window.focar = function (did, opts = {}) {
+window.focar = function (did) {
   _salvarFocoCliente(did);
   mostrarCardDispositivo(did); moverCardParaInicio(did);
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.toggle('ativo', el.dataset.did === did));
   const v = veiculosMap[did]; if (!v?.posicao) return;
   ativarFoco(did);
-  _centralizarDispositivo(v.posicao, 16, opts.extraX || 0, opts.extraY || 0);
-  setTimeout(() => {
-    if (opts.abrirPopup === false) return;
-    if (_mostrarPopup && marcadores[did] && map.hasLayer(marcadores[did])) marcadores[did].openPopup();
-  }, 900);
+  map.flyTo([v.posicao.latitude, v.posicao.longitude], 16, { animate: true, duration: 0.8 });
+  setTimeout(() => { if (_mostrarPopup && marcadores[did] && map.hasLayer(marcadores[did])) marcadores[did].openPopup(); }, 900);
 };
 
 window.focarCliente = function (did) {
