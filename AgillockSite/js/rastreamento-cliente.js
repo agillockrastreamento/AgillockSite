@@ -405,7 +405,7 @@ function renderEventosLista() {
     const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
 
     return `<div class="evento-item" style="border-left:none !important;" onclick="clicarEvento(${_eventos.indexOf(e)})">
-      <div class="evt-icon-wrap" style="background: ${style.color}15; color: ${style.color}"><i class="fa ${style.icon}"></i></div>
+      <div class="evt-icon-wrap" style="color: ${style.color}"><i class="fa ${style.icon}"></i></div>
       <div class="evt-content">
         <div class="evt-dispositivo" style="color: ${style.color}; font-weight: 700;">${nomeDev} ${placaDev}</div>
         <div class="evt-desc" style="color: #555; font-size: 11px; margin: 2px 0;">${textoMensagem}</div>
@@ -416,6 +416,16 @@ function renderEventosLista() {
       </div>
     </div>`;
   }).join('');
+}
+
+function _latLngComOffset(posicao) {
+  const offset = 220; // Offset para evitar o card lateral no portal do cliente
+  if (!map || !posicao) return [posicao.latitude, posicao.longitude];
+  const zoom = map.getZoom() || 16;
+  const point = map.project([posicao.latitude, posicao.longitude], zoom);
+  const centerPoint = L.point(point.x - offset, point.y);
+  const target = map.unproject(centerPoint, zoom);
+  return [target.lat, target.lng];
 }
 
 window.clicarEvento = function (idx) {
@@ -435,19 +445,38 @@ window.clicarEvento = function (idx) {
   if (v?.posicao) {
     focar(e.dispositivoId);
     
-    // Criar popup nativo do Leaflet que segue o marcador
     const marker = marcadores[e.dispositivoId];
     if (marker) {
+      if (!marker._originalPopup) marker._originalPopup = marker.getPopup();
+
+      const addrId = `evt-addr-${idx}`;
       const content = `
-        <div style="padding: 5px; min-width: 150px;">
-          <h6 style="margin: 0 0 5px; color: ${style.color}; font-weight: 700; font-size: 13px;">${e.tipoLabel || 'Alerta'}</h6>
-          <div style="font-size: 11px; color: #333; line-height: 1.3; margin-bottom: 5px;">${e.mensagem || ''}</div>
-          <div style="font-size: 10px; color: #999; border-top: 1px solid #eee; pt: 3px;">
+        <div style="padding: 4px; min-width: 200px;">
+          <h6 style="margin: 0 0 6px; color: ${style.color}; font-weight: 700; font-size: 13px; border-bottom: 1px solid #eee; padding-bottom: 4px;">${e.tipoLabel || 'Notificação'}</h6>
+          <div style="font-size: 11px; color: #333; line-height: 1.4; margin-bottom: 8px; font-weight: 500;">${e.mensagem || ''}</div>
+          
+          <div style="background: #f8f9fa; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
+            <div id="${addrId}" style="font-size: 10px; color: #666; margin-bottom: 4px;"><i class="fa fa-map-marker"></i> Buscando endereço...</div>
+            <div style="font-size: 9px; color: #999;">Lat: ${v.posicao.latitude.toFixed(5)} | Lng: ${v.posicao.longitude.toFixed(5)}</div>
+          </div>
+
+          <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+            <a href="${_urlGoogleMaps(v.posicao.latitude, v.posicao.longitude)}" target="_blank" class="btn btn-xs btn-default" style="flex:1; font-size: 9px; padding: 4px;"><i class="fa fa-google"></i> Maps</a>
+            <a href="${_urlStreetView(v.posicao.latitude, v.posicao.longitude)}" target="_blank" class="btn btn-xs btn-primary" style="flex:1; font-size: 9px; padding: 4px;"><i class="fa fa-street-view"></i> StreetView</a>
+          </div>
+
+          <div style="font-size: 9px; color: #aaa; text-align: right;">
             <i class="fa fa-clock-o"></i> ${fmtGPSTimeSec(e.serverTime)}
           </div>
         </div>
       `;
-      marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10] }).openPopup();
+
+      marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 250 }).openPopup();
+      geocodificarCoordenadas(v.posicao.latitude, v.posicao.longitude, addrId);
+
+      marker.once('popupclose', function() {
+        if (marker._originalPopup) marker.bindPopup(marker._originalPopup);
+      });
     }
   } else if (e.lat != null && e.lng != null) {
     map.flyTo([e.lat, e.lng], 16, { animate: true, duration: 0.8 });
