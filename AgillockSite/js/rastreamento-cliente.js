@@ -96,6 +96,14 @@ function _urlStreetView(lat, lng) {
   return `https://www.google.com/maps?q=&layer=c&cbll=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
+function _urlGoogleMaps(lat, lng) {
+  return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}`;
+}
+
+function _htmlBotaoGoogleMaps(lat, lng) {
+  return `<a href="${_urlGoogleMaps(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-maps-btn" title="Abrir no Google Maps"><i class="fa fa-map-pin" style="color:#e74c3c"></i></a>`;
+}
+
 function _htmlBotaoStreetView(lat, lng) {
   return `<a href="${_urlStreetView(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-streetview-btn" title="Abrir no Street View"><i class="fa fa-street-view"></i></a>`;
 }
@@ -1385,8 +1393,8 @@ function mostrarCardDispositivo(id) {
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <div class="dcard-section-title">Endereço</div>
         <div style="display:flex;align-items:flex-start;gap:6px">
-          <i class="fa fa-map-pin" style="color:#e74c3c;width:13px;flex:0 0 auto;margin-top:2px"></i>
-          <span id="${addrId}" style="flex:1 1 auto">${addrTxt}</span>
+          ${_htmlBotaoGoogleMaps(p.latitude, p.longitude)}
+          <span id="${addrId}" style="flex:1 1 auto;margin-top:2px">${addrTxt}</span>
           ${_htmlBotaoStreetView(p.latitude, p.longitude)}
         </div>
       </div>` : ''}

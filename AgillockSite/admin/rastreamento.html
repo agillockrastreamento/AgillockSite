@@ -94,11 +94,19 @@
       }
       .map-control-option i { font-size: 18px; }
       .map-control-option.ativo { background: #fab32c; color: #222; }
-      .dcard-streetview-btn {
-        width: 60px; height: 40px; display: inline-flex; align-items: center; justify-content: center;
+      .dcard-streetview-btn, .dcard-maps-btn {
+        width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
         border-radius: 50%; border: 1px solid rgba(41,128,185,.18); background: #eef6fc; color: #2980b9; text-decoration: none;
+        transition: all 0.2s ease;
       }
-      html.dark-theme .dcard-streetview-btn { background: rgba(41,128,185,.14); border-color: rgba(41,128,185,.3); color: #87c7ff; }
+      .dcard-streetview-btn:hover, .dcard-maps-btn:hover { background: #d9ebf7; color: #21618c; transform: scale(1.08); }
+
+      html.dark-theme .dcard-streetview-btn, html.dark-theme .dcard-maps-btn { 
+        background: rgba(41,128,185,.14); border-color: rgba(41,128,185,.3); color: #87c7ff; 
+      }
+      html.dark-theme .dcard-streetview-btn:hover, html.dark-theme .dcard-maps-btn:hover {
+        background: rgba(41,128,185,.25); border-color: rgba(41,128,185,.45); color: #fff;
+      }
        
 
     .admin-content {
