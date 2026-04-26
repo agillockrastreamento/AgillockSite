@@ -456,9 +456,8 @@ window.clicarEvento = function (idx) {
 
   // Focar no dispositivo se tiver posição
   if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
-    const jaEstavaFocado = modoFoco && ativoId === e.dispositivoId;
-    const offsetNotificacao = jaEstavaFocado ? _eventPopupOffsetPx : 24;
-    focar(e.dispositivoId, { abrirPopup: false, offsetPx: offsetNotificacao });
+    // Offset extra para garantir que o popup de notificação caiba bem
+    focar(e.dispositivoId, { abrirPopup: false, extraX: 50, extraY: 20 });
 
     // Criar popup nativo do Leaflet que segue o marcador
     if (!marcadores[e.dispositivoId]) renderMarcadores();
@@ -513,7 +512,6 @@ window.clicarEvento = function (idx) {
       `;
 
       marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 }).openPopup();
-      _centralizarDispositivo(v.posicao, 16, offsetNotificacao);
       if (enderecoInicial) {
         const addrEl = document.getElementById(addrId);
         if (addrEl) addrEl.innerHTML = enderecoHtml;
@@ -2103,25 +2101,41 @@ function _agendarAtualizacaoAtributos(dispositivoId) {
   }, 1200);
 }
 
-function _latLngComOffset(posicao, offsetOverride) {
-  let offset = 0;
-  if (ativoId) {
-    offset = Number.isFinite(offsetOverride) ? offsetOverride : ((_cardAdminExpandido && _attrsTrayOpen) ? _cardFocusOffsetPx : _focusOffsetPx);
+function _latLngComOffset(posicao, extraX = 0, extraY = 0) {
+  if (!map || !posicao) return [posicao.latitude, posicao.longitude];
+  
+  let offsetX = 0;
+  let offsetY = 0;
+
+  // No admin, o card lateral está sempre à esquerda quando ativoId existe
+  const card = document.getElementById('device-detail-card');
+  if (card && card.style.display !== 'none' && window.innerWidth > 768) {
+    if (_cardAdminExpandido && _attrsTrayOpen) {
+       offsetX = _cardFocusOffsetPx; // 310
+    } else {
+       offsetX = 145; // Meio do card lateral (~290px / 2)
+    }
   }
-  if (!offset || !map || !posicao) return [posicao.latitude, posicao.longitude];
+
+  // Adiciona offsets extras solicitados
+  offsetX += extraX;
+  offsetY += extraY;
+
   const zoom = map.getZoom() || 16;
   const point = map.project([posicao.latitude, posicao.longitude], zoom);
-  const centerPoint = L.point(point.x - offset, point.y);
-  const target = map.unproject(centerPoint, zoom);
-  return [target.lat, target.lng];
+  const centerPoint = L.point(point.x - offsetX, point.y - offsetY);
+  return map.unproject(centerPoint, zoom);
 }
 
-function _centralizarDispositivo(posicao, zoom = 16, offsetPx = 0, animate = true) {
+function _centralizarDispositivo(posicao, zoom = 16, extraX = 0, extraY = 0, animate = true) {
   if (!map || !posicao) return;
-  const destino = offsetPx ? _latLngComOffset(posicao, offsetPx) : [posicao.latitude, posicao.longitude];
+  
   map.stop();
   map.invalidateSize();
-  if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.45 });
+  
+  const destino = _latLngComOffset(posicao, extraX, extraY);
+  
+  if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.5 });
   else map.setView(destino, zoom, { animate: false });
 }
 
@@ -2470,7 +2484,7 @@ window.focar = function (dispositivoId, opts = {}) {
   if (!v?.posicao) return;
 
   ativarFoco(dispositivoId);
-  _centralizarDispositivo(v.posicao, 16, opts.offsetPx || 0);
+  _centralizarDispositivo(v.posicao, 16, opts.extraX || 0, opts.extraY || 0);
 
   setTimeout(() => {
     if (opts.abrirPopup === false) return;

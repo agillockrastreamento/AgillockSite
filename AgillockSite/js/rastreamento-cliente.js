@@ -437,22 +437,44 @@ function renderEventosLista() {
   }).join('');
 }
 
-function _latLngComOffset(posicao, offsetOverride) {
-  const offset = Number.isFinite(offsetOverride) ? offsetOverride : _focusOffsetPx;
+function _latLngComOffset(posicao, extraX = 0, extraY = 0) {
   if (!map || !posicao) return [posicao.latitude, posicao.longitude];
+  
+  let offsetX = 0;
+  let offsetY = 0;
+
+  // Se o card de detalhes estiver aberto (está à esquerda)
+  const card = document.getElementById('device-detail-card');
+  if (card && card.style.display !== 'none' && window.innerWidth > 768) {
+    offsetX = 145; // Meio do card (~290px / 2)
+  }
+
+  // Se o rodapé estiver aberto, compensa verticalmente para evitar clipping no topo
+  const barra = document.getElementById('barra-veiculos');
+  if (barra && barra.classList.contains('expandida')) {
+    offsetY = 110; // Move o veículo para baixo para dar espaço ao popup no topo
+  }
+
+  // Adiciona offsets extras solicitados (ex: por notificação)
+  offsetX += extraX;
+  offsetY += extraY;
+
   const zoom = map.getZoom() || 16;
   const point = map.project([posicao.latitude, posicao.longitude], zoom);
-  const centerPoint = L.point(point.x - offset, point.y);
-  const target = map.unproject(centerPoint, zoom);
-  return [target.lat, target.lng];
+  // centerPoint é o pixel que FICARÁ no centro da tela.
+  const centerPoint = L.point(point.x - offsetX, point.y - offsetY);
+  return map.unproject(centerPoint, zoom);
 }
 
-function _centralizarDispositivo(posicao, zoom = 16, offsetPx = 0, animate = true) {
+function _centralizarDispositivo(posicao, zoom = 16, extraX = 0, extraY = 0, animate = true) {
   if (!map || !posicao) return;
-  const destino = offsetPx ? _latLngComOffset(posicao, offsetPx) : [posicao.latitude, posicao.longitude];
+  
   map.stop();
   map.invalidateSize();
-  if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.45 });
+  
+  const destino = _latLngComOffset(posicao, extraX, extraY);
+  
+  if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.5 });
   else map.setView(destino, zoom, { animate: false });
 }
 
@@ -472,9 +494,8 @@ window.clicarEvento = function (idx) {
 
   const v = veiculosMap[e.dispositivoId];
   if (v?.posicao) {
-    const jaEstavaFocado = modoFoco && ativoId === e.dispositivoId;
-    const offsetNotificacao = jaEstavaFocado ? _eventPopupOffsetPx : 20;
-    focar(e.dispositivoId, { abrirPopup: false, offsetPx: offsetNotificacao });
+    // Foca o dispositivo com offset extra para caber o popup largo
+    focar(e.dispositivoId, { abrirPopup: false, extraX: 50, extraY: 20 });
     
     if (!marcadores[e.dispositivoId]) renderMarcadores();
     const marker = marcadores[e.dispositivoId];
@@ -532,7 +553,7 @@ window.clicarEvento = function (idx) {
         offset: [0, barraExpandida ? 76 : -10],
         maxWidth: 250,
       }).openPopup();
-      _centralizarDispositivo(v.posicao, 16, offsetNotificacao);
+
       if (enderecoInicial) {
         const addrEl = document.getElementById(addrId);
         if (addrEl) addrEl.innerHTML = enderecoHtml;
@@ -1949,7 +1970,7 @@ window.focar = function (did, opts = {}) {
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.toggle('ativo', el.dataset.did === did));
   const v = veiculosMap[did]; if (!v?.posicao) return;
   ativarFoco(did);
-  _centralizarDispositivo(v.posicao, 16, opts.offsetPx || 0);
+  _centralizarDispositivo(v.posicao, 16, opts.extraX || 0, opts.extraY || 0);
   setTimeout(() => {
     if (opts.abrirPopup === false) return;
     if (_mostrarPopup && marcadores[did] && map.hasLayer(marcadores[did])) marcadores[did].openPopup();
