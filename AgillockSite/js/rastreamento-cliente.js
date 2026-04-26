@@ -254,6 +254,11 @@ function inicializarEventosPanel() {
     });
   });
 
+  // Carregar 'hoje' por padrão ao iniciar
+  const btnHoje = document.querySelector('.btn-evt-periodo[data-periodo="hoje"]');
+  if (btnHoje) btnHoje.classList.add('active');
+  carregarHistoricoEventos('hoje');
+
   document.getElementById('evt-custom-buscar').addEventListener('click', function() {
     const de = document.getElementById('evt-custom-de').value;
     const ate = document.getElementById('evt-custom-ate').value;
@@ -380,16 +385,33 @@ function renderEventosLista() {
     return;
   }
 
+  const getEventoStyle = (tipo) => {
+    switch (tipo) {
+      case 'ignitionOn': case 'deviceUnlocked': return { cls: 'tipo-success', icon: 'fa-key' };
+      case 'ignitionOff': return { cls: 'tipo-warning', icon: 'fa-power-off' };
+      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': return { cls: 'tipo-danger', icon: 'fa-exclamation-triangle' };
+      case 'geofenceEnter': return { cls: 'tipo-info', icon: 'fa-sign-in' };
+      case 'geofenceExit': return { cls: 'tipo-warning', icon: 'fa-sign-out' };
+      case 'trocaOleo': return { cls: 'tipo-warning', icon: 'fa-tint' };
+      case 'kmExcedida': return { cls: 'tipo-danger', icon: 'fa-road' };
+      case 'kmReduzida': return { cls: 'tipo-info', icon: 'fa-road' };
+      default: return { cls: 'tipo-info', icon: 'fa-bell' };
+    }
+  };
+
   lista.innerHTML = filtrados.map(function (e) {
-    const css = (e.tipo === 'geofenceEnter' || e.tipo === 'geofenceExit') ? 'tipo-geofence' : 'tipo-ignition';
+    const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
     const nomeDev = _nomeDispositivo(e.dispositivoId);
-    return `<div class="evento-item ${css}" onclick="clicarEvento(${_eventos.indexOf(e)})">
-      <div class="evt-dispositivo">${nomeDev}</div>
-      <div class="evt-desc">${e.tipoLabel || e.tipo}</div>
-      <div class="evt-footer">
-        <span class="evt-tempo">há ${tempo}</span>
-        <i class="fa fa-map-marker evt-ico-pin"></i>
+    return `<div class="evento-item ${style.cls}" onclick="clicarEvento(${_eventos.indexOf(e)})">
+      <div class="evt-icon-wrap"><i class="fa ${style.icon}"></i></div>
+      <div class="evt-content">
+        <div class="evt-dispositivo">${nomeDev}</div>
+        <div class="evt-desc">${e.tipoLabel || e.tipo}</div>
+        <div class="evt-footer">
+          <span class="evt-tempo">há ${tempo}</span>
+          <i class="fa fa-map-marker evt-ico-pin"></i>
+        </div>
       </div>
     </div>`;
   }).join('');

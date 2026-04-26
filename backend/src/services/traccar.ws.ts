@@ -216,7 +216,17 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
           ignicao: norm.ignicao,
           alarme: norm.alarme
         };
+        
         NotificationService.verificarEventosPosicao(identificador, anterior, dados)
+          .then(evts => {
+            if (evts && evts.length > 0) {
+              const payload = { events: evts };
+              const outgoing = JSON.stringify(payload);
+              frontendClients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) client.send(outgoing);
+              });
+            }
+          })
           .catch(err => console.error(`[Notif] Erro na verificação proativa (${identificador}):`, err.message));
       }
     });

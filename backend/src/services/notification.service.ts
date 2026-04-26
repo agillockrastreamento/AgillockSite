@@ -6,7 +6,8 @@ type DispositivoBasico = { id: string; nome: string; placa: string | null; ident
 class NotificationService {
   private _lastOverspeedAt = new Map<string, number>(); // Cache em memória para evitar spam de velocidade
 
-  async verificarEventosPosicao(identificador: string, dispositivo: any, dados: any) {
+  async verificarEventosPosicao(identificador: string, dispositivo: any, dados: any): Promise<any[]> {
+    const eventosDetectados: any[] = [];
     try {
       const clientesMap = new Map<string, { id: string; nome: string; login: { id: string; email: string; ativo: boolean } | null }>();
       if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, dispositivo.cliente as any);
@@ -19,13 +20,12 @@ class NotificationService {
         if (!clienteLogin || !clienteLogin.ativo) continue;
 
         // 1. Verificar Ignição (se mudou)
-        // dispositivo.telemetriaUltimaIgnicao é o estado ANTERIOR se chamado antes de salvar, 
-        // ou o atual se chamado depois. Vamos comparar com dados.ignicao.
         if (dados.ignicao !== null && dispositivo.telemetriaUltimaIgnicao !== null) {
           if (dados.ignicao !== dispositivo.telemetriaUltimaIgnicao) {
             const tipoIgn = dados.ignicao ? 'ignitionOn' : 'ignitionOff';
             console.log(`[Notif] Detectada mudança de ignição (${tipoIgn}) para ${identificador}`);
-            await this.processarEvento(identificador, tipoIgn, dados);
+            const result = await this.processarEvento(identificador, tipoIgn, dados, clienteLogin.id);
+            if (result) eventosDetectados.push(result);
           }
         }
 
@@ -49,33 +49,34 @@ class NotificationService {
               const agora = Date.now();
               const ultimoAlerta = this._lastOverspeedAt.get(chaveSpam) || 0;
               
-              // Evita enviar alerta de velocidade mais de uma vez a cada 1 minuto para o mesmo veículo (facilitando testes)
               if (agora - ultimoAlerta > 1 * 60 * 1000) {
                 console.log(`[Notif] Detectado excesso de velocidade (${dados.velocidade} km/h > ${limite}) para ${identificador} (Cliente: ${cliente.nome})`);
-                await this.processarEvento(identificador, 'overspeed', dados, clienteLogin.id);
+                const dadosComLimite = { ...dados, limiteConfigurado: limite };
+                const result = await this.processarEvento(identificador, 'overspeed', dadosComLimite, clienteLogin.id);
+                if (result) eventosDetectados.push(result);
                 this._lastOverspeedAt.set(chaveSpam, agora);
               }
             }
           }
         }
-        // 3. Verificar Alarmes de Hardware (se presentes nos atributos)
+        // 3. Verificar Alarmes de Hardware
         if (dados.alarme) {
-          // Mapeia alarmes comuns para nossos tipos de evento
           let tipoAlarme = 'alarm';
           if (dados.alarme === 'powerCut' || dados.alarme === 'powerRestored') tipoAlarme = 'powerCut';
-          if (dados.alarme === 'vibration') tipoAlarme = 'alarm';
-          if (dados.alarme === 'sos') tipoAlarme = 'alarm';
-
+          
           console.log(`[Notif] Detectado alarme de hardware (${dados.alarme}) para ${identificador} -> ${tipoAlarme}`);
-          await this.processarEvento(identificador, tipoAlarme, dados, clienteLogin.id);
+          const result = await this.processarEvento(identificador, tipoAlarme, dados, clienteLogin.id);
+          if (result) eventosDetectados.push(result);
         }
       }
     } catch (error: any) {
       console.error(`[Notif] Erro ao verificar eventos de posição para ${identificador}:`, error.message);
     }
+    return eventosDetectados;
   }
 
-  async processarEvento(identificador: string, tipo: string, dados: any, targetClienteLoginId?: string) {
+  async processarEvento(identificador: string, tipo: string, dados: any, targetClienteLoginId?: string): Promise<any | null> {
+    let wsEvent: any = null;
     try {
       // Normalização exaustiva de tipos de evento
       const tipoOriginal = tipo;
@@ -99,7 +100,7 @@ class NotificationService {
 
       if (!dispositivo) {
         console.warn(`[Notif] Dispositivo não encontrado para identificador: ${identificador} (tipo: ${tipoOriginal})`);
-        return;
+        return null;
       }
 
       // Se encontramos por identificador mas o traccarId no banco está nulo, aproveitamos para atualizar
@@ -118,7 +119,7 @@ class NotificationService {
 
       if (clientesMap.size === 0) {
         console.warn(`[Notif] Nenhum cliente encontrado para dispositivo ${identificador} (${dispositivo.id})`);
-        return;
+        return null;
       }
 
       // Filtra apenas o cliente alvo, se especificado (vindo da verificação proativa)
@@ -165,6 +166,7 @@ class NotificationService {
           }
 
           const mensagem = this.gerarMensagem(tipo, dispositivo.nome, dispositivo.placa, dados);
+          const label = this.getLabelTipo(tipo);
 
           // Canal Web/App (Banco de Dados)
           if (pref.web || pref.app) {
@@ -180,6 +182,16 @@ class NotificationService {
                   velocidade: dados.velocidade ?? null,
                 },
               });
+              
+              // Prepara objeto para o WebSocket
+              wsEvent = {
+                deviceId: (dados as any).traccarDeviceId || dispositivo.traccarId,
+                type: tipo,
+                tipoLabel: label,
+                serverTime: new Date().toISOString(),
+                mensagem,
+              };
+
               console.log(`[Notif] Evento "${tipo}" salvo no banco para ${cliente.nome}`);
             } catch (dbErr: any) {
               console.error(`[Notif] Erro ao salvar evento no banco para ${cliente.nome}:`, dbErr.message);
@@ -193,13 +205,13 @@ class NotificationService {
                 cliente.nome,
                 dispositivo.nome,
                 dispositivo.placa || '',
-                this.getLabelTipo(tipo),
+                label,
                 new Date().toLocaleString('pt-BR'),
                 dados.endereco ?? null,
               );
               await EmailService.enviarEmail(
                 clienteLogin.email,
-                `Alerta: ${this.getLabelTipo(tipo)} — ${dispositivo.nome}`,
+                `Alerta: ${label} — ${dispositivo.nome}`,
                 html,
               );
               console.log(`[Notif] E-mail "${tipo}" enviado para ${clienteLogin.email}`);
@@ -218,6 +230,7 @@ class NotificationService {
     } catch (error: any) {
       console.error(`[Notif] Erro ao processar evento "${tipo}" para ${identificador}:`, error?.message || error);
     }
+    return wsEvent;
   }
 
   async verificarKmNotificacoes(identificador: string, odometroMetros: number) {
@@ -401,7 +414,7 @@ class NotificationService {
       case 'ignitionOff':   return `Ignição Desligada: O veículo ${nome} ${p} foi desligado.`;
       case 'geofenceEnter': return `Cerca Virtual: O veículo ${nome} ${p} entrou em uma área monitorada.`;
       case 'geofenceExit':  return `Cerca Virtual: O veículo ${nome} ${p} saiu de uma área monitorada.`;
-      case 'overspeed':     return `Velocidade: O veículo ${nome} ${p} excedeu o limite definido (${dados.velocidade} km/h).`;
+      case 'overspeed':     return `Excesso de Velocidade: O veículo ${nome} ${p} atingiu ${dados.velocidade} km/h (limite: ${dados.limiteConfigurado ?? '—'} km/h).`;
       case 'powerCut':      return `Alerta de Energia: A alimentação do rastreador no veículo ${nome} ${p} foi cortada.`;
       case 'alarm':         return `Alarme: O veículo ${nome} ${p} acionou um alerta${dados.alarme ? ` (${dados.alarme})` : ''}.`;
       case 'deviceLocked':  return `Bloqueio: O motor do veículo ${nome} ${p} foi bloqueado remotamente.`;
