@@ -95,7 +95,13 @@ async function connectToTraccar() {
       return;
     }
 
-    const payload = await transformTraccarMessage(msg);
+    let payload: object | null;
+    try {
+      payload = await transformTraccarMessage(msg);
+    } catch (err: any) {
+      console.error('[WS Traccar] Erro ao processar mensagem:', err?.message || err);
+      return;
+    }
     if (!payload) return;
 
     const outgoing = JSON.stringify(payload);

@@ -14,19 +14,30 @@ class NotificationService {
         },
       });
 
-      if (!dispositivo) return;
+      if (!dispositivo) {
+        console.warn(`[Notif] Dispositivo não encontrado para identificador: ${identificador}`);
+        return;
+      }
 
       const clientesMap = new Map<string, { nome: string; login: { id: string; email: string; ativo: boolean } | null }>();
       if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, dispositivo.cliente);
       for (const vinculo of dispositivo.clientesVinculados) {
         if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, vinculo.cliente);
       }
-      if (clientesMap.size === 0) return;
+
+      if (clientesMap.size === 0) {
+        console.warn(`[Notif] Nenhum cliente encontrado para dispositivo ${identificador}`);
+        return;
+      }
+
+      console.log(`[Notif] Evento "${tipo}" para ${identificador} — ${clientesMap.size} cliente(s)`);
 
       for (const cliente of clientesMap.values()) {
         const clienteLogin = cliente.login;
         if (!clienteLogin || !clienteLogin.ativo) continue;
 
+        // select explícito: apenas os campos de canais e limite — evita erro de coluna inexistente
+        // caso a migration de km ainda não tenha sido aplicada em produção
         const pref = await prisma.preferenciaNotificacao.findUnique({
           where: {
             clienteLoginId_dispositivoId_tipoEvento: {
@@ -35,15 +46,22 @@ class NotificationService {
               tipoEvento: tipo,
             },
           },
+          select: { web: true, app: true, email: true, overspeedLimit: true },
         });
 
         if (!pref || (!pref.web && !pref.app && !pref.email)) {
-          if (tipo !== 'overspeed') continue;
+          if (tipo !== 'overspeed') {
+            console.log(`[Notif] Sem preferência ativa para "${tipo}" — cliente ${clienteLogin.id}`);
+            continue;
+          }
         }
 
         if (tipo === 'overspeed') {
           const limiteCliente = pref?.overspeedLimit ?? 100;
-          if ((dados.velocidade ?? 0) <= limiteCliente) continue;
+          if ((dados.velocidade ?? 0) <= limiteCliente) {
+            console.log(`[Notif] Overspeed ignorado: ${dados.velocidade} km/h <= limite ${limiteCliente}`);
+            continue;
+          }
         }
 
         const mensagem = this.gerarMensagem(tipo, dispositivo.nome, dispositivo.placa, dados);
@@ -60,6 +78,7 @@ class NotificationService {
               velocidade: dados.velocidade ?? null,
             },
           });
+          console.log(`[Notif] Evento "${tipo}" salvo para ${cliente.nome}`);
         }
 
         if (pref?.email && clienteLogin.email) {
@@ -76,14 +95,15 @@ class NotificationService {
             `Alerta: ${this.getLabelTipo(tipo)} — ${dispositivo.nome}`,
             html,
           );
+          console.log(`[Notif] E-mail "${tipo}" enviado para ${clienteLogin.email}`);
         }
 
         if (pref?.app) {
           console.log(`[APP NOTIF] Enviando para ${cliente.nome}: ${mensagem}`);
         }
       }
-    } catch (error) {
-      console.error('Erro no NotificationService:', error);
+    } catch (error: any) {
+      console.error(`[Notif] Erro ao processar evento "${tipo}" para ${identificador}:`, error?.message || error);
     }
   }
 
