@@ -108,6 +108,7 @@ class NotificationService {
       geofenceExit:  'Saída de Cerca',
       overspeed:     'Excesso de Velocidade',
       powerCut:      'Alimentação Cortada',
+      alarm:         'Alarme',
       deviceLocked:  'Veículo Bloqueado',
       deviceUnlocked:'Veículo Desbloqueado',
     };
@@ -123,6 +124,7 @@ class NotificationService {
       case 'geofenceExit':  return `Cerca Virtual: O veículo ${nome} ${p} saiu de uma área monitorada.`;
       case 'overspeed':     return `Velocidade: O veículo ${nome} ${p} excedeu o limite definido (${dados.velocidade} km/h).`;
       case 'powerCut':      return `Alerta de Energia: A alimentação do rastreador no veículo ${nome} ${p} foi cortada.`;
+      case 'alarm':         return `Alarme: O veículo ${nome} ${p} acionou um alerta${dados.alarme ? ` (${dados.alarme})` : ''}.`;
       case 'deviceLocked':  return `Bloqueio: O motor do veículo ${nome} ${p} foi bloqueado remotamente.`;
       case 'deviceUnlocked':return `Desbloqueio: O motor do veículo ${nome} ${p} foi desbloqueado remotamente.`;
       default:              return `Evento: ${tipo} no veículo ${nome} ${p}`;

@@ -74,6 +74,7 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'geofenceExit',  label: 'Saída da Cerca',          css: 'tipo-geofence' },
   { tipo: 'overspeed',     label: 'Excesso de Velocidade',   css: 'tipo-overspeed' },
   { tipo: 'powerCut',      label: 'Alimentação Cortada',     css: 'tipo-alarm' },
+  { tipo: 'alarm',         label: 'Alarme',                  css: 'tipo-alarm' },
   { tipo: 'deviceLocked',  label: 'Veículo Bloqueado',       css: 'tipo-alarm' },
   { tipo: 'deviceUnlocked',label: 'Veículo Desbloqueado',    css: 'tipo-ignition' },
 ];
@@ -667,7 +668,10 @@ function _adicionarBotoesCamadas() {
 // ── Rastros ───────────────────────────────────────────────────────────────────
 
 function _limparRastros() {
-  Object.values(_rastros).forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+  Object.values(_rastros).forEach(r => {
+    if (r.linha && map.hasLayer(r.linha)) map.removeLayer(r.linha);
+    (r.setas || []).forEach(s => { if (map.hasLayer(s)) map.removeLayer(s); });
+  });
   Object.keys(_rastros).forEach(k => delete _rastros[k]);
 }
 
@@ -677,15 +681,16 @@ async function _carregarRastros() {
     if (!_overlay.rastro) break;
     try {
       const now = new Date();
-      const from = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+      const from = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString();
       const hist = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/historico?from=${from}&to=${now.toISOString()}`);
       if (!_overlay.rastro) break;
       const pontos = (hist.posicoes || []).map(p => [p.latitude, p.longitude]);
       if (pontos.length >= 2) {
         const linha = L.polyline(pontos, {
-          color: '#2980b9', weight: 3, opacity: 0.7, dashArray: '6,4',
+          color: '#2980b9', weight: 3, opacity: 0.75,
         }).addTo(map);
-        _rastros[id] = linha;
+        const setas = _criarSetasNoRastro(pontos, '#2980b9');
+        _rastros[id] = { linha, setas };
       }
     } catch {}
   }
@@ -853,7 +858,7 @@ function processarMensagemWs(msg) {
       };
       atualizarMarcador(did); atualizarCardAtivo(did); atualizarCardBarra(did);
       if (_overlay.alarmes) _renderAlarmeBadge(did, veiculosMap[did]);
-      if (_overlay.rastro && _rastros[did]) _rastros[did].addLatLng([pos.latitude, pos.longitude]);
+      if (_overlay.rastro && _rastros[did]) _rastros[did].linha.addLatLng([pos.latitude, pos.longitude]);
       if (_rotasIndividuais[did]) _rotasIndividuais[did].polyline.addLatLng([pos.latitude, pos.longitude]);
     });
   }

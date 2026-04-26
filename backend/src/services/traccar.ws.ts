@@ -279,11 +279,13 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
 
     for (const evt of realtimeEvents.concat(syntheticEvents)) {
       const pos = posicaoPorDeviceId.get(evt.deviceId);
+      const norm = pos ? normalizeAttributes(pos.attributes ?? {}) : {};
       const dados = {
         latitude: pos?.latitude ?? null,
         longitude: pos?.longitude ?? null,
         velocidade: pos != null ? Math.round(pos.speed * 1.852) : null,
         endereco: pos?.address ?? null,
+        alarme: (norm as any).alarme ?? null,
       };
       NotificationService.processarEvento(evt.deviceId, evt.type, dados).catch(err => {
         console.error('[Notificações] Erro ao processar evento:', err.message);

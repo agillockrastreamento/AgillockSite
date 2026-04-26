@@ -8,6 +8,7 @@
     { id: 'geofenceExit',  label: 'Saída da Cerca',          icon: 'fa-sign-out' },
     { id: 'overspeed',     label: 'Excesso de Velocidade',   icon: 'fa-tachometer' },
     { id: 'powerCut',      label: 'Alimentação Cortada',     icon: 'fa-bolt' },
+    { id: 'alarm',         label: 'Alarme',                  icon: 'fa-exclamation-triangle' },
     { id: 'deviceLocked',  label: 'Veículo Bloqueado',       icon: 'fa-lock' },
     { id: 'deviceUnlocked',label: 'Veículo Desbloqueado',    icon: 'fa-unlock' },
   ];
