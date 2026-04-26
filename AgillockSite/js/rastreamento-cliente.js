@@ -1408,7 +1408,8 @@ function mostrarCardDispositivo(id) {
   const addrId = `dcard-addr-${id}`;
   const cacheKey = p ? `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}` : null;
   const hasCached = cacheKey != null && cacheKey in _geocodeCache;
-  const addrTxt = hasCached ? (_geocodeCache[cacheKey] || `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})`) : (p ? 'Buscando...' : '—');
+  const cachedAddr = hasCached ? _geocodeCache[cacheKey] : null;
+  const addrTxt = hasCached ? (cachedAddr || `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})`) : (p ? 'Buscando...' : '—');
 
   const imgHtml = v.imagemUrlCliente
     ? `<img src="${API_BASE}${v.imagemUrlCliente}" style="width:100%;height:140px;object-fit:cover;display:block;border-radius:12px 12px 0 0" onerror="this.style.display='none'" />`
