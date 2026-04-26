@@ -1393,14 +1393,18 @@ function mostrarCardDispositivo(id) {
       <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:12px;border-top:1px solid rgba(128,128,128,0.1)">
         <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
       </div>
-      <div style="margin-top:12px;display:flex;gap:6px">
-        <button onclick="window.location.href='relatorio.html?id=${encodeURIComponent(id)}'" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-bar-chart"></i> Relatório</button>
-        <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;flex:1"><i class="fa fa-history"></i> Histórico</button>
+      <div style="margin-top:12px">
+        <button onclick="window.location.href='relatorio.html?id=${encodeURIComponent(id)}'" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;width:100%"><i class="fa fa-bar-chart"></i> Relatório</button>
       </div>
       ${_htmlAcoesCard(id)}
       <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
         <div class= "dcard-section-title-title">RESUMO DE HOJE</div>
         <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
+        <div style="margin-top:10px">
+          <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;width:100%;text-align:center;">
+            <i class="fa fa-history"></i> Ver Mais
+          </button>
+        </div>
       </div>
     </div>
   `;
