@@ -3,96 +3,111 @@ import EmailService from './email.service';
 
 class NotificationService {
   /**
-   * Processa um evento que acabou de ocorrer
+   * Processa um evento que acabou de ocorrer.
    * @param dispositivoTraccarId ID do dispositivo no Traccar
-   * @param tipo ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut
+   * @param tipo ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut, alarm, deviceLocked, deviceUnlocked
    * @param dados Dados extras (velocidade, latitude, longitude, etc)
    */
   async processarEvento(dispositivoTraccarId: number, tipo: string, dados: any) {
     try {
-      // 1. Encontrar o dispositivo no nosso sistema
+      // 1. Encontrar o dispositivo e TODOS os clientes associados (dono direto + vinculados)
       const dispositivo = await prisma.dispositivo.findFirst({
         where: { traccarId: dispositivoTraccarId },
         include: {
+          cliente: {
+            include: { login: true },
+          },
           clientesVinculados: {
             include: {
               cliente: {
-                include: { login: true }
-              }
-            }
-          }
-        }
+                include: { login: true },
+              },
+            },
+          },
+        },
       });
 
-      if (!dispositivo || !dispositivo.clientesVinculados.length) return;
+      if (!dispositivo) return;
 
-      // 2. Para cada cliente vinculado, verificar preferências
+      // Montar lista única de clientes: dono direto + vinculados (sem duplicatas)
+      const clientesMap = new Map<string, { nome: string; login: { id: string; email: string; ativo: boolean } | null }>();
+
+      if (dispositivo.cliente) {
+        clientesMap.set(dispositivo.cliente.id, dispositivo.cliente);
+      }
       for (const vinculo of dispositivo.clientesVinculados) {
-        const clienteLogin = vinculo.cliente.login;
-        if (!clienteLogin) continue;
+        if (!clientesMap.has(vinculo.cliente.id)) {
+          clientesMap.set(vinculo.cliente.id, vinculo.cliente);
+        }
+      }
+
+      if (clientesMap.size === 0) return;
+
+      // 2. Para cada cliente, verificar preferências e disparar notificação
+      for (const cliente of clientesMap.values()) {
+        const clienteLogin = cliente.login;
+        if (!clienteLogin || !clienteLogin.ativo) continue;
 
         const pref = await prisma.preferenciaNotificacao.findUnique({
           where: {
             clienteLoginId_dispositivoId_tipoEvento: {
               clienteLoginId: clienteLogin.id,
               dispositivoId: dispositivo.id,
-              tipoEvento: tipo
-            }
-          }
+              tipoEvento: tipo,
+            },
+          },
         });
 
         // Se não tem preferência ou está tudo desligado, ignora
         if (!pref || (!pref.web && !pref.app && !pref.email)) {
-          // Exceção: excesso de velocidade precisa checar o limite personalizado do cliente
           if (tipo !== 'overspeed') continue;
         }
 
         // 3. Lógica específica de Excesso de Velocidade (limite do cliente)
         if (tipo === 'overspeed') {
-          const limiteCliente = pref?.overspeedLimit || 100;
-          if (dados.velocidade <= limiteCliente) continue;
+          const limiteCliente = pref?.overspeedLimit ?? 100;
+          if ((dados.velocidade ?? 0) <= limiteCliente) continue;
         }
 
         // 4. Gerar mensagem amigável
         const mensagem = this.gerarMensagem(tipo, dispositivo.nome, dispositivo.placa, dados);
 
-        // 5. Salvar no histórico (para consulta posterior e Web)
+        // 5. Salvar no histórico (para consulta posterior na Web)
         if (pref?.web || pref?.app) {
-           await prisma.eventoNotificacao.create({
-             data: {
-               clienteLoginId: clienteLogin.id,
-               dispositivoId: dispositivo.id,
-               tipoEvento: tipo,
-               mensagem,
-               latitude: dados.latitude,
-               longitude: dados.longitude,
-               velocidade: dados.velocidade
-             }
-           });
+          await prisma.eventoNotificacao.create({
+            data: {
+              clienteLoginId: clienteLogin.id,
+              dispositivoId: dispositivo.id,
+              tipoEvento: tipo,
+              mensagem,
+              latitude: dados.latitude ?? null,
+              longitude: dados.longitude ?? null,
+              velocidade: dados.velocidade ?? null,
+            },
+          });
         }
 
-        // 6. Disparar E-mail
+        // 6. Disparar E-mail (usa o e-mail de acesso ao portal — ClienteLogin.email)
         if (pref?.email && clienteLogin.email) {
           const html = EmailService.gerarTemplateAlerta(
-            vinculo.cliente.nome,
+            cliente.nome,
             dispositivo.nome,
             dispositivo.placa || '',
             this.getLabelTipo(tipo),
             new Date().toLocaleString('pt-BR'),
-            dados.endereco
+            dados.endereco ?? null,
           );
-          
+
           await EmailService.enviarEmail(
             clienteLogin.email,
-            `Alerta: ${this.getLabelTipo(tipo)} - ${dispositivo.nome}`,
-            html
+            `Alerta: ${this.getLabelTipo(tipo)} — ${dispositivo.nome}`,
+            html,
           );
         }
 
-        // 7. Notificação App (Futuro)
+        // 7. Notificação App (futuro — Firebase Cloud Messaging)
         if (pref?.app) {
-          // Aqui entraria a lógica de Firebase Cloud Messaging (FCM)
-          console.log(`[APP NOTIF] Enviando para ${vinculo.cliente.nome}: ${mensagem}`);
+          console.log(`[APP NOTIF] Enviando para ${cliente.nome}: ${mensagem}`);
         }
       }
     } catch (error) {
