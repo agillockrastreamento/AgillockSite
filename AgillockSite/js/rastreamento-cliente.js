@@ -1562,7 +1562,7 @@ function buildOleoStatusHtml(p, v) {
   const textoOleo = pastDue
     ? `Você passou ${kmAbs.toLocaleString('pt-BR')} km da troca`
     : `Falta ${kmAbs.toLocaleString('pt-BR')} km p/ troca`;
-  return `<span style="color:${cor};display:flex;align-items:center;gap:4px;font-size:12px;"><i class="fa fa-tint" style="flex-shrink:0;"></i><span style="flex:1;">${textoOleo}</span><span style="display:flex;gap:3px;flex-shrink:0;"><button onclick="abrirModalConfirmarTrocaOleo(ativoId)" style="${btnStyle}" title="Confirmar troca feita"><i class="fa fa-check"></i></button><button onclick="abrirModalTrocaOleo(ativoId)" style="${btnStyle}" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span></span>`;
+  return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;"><i class="fa fa-tint" style="flex-shrink:0;"></i>${textoOleo}<span style="display:flex;gap:3px;flex-shrink:0;margin-left:4px;"><button onclick="abrirModalConfirmarTrocaOleo(ativoId)" style="${btnStyle}" title="Confirmar troca feita"><i class="fa fa-check"></i></button><button onclick="abrirModalTrocaOleo(ativoId)" style="${btnStyle}" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span></span>`;
 }
 
 function _fmtResumoDurCliente(min) {
