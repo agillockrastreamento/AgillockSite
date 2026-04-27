@@ -226,9 +226,28 @@ function renderMapa(posicoes) {
   document.getElementById('mapa-sem-dados').style.display = 'none';
 
   polylineRota = L.polyline(validas.map(p => [p.latitude, p.longitude]), { color: '#2980b9', weight: 3, opacity: 0.8 }).addTo(map);
-  marcadorInicio = L.circleMarker([validas[0].latitude, validas[0].longitude], { radius: 6, color: '#27ae60', fillColor: '#27ae60', fillOpacity: 1, weight: 2 }).bindTooltip('Início').addTo(map);
+  const cat = window._veiculoDetalhe?.categoria || 'carro';
+
+  const iconeInicio = L.divIcon({
+    html: window.AL_ICONS_3D.getSvgHtml(cat, '#27ae60', 0),
+    className: '',
+    iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
+    iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
+  });
+  marcadorInicio = L.marker([validas[0].latitude, validas[0].longitude], { icon: iconeInicio })
+    .bindTooltip('Início')
+    .addTo(map);
+  
   const ult = validas[validas.length-1];
-  marcadorFim = L.circleMarker([ult.latitude, ult.longitude], { radius: 6, color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).bindTooltip('Fim').addTo(map);
+  const iconeFim = L.divIcon({
+    html: window.AL_ICONS_3D.getSvgHtml(cat, '#e74c3c', 0),
+    className: '',
+    iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
+    iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
+  });
+  marcadorFim = L.marker([ult.latitude, ult.longitude], { icon: iconeFim })
+    .bindTooltip('Fim')
+    .addTo(map);
   map.fitBounds(polylineRota.getBounds().pad(0.15));
 }
 

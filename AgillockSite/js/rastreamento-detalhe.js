@@ -342,28 +342,41 @@ function renderMapa(posicoes, posicaoAtual) {
   const coords = validas.map(p => [p.latitude, p.longitude]);
   polylineRota = L.polyline(coords, { color: '#2980b9', weight: 3, opacity: 0.8 }).addTo(map);
 
-  // Marcadores de início e fim do rastro
-  marcadorInicio = L.circleMarker([validas[0].latitude, validas[0].longitude], {
-    radius: 6, color: '#27ae60', fillColor: '#27ae60', fillOpacity: 1, weight: 2,
-  }).bindTooltip('Início do rastro').addTo(map);
+  // Marcadores de início e fim do rastro (com ícones 3D baseados na categoria do veículo)
+  const veiculo = window._veiculoDetalhe || {};
+  const cat = veiculo.categoria || 'carro';
+  
+  const iconeInicio = L.divIcon({
+    html: window.AL_ICONS_3D.getSvgHtml(cat, '#27ae60', 0),
+    className: '',
+    iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
+    iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
+  });
+  marcadorInicio = L.marker([validas[0].latitude, validas[0].longitude], { icon: iconeInicio })
+    .bindTooltip('Início do rastro')
+    .addTo(map);
 
   const ult = validas[validas.length - 1];
-  marcadorFim = L.circleMarker([ult.latitude, ult.longitude], {
-    radius: 6, color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 1, weight: 2,
-  }).bindTooltip('Fim do rastro').addTo(map);
+  const iconeFim = L.divIcon({
+    html: window.AL_ICONS_3D.getSvgHtml(cat, '#e74c3c', 0),
+    className: '',
+    iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
+    iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
+  });
+  marcadorFim = L.marker([ult.latitude, ult.longitude], { icon: iconeFim })
+    .bindTooltip('Fim do rastro')
+    .addTo(map);
 
-  // Posição atual do veículo (mesmo estilo da tela principal)
+  // Posição atual do veículo (com ícone 3D)
   if (posicaoAtual?.latitude) {
     const veiculo = window._veiculoDetalhe || {};
-    const fa = categoriaParaIconeDetalhe(veiculo.categoria);
+    const cat = veiculo.categoria || 'carro';
     const cor = posicaoAtual.emMovimento ? '#2980b9' : '#27ae60';
-    const html = `<div style="
-      width:34px;height:34px;background:${cor};border-radius:50%;
-      border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);
-      display:flex;align-items:center;justify-content:center;
-      color:#fff;font-size:14px;
-    "><i class="fa ${fa}"></i></div>`;
-    const icone = L.divIcon({ html, className: '', iconSize: [34, 34], iconAnchor: [17, 17] });
+    const course = posicaoAtual.course || 0;
+    
+    const html = window.AL_ICONS_3D.getSvgHtml(cat, cor, course);
+    
+    const icone = L.divIcon({ html, className: '', iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE], iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2] });
     marcadorAtual = L.marker([posicaoAtual.latitude, posicaoAtual.longitude], { icon: icone })
       .bindTooltip('Posição atual')
       .addTo(map);

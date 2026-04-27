@@ -139,8 +139,8 @@ async function carregarDispositivosCliente() {
     opt.dataset.traccarId = String(v.traccarId);
     opt.textContent = v.nome + (v.placa ? ` (${v.placa})` : '');
     sel.appendChild(opt);
-    dispositivosMap[v.traccarId] = { nome: v.nome, placa: v.placa };
-    dispositivosMap[v.dispositivoId] = { nome: v.nome, placa: v.placa };
+    dispositivosMap[v.traccarId] = { nome: v.nome, placa: v.placa, categoria: v.categoria };
+    dispositivosMap[v.dispositivoId] = { nome: v.nome, placa: v.placa, categoria: v.categoria };
     dispositivoLocalParaTraccar[v.dispositivoId] = String(v.traccarId);
   });
 }
@@ -476,8 +476,30 @@ function renderRota(data) {
     const poly = L.polyline(coords, { color: cor, weight: 4, opacity: 0.8 }).bindTooltip(`<b>${dInfo.nome}</b>`).addTo(mapaRota);
     group.addLayer(poly);
     const ini = pos[0], fim = pos[pos.length - 1];
-    L.circleMarker([ini.latitude, ini.longitude], { radius: 7, color: cor, fillColor: '#fff', fillOpacity: 1 }).bindPopup(`<b>Início: ${dInfo.nome}</b><br>${fmtHora(ini.fixTime)}`).addTo(mapaRota);
-    L.circleMarker([fim.latitude, fim.longitude], { radius: 7, color: cor, fillColor: cor, fillOpacity: 1 }).bindPopup(`<b>Fim: ${dInfo.nome}</b><br>${fmtHora(fim.fixTime)}`).addTo(mapaRota);
+    
+    // Obter categoria do dispositivo
+    const cat = dInfo.categoria || 'carro'; 
+    
+    const iconeIni = L.divIcon({
+      html: window.AL_ICONS_3D.getSvgHtml(cat, '#27ae60', 0),
+      className: '',
+      iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
+      iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
+    });
+    L.marker([ini.latitude, ini.longitude], { icon: iconeIni })
+      .bindPopup(`<b>Início: ${dInfo.nome}</b><br>${fmtHora(ini.fixTime)}`)
+      .addTo(mapaRota);
+      
+    const iconeFim = L.divIcon({
+      html: window.AL_ICONS_3D.getSvgHtml(cat, '#e74c3c', 0),
+      className: '',
+      iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
+      iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
+    });
+    L.marker([fim.latitude, fim.longitude], { icon: iconeFim })
+      .bindPopup(`<b>Fim: ${dInfo.nome}</b><br>${fmtHora(fim.fixTime)}`)
+      .addTo(mapaRota);
+      
     idx++;
   }
 
