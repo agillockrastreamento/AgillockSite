@@ -278,13 +278,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
 let _panelAbertoAdmin = false;
 
+function _getUltimaLeituraAdmin() {
+  const v = localStorage.getItem('al_last_notif_admin');
+  return v ? parseInt(v, 10) : 0;
+}
+
+function _setUltimaLeituraAdmin() {
+  localStorage.setItem('al_last_notif_admin', Date.now().toString());
+}
+
 function _atualizarBadgeNotificacoesAdmin() {
   const btn = document.getElementById('map-btn-notif');
   if (!btn) return;
   const badge = btn.querySelector('.badge-count');
   if (!badge) return;
-  if (_eventos.length > 0 && !_panelAbertoAdmin) {
-    badge.textContent = _eventos.length > 99 ? '99+' : _eventos.length;
+  
+  if (_panelAbertoAdmin) {
+    _setUltimaLeituraAdmin();
+    badge.classList.remove('has-notifications');
+    return;
+  }
+
+  const ultimaLeitura = _getUltimaLeituraAdmin();
+  let countUnread = 0;
+  for (let i = 0; i < _eventos.length; i++) {
+    const time = new Date(_eventos[i].serverTime || Date.now()).getTime();
+    if (time > ultimaLeitura) countUnread++;
+  }
+
+  if (countUnread > 0) {
+    badge.textContent = countUnread > 99 ? '99+' : countUnread;
     badge.classList.add('has-notifications');
   } else {
     badge.classList.remove('has-notifications');
@@ -491,6 +514,8 @@ function renderEventosLista() {
       </div>
     </div>`;
   }).join('');
+
+  _atualizarBadgeNotificacoesAdmin();
 }
 
 function _nomeDispositivo(dispositivoId) {

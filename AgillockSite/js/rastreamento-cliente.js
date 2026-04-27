@@ -204,13 +204,36 @@ async function verificarAcesso() {
 
 let _panelAbertoCliente = false;
 
+function _getUltimaLeituraCliente() {
+  const v = localStorage.getItem('al_last_notif_client');
+  return v ? parseInt(v, 10) : 0;
+}
+
+function _setUltimaLeituraCliente() {
+  localStorage.setItem('al_last_notif_client', Date.now().toString());
+}
+
 function _atualizarBadgeNotificacoesCliente() {
   const btn = document.getElementById('map-btn-notif-cliente');
   if (!btn) return;
   const badge = btn.querySelector('.badge-count');
   if (!badge) return;
-  if (_eventos.length > 0 && !_panelAbertoCliente) {
-    badge.textContent = _eventos.length > 99 ? '99+' : _eventos.length;
+  
+  if (_panelAbertoCliente) {
+    _setUltimaLeituraCliente();
+    badge.classList.remove('has-notifications');
+    return;
+  }
+
+  const ultimaLeitura = _getUltimaLeituraCliente();
+  let countUnread = 0;
+  for (let i = 0; i < _eventos.length; i++) {
+    const time = new Date(_eventos[i].serverTime || Date.now()).getTime();
+    if (time > ultimaLeitura) countUnread++;
+  }
+
+  if (countUnread > 0) {
+    badge.textContent = countUnread > 99 ? '99+' : countUnread;
     badge.classList.add('has-notifications');
   } else {
     badge.classList.remove('has-notifications');
@@ -444,6 +467,8 @@ function renderEventosLista() {
       </div>
     </div>`;
   }).join('');
+
+  _atualizarBadgeNotificacoesCliente();
 }
 
 function _latLngComOffset(posicao, offsetOverride, targetZoom, offsetY) {
