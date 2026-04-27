@@ -179,6 +179,54 @@
     }
     .ml-btn.ativo .ml-btn-icon { background: rgba(250,179,44,.35); border-color: #fab32c; color: #fab32c; }
 
+    /* ── Botão Global de Notificações ── */
+    .leaflet-top.leaflet-right .leaflet-control-zoom {
+      clear: none !important;
+    }
+    .leaflet-control.map-btn-notif {
+      clear: none !important;
+      margin-right: 10px !important;
+    }
+    .map-btn-notif {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      border: 2px solid #c2c1c1;
+      background: #fff;
+      color: #555;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: none;
+      padding: 0;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      outline: none;
+    }
+    .map-btn-notif:hover { background: #f0f0f0; }
+    html.dark-theme .map-btn-notif { background: #1e2530; border-color: #3a3a5c; color: #c9d1d9; }
+    html.dark-theme .map-btn-notif:hover { background: #252535; }
+    .map-btn-notif.ativo { background: #fab32c; border-color: #fab32c; color: #222; }
+    html.dark-theme .map-btn-notif.ativo { background: #fab32c; border-color: #fab32c; color: #222; }
+    .map-btn-notif .badge-count {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: #e74c3c;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 12px;
+      line-height: 1;
+      border: 2px solid #fff;
+      display: none;
+    }
+    html.dark-theme .map-btn-notif .badge-count { border-color: #1e2530; }
+    .map-btn-notif .badge-count.has-notifications { display: inline-block; }
+
     /* ── Lista de resultados flutuante (abaixo do input na topbar) ── */
     #lista-resultados-busca {
       position: absolute;
@@ -495,8 +543,9 @@
     }
     .dark-theme #eventos-panel { background: #1e1e2e; border-color: #333; }
     #eventos-panel.minimizado {
-      width: 48px;
-      min-width: 48px;
+      width: 0;
+      min-width: 0;
+      border-left: none;
     }
 
     #eventos-header {
@@ -1052,11 +1101,6 @@
       <!-- Painel de Eventos -->
       <div id="eventos-panel">
         <div id="eventos-header">
-          <div id="eventos-header-top">
-            <button id="evt-btn-toggle" title="Minimizar eventos">
-              <i class="fa fa-chevron-right"></i>
-            </button>
-          </div>
           <h5>Eventos</h5>
 
           <div id="evt-data-filtros" style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;">

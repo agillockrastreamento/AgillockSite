@@ -276,8 +276,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // ── Painel de Eventos — inicialização ─────────────────────────────────────────
 
+let _panelAbertoAdmin = false;
+
+function _atualizarBadgeNotificacoesAdmin() {
+  const btn = document.getElementById('map-btn-notif');
+  if (!btn) return;
+  const badge = btn.querySelector('.badge-count');
+  if (!badge) return;
+  if (_eventos.length > 0 && !_panelAbertoAdmin) {
+    badge.textContent = _eventos.length > 99 ? '99+' : _eventos.length;
+    badge.classList.add('has-notifications');
+  } else {
+    badge.classList.remove('has-notifications');
+  }
+}
+
 function inicializarEventosPanel() {
-  _aplicarEstadoPainelEventos();
+  // O painel inicia minimizado (Display none controlado via class)
+  const panel = document.getElementById('eventos-panel');
+  if (panel) panel.classList.add('minimizado');
+
   const dropdown = document.getElementById('evt-tipo-dropdown');
   dropdown.innerHTML = TIPOS_EVENTO_ADMIN.map(t =>
     `<label class="evt-tipo-item">
@@ -309,16 +327,8 @@ function inicializarEventosPanel() {
   // Limpar eventos
   document.getElementById('evt-btn-limpar').addEventListener('click', function () {
     _eventos.length = 0;
+    _atualizarBadgeNotificacoesAdmin();
     renderEventosLista();
-  });
-
-  document.getElementById('evt-btn-toggle').addEventListener('click', function () {
-    const panel = document.getElementById('eventos-panel');
-    if (!panel) return;
-    panel.classList.toggle('minimizado');
-    try { localStorage.setItem(EVENTOS_PANEL_STORAGE_KEY, panel.classList.contains('minimizado') ? '1' : '0'); } catch {}
-    this.title = panel.classList.contains('minimizado') ? 'Expandir eventos' : 'Minimizar eventos';
-    if (map) setTimeout(() => map.invalidateSize(), 220);
   });
 
   // Listeners dos botões de período
@@ -609,6 +619,40 @@ function inicializarMapa() {
 
   // Zoom e camadas de tile — todos à direita
   L.control.zoom({ position: 'topright' }).addTo(map);
+
+  // ── Botão Global de Notificações (BtnNotif) ──
+  const BtnNotif = L.Control.extend({
+    onAdd() {
+      const btn = L.DomUtil.create('button', 'leaflet-control map-btn-notif');
+      btn.id = 'map-btn-notif';
+      btn.title = 'Notificações / Eventos';
+      btn.innerHTML = `
+        <i class="fa fa-bell"></i>
+        <span class="badge-count">0</span>
+      `;
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, 'click', function () {
+        const panel = document.getElementById('eventos-panel');
+        if (!panel) return;
+        const estaAberto = !panel.classList.contains('minimizado');
+        _panelAbertoAdmin = !estaAberto;
+        
+        if (_panelAbertoAdmin) {
+          panel.classList.remove('minimizado');
+          btn.classList.add('ativo');
+        } else {
+          panel.classList.add('minimizado');
+          btn.classList.remove('ativo');
+        }
+        _atualizarBadgeNotificacoesAdmin();
+        if (map) setTimeout(() => map.invalidateSize(), 220);
+      });
+      return btn;
+    },
+    onRemove() {}
+  });
+  new BtnNotif({ position: 'topright' }).addTo(map);
+
   L.control.layers(
     { 'Google Maps': _googleMapLayers.roadmap, 'CartoDB Voyager': tilesCartoDB, 'OpenStreetMap': tilesOsm, 'ESRI Street': tilesEsri },
     {},
