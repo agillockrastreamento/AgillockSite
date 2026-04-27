@@ -360,7 +360,7 @@ function _atualizarFiltrosTipo() {
 }
 
 function adicionarEvento(evt) {
-  // Filtra apenas os tipos permitidos para cliente
+  if (evt.tipo === 'deviceOverspeed') evt = { ...evt, tipo: 'overspeed' };
   const tiposPermitidos = TIPOS_EVENTO_CLIENTE.map(t => t.tipo);
   if (!tiposPermitidos.includes(evt.tipo)) return;
   _eventos.unshift(evt);
@@ -437,19 +437,20 @@ function renderEventosLista() {
   }).join('');
 }
 
-function _latLngComOffset(posicao, offsetOverride) {
+function _latLngComOffset(posicao, offsetOverride, targetZoom, offsetY) {
   const offset = Number.isFinite(offsetOverride) ? offsetOverride : _focusOffsetPx;
+  const oy = Number.isFinite(offsetY) ? offsetY : 0;
   if (!map || !posicao) return [posicao.latitude, posicao.longitude];
-  const zoom = map.getZoom() || 16;
+  const zoom = Number.isFinite(targetZoom) ? targetZoom : (map.getZoom() || 16);
   const point = map.project([posicao.latitude, posicao.longitude], zoom);
-  const centerPoint = L.point(point.x - offset, point.y);
+  const centerPoint = L.point(point.x - offset, point.y - oy);
   const target = map.unproject(centerPoint, zoom);
   return [target.lat, target.lng];
 }
 
-function _centralizarDispositivo(posicao, zoom = 16, offsetPx = 0, animate = true) {
+function _centralizarDispositivo(posicao, zoom = 16, offsetPx = 0, animate = true, offsetY = 0) {
   if (!map || !posicao) return;
-  const destino = offsetPx ? _latLngComOffset(posicao, offsetPx) : [posicao.latitude, posicao.longitude];
+  const destino = (offsetPx || offsetY) ? _latLngComOffset(posicao, offsetPx, zoom, offsetY) : [posicao.latitude, posicao.longitude];
   map.stop();
   map.invalidateSize();
   if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.45 });
@@ -472,10 +473,11 @@ window.clicarEvento = function (idx) {
 
   const v = veiculosMap[e.dispositivoId];
   if (v?.posicao) {
-    const jaEstavaFocado = modoFoco && ativoId === e.dispositivoId;
-    const offsetNotificacao = jaEstavaFocado ? _eventPopupOffsetPx : 20;
-    focar(e.dispositivoId, { abrirPopup: false, offsetPx: offsetNotificacao });
-    
+    const barraWrap = document.getElementById('barra-veiculos-wrap');
+    const barraExpandida = !!document.getElementById('barra-veiculos')?.classList.contains('expandida');
+    const offsetBarraY = barraExpandida ? Math.round((barraWrap?.offsetHeight || 80) / 2) : 0;
+    focar(e.dispositivoId, { abrirPopup: false, offsetPx: _eventPopupOffsetPx, offsetY: offsetBarraY });
+
     if (!marcadores[e.dispositivoId]) renderMarcadores();
     const marker = marcadores[e.dispositivoId];
     if (marker) {
@@ -526,13 +528,12 @@ window.clicarEvento = function (idx) {
         </div>
       `;
 
-      const barraExpandida = !!document.getElementById('barra-veiculos')?.classList.contains('expandida');
       marker.bindPopup(content, {
         className: `popup-evento-moderno${barraExpandida ? ' popup-evento-rodape-aberto' : ''}`,
-        offset: [0, barraExpandida ? 76 : -10],
+        offset: [0, -10],
         maxWidth: 250,
-      }).openPopup();
-      _centralizarDispositivo(v.posicao, 16, offsetNotificacao);
+      });
+      setTimeout(function() { if (map.hasLayer(marker)) marker.openPopup(); }, 500);
       if (enderecoInicial) {
         const addrEl = document.getElementById(addrId);
         if (addrEl) addrEl.innerHTML = enderecoHtml;
@@ -1862,7 +1863,13 @@ function atualizarCardAtivo(did) {
   if (tsDev && p) tsDev.textContent = fmtGPSTimeSec(p.deviceTime);
   if (tsGps && p) tsGps.textContent = fmtGPSTimeSec(p.fixTime);
 
-  if (modoFoco && v?.posicao) map.panTo(_latLngComOffset(v.posicao), { animate: true, duration: 0.5 });
+  if (modoFoco && v?.posicao) {
+    const trackOff = _eventoPopupAtualIdx !== null ? _eventPopupOffsetPx : 0;
+    const barraWrap = document.getElementById('barra-veiculos-wrap');
+    const barraExpandida = !!document.getElementById('barra-veiculos')?.classList.contains('expandida');
+    const trackOffY = (_eventoPopupAtualIdx !== null && barraExpandida) ? Math.round((barraWrap?.offsetHeight || 80) / 2) : 0;
+    map.panTo(_latLngComOffset(v.posicao, trackOff, 16, trackOffY), { animate: true, duration: 0.5 });
+  }
 }
 
 function svgVelocimetro(vel, limite) {
@@ -1949,7 +1956,7 @@ window.focar = function (did, opts = {}) {
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.toggle('ativo', el.dataset.did === did));
   const v = veiculosMap[did]; if (!v?.posicao) return;
   ativarFoco(did);
-  _centralizarDispositivo(v.posicao, 16, opts.offsetPx || 0);
+  _centralizarDispositivo(v.posicao, 16, opts.offsetPx || 0, true, opts.offsetY || 0);
   setTimeout(() => {
     if (opts.abrirPopup === false) return;
     if (_mostrarPopup && marcadores[did] && map.hasLayer(marcadores[did])) marcadores[did].openPopup();

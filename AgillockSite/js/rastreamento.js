@@ -456,9 +456,7 @@ window.clicarEvento = function (idx) {
 
   // Focar no dispositivo se tiver posição
   if (e.dispositivoId && veiculosMap[e.dispositivoId]?.posicao) {
-    const jaEstavaFocado = modoFoco && ativoId === e.dispositivoId;
-    const offsetNotificacao = jaEstavaFocado ? _eventPopupOffsetPx : 24;
-    focar(e.dispositivoId, { abrirPopup: false, offsetPx: offsetNotificacao });
+    focar(e.dispositivoId, { abrirPopup: false, offsetPx: _eventPopupOffsetPx });
 
     // Criar popup nativo do Leaflet que segue o marcador
     if (!marcadores[e.dispositivoId]) renderMarcadores();
@@ -512,8 +510,8 @@ window.clicarEvento = function (idx) {
         </div>
       `;
 
-      marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 }).openPopup();
-      _centralizarDispositivo(v.posicao, 16, offsetNotificacao);
+      marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 });
+      setTimeout(function() { if (map.hasLayer(marker)) marker.openPopup(); }, 500);
       if (enderecoInicial) {
         const addrEl = document.getElementById(addrId);
         if (addrEl) addrEl.innerHTML = enderecoHtml;
@@ -2103,13 +2101,13 @@ function _agendarAtualizacaoAtributos(dispositivoId) {
   }, 1200);
 }
 
-function _latLngComOffset(posicao, offsetOverride) {
+function _latLngComOffset(posicao, offsetOverride, targetZoom) {
   let offset = 0;
   if (ativoId) {
     offset = Number.isFinite(offsetOverride) ? offsetOverride : ((_cardAdminExpandido && _attrsTrayOpen) ? _cardFocusOffsetPx : _focusOffsetPx);
   }
   if (!offset || !map || !posicao) return [posicao.latitude, posicao.longitude];
-  const zoom = map.getZoom() || 16;
+  const zoom = Number.isFinite(targetZoom) ? targetZoom : (map.getZoom() || 16);
   const point = map.project([posicao.latitude, posicao.longitude], zoom);
   const centerPoint = L.point(point.x - offset, point.y);
   const target = map.unproject(centerPoint, zoom);
@@ -2118,7 +2116,7 @@ function _latLngComOffset(posicao, offsetOverride) {
 
 function _centralizarDispositivo(posicao, zoom = 16, offsetPx = 0, animate = true) {
   if (!map || !posicao) return;
-  const destino = offsetPx ? _latLngComOffset(posicao, offsetPx) : [posicao.latitude, posicao.longitude];
+  const destino = offsetPx ? _latLngComOffset(posicao, offsetPx, zoom) : [posicao.latitude, posicao.longitude];
   map.stop();
   map.invalidateSize();
   if (animate) map.flyTo(destino, zoom, { animate: true, duration: 0.45 });
@@ -2435,7 +2433,8 @@ function atualizarCardAtivo(dispositivoId) {
   if (tsGps && p) tsGps.textContent = fmtGPSTimeSec(p.fixTime);
 
   if (modoFoco && v?.posicao) {
-    map.panTo(_latLngComOffset(v.posicao), { animate: true, duration: 0.5 });
+    const trackOff = _eventoPopupAtualIdx !== null ? _eventPopupOffsetPx : undefined;
+    map.panTo(_latLngComOffset(v.posicao, trackOff, 16), { animate: true, duration: 0.5 });
   }
   _posicionarBotaoTrayAtributos();
   _agendarAtualizacaoAtributos(dispositivoId);
