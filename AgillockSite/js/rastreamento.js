@@ -474,7 +474,7 @@ window.clicarEvento = function (idx) {
         && Math.abs(eventoLng - v.posicao.longitude) < 0.00001;
       const enderecoInicial = e.endereco || (mesmaPosicaoAtual ? (v.posicao.endereco || v.endereco || '') : '');
       const enderecoHtml = enderecoInicial
-        ? `<i class="fa fa-map-marker"></i> ${esc(enderecoInicial)} <span class="evt-popup-coords">(${eventoLat.toFixed(5)}, ${eventoLng.toFixed(5)})</span>`
+        ? `<i class="fa fa-map-marker"></i> ${esc(enderecoInicial)}`
         : eventoTemCoords
           ? '<i class="fa fa-map-marker"></i> Buscando endereco...'
           : '<i class="fa fa-map-marker"></i> Localizacao do evento indisponivel';
@@ -500,7 +500,7 @@ window.clicarEvento = function (idx) {
           
           <div class="evt-popup-address" style="background: ${bgAddr}; border: 1px solid ${borderCol}; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
             <div id="${addrId}" style="font-size: 10px; color: ${colorMuted}; margin-bottom: 4px;">${enderecoHtml}</div>
-            <div style="font-size: 9px; color: ${coordColor};">${coordsHtml}</div>
+            ${enderecoInicial ? '' : `<div id="${addrId}-coords" style="font-size: 9px; color: ${coordColor};">${coordsHtml}</div>`}
           </div>
           ${acoesMapaHtml}
 
@@ -511,13 +511,12 @@ window.clicarEvento = function (idx) {
       `;
 
       marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 });
-      setTimeout(function() { if (map.hasLayer(marker)) marker.openPopup(); }, 500);
-      if (enderecoInicial) {
-        const addrEl = document.getElementById(addrId);
-        if (addrEl) addrEl.innerHTML = enderecoHtml;
-      } else if (eventoTemCoords) {
-        geocodificarCoordenadas(eventoLat, eventoLng, addrId);
-      }
+      setTimeout(function() {
+        if (map.hasLayer(marker)) {
+          marker.openPopup();
+          if (!enderecoInicial && eventoTemCoords) geocodificarCoordenadas(eventoLat, eventoLng, addrId);
+        }
+      }, 500);
 
       marker.once('popupclose', function() {
         if (marker._eventOriginalPopup) {
@@ -1896,8 +1895,9 @@ function fmtGPSTime(iso) {
 function fmtGPSTimeSec(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR') + ' ' +
-    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const tz = 'America/Sao_Paulo';
+  return d.toLocaleDateString('pt-BR', { timeZone: tz }) + ' ' +
+    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz });
 }
 
 function fmtTempoDecorrido(iso) {
@@ -2523,10 +2523,15 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
     const btnMaps = document.getElementById(`btn-maps-${lat}-${lng}`);
     if (btnMaps) btnMaps.href = _urlGoogleMaps(lat, lng, endereco);
   };
+  const hideCoords = () => {
+    const coordsEl = document.getElementById(elementId + '-coords');
+    if (coordsEl) coordsEl.style.display = 'none';
+  };
 
   if (cacheKey in _geocodeCache) {
     const cached = _geocodeCache[cacheKey];
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${cached ? `${cached} ${coords}` : coords}`;
+    el.innerHTML = `<i class="fa fa-map-marker"></i> ${cached || coords}`;
+    if (cached) hideCoords();
     updateLink(cached);
     return;
   }
@@ -2535,7 +2540,8 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
     const data = await window.AL.apiGet(`/api/rastreamento/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
     const end = data.endereco || '';
     _geocodeCache[cacheKey] = end;
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end ? `${end} ${coords}` : coords}`;
+    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end || coords}`;
+    if (end) hideCoords();
     updateLink(end);
   } catch {
     el.innerHTML = `<i class="fa fa-map-marker"></i> ${coords}`;

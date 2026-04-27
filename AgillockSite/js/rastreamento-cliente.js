@@ -492,7 +492,7 @@ window.clicarEvento = function (idx) {
         && Math.abs(eventoLng - v.posicao.longitude) < 0.00001;
       const enderecoInicial = e.endereco || (mesmaPosicaoAtual ? (v.posicao.endereco || v.endereco || '') : '');
       const enderecoHtml = enderecoInicial
-        ? `<i class="fa fa-map-marker"></i> ${esc(enderecoInicial)} <span class="evt-popup-coords">(${eventoLat.toFixed(5)}, ${eventoLng.toFixed(5)})</span>`
+        ? `<i class="fa fa-map-marker"></i> ${esc(enderecoInicial)}`
         : eventoTemCoords
           ? '<i class="fa fa-map-marker"></i> Buscando endereco...'
           : '<i class="fa fa-map-marker"></i> Localizacao do evento indisponivel';
@@ -518,7 +518,7 @@ window.clicarEvento = function (idx) {
           
           <div class="evt-popup-address" style="background: ${bgAddr}; border: 1px solid ${borderCol}; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
             <div id="${addrId}" style="font-size: 10px; color: ${colorMuted}; margin-bottom: 4px;">${enderecoHtml}</div>
-            <div style="font-size: 9px; color: ${coordColor};">${coordsHtml}</div>
+            ${enderecoInicial ? '' : `<div id="${addrId}-coords" style="font-size: 9px; color: ${coordColor};">${coordsHtml}</div>`}
           </div>
           ${acoesMapaHtml}
 
@@ -533,13 +533,12 @@ window.clicarEvento = function (idx) {
         offset: [0, -10],
         maxWidth: 250,
       });
-      setTimeout(function() { if (map.hasLayer(marker)) marker.openPopup(); }, 500);
-      if (enderecoInicial) {
-        const addrEl = document.getElementById(addrId);
-        if (addrEl) addrEl.innerHTML = enderecoHtml;
-      } else if (eventoTemCoords) {
-        geocodificarCoordenadas(eventoLat, eventoLng, addrId);
-      }
+      setTimeout(function() {
+        if (map.hasLayer(marker)) {
+          marker.openPopup();
+          if (!enderecoInicial && eventoTemCoords) geocodificarCoordenadas(eventoLat, eventoLng, addrId);
+        }
+      }, 500);
 
       marker.once('popupclose', function() {
         if (marker._eventOriginalPopup) {
@@ -1543,9 +1542,19 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
   const kmConfig = v?._kmConfig;
   if (kmConfig?.trocaOleo && p.odometro != null && kmConfig.trocaOleo.kmBaseMetros != null) {
     const kmPercorrido = (p.odometro - kmConfig.trocaOleo.kmBaseMetros) / 1000;
-    const kmRestante = Math.max(0, Math.round(kmConfig.trocaOleo.kmIntervalo - kmPercorrido));
-    const cor = kmRestante < 500 ? '#e74c3c' : kmRestante < 1000 ? '#f39c12' : '#27ae60';
-    si.push(`<span style="color:${cor};display:flex;align-items:center;gap:6px;"><i class="fa fa-tint"></i> Falta ${kmRestante.toLocaleString('pt-BR')} km para troca de óleo<button onclick="abrirModalTrocaOleo(ativoId)" style="background:none;border:none;padding:0 2px;cursor:pointer;color:#7f8c8d;font-size:11px;line-height:1;" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span>`);
+    const kmRestante = Math.round(kmConfig.trocaOleo.kmIntervalo - kmPercorrido);
+    const pastDue = kmRestante < 0;
+    const kmAbs = Math.abs(kmRestante);
+    const cor = pastDue ? '#e74c3c' : kmAbs < 500 ? '#e74c3c' : kmAbs < 1000 ? '#f39c12' : '#27ae60';
+    const isDark = document.documentElement.classList.contains('dark-theme');
+    const btnBg = isDark ? '#2d3748' : '#e9ecef';
+    const btnBd = isDark ? '#4a5568' : '#ccc';
+    const btnClr = isDark ? '#cbd5e0' : '#555';
+    const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
+    const textoOleo = pastDue
+      ? `<i class="fa fa-tint"></i> Você passou ${kmAbs.toLocaleString('pt-BR')} km da troca de óleo`
+      : `<i class="fa fa-tint"></i> Falta ${kmAbs.toLocaleString('pt-BR')} km para troca de óleo`;
+    si.push(`<span style="color:${cor};display:flex;align-items:center;gap:5px;flex-wrap:wrap;">${textoOleo}<button onclick="abrirModalConfirmarTrocaOleo(ativoId)" style="${btnStyle}" title="Confirmar troca feita"><i class="fa fa-check"></i></button><button onclick="abrirModalTrocaOleo(ativoId)" style="${btnStyle}" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span>`);
   }
 
   if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
@@ -1664,6 +1673,35 @@ window.abrirModalTrocaOleo = function (dispositivoId) {
       .finally(function () {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa fa-check"></i> Salvar';
+      });
+  };
+};
+
+window.abrirModalConfirmarTrocaOleo = function (dispositivoId) {
+  const v = veiculosMap[dispositivoId]; if (!v) return;
+  const modal = document.getElementById('modal-confirmar-troca-oleo');
+  $(modal).modal('show');
+  document.getElementById('btn-confirmar-oleo-salvar').onclick = function () {
+    const btn = document.getElementById('btn-confirmar-oleo-salvar');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    AL_CLIENTE.apiPost('/api/cliente/notificacoes/confirmar-troca-oleo/' + dispositivoId, {})
+      .then(function () {
+        $(modal).modal('hide');
+        if (!v._kmConfig) v._kmConfig = {};
+        if (!v._kmConfig.trocaOleo) v._kmConfig.trocaOleo = {};
+        const p = v.posicao;
+        if (p?.odometro != null) v._kmConfig.trocaOleo.kmBaseMetros = p.odometro;
+        v._kmConfigCarregado = false;
+        if (ativoId === dispositivoId) atualizarCardAtivo(dispositivoId);
+        AL_CLIENTE.showAlert('Troca de óleo confirmada! Contador reiniciado.', 'success');
+      })
+      .catch(function (err) {
+        AL_CLIENTE.showAlert('Erro ao confirmar: ' + (err.message || 'tente novamente.'));
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-check"></i> Confirmar';
       });
   };
 };
@@ -1888,7 +1926,8 @@ function svgVelocimetro(vel, limite) {
 function fmtGPSTimeSec(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const tz = 'America/Sao_Paulo';
+  return d.toLocaleDateString('pt-BR', { timeZone: tz }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz });
 }
 
 function fmtTempoDecorridoMs(ms) {
@@ -1909,15 +1948,20 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
   const el = document.getElementById(elementId); if (!el) return;
   const coords = `(${lat.toFixed(5)}, ${lng.toFixed(5)})`;
   const ck = `${lat.toFixed(3)},${lng.toFixed(3)}`;
-  
+
   const updateLink = (endereco) => {
     const btnMaps = document.getElementById(`btn-maps-${lat}-${lng}`);
     if (btnMaps) btnMaps.href = _urlGoogleMaps(lat, lng, endereco);
   };
+  const hideCoords = () => {
+    const coordsEl = document.getElementById(elementId + '-coords');
+    if (coordsEl) coordsEl.style.display = 'none';
+  };
 
   if (ck in _geocodeCache) {
     const end = _geocodeCache[ck];
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end ? `${end} ${coords}` : coords}`;
+    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end || coords}`;
+    if (end) hideCoords();
     updateLink(end);
     return;
   }
@@ -1925,7 +1969,8 @@ window.geocodificarCoordenadas = async function (lat, lng, elementId) {
     const data = await AL_CLIENTE.apiGet(`/api/cliente/rastreamento/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
     const end = data.endereco || '';
     _geocodeCache[ck] = end;
-    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end ? `${end} ${coords}` : coords}`;
+    el.innerHTML = `<i class="fa fa-map-marker"></i> ${end || coords}`;
+    if (end) hideCoords();
     updateLink(end);
   } catch { el.innerHTML = `<i class="fa fa-map-marker"></i> ${coords}`; updateLink(null); }
 };

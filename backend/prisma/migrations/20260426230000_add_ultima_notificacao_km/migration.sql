@@ -1,0 +1,1 @@
+ALTER TABLE "EstadoKmNotificacao" ADD COLUMN "ultimaNotificacaoKm" DOUBLE PRECISION NOT NULL DEFAULT -9999;

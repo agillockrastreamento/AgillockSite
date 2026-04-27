@@ -1,9 +1,19 @@
 import nodemailer from 'nodemailer';
+import * as fs from 'fs';
+import * as path from 'path';
 
 class EmailService {
   private transporter;
+  private _logoBase64: string = '';
 
   constructor() {
+    try {
+      const logoPath = path.join(__dirname, '../templates/logo_agillock_white_new.png');
+      const logoData = fs.readFileSync(logoPath);
+      this._logoBase64 = `data:image/png;base64,${logoData.toString('base64')}`;
+    } catch {
+      // fallback to external URL
+    }
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.hostinger.com',
       port: Number(process.env.SMTP_PORT) || 465,
@@ -34,7 +44,7 @@ class EmailService {
   // Template moderno para alertas
   gerarTemplateAlerta(clienteNome: string, veiculoNome: string, placa: string, alertaTipo: string, dataHora: string, endereco?: string) {
     const publicUrl = process.env.PUBLIC_URL || 'https://agillockrastreamento.com.br';
-    const logoUrl = `${publicUrl}/AgillockSite/img/logo_agillock_white_new.png`;
+    const logoUrl = this._logoBase64 || `${publicUrl}/AgillockSite/img/logo_agillock_white_new.png`;
     
     return `
       <!DOCTYPE html>

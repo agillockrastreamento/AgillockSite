@@ -384,10 +384,11 @@ model EstadoKmNotificacao {
   clienteLoginId     String
   dispositivoId      String
   tipoEvento         String   // kmExcedida, kmReduzida, trocaOleo
-  kmBaseMetros       Float    @default(0)
-  dataBase           DateTime @default(now())
-  notificacaoEnviada Boolean  @default(false)
-  createdAt          DateTime @default(now())
+  kmBaseMetros         Float    @default(0)
+  dataBase             DateTime @default(now())
+  notificacaoEnviada   Boolean  @default(false)
+  ultimaNotificacaoKm  Float    @default(-9999)
+  createdAt            DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)

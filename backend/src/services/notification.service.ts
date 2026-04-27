@@ -53,7 +53,7 @@ class NotificationService {
         if (!clienteLogin || !clienteLogin.ativo) continue;
 
         // Processar Mudança de Ignição para este cliente
-        if (mudouIgnicao && tipoIgn) {
+        if (mudouIgnicao && tipoIgn && !dados._skipIgnition) {
           const result = await this.processarEvento(identificador, tipoIgn, dados, clienteLogin.id);
           if (result) eventosDetectados.push(result);
         }
@@ -240,7 +240,7 @@ class NotificationService {
                 dispositivo.nome,
                 dispositivo.placa || '',
                 label,
-                new Date().toLocaleString('pt-BR'),
+                new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
                 enderecoEvento ?? undefined,
               );
               await EmailService.enviarEmail(
@@ -379,20 +379,57 @@ class NotificationService {
 
     const estado = await prisma.estadoKmNotificacao.upsert({
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'trocaOleo' } },
-      create: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'trocaOleo', kmBaseMetros: odometroMetros, dataBase: new Date(), notificacaoEnviada: false },
+      create: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'trocaOleo', kmBaseMetros: odometroMetros, dataBase: new Date(), notificacaoEnviada: false, ultimaNotificacaoKm: -9999 },
       update: {},
     });
 
+    const intervalo = pref.kmTrocaOleo;
     const kmDesdeBase = (odometroMetros - estado.kmBaseMetros) / 1000;
-    if (kmDesdeBase >= pref.kmTrocaOleo && !estado.notificacaoEnviada) {
-      const mensagem = `Troca de Óleo: O veículo ${dispositivo.nome}${dispositivo.placa ? ' (' + dispositivo.placa + ')' : ''} percorreu ${Math.round(kmDesdeBase)} km desde a última troca de óleo. Recomenda-se a troca!`;
-      await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'trocaOleo', mensagem);
-      // Auto-reset: start counting from current odometer again
-      await prisma.estadoKmNotificacao.update({
-        where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'trocaOleo' } },
-        data: { kmBaseMetros: odometroMetros, dataBase: new Date(), notificacaoEnviada: false },
+    const ultima = estado.ultimaNotificacaoKm ?? -9999;
+    const nome = dispositivo.nome;
+    const pl = dispositivo.placa ? ` (${dispositivo.placa})` : '';
+
+    // Build threshold list in ascending order
+    const candidatos: Array<{ km: number; mensagem: string }> = [];
+
+    if (intervalo - 100 > 0) {
+      candidatos.push({
+        km: intervalo - 100,
+        mensagem: `Troca de Óleo: O veículo ${nome}${pl} está a 100 km da próxima troca de óleo (intervalo: ${intervalo} km).`,
       });
     }
+    if (intervalo - 50 > 0) {
+      candidatos.push({
+        km: intervalo - 50,
+        mensagem: `Troca de Óleo: O veículo ${nome}${pl} está a 50 km da próxima troca de óleo (intervalo: ${intervalo} km).`,
+      });
+    }
+    candidatos.push({
+      km: intervalo,
+      mensagem: `Troca de Óleo: O veículo ${nome}${pl} atingiu o intervalo de troca de óleo (${intervalo} km). Realize a troca!`,
+    });
+
+    // Past-due: every 20km
+    if (kmDesdeBase > intervalo) {
+      const blocos = Math.floor((kmDesdeBase - intervalo) / 20);
+      for (let i = 1; i <= blocos; i++) {
+        const kmAtrasado = i * 20;
+        candidatos.push({
+          km: intervalo + kmAtrasado,
+          mensagem: `Troca de Óleo Atrasada: O veículo ${nome}${pl} passou ${kmAtrasado} km do intervalo de troca de óleo. Realize a troca o quanto antes!`,
+        });
+      }
+    }
+
+    // Find first uncrossed threshold
+    const proximo = candidatos.find(c => kmDesdeBase >= c.km && ultima < c.km);
+    if (!proximo) return;
+
+    await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'trocaOleo', proximo.mensagem);
+    await prisma.estadoKmNotificacao.update({
+      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'trocaOleo' } },
+      data: { ultimaNotificacaoKm: proximo.km },
+    });
   }
 
   private async _salvarEEnviar(
@@ -415,7 +452,7 @@ class NotificationService {
           dispositivo.nome,
           dispositivo.placa || '',
           this.getLabelTipo(tipo),
-          new Date().toLocaleString('pt-BR'),
+          new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
           undefined,
         );
         await EmailService.enviarEmail(loginData.email, `Alerta: ${this.getLabelTipo(tipo)} — ${dispositivo.nome}`, html);

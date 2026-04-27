@@ -209,6 +209,10 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       const pos = posicaoPorIdentificador.get(identificador);
       if (pos && anterior) {
         const norm = normalizeAttributes(pos.attributes ?? {});
+        const hasNativeIgnition = (msg.events || []).some(e =>
+          e.deviceId === pos.deviceId &&
+          (e.type === 'ignitionOn' || e.type === 'ignitionOff'),
+        );
         const dados = {
           traccarDeviceId: pos.deviceId,
           latitude: pos.latitude,
@@ -216,9 +220,10 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
           velocidade: Math.round(pos.speed * 1.852),
           endereco: pos.address,
           ignicao: norm.ignicao,
-          alarme: norm.alarme
+          alarme: norm.alarme,
+          _skipIgnition: hasNativeIgnition,
         };
-        
+
         NotificationService.verificarEventosPosicao(identificador, anterior, dados)
           .then(evts => {
             if (evts && evts.length > 0) {

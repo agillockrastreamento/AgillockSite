@@ -97,14 +97,38 @@ router.patch('/km-troca-oleo/:dispositivoId', clienteAuthMiddleware, async (req:
     const dispositivo = await prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { odometroSistemaMetros: true } });
     await prisma.estadoKmNotificacao.upsert({
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo' } },
-      update: { kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false },
-      create: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo', kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false },
+      update: { kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false, ultimaNotificacaoKm: -9999 },
+      create: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo', kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false, ultimaNotificacaoKm: -9999 },
     });
 
     res.json({ message: 'Intervalo atualizado com sucesso!', kmTrocaOleo });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erro ao atualizar intervalo.' });
+  }
+});
+
+// Confirmar que a troca de óleo foi realizada (reseta contador)
+router.post('/confirmar-troca-oleo/:dispositivoId', clienteAuthMiddleware, async (req: any, res) => {
+  try {
+    const { dispositivoId } = req.params;
+    const clienteLoginId = req.cliente.sub;
+
+    const dispositivo = await prisma.dispositivo.findUnique({
+      where: { id: dispositivoId },
+      select: { odometroSistemaMetros: true },
+    });
+
+    await prisma.estadoKmNotificacao.upsert({
+      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo' } },
+      update: { kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false, ultimaNotificacaoKm: -9999 },
+      create: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo', kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false, ultimaNotificacaoKm: -9999 },
+    });
+
+    res.json({ message: 'Troca de óleo confirmada com sucesso!' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao confirmar troca de óleo.' });
   }
 });
 
