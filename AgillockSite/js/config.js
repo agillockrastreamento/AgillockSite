@@ -186,30 +186,41 @@ window.AL_ICONS_3D = {
     // 3. MOTOS E BICICLETAS (Moto Esportiva!)
     // ==========================================
     motocicleta_cruzada: (cor, grad) => `
-      <!-- Roda dianteira -->
-      <rect x="-3" y="-38" width="6" height="16" rx="3" fill="#111" />
-      <!-- Para-lama dianteiro -->
-      <path d="M-4,-30 Q0,-34 4,-30 L4,-24 Q0,-26 -4,-24 Z" fill="${cor}" />
-      <!-- Carenagem frontal e tanque aerodinâmicos -->
-      <path d="M-10,-20 Q0,-35 10,-20 L13,-5 Q0,-8 -13,-5 Z" fill="${cor}" />
-      <path d="M-10,-20 Q0,-35 10,-20 L13,-5 Q0,-8 -13,-5 Z" fill="${grad}" opacity="0.6" />
-      <!-- Para-brisa esporte fumê -->
-      <path d="M-6,-22 Q0,-28 6,-22 L7,-16 Q0,-18 -7,-16 Z" fill="url(#grad-glass)" opacity="0.9" />
-      <!-- Guidão tipo clip-on -->
-      <path d="M-16,-18 L-8,-14 M16,-18 L8,-14" stroke="#222" stroke-width="3" stroke-linecap="round" />
-      <circle cx="-16" cy="-18" r="1.5" fill="#555" />
-      <circle cx="16" cy="-18" r="1.5" fill="#555" />
-      <!-- Banco do piloto -->
-      <path d="M-6,-5 Q0,-10 6,-5 L4,14 Q0,18 -4,14 Z" fill="#1a1a1a" />
-      <!-- Banco do garupa -->
-      <path d="M-4,14 Q0,10 4,14 L3,24 Q0,26 -3,24 Z" fill="#222" />
-      <!-- Rabeta traseira esguia -->
-      <path d="M-3,22 Q0,18 3,22 L2,30 Q0,34 -2,30 Z" fill="${cor}" />
-      <!-- Roda traseira larga de alta performance -->
-      <rect x="-4.5" y="26" width="9" height="16" rx="3" fill="#111" />
-      <!-- Escapamento esportivo lateral -->
-      <path d="M5,8 L11,25" stroke="url(#grad-metal)" stroke-width="4" stroke-linecap="round" />
-      <circle cx="11" cy="25" r="1.5" fill="#111" />
+      <!-- Rodas Slick Larga (MotoGP) -->
+      <rect x="-3.5" y="-38" width="7" height="16" rx="3" fill="#111" />
+      <rect x="-5.5" y="22" width="11" height="18" rx="4" fill="#111" />
+      
+      <!-- Para-lama dianteiro aerodinâmico -->
+      <path d="M-4.5,-29 Q0,-32 4.5,-29 L4.5,-22 Q0,-24 -4.5,-22 Z" fill="${cor}" />
+      
+      <!-- Asas Aerodinâmicas Laterais (Winglets MotoGP) -->
+      <path d="M-12,-22 L-22,-18 L-14,-12 Z" fill="#1a1a1a" />
+      <path d="M12,-22 L22,-18 L14,-12 Z" fill="#1a1a1a" />
+      
+      <!-- Carenagem Frontal Larga e Agressiva -->
+      <path d="M-12,-25 Q0,-38 12,-25 L15,-8 Q0,-10 -15,-8 Z" fill="${cor}" />
+      <path d="M-12,-25 Q0,-38 12,-25 L15,-8 Q0,-10 -15,-8 Z" fill="${grad}" opacity="0.8" />
+      
+      <!-- Para-brisa (Bolha Racing) -->
+      <path d="M-7,-24 Q0,-32 7,-24 L8,-16 Q0,-18 -8,-16 Z" fill="url(#grad-glass)" opacity="0.9" />
+      
+      <!-- Guidão clip-on racing (recolhido) -->
+      <path d="M-12,-15 L-6,-12 M12,-15 L6,-12" stroke="#222" stroke-width="3" stroke-linecap="round" />
+      
+      <!-- Tanque de Combustível Robusto -->
+      <path d="M-10,-8 Q0,-16 10,-8 L8,6 Q0,10 -8,6 Z" fill="${cor}" />
+      <path d="M-10,-8 Q0,-16 10,-8 L8,6 Q0,10 -8,6 Z" fill="url(#grad-metal)" opacity="0.4" />
+      
+      <!-- Escapamento esportivo lateral (Carbono/Titânio) -->
+      <path d="M5,10 L13,26" stroke="#222" stroke-width="5" stroke-linecap="round" />
+      <path d="M6,12 L12,25" stroke="url(#grad-metal)" stroke-width="2" stroke-linecap="round" />
+      <circle cx="13" cy="26" r="1.5" fill="#000" />
+      
+      <!-- Banco do piloto solo (Racing) -->
+      <path d="M-6,4 Q0,-2 6,4 L4,16 Q0,20 -4,16 Z" fill="#1a1a1a" />
+      
+      <!-- Rabeta traseira pontiaguda (Solo/Sem garupa) -->
+      <path d="M-4,16 Q0,12 4,16 L1,32 Q0,35 -1,32 Z" fill="${cor}" />
     `,
     bicicleta: (cor) => `
       <rect x="-1.5" y="-30" width="3" height="60" fill="#333" />
