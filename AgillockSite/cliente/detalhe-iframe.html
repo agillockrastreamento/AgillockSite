@@ -109,6 +109,9 @@
     html.dark-theme .leaflet-control-scale-line { background: rgba(30,32,40,.7) !important; color: #aaa !important; border-color: #555 !important; }
     .map-control-btn:not(.ativo):hover { background: #f0f0f0 !important; }
     html.dark-theme .map-control-btn:not(.ativo):hover { background: #252535 !important; }
+    
+    /* Impedir clip do ícone divIcon */
+    .leaflet-marker-icon { overflow: visible !important; background: transparent; border: none; }
   </style>
 </head>
 <body>
