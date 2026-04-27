@@ -1541,26 +1541,28 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
     si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h</span>`);
   }
 
-  const kmConfig = v?._kmConfig;
-  if (kmConfig?.trocaOleo && p.odometro != null && kmConfig.trocaOleo.kmBaseMetros != null) {
-    const kmPercorrido = (p.odometro - kmConfig.trocaOleo.kmBaseMetros) / 1000;
-    const kmRestante = Math.round(kmConfig.trocaOleo.kmIntervalo - kmPercorrido);
-    const pastDue = kmRestante < 0;
-    const kmAbs = Math.abs(kmRestante);
-    const cor = pastDue ? '#e74c3c' : kmAbs < 500 ? '#e74c3c' : kmAbs < 1000 ? '#f39c12' : '#27ae60';
-    const isDark = document.documentElement.classList.contains('dark-theme');
-    const btnBg = isDark ? '#2d3748' : '#e9ecef';
-    const btnBd = isDark ? '#4a5568' : '#ccc';
-    const btnClr = isDark ? '#cbd5e0' : '#555';
-    const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
-    const textoOleo = pastDue
-      ? `Você passou ${kmAbs.toLocaleString('pt-BR')} km da troca`
-      : `Falta ${kmAbs.toLocaleString('pt-BR')} km p/ troca`;
-    si.push(`<span style="color:${cor};display:flex;align-items:center;gap:4px;min-width:0;"><i class="fa fa-tint" style="flex-shrink:0;"></i><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${textoOleo}</span><span style="display:flex;gap:3px;flex-shrink:0;"><button onclick="abrirModalConfirmarTrocaOleo(ativoId)" style="${btnStyle}" title="Confirmar troca feita"><i class="fa fa-check"></i></button><button onclick="abrirModalTrocaOleo(ativoId)" style="${btnStyle}" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span></span>`);
-  }
-
   if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
   return si.join('');
+}
+
+function buildOleoStatusHtml(p, v) {
+  if (!p || p.odometro == null) return '';
+  const kmConfig = v?._kmConfig;
+  if (!kmConfig?.trocaOleo || kmConfig.trocaOleo.kmBaseMetros == null) return '';
+  const kmPercorrido = (p.odometro - kmConfig.trocaOleo.kmBaseMetros) / 1000;
+  const kmRestante = Math.round(kmConfig.trocaOleo.kmIntervalo - kmPercorrido);
+  const pastDue = kmRestante < 0;
+  const kmAbs = Math.abs(kmRestante);
+  const cor = pastDue ? '#e74c3c' : kmAbs < 500 ? '#e74c3c' : kmAbs < 1000 ? '#f39c12' : '#27ae60';
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  const btnBg = isDark ? '#2d3748' : '#e9ecef';
+  const btnBd = isDark ? '#4a5568' : '#ccc';
+  const btnClr = isDark ? '#cbd5e0' : '#555';
+  const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
+  const textoOleo = pastDue
+    ? `Você passou ${kmAbs.toLocaleString('pt-BR')} km da troca`
+    : `Falta ${kmAbs.toLocaleString('pt-BR')} km p/ troca`;
+  return `<span style="color:${cor};display:flex;align-items:center;gap:4px;font-size:12px;"><i class="fa fa-tint" style="flex-shrink:0;"></i><span style="flex:1;">${textoOleo}</span><span style="display:flex;gap:3px;flex-shrink:0;"><button onclick="abrirModalConfirmarTrocaOleo(ativoId)" style="${btnStyle}" title="Confirmar troca feita"><i class="fa fa-check"></i></button><button onclick="abrirModalTrocaOleo(ativoId)" style="${btnStyle}" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span></span>`;
 }
 
 function _fmtResumoDurCliente(min) {
@@ -1632,6 +1634,8 @@ function _carregarKmConfig(id) {
         const batCor2 = bat2 >= 40 ? '#27ae60' : bat2 >= 20 ? '#f39c12' : '#e74c3c';
         const batFa2 = bat2 >= 80 ? 'fa-battery-full' : bat2 >= 60 ? 'fa-battery-3' : bat2 >= 40 ? 'fa-battery-2' : bat2 >= 20 ? 'fa-battery-1' : 'fa-battery-0';
         elStatusItems.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2, v);
+        const elOleo = document.getElementById('dcard-oleo-status');
+        if (elOleo) elOleo.innerHTML = buildOleoStatusHtml(p, v);
       }
     }
   }).catch(function () { v._kmConfigCarregado = false; });
@@ -1775,10 +1779,11 @@ function mostrarCardDispositivo(id) {
     </div>
     <div class="dcard-body">
       <div class="dcard-section-title">Informações do Dispositivo</div>
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px">
-        <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1">${buildStatusHtmlCliente(p, bat, batFa, batCor, v)}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px">
+        <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">${buildStatusHtmlCliente(p, bat, batFa, batCor, v)}</div>
         <div id="dcard-velocimetro" style="flex-shrink:0;margin-top:-4px">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
       </div>
+      <div id="dcard-oleo-status" style="margin-bottom:6px">${buildOleoStatusHtml(p, v)}</div>
       <div id="dcard-horas">${horasHtml}</div>
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <div class="dcard-section-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -1907,6 +1912,8 @@ function atualizarCardAtivo(did) {
     const batCor2 = bat2 >= 40 ? '#27ae60' : bat2 >= 20 ? '#f39c12' : '#e74c3c';
     const batFa2 = bat2 >= 80 ? 'fa-battery-full' : bat2 >= 60 ? 'fa-battery-3' : bat2 >= 40 ? 'fa-battery-2' : bat2 >= 20 ? 'fa-battery-1' : 'fa-battery-0';
     elStatusItems.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2, v);
+    const elOleo = document.getElementById('dcard-oleo-status');
+    if (elOleo) elOleo.innerHTML = buildOleoStatusHtml(p, v);
   }
   const tsSrv = document.getElementById('dcard-ts-srv'), tsDev = document.getElementById('dcard-ts-dev'), tsGps = document.getElementById('dcard-ts-gps');
   if (tsSrv && p) tsSrv.textContent = fmtGPSTimeSec(p.serverTime);
