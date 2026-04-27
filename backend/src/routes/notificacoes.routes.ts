@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../utils/prisma';
 import { clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
+import EmailService from '../services/email.service';
 
 const router = Router();
 
@@ -114,10 +115,20 @@ router.post('/confirmar-troca-oleo/:dispositivoId', clienteAuthMiddleware, async
     const { dispositivoId } = req.params;
     const clienteLoginId = req.cliente.sub;
 
-    const dispositivo = await prisma.dispositivo.findUnique({
-      where: { id: dispositivoId },
-      select: { odometroSistemaMetros: true },
-    });
+    const [dispositivo, pref, login] = await Promise.all([
+      prisma.dispositivo.findUnique({
+        where: { id: dispositivoId },
+        select: { odometroSistemaMetros: true, nome: true, placa: true },
+      }),
+      prisma.preferenciaNotificacao.findUnique({
+        where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo' } },
+        select: { web: true, app: true, email: true },
+      }),
+      prisma.clienteLogin.findUnique({
+        where: { id: clienteLoginId },
+        select: { email: true, cliente: { select: { nome: true } } },
+      }),
+    ]);
 
     await prisma.estadoKmNotificacao.upsert({
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo' } },
@@ -125,7 +136,29 @@ router.post('/confirmar-troca-oleo/:dispositivoId', clienteAuthMiddleware, async
       create: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleo', kmBaseMetros: dispositivo?.odometroSistemaMetros ?? 0, dataBase: new Date(), notificacaoEnviada: false, ultimaNotificacaoKm: -9999 },
     });
 
-    res.json({ message: 'Troca de óleo confirmada com sucesso!' });
+    const nomeVeiculo = dispositivo?.nome ?? 'Veículo';
+    const placa = dispositivo?.placa ? ` (${dispositivo.placa})` : '';
+    const mensagem = `Troca de Óleo Realizada: A troca de óleo do veículo ${nomeVeiculo}${placa} foi confirmada com sucesso.`;
+
+    if (pref?.web || pref?.app) {
+      await prisma.eventoNotificacao.create({
+        data: { clienteLoginId, dispositivoId, tipoEvento: 'trocaOleoFeita', mensagem, latitude: null, longitude: null, velocidade: null },
+      });
+    }
+
+    if (pref?.email && login) {
+      const html = EmailService.gerarTemplateAlerta(
+        login.cliente.nome,
+        nomeVeiculo,
+        dispositivo?.placa ?? '',
+        'Troca de Óleo Realizada',
+        new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+        undefined,
+      );
+      await EmailService.enviarEmail(login.email, `Troca de Óleo Realizada — ${nomeVeiculo}`, html);
+    }
+
+    res.json({ message: 'Troca de óleo confirmada com sucesso!', mensagem });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erro ao confirmar troca de óleo.' });

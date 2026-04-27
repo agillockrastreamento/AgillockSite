@@ -82,6 +82,7 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'kmExcedida',    label: 'Km Excedida (Período)',       css: 'tipo-overspeed' },
   { tipo: 'kmReduzida',    label: 'Km Reduzida (Período)',       css: 'tipo-geofence' },
   { tipo: 'trocaOleo',     label: 'Troca de Óleo',               css: 'tipo-alarm' },
+  { tipo: 'trocaOleoFeita', label: 'Troca de Óleo Realizada',   css: 'tipo-ignition' },
 ];
 
 let _evtFiltros = new Set();
@@ -404,6 +405,7 @@ function renderEventosLista() {
       case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { cls: 'danger', color: '#e74c3c', icon: 'fa-exclamation-triangle' };
       case 'geofenceEnter': case 'kmReduzida': return { cls: 'info', color: '#2980b9', icon: 'fa-sign-in' };
       case 'geofenceExit': case 'trocaOleo': return { cls: 'warning', color: '#e67e22', icon: 'fa-sign-out' };
+      case 'trocaOleoFeita': return { cls: 'success', color: '#27ae60', icon: 'fa-check-circle' };
       default: return { cls: 'info', color: '#2980b9', icon: 'fa-bell' };
     }
   };
@@ -1686,7 +1688,7 @@ window.abrirModalConfirmarTrocaOleo = function (dispositivoId) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
     AL_CLIENTE.apiPost('/api/cliente/notificacoes/confirmar-troca-oleo/' + dispositivoId, {})
-      .then(function () {
+      .then(function (res) {
         $(modal).modal('hide');
         if (!v._kmConfig) v._kmConfig = {};
         if (!v._kmConfig.trocaOleo) v._kmConfig.trocaOleo = {};
@@ -1694,6 +1696,16 @@ window.abrirModalConfirmarTrocaOleo = function (dispositivoId) {
         if (p?.odometro != null) v._kmConfig.trocaOleo.kmBaseMetros = p.odometro;
         v._kmConfigCarregado = false;
         if (ativoId === dispositivoId) atualizarCardAtivo(dispositivoId);
+        adicionarEvento({
+          id: 'local-' + Date.now(),
+          dispositivoId: dispositivoId,
+          tipo: 'trocaOleoFeita',
+          mensagem: res.mensagem || 'Troca de Óleo Realizada',
+          serverTime: new Date().toISOString(),
+          lat: p?.latitude ?? null,
+          lng: p?.longitude ?? null,
+          velocidade: null,
+        });
         AL_CLIENTE.showAlert('Troca de óleo confirmada! Contador reiniciado.', 'success');
       })
       .catch(function (err) {
@@ -1729,7 +1741,7 @@ function mostrarCardDispositivo(id) {
   const addrTxt = hasCached ? (cachedAddr || `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})`) : (p ? 'Buscando...' : '—');
 
   const imgHtml = v.imagemUrlCliente
-    ? `<img src="${API_BASE}${v.imagemUrlCliente}" style="width:100%;height:140px;object-fit:cover;display:block;border-radius:12px 12px 0 0" onerror="this.style.display='none'" />`
+    ? `<img src="${API_BASE}${v.imagemUrlCliente}" style="width:100%;height:130px;object-fit:cover;display:block;border-radius:12px 12px 0 0" onerror="this.style.display='none'" />`
     : '';
 
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';

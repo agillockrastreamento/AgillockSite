@@ -219,6 +219,7 @@ const TIPOS_EVENTO_ADMIN = [
   { tipo: 'alarm',          label: 'Alarme',                     css: 'tipo-alarm'    },
   { tipo: 'textMessage',    label: 'Mensagem de Texto Recebida', css: 'tipo-text'     },
   { tipo: 'driverChanged',  label: 'Condutor Alterado',          css: 'tipo-driver'   },
+  { tipo: 'trocaOleoFeita', label: 'Troca de Óleo Realizada',   css: 'tipo-ignition' },
 ];
 
 // Filtros ativos (null = todos)
@@ -447,6 +448,7 @@ function renderEventosLista() {
       case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c', icon: 'fa-exclamation-triangle' };
       case 'geofenceEnter': case 'kmReduzida': return { color: '#2980b9', icon: 'fa-sign-in' };
       case 'geofenceExit': case 'trocaOleo': return { color: '#e67e22', icon: 'fa-sign-out' };
+      case 'trocaOleoFeita': return { color: '#27ae60', icon: 'fa-check-circle' };
       default: return { color: '#2980b9', icon: 'fa-bell' };
     }
   };
