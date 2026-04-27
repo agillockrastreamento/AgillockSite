@@ -128,35 +128,57 @@ window.AL_ICONS_3D = {
     // 2. PICKUPS E VANS
     // ==========================================
     carro_assistencia: (cor, grad) => `
-      <!-- Rodas Pick-up -->
-      <rect x="-19" y="-25" width="5" height="14" rx="2" fill="#111" />
-      <rect x="14" y="-25" width="5" height="14" rx="2" fill="#111" />
-      <rect x="-19" y="18" width="5" height="14" rx="2" fill="#111" />
-      <rect x="14" y="18" width="5" height="14" rx="2" fill="#111" />
-      <!-- Cabine Frontal -->
-      <path d="M-16,-35 Q0,-40 16,-35 L16.5,-2 L-16.5,-2 Z" fill="${cor}" />
-      <path d="M-16,-35 Q0,-40 16,-35 L16.5,-2 L-16.5,-2 Z" fill="${grad}" opacity="0.6" />
-      <!-- Para-brisa -->
-      <path d="M-13,-20 Q0,-25 13,-20 L14.5,-5 Q0,-3 -14.5,-5 Z" fill="url(#grad-glass)" />
-      <!-- Retrovisores de Pickup -->
-      <rect x="-20" y="-18" width="5" height="8" rx="1" fill="#1a1a1a" />
-      <rect x="15" y="-18" width="5" height="8" rx="1" fill="#1a1a1a" />
+      <!-- Rodas Robustas de Pickup -->
+      <rect x="-18" y="-26" width="5" height="14" rx="2" fill="#111" />
+      <rect x="13" y="-26" width="5" height="14" rx="2" fill="#111" />
+      <rect x="-18" y="16" width="5" height="14" rx="2" fill="#111" />
+      <rect x="13" y="16" width="5" height="14" rx="2" fill="#111" />
+      
+      <!-- Capô Frontal (Longo como na Hilux) -->
+      <path d="M-14,-36 Q0,-40 14,-36 L16,-18 L-16,-18 Z" fill="${cor}" />
+      <path d="M-14,-36 Q0,-40 14,-36 L16,-18 L-16,-18 Z" fill="${grad}" opacity="0.6" />
+      
+      <!-- Cabine (Dupla) -->
+      <path d="M-16,-18 L16,-18 L16,8 L-16,8 Z" fill="${cor}" />
+      <path d="M-16,-18 L16,-18 L16,8 L-16,8 Z" fill="${grad}" opacity="0.6" />
+      
+      <!-- Para-brisa inclinado -->
+      <path d="M-13,-18 Q0,-22 13,-18 L14.5,-6 Q0,-4 -14.5,-6 Z" fill="url(#grad-glass)" />
+      
+      <!-- Teto da Cabine -->
+      <rect x="-12" y="-6" width="24" height="12" rx="2" fill="#fff" opacity="0.1" />
+      
+      <!-- Vidro Traseiro da Cabine -->
+      <path d="M-13,6 Q0,4 13,6 L14,9 L-14,9 Z" fill="url(#grad-glass)" />
+      
+      <!-- Retrovisores Maiores e Robustos -->
+      <rect x="-20" y="-12" width="5" height="8" rx="2" fill="#1a1a1a" />
+      <rect x="15" y="-12" width="5" height="8" rx="2" fill="#1a1a1a" />
+      
       <!-- Caçamba Traseira -->
-      <path d="M-16.5,-1 L16.5,-1 L16,38 L-16,38 Z" fill="${cor}" />
-      <path d="M-16.5,-1 L16.5,-1 L16,38 L-16,38 Z" fill="url(#grad-metal)" opacity="0.4" />
-      <!-- Detalhes do interior da Caçamba -->
-      <rect x="-13" y="1" width="26" height="34" rx="1" fill="#1a1a1a" />
-      <path d="M-10,3 V33 M-5,3 V33 M0,3 V33 M5,3 V33 M10,3 V33" stroke="#333" stroke-width="1.5" />
-      <!-- Santantônio (Barra de proteção traseira) -->
-      <path d="M-16,-1 L16,-1 L16,4 L-16,4 Z" fill="url(#grad-metal)" />
-      <!-- Faróis -->
-      <rect x="-14" y="-38" width="7" height="4" rx="1" fill="#fff" opacity="0.9" />
-      <rect x="7" y="-38" width="7" height="4" rx="1" fill="#fff" opacity="0.9" />
-      <!-- Giroflex de Assistência -->
-      <rect x="-6" y="-12" width="12" height="4" rx="2" fill="#f39c12" opacity="0.9" />
-      <!-- Lanternas -->
-      <rect x="-16" y="36" width="4" height="3" fill="red" opacity="0.9" />
-      <rect x="12" y="36" width="4" height="3" fill="red" opacity="0.9" />
+      <path d="M-16,9 L16,9 L15,38 L-15,38 Z" fill="${cor}" />
+      <path d="M-16,9 L16,9 L15,38 L-15,38 Z" fill="url(#grad-metal)" opacity="0.4" />
+      
+      <!-- Interior da Caçamba (Revestimento Protetor Preto) -->
+      <rect x="-13" y="11" width="26" height="25" rx="1" fill="#1a1a1a" />
+      <path d="M-10,13 V34 M-5,13 V34 M0,13 V34 M5,13 V34 M10,13 V34" stroke="#333" stroke-width="1.5" />
+      
+      <!-- Santantônio (Barra tubulares de proteção na caçamba) -->
+      <path d="M-15,8 L15,8 L14,12 L-14,12 Z" fill="url(#grad-metal)" opacity="0.8" />
+      <path d="M-14,8 L-12,18 M14,8 L12,18" stroke="url(#grad-metal)" stroke-width="2" stroke-linecap="round" />
+      
+      <!-- Faróis e Grade Frontal Agressiva (Estilo Hilux/Ranger) -->
+      <rect x="-13" y="-38" width="8" height="4" rx="1" fill="#fff" opacity="0.9" />
+      <rect x="5" y="-38" width="8" height="4" rx="1" fill="#fff" opacity="0.9" />
+      <rect x="-4" y="-39" width="8" height="3" rx="1" fill="#111" />
+      <path d="M-3,-38 L3,-38 M-3,-37 L3,-37" stroke="#888" stroke-width="0.5" />
+      
+      <!-- Lanternas Traseiras Verticais de Pickup -->
+      <rect x="-15" y="36" width="4" height="3" fill="red" opacity="0.9" />
+      <rect x="11" y="36" width="4" height="3" fill="red" opacity="0.9" />
+      
+      <!-- Para-choque Traseiro -->
+      <rect x="-10" y="38" width="20" height="3" rx="1" fill="#1a1a1a" />
     `,
     van: (cor, grad) => `
       <rect x="-18" y="-28" width="4" height="14" rx="2" fill="#111" />
