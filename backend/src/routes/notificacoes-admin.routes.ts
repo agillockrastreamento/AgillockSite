@@ -9,7 +9,7 @@ router.use(authMiddleware);
 
 router.get('/admin-prefs', async (req: any, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const row = await prisma.adminPreferencia.findUnique({ where: { userId } });
     res.json({ prefs: (row?.prefs as Record<string, boolean>) ?? {} });
   } catch {
@@ -19,7 +19,7 @@ router.get('/admin-prefs', async (req: any, res) => {
 
 router.post('/admin-prefs', async (req: any, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { prefs } = req.body;
     if (!prefs || typeof prefs !== 'object') {
       return res.status(400).json({ message: 'Payload inválido.' });
@@ -40,7 +40,15 @@ router.post('/admin-prefs', async (req: any, res) => {
 router.get('/clientes', async (_req, res) => {
   try {
     const logins = await prisma.clienteLogin.findMany({
-      where: { ativo: true },
+      where: {
+        ativo: true,
+        cliente: {
+          OR: [
+            { dispositivos:          { some: {} } },
+            { dispositivosVinculados: { some: {} } },
+          ],
+        },
+      },
       select: {
         id: true,
         email: true,
