@@ -2466,13 +2466,8 @@ function atualizarCardAtivo(dispositivoId) {
     if (p?.ignicao === false) si.push(`<span style="color:#bdc3c7"><i class="fa fa-key"></i> Ignição: Desligado</span>`);
     if (bat != null)          si.push(`<span style="color:${batCor}"><i class="fa ${batFa}"></i> Bateria: ${bat}%</span>`);
     if (p?.tensao != null)    si.push(`<span style="color:#8e44ad"><i class="fa fa-bolt"></i> Tensão: ${p.tensao.toFixed(1)} V</span>`);
-    const isDark = document.documentElement.classList.contains('dark-theme');
-    const btnBg = isDark ? '#2d3748' : '#e9ecef';
-    const btnBd = isDark ? '#4a5568' : '#ccc';
-    const btnClr = isDark ? '#cbd5e0' : '#555';
-    const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
-    if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km${_podeEditarMedidores ? ` <button type="button" onclick="abrirModalMedidores('${v.dispositivoId}')" title="Editar odômetro e motor" style="${btnStyle}"><i class="fa fa-pencil"></i></button>` : ''}</span>`);
-    if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h${_podeEditarMedidores ? ` <button type="button" onclick="abrirModalMedidores('${v.dispositivoId}')" title="Editar odômetro e motor" style="${btnStyle}"><i class="fa fa-pencil"></i></button>` : ''}</span>`);
+    if (p?.odometro != null)  si.push(`<span><i class="fa fa-tachometer" style="color:#7f8c8d"></i> Odômetro: ${Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km${_podeEditarMedidores ? ` <button type="button" onclick="abrirModalMedidores('${v.dispositivoId}')" title="Editar odômetro e motor" style="border:1px solid #4a5568;background:#2d3748;color:#2980b9;padding:0 0 0 6px"><i class="fa fa-pencil"></i></button>` : ''}</span>`);
+    if (p?.horas_motor != null) si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h${_podeEditarMedidores ? ` <button type="button" onclick="abrirModalMedidores('${v.dispositivoId}')" title="Editar odômetro e motor" style="border:1px solid #4a5568;background:#2d3748;color:#2980b9;padding:0 0 0 6px"><i class="fa fa-pencil"></i></button>` : ''}</span>`);
     if (v?.motorista?.nome) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${v.motorista.nome}</span>`);
     else if (p?.motorista_id) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista ID: ${p.motorista_id}</span>`);
     if (p?.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
