@@ -194,4 +194,58 @@ router.get('/clientes/:clienteLoginId/km-config/:dispositivoId', async (req, res
   }
 });
 
+// ── Admin events history ──────────────────────────────────────────────────────
+
+router.get('/eventos', async (req, res) => {
+  try {
+    const { periodo, de, ate } = req.query as Record<string, string>;
+    const agora = new Date();
+    let dateFilter: any = {};
+
+    if (periodo === 'hoje') {
+      const inicio = new Date(agora); inicio.setHours(0, 0, 0, 0);
+      dateFilter = { gte: inicio };
+    } else if (periodo === 'ontem') {
+      const inicio = new Date(agora); inicio.setDate(agora.getDate() - 1); inicio.setHours(0, 0, 0, 0);
+      const fim   = new Date(agora); fim.setHours(0, 0, 0, 0);
+      dateFilter = { gte: inicio, lt: fim };
+    } else if (periodo === '7dias') {
+      const inicio = new Date(agora); inicio.setDate(agora.getDate() - 7);
+      dateFilter = { gte: inicio };
+    } else if (periodo === 'custom' && de && ate) {
+      const inicio = new Date(de); inicio.setHours(0, 0, 0, 0);
+      const fim    = new Date(ate); fim.setHours(23, 59, 59, 999);
+      if (!isNaN(inicio.getTime()) && !isNaN(fim.getTime())) dateFilter = { gte: inicio, lte: fim };
+    }
+
+    const eventos = await prisma.eventoNotificacao.findMany({
+      where: { createdAt: dateFilter },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      include: {
+        dispositivo:  { select: { nome: true, placa: true } },
+        clienteLogin: { select: { cliente: { select: { nome: true } } } },
+      },
+    });
+
+    res.json(eventos.map(e => ({
+      id:               e.id,
+      dispositivoId:    e.dispositivoId,
+      tipo:             e.tipoEvento,
+      mensagem:         e.mensagem,
+      serverTime:       e.createdAt,
+      lat:              e.latitude,
+      lng:              e.longitude,
+      endereco:         e.endereco,
+      velocidade:       e.velocidade,
+      dispositivoNome:  e.dispositivo.nome,
+      dispositivoPlaca: e.dispositivo.placa,
+      clienteNome:      e.clienteLogin.cliente.nome,
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao obter eventos.' });
+  }
+});
+
 export default router;

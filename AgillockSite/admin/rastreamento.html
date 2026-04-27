@@ -526,7 +526,9 @@
     #eventos-panel.minimizado #eventos-lista,
     #eventos-panel.minimizado #evt-tipo-wrap,
     #eventos-panel.minimizado #evt-btn-notif,
-    #eventos-panel.minimizado #evt-btn-limpar {
+    #eventos-panel.minimizado #evt-btn-limpar,
+    #eventos-panel.minimizado #evt-data-filtros,
+    #eventos-panel.minimizado #evt-custom-range {
       display: none;
     }
     #eventos-panel.minimizado #eventos-filtros {
@@ -1056,6 +1058,23 @@
             </button>
           </div>
           <h5>Eventos</h5>
+
+          <div id="evt-data-filtros" style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;">
+            <button class="btn btn-default btn-xs btn-evt-periodo active" data-periodo="hoje">Hoje</button>
+            <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="ontem">Ontem</button>
+            <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="7dias">7 dias</button>
+            <button class="btn btn-default btn-xs btn-evt-periodo" data-periodo="custom" title="Personalizado"><i class="fa fa-calendar"></i></button>
+          </div>
+          <div id="evt-custom-range" style="display:none;margin-bottom:10px;">
+            <div style="display:flex;gap:4px;margin-bottom:4px;">
+              <input type="date" id="evt-custom-de" class="form-control input-xs" style="flex:1;font-size:11px;padding:3px 5px;height:26px;" title="Data inicial">
+              <input type="date" id="evt-custom-ate" class="form-control input-xs" style="flex:1;font-size:11px;padding:3px 5px;height:26px;" title="Data final">
+            </div>
+            <button id="evt-custom-buscar" class="btn btn-primary btn-xs btn-block">
+              <i class="fa fa-search"></i> Buscar
+            </button>
+          </div>
+
           <div id="eventos-filtros">
             <div id="evt-tipo-wrap">
               <button id="evt-tipo-btn" type="button">

@@ -319,6 +319,37 @@ function inicializarEventosPanel() {
     this.title = panel.classList.contains('minimizado') ? 'Expandir eventos' : 'Minimizar eventos';
     if (map) setTimeout(() => map.invalidateSize(), 220);
   });
+
+  // Listeners dos botões de período
+  document.querySelectorAll('.btn-evt-periodo').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.btn-evt-periodo').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const periodo = this.dataset.periodo;
+      const customRange = document.getElementById('evt-custom-range');
+      if (periodo === 'custom') {
+        customRange.style.display = 'block';
+        const hoje = new Date().toISOString().slice(0, 10);
+        const deInput  = document.getElementById('evt-custom-de');
+        const ateInput = document.getElementById('evt-custom-ate');
+        if (!deInput.value)  deInput.value  = hoje;
+        if (!ateInput.value) ateInput.value = hoje;
+      } else {
+        customRange.style.display = 'none';
+        carregarHistoricoEventos(periodo);
+      }
+    });
+  });
+
+  document.getElementById('evt-custom-buscar').addEventListener('click', function () {
+    const de  = document.getElementById('evt-custom-de').value;
+    const ate = document.getElementById('evt-custom-ate').value;
+    if (!de || !ate) { AL.showAlert('Preencha as duas datas.', 'warning'); return; }
+    carregarHistoricoEventos('custom', de, ate);
+  });
+
+  // Carregar hoje por padrão
+  carregarHistoricoEventos('hoje');
 }
 
 function _aplicarEstadoPainelEventos() {
@@ -329,6 +360,22 @@ function _aplicarEstadoPainelEventos() {
   try { minimizado = localStorage.getItem(EVENTOS_PANEL_STORAGE_KEY) === '1'; } catch {}
   panel.classList.toggle('minimizado', minimizado);
   btn.title = minimizado ? 'Expandir eventos' : 'Minimizar eventos';
+}
+
+async function carregarHistoricoEventos(periodo, de, ate) {
+  const lista = document.getElementById('eventos-lista');
+  lista.innerHTML = '<div style="padding:20px;text-align:center;color:#999"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
+  try {
+    let url = `/api/notificacoes-admin/eventos?periodo=${periodo}`;
+    if (periodo === 'custom' && de && ate) url += `&de=${de}&ate=${ate}`;
+    const data = await AL.apiGet(url);
+    _eventos.length = 0;
+    if (data && data.length) data.forEach(e => _eventos.push(e));
+    renderEventosLista();
+  } catch (err) {
+    console.error('Erro ao carregar histórico de eventos', err);
+    lista.innerHTML = '<div style="padding:20px;text-align:center;color:#e74c3c">Erro ao carregar histórico.</div>';
+  }
 }
 
 function _atualizarFiltrosTipo() {
