@@ -1552,9 +1552,9 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
     const btnClr = isDark ? '#cbd5e0' : '#555';
     const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
     const textoOleo = pastDue
-      ? `<i class="fa fa-tint"></i> Você passou ${kmAbs.toLocaleString('pt-BR')} km da troca de óleo`
-      : `<i class="fa fa-tint"></i> Falta ${kmAbs.toLocaleString('pt-BR')} km para troca de óleo`;
-    si.push(`<span style="color:${cor};display:flex;align-items:center;gap:5px;flex-wrap:wrap;">${textoOleo}<button onclick="abrirModalConfirmarTrocaOleo(ativoId)" style="${btnStyle}" title="Confirmar troca feita"><i class="fa fa-check"></i></button><button onclick="abrirModalTrocaOleo(ativoId)" style="${btnStyle}" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span>`);
+      ? `Você passou ${kmAbs.toLocaleString('pt-BR')} km da troca`
+      : `Falta ${kmAbs.toLocaleString('pt-BR')} km p/ troca`;
+    si.push(`<span style="color:${cor};display:flex;align-items:center;gap:4px;min-width:0;"><i class="fa fa-tint" style="flex-shrink:0;"></i><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${textoOleo}</span><span style="display:flex;gap:3px;flex-shrink:0;"><button onclick="abrirModalConfirmarTrocaOleo(ativoId)" style="${btnStyle}" title="Confirmar troca feita"><i class="fa fa-check"></i></button><button onclick="abrirModalTrocaOleo(ativoId)" style="${btnStyle}" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span></span>`);
   }
 
   if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
