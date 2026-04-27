@@ -126,7 +126,7 @@ html.al-sb-collapsed .admin-sidebar { width: 64px !important; }
     background: rgba(0,0,0,0.18);
 }
 .sidebar-dropdown.open .sidebar-submenu {
-    max-height: 220px;
+    max-height: 300px;
 }
 .sidebar-submenu li a {
     padding-left: 40px !important;
@@ -1095,7 +1095,7 @@ html.dark-theme .btn-tema-login:hover { border-color: #fab32c; color: #fab32c; }
     transition: max-height 0.22s ease;
 }
 .admin-sidebar.collapsed .sidebar-dropdown.open .sidebar-submenu {
-    max-height: 240px !important;
+    max-height: 320px !important;
     padding: 4px 0 8px;
 }
 .admin-sidebar.collapsed .sidebar-submenu li a {
