@@ -122,7 +122,7 @@ function _iniciarGestoDrawer() {
     const h = card.getBoundingClientRect().height;
     const vh = window.innerHeight;
     // Limiar dinâmico: se estava aberta precisa baixar mais para fechar; se fechada precisa subir menos para abrir
-    const limiar = _drawerAberta ? vh * 0.50 : vh * 0.40;
+    const limiar = _drawerAberta ? vh * 0.45 : vh * 0.40;
     if (h > limiar) _abrirDrawer();
     else _fecharDrawer();
     card.style.height = '';
@@ -352,7 +352,7 @@ function _ajustarAlturaCard() {
   const mapa = document.getElementById('mapa');
   if (!card || !mapa || card.style.display === 'none') return;
   const mapaRect = mapa.getBoundingClientRect();
-  card.style.top = '80px';
+  card.style.top = '120px';
   card.style.maxHeight = `${Math.max(220, mapaRect.height - 104)}px`;
 }
 
