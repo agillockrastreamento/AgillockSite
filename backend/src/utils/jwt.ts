@@ -63,7 +63,7 @@ export interface ShareTokenPayload {
 }
 
 export function signShareToken(dispositivoId: string): string {
-  return jwt.sign({ type: 'share', dispositivoId }, SECRET, { expiresIn: '30d' });
+  return jwt.sign({ type: 'share', dispositivoId }, SECRET, { expiresIn: '24h' });
 }
 
 export function verifyShareToken(token: string): ShareTokenPayload {

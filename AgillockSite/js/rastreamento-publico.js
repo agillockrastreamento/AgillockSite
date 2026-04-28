@@ -11,6 +11,8 @@ let _pollTimer = null;
 const _geocodeCache = {};
 const _overlay = { labels: true, rastro: false };
 const _rastro = { linha: null, setas: [] };
+let _usuarioInteragindo = false;
+let _recentralizarTimer = null;
 
 // ── Utilitários ───────────────────────────────────────────────────────────────
 
@@ -73,6 +75,11 @@ function _abrirDrawer() {
   if (!card) return;
   _drawerAberta = true;
   card.classList.add('drawer-aberta');
+  const mc = document.getElementById('mapa-container');
+  if (mc) mc.classList.add('mapa-expandido');
+  if (map) setTimeout(function () { map.invalidateSize(); }, 320);
+  const btn = document.getElementById('pub-legenda-btn');
+  if (btn) btn.classList.add('drawer-open');
 }
 
 function _fecharDrawer() {
@@ -80,6 +87,11 @@ function _fecharDrawer() {
   if (!card) return;
   _drawerAberta = false;
   card.classList.remove('drawer-aberta');
+  const mc = document.getElementById('mapa-container');
+  if (mc) mc.classList.remove('mapa-expandido');
+  if (map) setTimeout(function () { map.invalidateSize(); }, 320);
+  const btn = document.getElementById('pub-legenda-btn');
+  if (btn) btn.classList.remove('drawer-open');
 }
 
 function _iniciarGestoDrawer() {
@@ -95,13 +107,18 @@ function _iniciarGestoDrawer() {
   }
   function onTouchMove(e) {
     if (_drawerDragY === null || !_isMobile()) return;
+    e.preventDefault();
     const dy = _drawerDragY - e.touches[0].clientY; // positivo = arrastar para cima
     const novaAltura = Math.min(Math.max(_drawerDragStartHeight + dy, window.innerHeight * 0.2), window.innerHeight * 0.85);
     card.style.height = `${novaAltura}px`;
+    const mc = document.getElementById('mapa-container');
+    if (mc) mc.style.bottom = `${novaAltura}px`;
   }
-  function onTouchEnd(e) {
+  function onTouchEnd() {
     if (_drawerDragY === null || !_isMobile()) return;
     card.style.transition = '';
+    const mc = document.getElementById('mapa-container');
+    if (mc) mc.style.bottom = '';
     const h = card.getBoundingClientRect().height;
     const vh = window.innerHeight;
     if (h > vh * 0.45) _abrirDrawer();
@@ -111,7 +128,7 @@ function _iniciarGestoDrawer() {
   }
 
   handle.addEventListener('touchstart', onTouchStart, { passive: true });
-  handle.addEventListener('touchmove', onTouchMove, { passive: true });
+  handle.addEventListener('touchmove', onTouchMove, { passive: false });
   handle.addEventListener('touchend', onTouchEnd, { passive: true });
 
   // Scroll no body do card abre gaveta
@@ -122,6 +139,28 @@ function _iniciarGestoDrawer() {
     }, { passive: true });
   }
 }
+
+// ── Auto-recentralização ──────────────────────────────────────────────────────
+
+function _agendarRecentralizacao() {
+  _cancelarRecentralizacao();
+  _recentralizarTimer = setTimeout(function () {
+    _usuarioInteragindo = false;
+    if (window._dadosPublico?.posicao && map) {
+      const p = window._dadosPublico.posicao;
+      map.flyTo([p.latitude, p.longitude], map.getZoom(), { animate: true, duration: 1 });
+    }
+  }, 5000);
+}
+
+function _cancelarRecentralizacao() {
+  if (_recentralizarTimer) { clearTimeout(_recentralizarTimer); _recentralizarTimer = null; }
+}
+
+window.toggleLegendaMob = function () {
+  const modal = document.getElementById('pub-legenda-modal');
+  if (modal) modal.classList.toggle('aberto');
+};
 
 // ── Estado / Erro ─────────────────────────────────────────────────────────────
 
@@ -154,23 +193,27 @@ async function _apiFetch(path) {
 // ── Ícone do marcador ─────────────────────────────────────────────────────────
 
 function _criarIconePublico(dados, posicao) {
+  const isOnline = dados.status === 'online';
+  const isMoving = isOnline && posicao?.emMovimento;
+  const cor = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#95a5a6';
   if (!window.AL_ICONS_3D) {
-    const cor = posicao?.emMovimento ? '#2980b9' : '#27ae60';
     return L.divIcon({
       html: `<div style="width:14px;height:14px;background:${cor};border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 0 4px ${cor}44;"></div>`,
       className: '',
       iconSize: [14, 14],
       iconAnchor: [7, 7],
+      popupAnchor: [0, -10],
     });
   }
-  const cor = dados.cor || '#2980b9';
   const cat = dados.categoria || 'carro';
   const curso = posicao?.curso || 0;
+  const SIZE = window.AL_ICONS_3D.SIZE;
   return L.divIcon({
     html: window.AL_ICONS_3D.getSvgHtml(cat, cor, curso),
     className: '',
-    iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
-    iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2],
+    iconSize: [SIZE, SIZE],
+    iconAnchor: [SIZE / 2, SIZE / 2],
+    popupAnchor: [0, -SIZE / 2 - 4],
   });
 }
 
@@ -216,41 +259,38 @@ window._mostrarCard = function _mostrarCard(dados) {
 
   const isMob = _isMobile();
   const velHtml = p?.velocidade != null ? svgVelocimetro(p.velocidade, dados.limiteVelocidade) : '';
+  const mobileHasImg = isMob && !!dados.imagemUrl;
 
-  // Desktop: imagem acima, velocímetro inline. Mobile: imagem + velocímetro lado a lado
+  // Desktop: imagem acima, velocímetro inline. Mobile: imagem + nome/placa lado a lado no topo
   let topoHtml;
-  if (isMob) {
-    const imgEl = dados.imagemUrl
-      ? `<div id="pub-img-wrap"><img src="${API_BASE}${dados.imagemUrl}" onerror="this.style.display='none'" /></div>`
-      : '';
-    const velEl = velHtml ? `<div id="pub-vel-mobile">${velHtml}</div>` : '';
-    if (imgEl || velEl) {
-      topoHtml = `<div id="pub-img-vel-row">${imgEl}${velEl}</div>`;
-    } else {
-      topoHtml = '';
-    }
+  if (mobileHasImg) {
+    const imgHtml = '<div id="pub-img-wrap"><img src="' + API_BASE + dados.imagemUrl + '" onerror="this.style.display=\'none\'" /></div>';
+    const nomeHtml = '<div id="pub-nome-mobile"><div class="pub-v-nome" style="font-size:13px">' + esc(dados.nome) + '</div>' + (dados.placa ? '<span class="pub-v-placa">' + esc(dados.placa) + '</span>' : '') + '</div>';
+    topoHtml = '<div id="pub-img-vel-row">' + imgHtml + nomeHtml + '</div>';
+  } else if (!isMob && dados.imagemUrl) {
+    topoHtml = `<img src="${API_BASE}${dados.imagemUrl}" style="width:100%;height:130px;object-fit:cover;display:block;border-radius:10px 10px 0 0" onerror="this.style.display='none'" />`;
   } else {
-    topoHtml = dados.imagemUrl
-      ? `<img src="${API_BASE}${dados.imagemUrl}" style="width:100%;height:130px;object-fit:cover;display:block;border-radius:10px 10px 0 0" onerror="this.style.display='none'" />`
-      : '';
+    topoHtml = '';
   }
 
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
 
   const handleHtml = '<div id="pub-drawer-handle"></div>';
 
+  const headerNomeHtml = mobileHasImg
+    ? '<div style="flex:1"></div>'
+    : '<div style="flex:1;min-width:0"><div class="pub-v-nome">' + esc(dados.nome) + '</div>' + (dados.placa ? '<div style="margin-top:3px"><span class="pub-v-placa">' + esc(dados.placa) + '</span></div>' : '') + '</div>';
+
   card.innerHTML = `
     ${handleHtml}
     ${topoHtml}
     <div class="pub-dcard-header">
-      <div style="flex:1;min-width:0">
-        <div class="pub-v-nome">${esc(dados.nome)}</div>
-        ${dados.placa ? `<div style="margin-top:3px"><span class="pub-v-placa">${esc(dados.placa)}</span></div>` : ''}
-      </div>
+      ${headerNomeHtml}
       <button class="pub-dcard-fechar" onclick="fecharCardPublico()" title="Fechar">×</button>
     </div>
     <div class="pub-dcard-body">
       <div class="pub-dcard-section-title">Informações do Dispositivo</div>
+      ${isMob && velHtml ? '<div style="text-align:center;margin-bottom:4px">' + velHtml + '</div>' : ''}
       <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:4px">
         <div id="pub-si" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1">${si.join('')}</div>
         ${!isMob ? `<div id="pub-vel" style="flex-shrink:0;margin-top:-4px">${velHtml}</div>` : ''}
@@ -314,8 +354,8 @@ function _ajustarAlturaCard() {
   const mapa = document.getElementById('mapa');
   if (!card || !mapa || card.style.display === 'none') return;
   const mapaRect = mapa.getBoundingClientRect();
-  card.style.top = '12px';
-  card.style.maxHeight = `${Math.max(220, mapaRect.height - 24)}px`;
+  card.style.top = '60px';
+  card.style.maxHeight = `${Math.max(220, mapaRect.height - 84)}px`;
 }
 
 function _atualizarCardAtivo(dados) {
@@ -369,6 +409,10 @@ function inicializarMapa() {
     'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: '© Google Maps', maxNativeZoom: 21, maxZoom: 21, detectRetina: true }
   );
+  const tilesGoogleSat = L.tileLayer(
+    'https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',
+    { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: '© Google Maps', maxNativeZoom: 21, maxZoom: 21, detectRetina: true }
+  );
   const tilesCartoDB = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
     { attribution: '© <a href="https://carto.com/">CartoDB</a>', maxNativeZoom: 19, maxZoom: 21, detectRetina: true }
@@ -377,10 +421,23 @@ function inicializarMapa() {
   tilesGoogle.addTo(map);
 
   L.control.zoom({ position: 'topright' }).addTo(map);
-  L.control.layers({ 'Google Maps': tilesGoogle, 'CartoDB': tilesCartoDB }, {}, { position: 'topright', collapsed: true }).addTo(map);
+  L.control.layers(
+    { 'Google Maps': tilesGoogle, 'Satélite': tilesGoogleSat, 'CartoDB': tilesCartoDB },
+    {},
+    { position: 'topright', collapsed: true }
+  ).addTo(map);
 
   _adicionarBotoesCamadas();
   window.addEventListener('resize', _ajustarAlturaCard);
+
+  // Auto-recentralização após 5s de inatividade do usuário
+  map.on('dragstart', function () { _usuarioInteragindo = true; _cancelarRecentralizacao(); });
+  map.on('dragend', function () { _agendarRecentralizacao(); });
+  map.getContainer().addEventListener('wheel', function () {
+    _usuarioInteragindo = true;
+    _cancelarRecentralizacao();
+    _agendarRecentralizacao();
+  }, { passive: true });
 }
 
 // ── Marcador ──────────────────────────────────────────────────────────────────
@@ -400,7 +457,7 @@ function _atualizarMarcador(dados) {
       if (_mostrarPopup && _overlay.labels) _marcador.openPopup();
     });
     if (_overlay.labels) {
-      _marcador.bindPopup(_htmlPopup(dados), { closeButton: false, autoPan: false }).openPopup();
+      _marcador.bindPopup(_htmlPopup(dados), { closeButton: false, autoPan: false, className: 'pub-popup' }).openPopup();
       _popupAberto = true;
     }
     map.setView(latlng, 15);
@@ -417,6 +474,9 @@ function _atualizarMarcador(dados) {
       _popupAberto = false;
     }
     _atualizarCardAtivo(dados);
+    if (!_usuarioInteragindo) {
+      map.panTo(latlng, { animate: true });
+    }
   }
 }
 
