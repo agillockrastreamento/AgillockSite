@@ -20,6 +20,7 @@ import clienteLoginRoutes from './routes/cliente-login.routes';
 import clientePortalRoutes from './routes/cliente-portal.routes';
 import notificacoesRoutes from './routes/notificacoes.routes';
 import notificacoesAdminRoutes from './routes/notificacoes-admin.routes';
+import compartilhamentoRoutes from './routes/compartilhamento.routes';
 import { UPLOADS_DIR } from './utils/upload-paths';
 
 const app = express();
@@ -103,6 +104,7 @@ app.use('/api/clientes', clienteLoginRoutes);   // CRUD do login do cliente (adm
 app.use('/api/cliente/notificacoes', notificacoesRoutes);    // Notificações do cliente
 app.use('/api/notificacoes-admin', notificacoesAdminRoutes); // Notificações admin
 app.use('/api/cliente', clientePortalRoutes);   // portal do cliente (JWT role=CLIENTE)
+app.use('/api/compartilhamento', compartilhamentoRoutes); // links públicos de compartilhamento
 
 // Rota não encontrada
 app.use((_req, res) => {

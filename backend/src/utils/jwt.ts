@@ -56,3 +56,18 @@ export function verifyClienteToken(token: string): ClienteJwtPayload {
   if (decoded.role !== 'CLIENTE') throw new Error('Token inválido para portal do cliente.');
   return decoded;
 }
+
+export interface ShareTokenPayload {
+  type: 'share';
+  dispositivoId: string;
+}
+
+export function signShareToken(dispositivoId: string): string {
+  return jwt.sign({ type: 'share', dispositivoId }, SECRET, { expiresIn: '30d' });
+}
+
+export function verifyShareToken(token: string): ShareTokenPayload {
+  const decoded = jwt.verify(token, SECRET) as ShareTokenPayload;
+  if (decoded.type !== 'share') throw new Error('Token de compartilhamento inválido.');
+  return decoded;
+}

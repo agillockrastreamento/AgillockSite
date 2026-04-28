@@ -2403,6 +2403,7 @@ function _cancelarDesenhoCirculo() {
 
 window.acaoDispositivoCliente = async function(acao, dispositivoId) {
   if (acao === 'rota') { ativarRota(dispositivoId); return; }
+  if (acao === 'compartilhar') { compartilharDispositivoCliente(dispositivoId); return; }
   if (acao === 'cerca') {
     const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
     if (btn && btn.classList.contains('ativo')) {
@@ -2433,12 +2434,36 @@ function _htmlAcoesCard(dispositivoId) {
           <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
           <span>Rota</span>
         </button>
+        <button class="dcard-acao" data-acao="compartilhar" onclick="acaoDispositivoCliente('compartilhar','${dispositivoId}')" title="Compartilhar link de acompanhamento">
+          <span class="dcard-acao-icon"><i class="fa fa-share-alt"></i></span>
+          <span>Compartilhar</span>
+        </button>
         <button class="dcard-acao" data-acao="cerca" onclick="acaoDispositivoCliente('cerca','${dispositivoId}')" title="Criar Cerca">
           <span class="dcard-acao-icon"><i class="fa fa-circle-o"></i></span>
           <span>Cerca</span>
         </button>
       </div>
     </div>`;
+}
+
+async function compartilharDispositivoCliente(dispositivoId) {
+  const btn = document.querySelector('.dcard-acao[data-acao="compartilhar"]');
+  if (btn) { btn.disabled = true; btn.querySelector('i').className = 'fa fa-spinner fa-spin'; }
+  try {
+    const data = await AL_CLIENTE.apiPost('/api/compartilhamento/gerar', { dispositivoId });
+    const siteBase = window.location.pathname.replace(/\/(?:admin|cliente|colaborador)\/[^/]+$/, '/');
+    const link = `${window.location.origin}${siteBase}rastreamento-publico.html?token=${data.token}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      AL_CLIENTE.showAlert('Link de acompanhamento copiado!', 'success');
+    } catch {
+      prompt('Copie o link de acompanhamento:', link);
+    }
+  } catch (err) {
+    AL_CLIENTE.showAlert('Erro ao gerar link: ' + (err.message || 'Tente novamente.'), 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.querySelector('i').className = 'fa fa-share-alt'; }
+  }
 }
 
 setInterval(() => { AL_CLIENTE.apiGet('/api/cliente/rastreamento/status-acesso').catch(() => {}); }, 60000);

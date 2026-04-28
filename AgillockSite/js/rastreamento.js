@@ -1045,6 +1045,7 @@ async function ativarRota(dispositivoId) {
 
 window.acaoDispositivo = async function (acao, dispositivoId) {
   if (acao === 'rota') { ativarRota(dispositivoId); return; }
+  if (acao === 'compartilhar') { compartilharDispositivo(dispositivoId); return; }
   if (acao === 'comando') { abrirModalComando(dispositivoId); return; }
   if (acao === 'cerca') {
     const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
@@ -2479,6 +2480,10 @@ function _htmlAcoesCard(dispositivoId) {
           <div class="dcard-acao-icon"><i class="fa fa-road"></i></div>
           <span>Rota</span>
         </button>
+        <button class="dcard-acao" data-acao="compartilhar" onclick="acaoDispositivo('compartilhar','${dispositivoId}')" title="Compartilhar link de acompanhamento">
+          <div class="dcard-acao-icon"><i class="fa fa-share-alt"></i></div>
+          <span>Compartilhar</span>
+        </button>
         <button class="dcard-acao" data-acao="comando" onclick="acaoDispositivo('comando','${dispositivoId}')" title="Comando">
           <div class="dcard-acao-icon"><i class="fa fa-terminal"></i></div>
           <span>Comando</span>
@@ -2489,6 +2494,26 @@ function _htmlAcoesCard(dispositivoId) {
         </button>
       </div>
     </div>`;
+}
+
+async function compartilharDispositivo(dispositivoId) {
+  const btn = document.querySelector('.dcard-acao[data-acao="compartilhar"]');
+  if (btn) { btn.disabled = true; btn.querySelector('i').className = 'fa fa-spinner fa-spin'; }
+  try {
+    const data = await window.AL.apiPost('/api/compartilhamento/gerar', { dispositivoId });
+    const siteBase = window.location.pathname.replace(/\/(?:admin|cliente|colaborador)\/[^/]+$/, '/');
+    const link = `${window.location.origin}${siteBase}rastreamento-publico.html?token=${data.token}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      window.AL.showAlert('Link de acompanhamento copiado!', 'success');
+    } catch {
+      prompt('Copie o link de acompanhamento:', link);
+    }
+  } catch (err) {
+    window.AL.showAlert('Erro ao gerar link: ' + (err.message || 'Tente novamente.'), 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.querySelector('i').className = 'fa fa-share-alt'; }
+  }
 }
 
 window.fecharCardDispositivo = function (skipClosePopup) {

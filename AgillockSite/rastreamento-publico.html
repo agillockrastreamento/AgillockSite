@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Acompanhamento — AgilLock</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,600,700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Montserrat', sans-serif; background: #1e2530; }
+
+    /* ── Loading / Erro ── */
+    #pub-loading, #pub-error {
+      position: fixed; inset: 0;
+      background: #1e2530;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 9999; color: #fff; text-align: center; padding: 24px;
+    }
+    #pub-error { display: none; }
+    #pub-loading img, #pub-error img { height: 56px; margin-bottom: 20px; }
+    #pub-loading p { font-size: 14px; color: #aaa; margin: 0; }
+    #pub-error h2 { font-size: 20px; margin: 0 0 8px; }
+    #pub-error p  { font-size: 14px; color: #aaa; margin: 0; }
+    .pub-spinner {
+      width: 36px; height: 36px; border: 3px solid rgba(255,255,255,.15);
+      border-top-color: #fab32c; border-radius: 50%;
+      animation: pub-spin .8s linear infinite;
+      margin: 0 auto 18px;
+    }
+    @keyframes pub-spin { to { transform: rotate(360deg); } }
+
+    /* ── Mapa container ── */
+    #mapa-container { position: fixed; inset: 0; }
+    #mapa { width: 100%; height: 100%; }
+
+    /* ── Logo flutuante (quando card está fechado) ── */
+    #pub-logo {
+      position: absolute; top: 12px; left: 12px; z-index: 900;
+      pointer-events: none; display: block;
+    }
+    #pub-logo img { height: 36px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+
+    /* ── Leaflet overrides ── */
+    .leaflet-control-layers {
+      width: 35px !important; height: 35px !important;
+      background: #fff !important; border-radius: 50% !important;
+      border: 2px solid #c2c1c1 !important; box-shadow: none !important;
+      overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 0 !important;
+    }
+    .leaflet-control-layers-toggle { width: 35px !important; height: 35px !important; background-size: 20px !important; margin: 0 !important; }
+    .leaflet-control-layers-expanded { width: auto !important; height: auto !important; border-radius: 8px !important; padding: 10px !important; }
+    .leaflet-bar { box-shadow: none !important; background: #fff !important; border-radius: 20px !important; border: 2px solid #c2c1c1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+    .leaflet-bar a { width: 35px !important; height: 35px !important; border-radius: 0 !important; border: none !important; border-bottom: 1px solid #c2c1c1 !important; background: transparent !important; color: #555 !important; font-size: 18px !important; display: flex !important; align-items: center !important; justify-content: center !important; text-decoration: none !important; line-height: 1 !important; }
+    .leaflet-bar a:last-child { border-bottom: none !important; }
+    .leaflet-bar a:hover { background: #f0f0f0 !important; }
+
+    /* ── Botões de controle do mapa ── */
+    .pub-map-control-btn {
+      width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; border: 2px solid #c2c1c1; background: #fff; color: #555;
+      cursor: pointer; box-shadow: none; padding: 0; line-height: 1; font-size: 15px;
+    }
+    .pub-map-control-btn.ativo { background: #fab32c; border-color: #fab32c; color: #222; }
+    .pub-map-control-btn:hover:not(.ativo) { background: #f0f0f0; }
+
+    /* ── Bandeja de camadas (Labels + Rastro) ── */
+    #pub-mapa-tray {
+      position: absolute; top: 10px; right: 52px; z-index: 940;
+      background: rgba(20,20,30,0.88); backdrop-filter: blur(6px);
+      border-radius: 12px; padding: 10px;
+      display: flex; flex-direction: row; align-items: center; gap: 8px;
+      transform: translateX(8px); opacity: 0;
+      transition: transform .2s ease, opacity .2s ease;
+      pointer-events: none;
+    }
+    #pub-mapa-tray::after {
+      content: ""; position: absolute; top: 9px; right: -7px; width: 0; height: 0;
+      border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+      border-left: 7px solid rgba(20,20,30,0.88);
+    }
+    #pub-mapa-tray.aberta { transform: translateX(0); opacity: 1; pointer-events: all; }
+    .pub-ml-btn {
+      display: flex; align-items: center; gap: 10px;
+      background: none; border: none; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px;
+      color: #fff; font-size: 12px; font-weight: 600;
+      white-space: nowrap; transition: background .12s;
+      font-family: 'Montserrat', sans-serif;
+    }
+    .pub-ml-btn:hover { background: rgba(255,255,255,.1); }
+    .pub-ml-btn.ativo { background: rgba(250,179,44,.18); }
+    .pub-ml-btn-icon {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+      transition: background .12s, border-color .12s;
+    }
+    .pub-ml-btn.ativo .pub-ml-btn-icon { background: rgba(250,179,44,.35); border-color: #fab32c; color: #fab32c; }
+
+    /* ── Card flutuante do dispositivo ── */
+    #pub-device-card {
+      display: none;
+      position: absolute; top: 12px; left: 12px;
+      z-index: 2100;
+      width: 290px;
+      max-width: calc(100vw - 24px);
+      max-height: calc(100vh - 24px);
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.25);
+      overflow: hidden;
+      flex-direction: column;
+      scrollbar-width: thin;
+      scrollbar-color: #ccc #fff;
+    }
+    #pub-device-card::-webkit-scrollbar { width: 5px; }
+    #pub-device-card::-webkit-scrollbar-track { background: #fff; }
+    #pub-device-card::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+    .pub-dcard-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid #eee;
+      flex-shrink: 0;
+    }
+    .pub-v-nome { font-weight: 700; font-size: 14px; color: #222; line-height: 1.3; }
+    .pub-v-placa {
+      display: inline-block; background: #333; color: #fff;
+      padding: 0 6px; border-radius: 3px; font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    }
+    .pub-dcard-fechar {
+      background: none; border: none; font-size: 20px; line-height: 1;
+      color: #bbb; cursor: pointer; padding: 0 2px; flex-shrink: 0; margin-top: -2px;
+    }
+    .pub-dcard-fechar:hover { color: #e74c3c; }
+
+    .pub-dcard-body {
+      padding: 10px 12px 10px;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .pub-dcard-section {
+      font-size: 11px;
+      border-top: 1px solid rgba(128,128,128,.15);
+      padding-top: 6px; margin-top: 6px; line-height: 1.7;
+    }
+    .pub-dcard-val { color: #333; }
+    .pub-dcard-lbl { font-weight: 600; color: #333; }
+    .pub-dcard-section-title {
+      font-size: 11px; font-weight: 900; color: #141414;
+      letter-spacing: .3px; line-height: 1.2; margin-bottom: 6px;
+    }
+
+    .pub-dcard-maps-btn {
+      width: 30px; height: 25px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 6px; border: 1px solid rgba(41,128,185,.18); background: #eef6fc; color: #2980b9;
+      text-decoration: none; transition: all .2s ease; font-size: 11px;
+    }
+    .pub-dcard-maps-btn:hover { background: #d9ebf7; color: #21618c; transform: scale(1.05); }
+
+    .pub-dcard-footer {
+      flex-shrink: 0;
+      padding: 8px 12px 10px;
+      border-top: 1px solid rgba(128,128,128,.12);
+      background: #fafafa;
+    }
+
+    /* ── Botão de "reabrir card" quando fechado ── */
+    #pub-btn-reabrir {
+      display: none;
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 2100;
+      background: rgba(20,20,30,0.88); color: #fff;
+      border: none; border-radius: 24px; padding: 10px 20px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      font-family: 'Montserrat', sans-serif;
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+    #pub-btn-reabrir i { margin-right: 6px; }
+
+    /* ── Popup Leaflet ── */
+    .pub-popup .leaflet-popup-content-wrapper { padding: 0 !important; border-radius: 8px !important; overflow: hidden !important; }
+    .pub-popup .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+
+    /* ── Responsive mobile ── */
+    @media (max-width: 480px) {
+      #pub-device-card {
+        width: calc(100vw - 24px);
+        max-height: 62vh;
+      }
+      .pub-ml-btn span:not(.pub-ml-btn-icon) { display: none; }
+      .pub-ml-btn { padding: 4px; }
+    }
+    @media (max-height: 500px) and (orientation: landscape) {
+      #pub-device-card { max-height: calc(100vh - 24px); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading -->
+  <div id="pub-loading">
+    <img src="img/logo_agillock_white_new.png" alt="AgilLock" onerror="this.style.display='none'" />
+    <div class="pub-spinner"></div>
+    <p>Carregando acompanhamento...</p>
+  </div>
+
+  <!-- Erro -->
+  <div id="pub-error">
+    <img src="img/logo_agillock_white_new.png" alt="AgilLock" onerror="this.style.display='none'" />
+    <h2 id="pub-error-titulo">Link inválido</h2>
+    <p id="pub-error-msg">O link de acompanhamento é inválido ou expirou.</p>
+  </div>
+
+  <!-- Mapa -->
+  <div id="mapa-container">
+    <div id="mapa"></div>
+
+    <!-- Logo (visível antes do card carregar) -->
+    <div id="pub-logo">
+      <img src="img/logo_agillock_white_new.png" alt="AgilLock" />
+    </div>
+
+    <!-- Bandeja de camadas: Labels + Rastro -->
+    <div id="pub-mapa-tray">
+      <button class="pub-ml-btn ativo" id="pub-ml-labels">
+        <span class="pub-ml-btn-icon"><i class="fa fa-comment"></i></span>
+        <span>Labels</span>
+      </button>
+      <button class="pub-ml-btn" id="pub-ml-rastro">
+        <span class="pub-ml-btn-icon"><i class="fa fa-ellipsis-h"></i></span>
+        <span>Rastro</span>
+      </button>
+    </div>
+
+    <!-- Card do dispositivo -->
+    <div id="pub-device-card"></div>
+
+    <!-- Botão flutuante para reabrir o card quando fechado -->
+    <button id="pub-btn-reabrir" onclick="reabrirCard()">
+      <i class="fa fa-car"></i> Ver Veículo
+    </button>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/rastreamento-publico.js"></script>
+  <script>
+    // Mostra/oculta o botão de reabrir conforme o card
+    const _cardObs = new MutationObserver(function () {
+      const card = document.getElementById('pub-device-card');
+      const btn = document.getElementById('pub-btn-reabrir');
+      if (!card || !btn) return;
+      const visivel = card.style.display !== 'none' && card.style.display !== '';
+      btn.style.display = visivel ? 'none' : 'block';
+    });
+    document.addEventListener('DOMContentLoaded', function () {
+      const card = document.getElementById('pub-device-card');
+      if (card) _cardObs.observe(card, { attributes: true, attributeFilter: ['style'] });
+    });
+
+    function reabrirCard() {
+      if (window._dadosPublico && window._mostrarCard) {
+        window._mostrarCard(window._dadosPublico);
+        document.getElementById('pub-logo').style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>
