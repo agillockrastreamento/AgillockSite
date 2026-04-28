@@ -121,7 +121,9 @@ function _iniciarGestoDrawer() {
     if (mc) mc.style.bottom = '';
     const h = card.getBoundingClientRect().height;
     const vh = window.innerHeight;
-    if (h > vh * 0.45) _abrirDrawer();
+    // Limiar dinâmico: se estava aberta precisa baixar mais para fechar; se fechada precisa subir menos para abrir
+    const limiar = _drawerAberta ? vh * 0.40 : vh * 0.38;
+    if (h > limiar) _abrirDrawer();
     else _fecharDrawer();
     card.style.height = '';
     _drawerDragY = null;
@@ -218,9 +220,8 @@ function _criarIconePublico(dados, posicao) {
 }
 
 function _htmlPopup(dados) {
-  const cor = dados.cor || '#2980b9';
-  const bg = `${cor}22`;
-  return `<div style="padding:6px 10px;font-size:12px;font-weight:700;color:#333;background:${bg};border-radius:6px;white-space:nowrap;">${esc(dados.nome)}${dados.placa ? `<br><span style="font-size:10px;font-weight:400;color:#666">${esc(dados.placa)}</span>` : ''}</div>`;
+  const txt = dados.placa ? esc(dados.placa) : esc(dados.nome);
+  return `<div style="padding:4px 9px;font-size:11px;font-weight:700;color:#222;background:#fff;white-space:nowrap;">${txt}</div>`;
 }
 
 // ── Card de dispositivo (simplificado) ────────────────────────────────────────
@@ -345,7 +346,6 @@ window.fecharCardPublico = function () {
     _fecharDrawer(); // no mobile só fecha para 30%, nunca some
   } else {
     card.style.display = 'none';
-    document.getElementById('pub-logo').style.display = 'block';
   }
 };
 
@@ -354,8 +354,8 @@ function _ajustarAlturaCard() {
   const mapa = document.getElementById('mapa');
   if (!card || !mapa || card.style.display === 'none') return;
   const mapaRect = mapa.getBoundingClientRect();
-  card.style.top = '60px';
-  card.style.maxHeight = `${Math.max(220, mapaRect.height - 84)}px`;
+  card.style.top = '80px';
+  card.style.maxHeight = `${Math.max(220, mapaRect.height - 104)}px`;
 }
 
 function _atualizarCardAtivo(dados) {
@@ -399,7 +399,7 @@ function _atualizarCardAtivo(dados) {
 let _mostrarPopup = true;
 
 function inicializarMapa() {
-  map = L.map('mapa', { zoomControl: false, maxZoom: 21 }).setView([-15.78, -47.93], 5);
+  map = L.map('mapa', { zoomControl: false, maxZoom: 21, closePopupOnClick: false }).setView([-15.78, -47.93], 5);
   // Toque no mapa (mobile) fecha gaveta para 30%
   map.on('click', function () {
     if (_isMobile() && _drawerAberta) _fecharDrawer();
@@ -452,17 +452,15 @@ function _atualizarMarcador(dados) {
     _marcador = L.marker(latlng, { icon, zIndexOffset: 100 }).addTo(map);
     _marcador.on('click', function () {
       window._mostrarCard(dados);
-      if (!_isMobile()) document.getElementById('pub-logo').style.display = 'none';
       if (_isMobile()) _abrirDrawer();
       if (_mostrarPopup && _overlay.labels) _marcador.openPopup();
     });
     if (_overlay.labels) {
-      _marcador.bindPopup(_htmlPopup(dados), { closeButton: false, autoPan: false, className: 'pub-popup' }).openPopup();
+      _marcador.bindPopup(_htmlPopup(dados), { closeButton: false, autoPan: false, autoClose: false, closeOnClick: false, className: 'pub-popup' }).openPopup();
       _popupAberto = true;
     }
     map.setView(latlng, 15);
     window._mostrarCard(dados);
-    if (!_isMobile()) document.getElementById('pub-logo').style.display = 'none';
   } else {
     _marcador.setLatLng(latlng);
     _marcador.setIcon(icon);
