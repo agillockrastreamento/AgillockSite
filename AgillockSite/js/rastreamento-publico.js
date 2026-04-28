@@ -122,7 +122,7 @@ function _iniciarGestoDrawer() {
     const h = card.getBoundingClientRect().height;
     const vh = window.innerHeight;
     // Limiar dinâmico: se estava aberta precisa baixar mais para fechar; se fechada precisa subir menos para abrir
-    const limiar = _drawerAberta ? vh * 0.40 : vh * 0.38;
+    const limiar = _drawerAberta ? vh * 0.50 : vh * 0.40;
     if (h > limiar) _abrirDrawer();
     else _fecharDrawer();
     card.style.height = '';
@@ -266,7 +266,8 @@ window._mostrarCard = function _mostrarCard(dados) {
   let topoHtml;
   if (mobileHasImg) {
     const imgHtml = '<div id="pub-img-wrap"><img src="' + API_BASE + dados.imagemUrl + '" onerror="this.style.display=\'none\'" /></div>';
-    const nomeHtml = '<div id="pub-nome-mobile"><div class="pub-v-nome" style="font-size:13px">' + esc(dados.nome) + '</div>' + (dados.placa ? '<span class="pub-v-placa">' + esc(dados.placa) + '</span>' : '') + '</div>';
+    const fecharBtn = '<button class="pub-dcard-fechar" onclick="fecharCardPublico()" title="Fechar" style="align-self:flex-start;margin-left:auto">×</button>';
+    const nomeHtml = '<div id="pub-nome-mobile"><div style="display:flex;align-items:flex-start;width:100%;gap:4px"><div class="pub-v-nome" style="font-size:13px;flex:1;min-width:0">' + esc(dados.nome) + '</div>' + fecharBtn + '</div>' + (dados.placa ? '<span class="pub-v-placa">' + esc(dados.placa) + '</span>' : '') + '</div>';
     topoHtml = '<div id="pub-img-vel-row">' + imgHtml + nomeHtml + '</div>';
   } else if (!isMob && dados.imagemUrl) {
     topoHtml = `<img src="${API_BASE}${dados.imagemUrl}" style="width:100%;height:130px;object-fit:cover;display:block;border-radius:10px 10px 0 0" onerror="this.style.display='none'" />`;
@@ -278,17 +279,14 @@ window._mostrarCard = function _mostrarCard(dados) {
 
   const handleHtml = '<div id="pub-drawer-handle"></div>';
 
-  const headerNomeHtml = mobileHasImg
-    ? '<div style="flex:1"></div>'
-    : '<div style="flex:1;min-width:0"><div class="pub-v-nome">' + esc(dados.nome) + '</div>' + (dados.placa ? '<div style="margin-top:3px"><span class="pub-v-placa">' + esc(dados.placa) + '</span></div>' : '') + '</div>';
+  const headerHtml = mobileHasImg
+    ? ''
+    : `<div class="pub-dcard-header"><div style="flex:1;min-width:0"><div class="pub-v-nome">${esc(dados.nome)}</div>${dados.placa ? '<div style="margin-top:3px"><span class="pub-v-placa">' + esc(dados.placa) + '</span></div>' : ''}</div><button class="pub-dcard-fechar" onclick="fecharCardPublico()" title="Fechar">×</button></div>`;
 
   card.innerHTML = `
     ${handleHtml}
     ${topoHtml}
-    <div class="pub-dcard-header">
-      ${headerNomeHtml}
-      <button class="pub-dcard-fechar" onclick="fecharCardPublico()" title="Fechar">×</button>
-    </div>
+    ${headerHtml}
     <div class="pub-dcard-body">
       <div class="pub-dcard-section-title">Informações do Dispositivo</div>
       ${isMob && velHtml ? '<div style="text-align:center;margin-bottom:4px">' + velHtml + '</div>' : ''}
