@@ -110,14 +110,6 @@ function _urlStreetView(lat, lng) {
   return `https://www.google.com/maps?q=&layer=c&cbll=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
-function _urlGoogleMaps(lat, lng) {
-  return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}`;
-}
-
-function _htmlBotaoGoogleMaps(lat, lng) {
-  return `<a href="${_urlGoogleMaps(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-maps-btn" title="Abrir no Google Maps"><i class="fa fa-map-pin" style="color:#e74c3c"></i></a>`;
-}
-
 function _urlGoogleMaps(lat, lng, endereco) {
   const query = endereco ? endereco : `${lat},${lng}`;
   return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
@@ -235,6 +227,7 @@ let _eventoPopupAtualIdx = null;
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function () {
+  carregarUltimaLeituraAdmin();
   inicializarMapa();
   inicializarEventosPanel();
   carregarPosicoes();
@@ -278,13 +271,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
 let _panelAbertoAdmin = false;
 
+let _ultimaLeituraAdmin = 0;
+
+async function carregarUltimaLeituraAdmin() {
+  try {
+    const data = await window.AL.apiGet('/api/notificacoes-admin/admin-prefs');
+    if (data && data.prefs && data.prefs.al_last_notif_admin) {
+      _ultimaLeituraAdmin = parseInt(data.prefs.al_last_notif_admin, 10) || 0;
+    }
+  } catch (e) {}
+  _atualizarBadgeNotificacoesAdmin();
+}
+
 function _getUltimaLeituraAdmin() {
-  const v = localStorage.getItem('al_last_notif_admin');
-  return v ? parseInt(v, 10) : 0;
+  return _ultimaLeituraAdmin;
 }
 
 function _setUltimaLeituraAdmin() {
-  localStorage.setItem('al_last_notif_admin', Date.now().toString());
+  const now = Date.now();
+  _ultimaLeituraAdmin = now;
+  try {
+    window.AL.apiPost('/api/notificacoes-admin/admin-prefs/merge', { prefs: { al_last_notif_admin: now } });
+  } catch (e) {}
 }
 
 function _atualizarBadgeNotificacoesAdmin() {

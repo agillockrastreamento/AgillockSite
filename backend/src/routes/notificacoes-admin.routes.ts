@@ -35,6 +35,28 @@ router.post('/admin-prefs', async (req: any, res) => {
   }
 });
 
+router.post('/admin-prefs/merge', async (req: any, res) => {
+  try {
+    const userId = req.user.userId;
+    const { prefs: partialPrefs } = req.body;
+    if (!partialPrefs || typeof partialPrefs !== 'object') {
+      return res.status(400).json({ message: 'Payload inválido.' });
+    }
+    const row = await prisma.adminPreferencia.findUnique({ where: { userId } });
+    const currentPrefs = (row?.prefs as any) || {};
+    const newPrefs = { ...currentPrefs, ...partialPrefs };
+
+    await prisma.adminPreferencia.upsert({
+      where: { userId },
+      update: { prefs: newPrefs },
+      create: { userId, prefs: newPrefs },
+    });
+    res.json({ message: 'Preferências mergeadas com sucesso!', prefs: newPrefs });
+  } catch {
+    res.status(500).json({ message: 'Erro ao salvar preferências.' });
+  }
+});
+
 // ── Client list for dropdown ──────────────────────────────────────────────────
 
 router.get('/clientes', async (_req, res) => {

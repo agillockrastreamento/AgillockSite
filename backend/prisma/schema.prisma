@@ -358,6 +358,7 @@ model ClienteLogin {
   email     String   @unique
   senhaHash String
   ativo     Boolean  @default(true)
+  prefs     Json     @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

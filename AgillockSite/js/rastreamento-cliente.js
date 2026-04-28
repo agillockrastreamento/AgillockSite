@@ -204,13 +204,28 @@ async function verificarAcesso() {
 
 let _panelAbertoCliente = false;
 
+let _ultimaLeituraCliente = 0;
+
+async function carregarUltimaLeituraCliente() {
+  try {
+    const data = await AL_CLIENTE.apiGet('/api/cliente/rastreamento/prefs');
+    if (data && data.prefs && data.prefs.al_last_notif_client) {
+      _ultimaLeituraCliente = parseInt(data.prefs.al_last_notif_client, 10) || 0;
+    }
+  } catch (e) {}
+  _atualizarBadgeNotificacoesCliente();
+}
+
 function _getUltimaLeituraCliente() {
-  const v = localStorage.getItem('al_last_notif_client');
-  return v ? parseInt(v, 10) : 0;
+  return _ultimaLeituraCliente;
 }
 
 function _setUltimaLeituraCliente() {
-  localStorage.setItem('al_last_notif_client', Date.now().toString());
+  const now = Date.now();
+  _ultimaLeituraCliente = now;
+  try {
+    AL_CLIENTE.apiPost('/api/cliente/rastreamento/prefs/merge', { prefs: { al_last_notif_client: now } });
+  } catch (e) {}
 }
 
 function _atualizarBadgeNotificacoesCliente() {

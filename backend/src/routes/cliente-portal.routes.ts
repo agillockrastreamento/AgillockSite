@@ -242,6 +242,54 @@ async function verificarBloqueio(clienteId: string): Promise<boolean> {
   return count > 0;
 }
 
+// ── GET e POST /api/cliente/rastreamento/prefs ──────────────────────────────
+router.get('/rastreamento/prefs', async (req: ClienteRequest, res: Response): Promise<void> => {
+  try {
+    const row = await prisma.clienteLogin.findUnique({ where: { id: req.cliente!.sub } });
+    res.json({ prefs: (row?.prefs as any) ?? {} });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao obter preferências.' });
+  }
+});
+
+router.post('/rastreamento/prefs', async (req: ClienteRequest, res: Response): Promise<void> => {
+  try {
+    const { prefs } = req.body;
+    if (!prefs || typeof prefs !== 'object') {
+      res.status(400).json({ error: 'Payload inválido.' });
+      return;
+    }
+    await prisma.clienteLogin.update({
+      where: { id: req.cliente!.sub },
+      data: { prefs },
+    });
+    res.json({ message: 'Preferências salvas com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao salvar preferências.' });
+  }
+});
+
+router.post('/rastreamento/prefs/merge', async (req: ClienteRequest, res: Response): Promise<void> => {
+  try {
+    const { prefs: partialPrefs } = req.body;
+    if (!partialPrefs || typeof partialPrefs !== 'object') {
+      res.status(400).json({ error: 'Payload inválido.' });
+      return;
+    }
+    const row = await prisma.clienteLogin.findUnique({ where: { id: req.cliente!.sub } });
+    const currentPrefs = (row?.prefs as any) || {};
+    const newPrefs = { ...currentPrefs, ...partialPrefs };
+
+    await prisma.clienteLogin.update({
+      where: { id: req.cliente!.sub },
+      data: { prefs: newPrefs },
+    });
+    res.json({ message: 'Preferências salvas com sucesso!', prefs: newPrefs });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao salvar preferências.' });
+  }
+});
+
 // ── GET /api/cliente/rastreamento/posicoes ────────────────────────────────────
 router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
