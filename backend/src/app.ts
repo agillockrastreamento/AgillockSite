@@ -85,6 +85,7 @@ app.get('/api/health', (_req, res) => {
 // Rotas — ordem importa: rotas com prefixo específico primeiro,
 // rotas genéricas (/api) depois para evitar que authMiddleware bloqueie rotas públicas
 app.use('/api/auth', authRoutes);
+app.use('/api/compartilhamento', compartilhamentoRoutes); // público — ANTES de routers com authMiddleware global
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/carnes', carnesRoutes);
 app.use('/api/boletos', boletosRoutes);
@@ -104,7 +105,6 @@ app.use('/api/clientes', clienteLoginRoutes);   // CRUD do login do cliente (adm
 app.use('/api/cliente/notificacoes', notificacoesRoutes);    // Notificações do cliente
 app.use('/api/notificacoes-admin', notificacoesAdminRoutes); // Notificações admin
 app.use('/api/cliente', clientePortalRoutes);   // portal do cliente (JWT role=CLIENTE)
-app.use('/api/compartilhamento', compartilhamentoRoutes); // links públicos de compartilhamento
 
 // Rota não encontrada
 app.use((_req, res) => {

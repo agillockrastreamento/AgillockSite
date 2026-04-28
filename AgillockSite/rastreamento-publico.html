@@ -101,7 +101,7 @@
     }
     .pub-ml-btn.ativo .pub-ml-btn-icon { background: rgba(250,179,44,.35); border-color: #fab32c; color: #fab32c; }
 
-    /* ── Card flutuante do dispositivo ── */
+    /* ── Card flutuante do dispositivo (desktop) ── */
     #pub-device-card {
       display: none;
       position: absolute; top: 12px; left: 12px;
@@ -171,7 +171,7 @@
       background: #fafafa;
     }
 
-    /* ── Botão de "reabrir card" quando fechado ── */
+    /* ── Botão de "reabrir card" quando fechado (desktop) ── */
     #pub-btn-reabrir {
       display: none;
       position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -189,15 +189,71 @@
     .pub-popup .leaflet-popup-content-wrapper { padding: 0 !important; border-radius: 8px !important; overflow: hidden !important; }
     .pub-popup .leaflet-popup-content { margin: 0 !important; width: auto !important; }
 
-    /* ── Responsive mobile ── */
-    @media (max-width: 480px) {
+    /* ── MOBILE: Gaveta ── */
+    @media (max-width: 600px) {
+      /* Card vira gaveta bottom-sheet */
       #pub-device-card {
-        width: calc(100vw - 24px);
-        max-height: 62vh;
+        position: fixed !important;
+        top: auto !important; left: 0 !important;
+        bottom: 0; right: 0;
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: none !important;
+        height: 30vh;          /* padrão: 30% fechada */
+        border-radius: 16px 16px 0 0 !important;
+        box-shadow: 0 -4px 24px rgba(0,0,0,.22) !important;
+        overflow: hidden;
+        flex-direction: column;
+        transition: height .3s cubic-bezier(.4,0,.2,1);
+        will-change: height;
+        touch-action: none;    /* evita scroll nativo interferir no gesto */
       }
+      #pub-device-card.drawer-aberta { height: 60vh; }
+
+      /* Handle da gaveta */
+      #pub-drawer-handle {
+        display: flex; align-items: center; justify-content: center;
+        padding: 10px 0 4px;
+        flex-shrink: 0;
+        cursor: grab;
+        touch-action: none;
+      }
+      #pub-drawer-handle::before {
+        content: '';
+        display: block;
+        width: 36px; height: 4px;
+        background: #ccc;
+        border-radius: 2px;
+      }
+
+      /* Header mais compacto */
+      .pub-dcard-header { padding: 6px 12px 6px; }
+
+      /* Imagem mobile: metade da largura, ao lado do velocímetro */
+      #pub-img-vel-row {
+        display: flex; gap: 8px; align-items: stretch;
+        margin-bottom: 6px;
+      }
+      #pub-img-wrap { flex: 1; min-width: 0; }
+      #pub-img-wrap img {
+        width: 100%; height: 90px;
+        object-fit: cover; border-radius: 8px; display: block;
+      }
+      #pub-vel-mobile {
+        flex: 1; display: flex; align-items: center; justify-content: center;
+      }
+
+      /* Oculta botão de reabrir no mobile (usa a gaveta) */
+      #pub-btn-reabrir { display: none !important; }
+
+      /* Labels da bandeja: texto oculto */
       .pub-ml-btn span:not(.pub-ml-btn-icon) { display: none; }
       .pub-ml-btn { padding: 4px; }
     }
+
+    /* handle oculto no desktop */
+    #pub-drawer-handle { display: none; }
+
     @media (max-height: 500px) and (orientation: landscape) {
       #pub-device-card { max-height: calc(100vh - 24px); }
     }
@@ -241,7 +297,9 @@
     </div>
 
     <!-- Card do dispositivo -->
-    <div id="pub-device-card"></div>
+    <div id="pub-device-card">
+      <div id="pub-drawer-handle"></div>
+    </div>
 
     <!-- Botão flutuante para reabrir o card quando fechado -->
     <button id="pub-btn-reabrir" onclick="reabrirCard()">

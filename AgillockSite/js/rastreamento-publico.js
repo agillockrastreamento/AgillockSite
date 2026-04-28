@@ -60,6 +60,69 @@ function svgVelocimetro(velocidade, limite) {
   </svg>`;
 }
 
+// ── Detecção mobile ───────────────────────────────────────────────────────────
+function _isMobile() { return window.innerWidth <= 600; }
+
+// ── Drawer mobile ─────────────────────────────────────────────────────────────
+let _drawerAberta = false;
+let _drawerDragY = null;
+let _drawerDragStartHeight = null;
+
+function _abrirDrawer() {
+  const card = document.getElementById('pub-device-card');
+  if (!card) return;
+  _drawerAberta = true;
+  card.classList.add('drawer-aberta');
+}
+
+function _fecharDrawer() {
+  const card = document.getElementById('pub-device-card');
+  if (!card) return;
+  _drawerAberta = false;
+  card.classList.remove('drawer-aberta');
+}
+
+function _iniciarGestoDrawer() {
+  const handle = document.getElementById('pub-drawer-handle');
+  const card = document.getElementById('pub-device-card');
+  if (!handle || !card) return;
+
+  function onTouchStart(e) {
+    if (!_isMobile()) return;
+    _drawerDragY = e.touches[0].clientY;
+    _drawerDragStartHeight = card.getBoundingClientRect().height;
+    card.style.transition = 'none';
+  }
+  function onTouchMove(e) {
+    if (_drawerDragY === null || !_isMobile()) return;
+    const dy = _drawerDragY - e.touches[0].clientY; // positivo = arrastar para cima
+    const novaAltura = Math.min(Math.max(_drawerDragStartHeight + dy, window.innerHeight * 0.2), window.innerHeight * 0.85);
+    card.style.height = `${novaAltura}px`;
+  }
+  function onTouchEnd(e) {
+    if (_drawerDragY === null || !_isMobile()) return;
+    card.style.transition = '';
+    const h = card.getBoundingClientRect().height;
+    const vh = window.innerHeight;
+    if (h > vh * 0.45) _abrirDrawer();
+    else _fecharDrawer();
+    card.style.height = '';
+    _drawerDragY = null;
+  }
+
+  handle.addEventListener('touchstart', onTouchStart, { passive: true });
+  handle.addEventListener('touchmove', onTouchMove, { passive: true });
+  handle.addEventListener('touchend', onTouchEnd, { passive: true });
+
+  // Scroll no body do card abre gaveta
+  const body = card.querySelector('.pub-dcard-body');
+  if (body) {
+    body.addEventListener('scroll', function () {
+      if (_isMobile() && !_drawerAberta && body.scrollTop > 0) _abrirDrawer();
+    }, { passive: true });
+  }
+}
+
 // ── Estado / Erro ─────────────────────────────────────────────────────────────
 
 function _ocultarLoading() {
@@ -151,14 +214,34 @@ window._mostrarCard = function _mostrarCard(dados) {
   const coords = p ? `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})` : '';
   const addrTxt = hasCached ? (cachedAddr ? `${cachedAddr}` : coords) : (p ? 'Buscando...' : '—');
 
-  const imgHtml = dados.imagemUrl
-    ? `<img src="${API_BASE}${dados.imagemUrl}" style="width:100%;height:130px;object-fit:cover;display:block;border-radius:10px 10px 0 0" onerror="this.style.display='none'" />`
-    : '';
+  const isMob = _isMobile();
+  const velHtml = p?.velocidade != null ? svgVelocimetro(p.velocidade, dados.limiteVelocidade) : '';
+
+  // Desktop: imagem acima, velocímetro inline. Mobile: imagem + velocímetro lado a lado
+  let topoHtml;
+  if (isMob) {
+    const imgEl = dados.imagemUrl
+      ? `<div id="pub-img-wrap"><img src="${API_BASE}${dados.imagemUrl}" onerror="this.style.display='none'" /></div>`
+      : '';
+    const velEl = velHtml ? `<div id="pub-vel-mobile">${velHtml}</div>` : '';
+    if (imgEl || velEl) {
+      topoHtml = `<div id="pub-img-vel-row">${imgEl}${velEl}</div>`;
+    } else {
+      topoHtml = '';
+    }
+  } else {
+    topoHtml = dados.imagemUrl
+      ? `<img src="${API_BASE}${dados.imagemUrl}" style="width:100%;height:130px;object-fit:cover;display:block;border-radius:10px 10px 0 0" onerror="this.style.display='none'" />`
+      : '';
+  }
 
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
 
+  const handleHtml = '<div id="pub-drawer-handle"></div>';
+
   card.innerHTML = `
-    ${imgHtml}
+    ${handleHtml}
+    ${topoHtml}
     <div class="pub-dcard-header">
       <div style="flex:1;min-width:0">
         <div class="pub-v-nome">${esc(dados.nome)}</div>
@@ -170,7 +253,7 @@ window._mostrarCard = function _mostrarCard(dados) {
       <div class="pub-dcard-section-title">Informações do Dispositivo</div>
       <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:4px">
         <div id="pub-si" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1">${si.join('')}</div>
-        <div id="pub-vel" style="flex-shrink:0;margin-top:-4px">${p?.velocidade != null ? svgVelocimetro(p.velocidade, dados.limiteVelocidade) : ''}</div>
+        ${!isMob ? `<div id="pub-vel" style="flex-shrink:0;margin-top:-4px">${velHtml}</div>` : ''}
       </div>
       <div class="pub-dcard-section pub-dcard-val" style="font-size:11px">
         <div class="pub-dcard-section-title">Última Atualização</div>
@@ -202,15 +285,28 @@ window._mostrarCard = function _mostrarCard(dados) {
   `;
 
   card.style.display = 'flex';
-  _ajustarAlturaCard();
+
+  if (_isMobile()) {
+    // Reconecta gestos (innerHTML recria o handle)
+    _iniciarGestoDrawer();
+    // Abre na posição 30% mas sempre visível
+    _fecharDrawer();
+  } else {
+    _ajustarAlturaCard();
+  }
 
   if (p && !hasCached) _geocodificar(p.latitude, p.longitude, addrId);
 }
 
 window.fecharCardPublico = function () {
   const card = document.getElementById('pub-device-card');
-  if (card) card.style.display = 'none';
-  document.getElementById('pub-logo').style.display = 'block';
+  if (!card) return;
+  if (_isMobile()) {
+    _fecharDrawer(); // no mobile só fecha para 30%, nunca some
+  } else {
+    card.style.display = 'none';
+    document.getElementById('pub-logo').style.display = 'block';
+  }
 };
 
 function _ajustarAlturaCard() {
@@ -264,6 +360,10 @@ let _mostrarPopup = true;
 
 function inicializarMapa() {
   map = L.map('mapa', { zoomControl: false, maxZoom: 21 }).setView([-15.78, -47.93], 5);
+  // Toque no mapa (mobile) fecha gaveta para 30%
+  map.on('click', function () {
+    if (_isMobile() && _drawerAberta) _fecharDrawer();
+  });
 
   const tilesGoogle = L.tileLayer(
     'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
@@ -295,7 +395,8 @@ function _atualizarMarcador(dados) {
     _marcador = L.marker(latlng, { icon, zIndexOffset: 100 }).addTo(map);
     _marcador.on('click', function () {
       window._mostrarCard(dados);
-      document.getElementById('pub-logo').style.display = 'none';
+      if (!_isMobile()) document.getElementById('pub-logo').style.display = 'none';
+      if (_isMobile()) _abrirDrawer();
       if (_mostrarPopup && _overlay.labels) _marcador.openPopup();
     });
     if (_overlay.labels) {
@@ -303,8 +404,8 @@ function _atualizarMarcador(dados) {
       _popupAberto = true;
     }
     map.setView(latlng, 15);
-    _mostrarCard(dados);
-    document.getElementById('pub-logo').style.display = 'none';
+    window._mostrarCard(dados);
+    if (!_isMobile()) document.getElementById('pub-logo').style.display = 'none';
   } else {
     _marcador.setLatLng(latlng);
     _marcador.setIcon(icon);
