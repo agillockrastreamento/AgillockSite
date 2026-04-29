@@ -13,8 +13,11 @@
     { id: 'deviceUnlocked',label: 'Veículo Desbloqueado',        icon: 'fa-unlock',               iconClass: 'ic-lock' },
     { id: 'kmExcedida',    label: 'Km Excedida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'kmReduzida',    label: 'Km Reduzida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
-    { id: 'trocaOleo',     label: 'Troca de Óleo',               icon: 'fa-tint',                 iconClass: 'ic-oleo' },
-    { id: 'manutencao',    label: 'Manutenções (Recorrências)',   icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
+    { id: 'trocaOleo',          label: 'Troca de Óleo',              icon: 'fa-tint',                 iconClass: 'ic-oleo' },
+    { id: 'manutencao',         label: 'Manutenções (Recorrências)', icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
+    { id: 'manutencaoAlerta',   label: 'Alerta de Manutenção',       icon: 'fa-wrench',               iconClass: 'ic-manutencao-alerta', hidden: true },
+    { id: 'manutencaoAtrasada', label: 'Manutenção Atrasada',        icon: 'fa-exclamation-triangle', iconClass: 'ic-manutencao-atrasada', hidden: true },
+    { id: 'manutencaoFeita',    label: 'Manutenção Realizada',       icon: 'fa-check-circle',         iconClass: 'ic-manutencao-feita', hidden: true },
   ];
 
   const CANAIS = [
@@ -91,7 +94,7 @@
 
   function renderGrid() {
     const grid = document.getElementById('grid-notificacoes');
-    grid.innerHTML = TIPOS_NOTIF.map(tipo => {
+    grid.innerHTML = TIPOS_NOTIF.filter(t => !t.hidden).map(tipo => {
       return `
         <div class="notif-card" data-tipo="${tipo.id}">
           <div class="notif-card-header">

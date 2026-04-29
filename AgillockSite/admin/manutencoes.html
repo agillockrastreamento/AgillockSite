@@ -204,6 +204,14 @@
     html.dark-theme .modal-header { border-bottom-color: #2d3748; }
     html.dark-theme .modal-footer { border-top-color: #2d3748; }
     html.dark-theme .modal-title { color: #e0e6f0; }
+    .man-modal .modal-body { max-height: calc(100vh - 220px); overflow-y: auto; }
+    .man-feito-aviso {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: rgba(243,156,18,.1); border: 1px solid rgba(243,156,18,.3);
+      border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;
+      font-size: 12px; color: #c0850e; line-height: 1.5;
+    }
+    html.dark-theme .man-feito-aviso { background: rgba(243,156,18,.15); color: #e6a020; }
     .man-foto-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
     .man-foto-preview-item { position: relative; }
     .man-foto-preview-item img { width: 64px; height: 64px; object-fit: cover; border-radius: 7px; border: 2px solid #e8e8e8; }
@@ -454,7 +462,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-          <h4 class="modal-title"><i class="fa fa-wrench" style="color:#27ae60;margin-right:8px;"></i>Registrar Manutenção para o Cliente</h4>
+          <h4 class="modal-title"><i class="fa fa-wrench" style="color:#27ae60;margin-right:8px;"></i><span id="modalRegistro-title">Registrar Manutenção para o Cliente</span></h4>
         </div>
         <div class="modal-body">
           <div class="man-info-box" style="margin-bottom:20px;">
@@ -537,7 +545,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-          <h4 class="modal-title"><i class="fa fa-repeat" style="color:#e67e22;margin-right:8px;"></i>Nova Recorrência para o Cliente</h4>
+          <h4 class="modal-title"><i class="fa fa-repeat" style="color:#e67e22;margin-right:8px;"></i><span id="modalRecorrencia-title">Nova Recorrência para o Cliente</span></h4>
         </div>
         <div class="modal-body">
           <div class="man-info-box" style="margin-bottom:20px;">
@@ -558,6 +566,21 @@
           <div class="form-group">
             <label class="man-modal-label">Descrição (opcional)</label>
             <textarea id="rec-descricao" class="form-control" rows="2" placeholder="Detalhes ou instruções para o cliente..."></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="man-modal-label"><i class="fa fa-bell" style="margin-right:4px;color:#e67e22;"></i>Notificar cliente via</label>
+            <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="rec-canal-web" /> <i class="fa fa-desktop" style="color:#2980b9;"></i> Web
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="rec-canal-app" /> <i class="fa fa-mobile" style="color:#27ae60;"></i> App
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="rec-canal-email" /> <i class="fa fa-envelope-o" style="color:#8e44ad;"></i> E-mail
+              </label>
+            </div>
+            <p style="font-size:11px;color:#8a9ab0;margin:6px 0 0;">Atualiza automaticamente a configuração de notificações de manutenção do cliente.</p>
           </div>
         </div>
         <div class="modal-footer">
@@ -626,8 +649,12 @@
           <h4 class="modal-title"><i class="fa fa-check-circle" style="color:#27ae60;margin-right:8px;"></i>Confirmar Manutenção Realizada</h4>
         </div>
         <div class="modal-body">
+          <div class="man-feito-aviso">
+            <i class="fa fa-exclamation-triangle" style="margin-top:1px;flex-shrink:0;"></i>
+            <span><strong>Atenção:</strong> Esta ação irá <strong>zerar o contador de km</strong> da recorrência e reiniciar a contagem a partir do km atual do veículo. Um registro será criado automaticamente no histórico.</span>
+          </div>
           <p style="font-size:13px;color:#4a5568;margin-bottom:16px;">
-            Confirme que o serviço <strong id="feito-titulo-label">—</strong> foi realizado. O contador será zerado e um registro de manutenção será criado automaticamente no histórico do cliente.
+            Confirme que o serviço <strong id="feito-titulo-label">—</strong> foi realizado.
           </p>
           <div class="form-group">
             <label class="man-modal-label">Anotações (opcional)</label>
@@ -639,6 +666,25 @@
           <button type="button" class="btn btn-success" id="btn-confirmar-feito">
             <i class="fa fa-check"></i> Confirmar Realizado
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Confirmar Exclusão ═══ -->
+  <div class="modal fade man-modal" id="modalConfirmarExcluir" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-exclamation-triangle" style="color:#e74c3c;margin-right:8px;"></i>Confirmar</h4>
+        </div>
+        <div class="modal-body">
+          <p id="excluir-msg" style="font-size:13px;color:#4a5568;margin:0;"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" id="btn-confirmar-excluir">Confirmar</button>
         </div>
       </div>
     </div>

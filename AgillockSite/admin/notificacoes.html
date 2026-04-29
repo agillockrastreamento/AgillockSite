@@ -180,6 +180,9 @@
     .notif-card-icon.ic-km        { background: rgba(52,152,219,.12); color: #2980b9; }
     .notif-card-icon.ic-oleo      { background: rgba(39,174,96,.12);  color: #27ae60; }
     .notif-card-icon.ic-manutencao { background: rgba(155,89,182,.12); color: #8e44ad; }
+    .notif-card-icon.ic-manutencao-alerta   { background: rgba(230,126,34,.12); color: #e67e22; }
+    .notif-card-icon.ic-manutencao-atrasada { background: rgba(231,76,60,.12);  color: #e74c3c; }
+    .notif-card-icon.ic-manutencao-feita    { background: rgba(39,174,96,.12);  color: #27ae60; }
     html.dark-theme .notif-card-icon.ic-ignition  { background: rgba(39,174,96,.18);  }
     html.dark-theme .notif-card-icon.ic-geofence  { background: rgba(230,126,34,.18); }
     html.dark-theme .notif-card-icon.ic-speed     { background: rgba(231,76,60,.18);  }
@@ -188,7 +191,10 @@
     html.dark-theme .notif-card-icon.ic-lock      { background: rgba(142,68,173,.18); }
     html.dark-theme .notif-card-icon.ic-km        { background: rgba(52,152,219,.18); }
     html.dark-theme .notif-card-icon.ic-oleo      { background: rgba(39,174,96,.18);  }
-    html.dark-theme .notif-card-icon.ic-manutencao { background: rgba(155,89,182,.18); }
+    html.dark-theme .notif-card-icon.ic-manutencao         { background: rgba(155,89,182,.18); }
+    html.dark-theme .notif-card-icon.ic-manutencao-alerta   { background: rgba(230,126,34,.18); }
+    html.dark-theme .notif-card-icon.ic-manutencao-atrasada { background: rgba(231,76,60,.18);  }
+    html.dark-theme .notif-card-icon.ic-manutencao-feita    { background: rgba(39,174,96,.18);  }
     .notif-card-label {
       font-size: 13px;
       font-weight: 700;
@@ -546,15 +552,8 @@
             </div>
           </div>
 
-          <!-- Troca de óleo -->
-          <div id="c-config-troca-oleo" class="notif-speed-card" style="display:none;">
-            <h6><i class="fa fa-tint" style="color:#27ae60;"></i> Alerta de Troca de Óleo</h6>
-            <p class="help-text">Defina de quantos em quantos km o sistema lembrará de trocar o óleo.</p>
-            <div class="notif-speed-input-wrap">
-              <input type="number" id="c-input-km-oleo" class="form-control" placeholder="5000" min="100" max="99999" style="width:110px;" />
-              <span class="notif-speed-unit"><i class="fa fa-road"></i> km</span>
-            </div>
-          </div>
+          <!-- Troca de óleo movida para Manutenções → Recorrências -->
+          <div id="c-config-troca-oleo" style="display:none;"><input type="hidden" id="c-input-km-oleo" value="" /></div>
 
         </div>
 

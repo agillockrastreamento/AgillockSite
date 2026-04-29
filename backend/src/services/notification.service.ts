@@ -462,33 +462,33 @@ class NotificationService {
       const intervalo = rec.intervaloKm;
       const titulo = rec.titulo;
 
-      // Pre-due: 50 km before
+      // Pre-due: 50 km before (orange)
       if (!rec.alerta50Enviado && kmPercorrido >= intervalo - 50) {
         const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
         const mensagem = `Manutenção Próxima: "${titulo}" no veículo ${nome}${pl} — faltam ${kmRestante} km para o próximo serviço (intervalo: ${intervalo} km).`;
-        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencao', mensagem);
+        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencaoAlerta', mensagem);
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta50Enviado: true } });
         rec.alerta50Enviado = true;
       }
 
-      // Pre-due: 25 km before
+      // Pre-due: 25 km before (orange)
       if (!rec.alerta25Enviado && kmPercorrido >= intervalo - 25) {
         const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
         const mensagem = `Manutenção Urgente: "${titulo}" no veículo ${nome}${pl} — faltam apenas ${kmRestante} km para o próximo serviço!`;
-        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencao', mensagem);
+        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencaoAlerta', mensagem);
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta25Enviado: true } });
         rec.alerta25Enviado = true;
       }
 
-      // At limit
+      // At limit (orange → transitions to red on post-due)
       if (!rec.alerta0Enviado && kmPercorrido >= intervalo) {
         const mensagem = `Manutenção Devida: "${titulo}" no veículo ${nome}${pl} atingiu o intervalo de ${intervalo} km. Realize o serviço!`;
-        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencao', mensagem);
+        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencaoAlerta', mensagem);
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta0Enviado: true } });
         rec.alerta0Enviado = true;
       }
 
-      // Post-due: every 50 km after the limit
+      // Post-due: every 50 km after the limit (red)
       if (kmPercorrido > intervalo) {
         const blocos = Math.floor((kmPercorrido - intervalo) / 50);
         const ultima = rec.ultimaAlertaPostDueKm ?? -1;
@@ -496,7 +496,7 @@ class NotificationService {
           const kmAtrasado = i * 50;
           if (ultima < kmAtrasado) {
             const mensagem = `Manutenção Atrasada: "${titulo}" no veículo ${nome}${pl} está ${kmAtrasado} km acima do intervalo recomendado (${intervalo} km). Realize o serviço urgente!`;
-            await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencao', mensagem);
+            await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencaoAtrasada', mensagem);
             await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { ultimaAlertaPostDueKm: kmAtrasado } });
             break;
           }
@@ -545,9 +545,12 @@ class NotificationService {
       deviceLocked:  'Veículo Bloqueado',
       deviceUnlocked:'Veículo Desbloqueado',
       kmExcedida:    'Quilometragem Excedida',
-      kmReduzida:    'Quilometragem Reduzida',
-      trocaOleo:     'Troca de Óleo',
-      manutencao:    'Manutenção',
+      kmReduzida:       'Quilometragem Reduzida',
+      trocaOleo:        'Troca de Óleo',
+      manutencao:       'Manutenção',
+      manutencaoAlerta: 'Alerta de Manutenção',
+      manutencaoAtrasada: 'Manutenção Atrasada',
+      manutencaoFeita:  'Manutenção Realizada',
     };
     return labels[tipo] || tipo;
   }

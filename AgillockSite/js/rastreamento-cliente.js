@@ -81,10 +81,12 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'deviceUnlocked',label: 'Veículo Desbloqueado',        css: 'tipo-ignition' },
   { tipo: 'kmExcedida',    label: 'Km Excedida (Período)',       css: 'tipo-overspeed' },
   { tipo: 'kmReduzida',    label: 'Km Reduzida (Período)',       css: 'tipo-geofence' },
-  { tipo: 'trocaOleo',        label: 'Troca de Óleo',              css: 'tipo-alarm' },
-  { tipo: 'trocaOleoFeita',   label: 'Troca de Óleo Realizada',  css: 'tipo-ignition' },
-  { tipo: 'manutencao',       label: 'Alerta de Manutenção',      css: 'tipo-overspeed' },
-  { tipo: 'manutencaoFeita',  label: 'Manutenção Realizada',      css: 'tipo-ignition' },
+  { tipo: 'trocaOleo',          label: 'Troca de Óleo',            css: 'tipo-alarm' },
+  { tipo: 'trocaOleoFeita',    label: 'Troca de Óleo Realizada',  css: 'tipo-ignition' },
+  { tipo: 'manutencao',        label: 'Alerta de Manutenção',     css: 'tipo-overspeed' },
+  { tipo: 'manutencaoAlerta',  label: 'Alerta de Manutenção',     css: 'tipo-manutencao-alerta' },
+  { tipo: 'manutencaoAtrasada',label: 'Manutenção Atrasada',      css: 'tipo-manutencao-atrasada' },
+  { tipo: 'manutencaoFeita',   label: 'Manutenção Realizada',     css: 'tipo-ignition' },
 ];
 
 let _evtFiltros = new Set();
@@ -453,6 +455,9 @@ function renderEventosLista() {
       case 'geofenceEnter': case 'kmReduzida': return { cls: 'info', color: '#2980b9', icon: 'fa-sign-in' };
       case 'geofenceExit': case 'trocaOleo': return { cls: 'warning', color: '#e67e22', icon: 'fa-sign-out' };
       case 'trocaOleoFeita': return { cls: 'success', color: '#27ae60', icon: 'fa-check-circle' };
+      case 'manutencao': case 'manutencaoAlerta': return { cls: 'warning', color: '#e67e22', icon: 'fa-wrench' };
+      case 'manutencaoAtrasada': return { cls: 'danger', color: '#e74c3c', icon: 'fa-wrench' };
+      case 'manutencaoFeita': return { cls: 'success', color: '#27ae60', icon: 'fa-check-circle' };
       default: return { cls: 'info', color: '#2980b9', icon: 'fa-bell' };
     }
   };
@@ -1630,22 +1635,31 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
 
 function buildOleoStatusHtml(p, v) {
   if (!p || p.odometro == null) return '';
-  const kmConfig = v?._kmConfig;
-  if (!kmConfig?.trocaOleo || kmConfig.trocaOleo.kmBaseMetros == null) return '';
-  const kmPercorrido = (p.odometro - kmConfig.trocaOleo.kmBaseMetros) / 1000;
-  const kmRestante = Math.round(kmConfig.trocaOleo.kmIntervalo - kmPercorrido);
-  const pastDue = kmRestante < 0;
-  const kmAbs = Math.abs(kmRestante);
-  const cor = pastDue ? '#e74c3c' : kmAbs < 500 ? '#e74c3c' : kmAbs < 1000 ? '#f39c12' : '#27ae60';
+  const recs = v?._recorrencias;
+  if (!recs || !recs.length) return '';
+  const odoKm = p.odometro / 1000;
   const isDark = document.documentElement.classList.contains('dark-theme');
   const btnBg = isDark ? '#2d3748' : '#e9ecef';
   const btnBd = isDark ? '#4a5568' : '#ccc';
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
-  const textoOleo = pastDue
-    ? `Você passou ${kmAbs.toLocaleString('pt-BR')} km da troca`
-    : `Falta ${kmAbs.toLocaleString('pt-BR')} km p/ troca`;
-  return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;"><i class="fa fa-tint" style="flex-shrink:0;"></i>${textoOleo}<span style="display:flex;gap:3px;flex-shrink:0;margin-left:4px;"><button onclick="abrirModalConfirmarTrocaOleo(ativoId)" style="${btnStyle}" title="Confirmar troca feita"><i class="fa fa-check"></i></button><button onclick="abrirModalTrocaOleo(ativoId)" style="${btnStyle}" title="Editar intervalo"><i class="fa fa-pencil"></i></button></span></span>`;
+  const visibles = recs.filter(r => {
+    const kmPercorrido = odoKm - r.kmBase;
+    const kmRestante = Math.round(r.intervaloKm - kmPercorrido);
+    return kmRestante <= 100; // shows when ≤100km remaining OR past due
+  });
+  if (!visibles.length) return '';
+  return visibles.map(r => {
+    const kmPercorrido = odoKm - r.kmBase;
+    const kmRestante = Math.round(r.intervaloKm - kmPercorrido);
+    const pastDue = kmRestante < 0;
+    const kmAbs = Math.abs(kmRestante);
+    const cor = pastDue ? '#e74c3c' : '#f39c12';
+    const texto = pastDue
+      ? `ultrapassou ${kmAbs.toLocaleString('pt-BR')} kms da(o) ${r.titulo}`
+      : `falta ${kmAbs.toLocaleString('pt-BR')} kms para ${r.titulo}`;
+    return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-wrench" style="flex-shrink:0;"></i>${texto}<button onclick="abrirModalFeitoCard('${r.id}','${r.titulo.replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Marcar como feito"><i class="fa fa-check"></i></button></span>`;
+  }).join('<br>');
 }
 
 function _fmtResumoDurCliente(min) {
@@ -1705,24 +1719,35 @@ function _carregarResumoHojeCliente(id) {
 
 function _carregarKmConfig(id) {
   const v = veiculosMap[id]; if (!v) return;
-  if (v._kmConfigCarregado) return;
-  v._kmConfigCarregado = true;
-  AL_CLIENTE.apiGet('/api/cliente/notificacoes/km-config/' + id).then(function (data) {
-    v._kmConfig = data || {};
-    if (ativoId === id) {
-      const elStatusItems = document.getElementById('dcard-status');
-      const p = v.posicao;
-      if (elStatusItems && p) {
-        const bat2 = p.bateria_nivel != null ? p.bateria_nivel : null;
-        const batCor2 = bat2 >= 40 ? '#27ae60' : bat2 >= 20 ? '#f39c12' : '#e74c3c';
-        const batFa2 = bat2 >= 80 ? 'fa-battery-full' : bat2 >= 60 ? 'fa-battery-3' : bat2 >= 40 ? 'fa-battery-2' : bat2 >= 20 ? 'fa-battery-1' : 'fa-battery-0';
-        elStatusItems.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2, v);
-        const elOleo = document.getElementById('dcard-oleo-status');
-        if (elOleo) elOleo.innerHTML = buildOleoStatusHtml(p, v);
-      }
-    }
-  }).catch(function () { v._kmConfigCarregado = false; });
+  if (v._recorrenciasCarregadas) return;
+  v._recorrenciasCarregadas = true;
+  AL_CLIENTE.apiGet('/api/cliente/manutencoes/recorrencias?dispositivoId=' + id).then(function (data) {
+    v._recorrencias = (data || []).filter(function(r) { return r.ativa !== false; });
+    const elOleo = document.getElementById('dcard-oleo-status');
+    if (elOleo && ativoId === id) elOleo.innerHTML = buildOleoStatusHtml(v.posicao, v);
+  }).catch(function () { v._recorrenciasCarregadas = false; });
 }
+
+window.abrirModalFeitoCard = function(recId, titulo) {
+  const el = document.getElementById('modal-feito-card-titulo');
+  if (el) el.textContent = titulo || 'esta manutenção';
+  const btn = document.getElementById('btn-modal-feito-card-confirmar');
+  if (btn) btn.onclick = function() { window._executarFeitoCard(recId); };
+  $('#modalFeitoCard').modal('show');
+};
+
+window._executarFeitoCard = function(recId) {
+  $('#modalFeitoCard').modal('hide');
+  AL_CLIENTE.apiPost('/api/cliente/manutencoes/recorrencias/' + recId + '/feito', {})
+    .then(function() {
+      AL_CLIENTE.showAlert('Manutenção confirmada! Contador reiniciado.', 'success');
+      if (ativoId) {
+        const v = veiculosMap[ativoId];
+        if (v) { v._recorrenciasCarregadas = false; _carregarKmConfig(ativoId); }
+      }
+    })
+    .catch(function(err) { AL_CLIENTE.showAlert('Erro: ' + (err.message || 'tente novamente.')); });
+};
 
 window.abrirModalTrocaOleo = function (dispositivoId) {
   const v = veiculosMap[dispositivoId]; if (!v) return;

@@ -9,7 +9,11 @@
   let registros = [];
   let recorrencias = [];
   let fotosPendentes = [];
+  let editandoRegistroId = null;
+  let editandoRecorrenciaId = null;
   let recorrenciaFeitoId = null;
+  let excluirId = null;
+  let excluirTipo = null;
   let gPage = 1;
 
   const TIPO_ICON = {
@@ -79,10 +83,7 @@
       document.getElementById('wrap-acoes-cliente').style.display = id ? 'flex' : 'none';
       document.getElementById('btn-novo-registro').disabled = true;
       document.getElementById('btn-nova-recorrencia').disabled = true;
-      if (!id) {
-        document.getElementById('wrap-filtro-dispositivo').style.display = 'none';
-        return;
-      }
+      if (!id) { document.getElementById('wrap-filtro-dispositivo').style.display = 'none'; return; }
       const c = clientes.find(c => c.id === id);
       document.getElementById('c-nome-cliente').textContent = c ? c.nome : '—';
       carregarDispositivosCliente(id);
@@ -109,6 +110,7 @@
     document.getElementById('btn-salvar-recorrencia').addEventListener('click', salvarRecorrencia);
     document.getElementById('btn-confirmar-feito').addEventListener('click', confirmarFeito);
     document.getElementById('btn-salvar-bulk').addEventListener('click', salvarBulk);
+    document.getElementById('btn-confirmar-excluir').addEventListener('click', executarExcluir);
 
     document.getElementById('reg-fotos-input').addEventListener('change', function () {
       processarFotos(this.files, fotosPendentes, 'reg-fotos-preview');
@@ -127,7 +129,6 @@
       document.querySelectorAll('#bulk-lista-clientes input[type=checkbox]').forEach(cb => cb.checked = false);
     });
 
-    // Lightbox
     document.getElementById('man-lightbox-close').addEventListener('click', fecharLightbox);
     document.getElementById('man-lightbox').addEventListener('click', function (e) {
       if (e.target === this) fecharLightbox();
@@ -172,7 +173,8 @@
               </div>
             </div>
             <div class="man-card-actions">
-              <button class="btn btn-danger btn-xs" onclick="_excluirRegistro('${r.id}')"><i class="fa fa-trash"></i></button>
+              <button class="btn btn-info btn-xs" onclick="_editarRegistro('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>
+              <button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','registro')" title="Excluir"><i class="fa fa-trash"></i></button>
               ${(r.notas || fotos.length) ? `<button class="btn btn-default btn-xs" onclick="_toggleExtra(this)"><i class="fa fa-chevron-down"></i></button>` : ''}
             </div>
           </div>
@@ -196,8 +198,7 @@
 
     const urgentes = recorrencias.filter(r => {
       const kmAtual = (r.dispositivo?.odometroSistemaMetros ?? 0) / 1000;
-      const kmRestante = r.kmBase + r.intervaloKm - kmAtual;
-      return kmRestante <= 50;
+      return r.intervaloKm - (kmAtual - r.kmBase) <= 50;
     }).length;
     badge.textContent = urgentes;
     badge.style.display = urgentes > 0 ? '' : 'none';
@@ -255,7 +256,8 @@
               <button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}', ${JSON.stringify(_esc(r.titulo))})">
                 <i class="fa fa-check"></i> Feito
               </button>
-              <button class="btn btn-danger btn-xs" onclick="_excluirRecorrencia('${r.id}')"><i class="fa fa-trash"></i></button>
+              <button class="btn btn-info btn-xs" onclick="_editarRecorrencia('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>
+              <button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','recorrencia')" title="Cancelar"><i class="fa fa-times"></i></button>
             </div>
           </div>
         </div>
@@ -265,10 +267,31 @@
 
   // ── Modais ────────────────────────────────────────────────────────────────────
   function abrirModalRegistro() {
+    editandoRegistroId = null;
+    document.getElementById('modalRegistro-title').textContent = 'Registrar Manutenção';
+    document.getElementById('btn-salvar-registro').innerHTML = '<i class="fa fa-save"></i> Salvar Registro';
     document.getElementById('reg-data').value = new Date().toISOString().slice(0, 10);
     $('#modalRegistro').modal('show');
   }
-  function abrirModalRecorrencia() { $('#modalRecorrencia').modal('show'); }
+
+  async function _carregarCanaisRecorrencia() {
+    if (!clienteLoginIdAtivo || !dispositivoIdAtivo) return;
+    try {
+      const data = await AL.apiGet('/api/notificacoes-admin/clientes/' + clienteLoginIdAtivo + '/preferencias/' + dispositivoIdAtivo);
+      const manut = data?.preferencias?.manutencao || {};
+      document.getElementById('rec-canal-web').checked = manut.web || false;
+      document.getElementById('rec-canal-app').checked = manut.app || false;
+      document.getElementById('rec-canal-email').checked = manut.email || false;
+    } catch { /* mantém desmarcado */ }
+  }
+
+  function abrirModalRecorrencia() {
+    editandoRecorrenciaId = null;
+    document.getElementById('modalRecorrencia-title').textContent = 'Nova Recorrência de Manutenção';
+    document.getElementById('btn-salvar-recorrencia').innerHTML = '<i class="fa fa-repeat"></i> Criar Recorrência';
+    _carregarCanaisRecorrencia();
+    $('#modalRecorrencia').modal('show');
+  }
 
   window._abrirFeito = function (id, titulo) {
     recorrenciaFeitoId = id;
@@ -276,7 +299,78 @@
     $('#modalFeito').modal('show');
   };
 
+  window._editarRegistro = function (id) {
+    const r = registros.find(x => x.id === id);
+    if (!r) return;
+    editandoRegistroId = id;
+    document.getElementById('modalRegistro-title').textContent = 'Editar Manutenção';
+    document.getElementById('btn-salvar-registro').innerHTML = '<i class="fa fa-save"></i> Salvar Alterações';
+    document.getElementById('reg-titulo').value = r.titulo || '';
+    document.getElementById('reg-tipo').value = r.tipo || 'preventiva';
+    document.getElementById('reg-data').value = r.dataRealizacao ? new Date(r.dataRealizacao).toISOString().slice(0, 10) : '';
+    document.getElementById('reg-km').value = r.kmRealizacao != null ? Math.round(r.kmRealizacao) : '';
+    document.getElementById('reg-custo').value = r.custo != null ? parseFloat(r.custo).toFixed(2) : '';
+    document.getElementById('reg-oficina').value = r.oficina || '';
+    document.getElementById('reg-notas').value = r.notas || '';
+    fotosPendentes = Array.isArray(r.fotos) ? [...r.fotos] : [];
+    const el = document.getElementById('reg-fotos-preview');
+    el.innerHTML = fotosPendentes.map((f, i) => `
+      <div class="man-foto-preview-item">
+        <img src="${f.dataUrl}" />
+        <button class="btn-remove-foto" onclick="fotosPendentes.splice(${i},1);this.closest('.man-foto-preview-item').remove()">×</button>
+      </div>
+    `).join('');
+    $('#modalRegistro').modal('show');
+  };
+
+  window._editarRecorrencia = function (id) {
+    const r = recorrencias.find(x => x.id === id);
+    if (!r) return;
+    editandoRecorrenciaId = id;
+    document.getElementById('modalRecorrencia-title').textContent = 'Editar Recorrência';
+    document.getElementById('btn-salvar-recorrencia').innerHTML = '<i class="fa fa-save"></i> Salvar Alterações';
+    document.getElementById('rec-titulo').value = r.titulo || '';
+    document.getElementById('rec-intervalo').value = r.intervaloKm || '';
+    document.getElementById('rec-descricao').value = r.descricao || '';
+    _carregarCanaisRecorrencia();
+    $('#modalRecorrencia').modal('show');
+  };
+
+  window._confirmarExcluir = function (id, tipo) {
+    excluirId = id;
+    excluirTipo = tipo;
+    const msg = tipo === 'registro'
+      ? 'Tem certeza que deseja excluir este registro de manutenção?'
+      : 'Tem certeza que deseja cancelar esta recorrência? Os alertas automáticos serão interrompidos.';
+    document.getElementById('excluir-msg').textContent = msg;
+    $('#modalConfirmarExcluir').modal('show');
+  };
+
+  async function executarExcluir() {
+    if (!excluirId || !excluirTipo) return;
+    const btn = document.getElementById('btn-confirmar-excluir');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    try {
+      if (excluirTipo === 'registro') {
+        await AL.apiDelete('/api/manutencoes-admin/registros/' + excluirId);
+        AL.showAlert('Registro excluído.', 'success');
+      } else {
+        await AL.apiDelete('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias/' + excluirId);
+        AL.showAlert('Recorrência cancelada.', 'success');
+      }
+      $('#modalConfirmarExcluir').modal('hide');
+      carregarDados(clienteLoginIdAtivo, dispositivoIdAtivo);
+    } catch (err) {
+      AL.showAlert('Erro: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Confirmar';
+    }
+  }
+
   function resetModalRegistro() {
+    editandoRegistroId = null;
     ['reg-titulo','reg-data','reg-km','reg-custo','reg-oficina','reg-notas'].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -286,8 +380,12 @@
   }
 
   function resetModalRecorrencia() {
+    editandoRecorrenciaId = null;
     ['rec-titulo','rec-intervalo','rec-descricao'].forEach(id => {
       document.getElementById(id).value = '';
+    });
+    ['rec-canal-web', 'rec-canal-app', 'rec-canal-email'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.checked = false;
     });
   }
 
@@ -297,26 +395,33 @@
     const dataRealizacao = document.getElementById('reg-data').value;
     if (!titulo || !dataRealizacao) { AL.showAlert('Preencha o título e a data.'); return; }
     const btn = document.getElementById('btn-salvar-registro');
-    btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
+    const payload = {
+      titulo,
+      tipo: document.getElementById('reg-tipo').value,
+      dataRealizacao,
+      kmRealizacao: parseFloat(document.getElementById('reg-km').value) || null,
+      custo: parseFloat(document.getElementById('reg-custo').value) || null,
+      oficina: document.getElementById('reg-oficina').value.trim() || null,
+      notas: document.getElementById('reg-notas').value.trim() || null,
+      fotos: fotosPendentes,
+    };
     try {
-      await AL.apiPost('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/registros', {
-        dispositivoId: dispositivoIdAtivo,
-        titulo,
-        tipo: document.getElementById('reg-tipo').value,
-        dataRealizacao,
-        kmRealizacao: parseFloat(document.getElementById('reg-km').value) || null,
-        custo: parseFloat(document.getElementById('reg-custo').value) || null,
-        oficina: document.getElementById('reg-oficina').value.trim() || null,
-        notas: document.getElementById('reg-notas').value.trim() || null,
-        fotos: fotosPendentes,
-      });
-      AL.showAlert('Registro salvo com sucesso!', 'success');
+      if (editandoRegistroId) {
+        await AL.apiPut('/api/manutencoes-admin/registros/' + editandoRegistroId, payload);
+        AL.showAlert('Registro atualizado!', 'success');
+      } else {
+        await AL.apiPost('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/registros', { ...payload, dispositivoId: dispositivoIdAtivo });
+        AL.showAlert('Registro salvo!', 'success');
+      }
       $('#modalRegistro').modal('hide');
       carregarDados(clienteLoginIdAtivo, dispositivoIdAtivo);
     } catch (err) {
       AL.showAlert('Erro ao salvar: ' + err.message);
     } finally {
-      btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Salvar Registro';
+      btn.disabled = false;
+      btn.innerHTML = editandoRegistroId ? '<i class="fa fa-save"></i> Salvar Alterações' : '<i class="fa fa-save"></i> Salvar Registro';
     }
   }
 
@@ -328,28 +433,44 @@
       return;
     }
     const btn = document.getElementById('btn-salvar-recorrencia');
-    btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
+    const payload = {
+      titulo,
+      descricao: document.getElementById('rec-descricao').value.trim() || null,
+      intervaloKm,
+    };
     try {
-      await AL.apiPost('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias', {
+      if (editandoRecorrenciaId) {
+        await AL.apiPut('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias/' + editandoRecorrenciaId, payload);
+        AL.showAlert('Recorrência atualizada!', 'success');
+      } else {
+        await AL.apiPost('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias', { ...payload, dispositivoId: dispositivoIdAtivo });
+        AL.showAlert('Recorrência criada!', 'success');
+      }
+      // Salva preferência de canal de notificação para manutenções do cliente
+      const web = document.getElementById('rec-canal-web').checked;
+      const app = document.getElementById('rec-canal-app').checked;
+      const email = document.getElementById('rec-canal-email').checked;
+      await AL.apiPost('/api/notificacoes-admin/clientes/' + clienteLoginIdAtivo + '/preferencias', {
         dispositivoId: dispositivoIdAtivo,
-        titulo,
-        descricao: document.getElementById('rec-descricao').value.trim() || null,
-        intervaloKm,
-      });
-      AL.showAlert('Recorrência criada com sucesso!', 'success');
+        preferencias: { manutencao: { web, app, email } },
+      }).catch(function() {}); // silencia erros da preferência
       $('#modalRecorrencia').modal('hide');
       carregarDados(clienteLoginIdAtivo, dispositivoIdAtivo);
     } catch (err) {
-      AL.showAlert('Erro ao criar: ' + err.message);
+      AL.showAlert('Erro ao salvar: ' + err.message);
     } finally {
-      btn.disabled = false; btn.innerHTML = '<i class="fa fa-repeat"></i> Criar Recorrência';
+      btn.disabled = false;
+      btn.innerHTML = editandoRecorrenciaId ? '<i class="fa fa-save"></i> Salvar Alterações' : '<i class="fa fa-repeat"></i> Criar Recorrência';
     }
   }
 
   async function confirmarFeito() {
     if (!recorrenciaFeitoId) return;
     const btn = document.getElementById('btn-confirmar-feito');
-    btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Confirmando...';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Confirmando...';
     try {
       await AL.apiPost('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias/' + recorrenciaFeitoId + '/feito', {
         notas: document.getElementById('feito-notas').value.trim() || null,
@@ -360,7 +481,8 @@
     } catch (err) {
       AL.showAlert('Erro ao confirmar: ' + err.message);
     } finally {
-      btn.disabled = false; btn.innerHTML = '<i class="fa fa-check"></i> Confirmar Realizado';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-check"></i> Confirmar Realizado';
     }
   }
 
@@ -387,7 +509,8 @@
       return;
     }
     const btn = document.getElementById('btn-salvar-bulk');
-    btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Criando...';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Criando...';
     try {
       const result = await AL.apiPost('/api/manutencoes-admin/bulk/recorrencias', {
         clienteLoginIds: selecionados,
@@ -401,7 +524,8 @@
     } catch (err) {
       AL.showAlert('Erro: ' + err.message);
     } finally {
-      btn.disabled = false; btn.innerHTML = '<i class="fa fa-users"></i> Criar para Selecionados';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-users"></i> Criar para Selecionados';
     }
   }
 
@@ -452,31 +576,12 @@
 
   window._irPagina = function (page) { gPage = page; window.buscarTodosRegistros(); };
 
-  // ── Ações inline ──────────────────────────────────────────────────────────────
-  window._excluirRegistro = async function (id) {
-    if (!confirm('Excluir este registro?')) return;
-    try {
-      await AL.apiDelete('/api/manutencoes-admin/registros/' + id);
-      AL.showAlert('Registro excluído.', 'success');
-      carregarDados(clienteLoginIdAtivo, dispositivoIdAtivo);
-    } catch (err) { AL.showAlert('Erro: ' + err.message); }
-  };
-
   window._excluirRegistroGeral = async function (id) {
     if (!confirm('Excluir este registro?')) return;
     try {
       await AL.apiDelete('/api/manutencoes-admin/registros/' + id);
       AL.showAlert('Registro excluído.', 'success');
       window.buscarTodosRegistros();
-    } catch (err) { AL.showAlert('Erro: ' + err.message); }
-  };
-
-  window._excluirRecorrencia = async function (id) {
-    if (!confirm('Remover esta recorrência?')) return;
-    try {
-      await AL.apiDelete('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias/' + id);
-      AL.showAlert('Recorrência removida.', 'success');
-      carregarDados(clienteLoginIdAtivo, dispositivoIdAtivo);
     } catch (err) { AL.showAlert('Erro: ' + err.message); }
   };
 

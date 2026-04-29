@@ -86,6 +86,7 @@
 
   function apiGet(endpoint) { return apiRequest('GET', endpoint, null); }
   function apiPost(endpoint, body) { return apiRequest('POST', endpoint, body); }
+  function apiPut(endpoint, body) { return apiRequest('PUT', endpoint, body); }
   function apiPatch(endpoint, body) { return apiRequest('PATCH', endpoint, body); }
   function apiDelete(endpoint) { return apiRequest('DELETE', endpoint, null); }
 
@@ -268,6 +269,7 @@
     logout: logout,
     apiGet: apiGet,
     apiPost: apiPost,
+    apiPut: apiPut,
     apiPatch: apiPatch,
     apiDelete: apiDelete,
     uploadFoto: uploadFoto,

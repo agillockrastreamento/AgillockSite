@@ -244,7 +244,7 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
 
     await prisma.manutencaoRecorrencia.update({
       where: { id },
-      data: { kmBase: kmAtual, alerta50Enviado: false, alerta25Enviado: false, alerta0Enviado: false },
+      data: { kmBase: kmAtual, alerta50Enviado: false, alerta25Enviado: false, alerta0Enviado: false, ultimaAlertaPostDueKm: -1 },
     });
 
     await prisma.manutencaoRegistro.create({
@@ -262,10 +262,85 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
       },
     });
 
+    // Notificação verde: manutenção realizada
+    const prefFeita = await prisma.preferenciaNotificacao.findUnique({
+      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
+    });
+    if (prefFeita && (prefFeita.web || prefFeita.app)) {
+      await prisma.eventoNotificacao.create({
+        data: {
+          clienteLoginId,
+          dispositivoId: recorrencia.dispositivoId,
+          tipoEvento: 'manutencaoFeita',
+          mensagem: `Manutenção "${recorrencia.titulo}" realizada! Contador reiniciado a partir de ${Math.round(kmAtual).toLocaleString('pt-BR')} km.`,
+          latitude: null,
+          longitude: null,
+          velocidade: null,
+        },
+      });
+    }
+
     res.json({ message: 'Manutenção marcada como feita. Contador reiniciado.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao confirmar manutenção.' });
+  }
+});
+
+// PUT /api/cliente/manutencoes/registros/:id
+router.put('/registros/:id', async (req: any, res) => {
+  try {
+    const clienteLoginId: string = req.cliente.sub;
+    const { id } = req.params;
+    const { titulo, tipo, dataRealizacao, kmRealizacao, custo, oficina, notas, fotos } = req.body;
+    const existing = await prisma.manutencaoRegistro.findFirst({
+      where: { id, clienteLoginId, origem: 'CLIENTE' },
+    });
+    if (!existing) return res.status(404).json({ message: 'Registro não encontrado.' });
+    const updated = await prisma.manutencaoRegistro.update({
+      where: { id },
+      data: {
+        titulo:        titulo        || existing.titulo,
+        tipo:          tipo          || existing.tipo,
+        dataRealizacao: dataRealizacao ? new Date(dataRealizacao) : existing.dataRealizacao,
+        kmRealizacao:  kmRealizacao  !== undefined ? (kmRealizacao  != null ? parseFloat(kmRealizacao)  : null) : existing.kmRealizacao,
+        custo:         custo         !== undefined ? (custo         != null ? parseFloat(custo)         : null) : existing.custo,
+        oficina:       oficina       !== undefined ? (oficina       || null) : existing.oficina,
+        notas:         notas         !== undefined ? (notas         || null) : existing.notas,
+        fotos:         fotos         !== undefined ? fotos : (existing.fotos as any),
+      },
+      include: { dispositivo: { select: { nome: true, placa: true } } },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao atualizar registro.' });
+  }
+});
+
+// PUT /api/cliente/manutencoes/recorrencias/:id
+router.put('/recorrencias/:id', async (req: any, res) => {
+  try {
+    const clienteLoginId: string = req.cliente.sub;
+    const { id } = req.params;
+    const { titulo, descricao, intervaloKm } = req.body;
+    const existing = await prisma.manutencaoRecorrencia.findFirst({
+      where: { id, clienteLoginId, origem: 'CLIENTE' },
+    });
+    if (!existing) return res.status(404).json({ message: 'Recorrência não encontrada.' });
+    const updated = await prisma.manutencaoRecorrencia.update({
+      where: { id },
+      data: {
+        titulo:     titulo     || existing.titulo,
+        descricao:  descricao  !== undefined ? (descricao  || null) : existing.descricao,
+        intervaloKm: intervaloKm ? parseInt(intervaloKm) : existing.intervaloKm,
+      },
+      include: { dispositivo: { select: { nome: true, placa: true, odometroSistemaMetros: true } } },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao atualizar recorrência.' });
   }
 });
 
