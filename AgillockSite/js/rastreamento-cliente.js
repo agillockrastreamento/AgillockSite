@@ -1840,9 +1840,7 @@ function mostrarCardDispositivo(id) {
         <span id="dcard-status-warning">${!p ? '&nbsp;<span style="color:#e67e22;font-size:10px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}</span>
       </div>
       ${p ? `
-        <div style="margin-bottom:2px"><i class="fa fa-server" style="${ico}"></i> <span class="dcard-lbl">Servidor:</span> <span id="dcard-ts-srv">${fmtGPSTimeSec(p.serverTime)}</span></div>
         <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
-        <div style="margin-bottom:2px"><i class="fa fa-crosshairs" style="${ico}"></i> <span class="dcard-lbl">GPS:</span> <span id="dcard-ts-gps">${fmtGPSTimeSec(p.fixTime)}</span></div>
       ` : ''}
     </div>`;
 
@@ -1878,9 +1876,6 @@ function mostrarCardDispositivo(id) {
       </div>` : ''}
       <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:12px;border-top:1px solid rgba(128,128,128,0.1)">
         <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
-      </div>
-      <div style="margin-top:12px">
-        <button onclick="window.location.href='relatorio.html?id=${encodeURIComponent(id)}'" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;width:100%"><i class="fa fa-bar-chart"></i> Relatório</button>
       </div>
       ${_htmlAcoesCard(id)}
       <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
