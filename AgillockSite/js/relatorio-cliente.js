@@ -175,8 +175,8 @@ function renderSemDispositivoSelecionado() {
 function configurarPeriodo() {
   const hoje = new Date();
   const s = hoje.getFullYear() + '-' + String(hoje.getMonth()+1).padStart(2,'0') + '-' + String(hoje.getDate()).padStart(2,'0');
-  document.getElementById('dt-de').value  = s + 'T00:00';
-  document.getElementById('dt-ate').value = s + 'T23:59';
+  document.getElementById('dt-de').value  = s;
+  document.getElementById('dt-ate').value = s;
 }
 
 function calcularIntervalo() {
@@ -193,9 +193,11 @@ function calcularIntervalo() {
   }
   const deVal  = document.getElementById('dt-de').value;
   const ateVal = document.getElementById('dt-ate').value;
+  const hrDe   = document.getElementById('hr-de')?.value  || '00:00';
+  const hrAte  = document.getElementById('hr-ate')?.value || '23:59';
   return {
-    from: deVal  ? new Date(deVal  + ':00') : hoje,
-    to:   ateVal ? new Date(ateVal + ':59') : amanha,
+    from: deVal  ? new Date(deVal  + 'T' + hrDe  + ':00') : hoje,
+    to:   ateVal ? new Date(ateVal + 'T' + hrAte + ':59') : amanha,
   };
 }
 
@@ -779,6 +781,11 @@ async function exportarRelatorio() {
     btn.disabled = false;
     btn.innerHTML = old;
   }
+}
+
+function _abrirPickerData(id) {
+  const el = document.getElementById(id);
+  try { el.showPicker(); } catch { el.focus(); }
 }
 
 function fmtHora(iso) {
