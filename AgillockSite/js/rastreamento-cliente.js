@@ -1840,7 +1840,7 @@ function mostrarCardDispositivo(id) {
         <span id="dcard-status-warning">${!p ? '&nbsp;<span style="color:#e67e22;font-size:10px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}</span>
       </div>
       ${p ? `
-        <div style="margin-bottom:2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
+        <div style="margin-bottom:2px; margin-left:-2px"><i class="fa fa-mobile" style="${ico}"></i> <span class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
       ` : ''}
     </div>`;
 
