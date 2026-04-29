@@ -20,6 +20,8 @@ import clienteLoginRoutes from './routes/cliente-login.routes';
 import clientePortalRoutes from './routes/cliente-portal.routes';
 import notificacoesRoutes from './routes/notificacoes.routes';
 import notificacoesAdminRoutes from './routes/notificacoes-admin.routes';
+import manutencoesRoutes from './routes/manutencoes.routes';
+import manutencoesAdminRoutes from './routes/manutencoes-admin.routes';
 import compartilhamentoRoutes from './routes/compartilhamento.routes';
 import { UPLOADS_DIR } from './utils/upload-paths';
 
@@ -104,6 +106,8 @@ app.use('/api/motoristas', motoristasRoutes);
 app.use('/api/clientes', clienteLoginRoutes);   // CRUD do login do cliente (admin/colaborador)
 app.use('/api/cliente/notificacoes', notificacoesRoutes);    // Notificações do cliente
 app.use('/api/notificacoes-admin', notificacoesAdminRoutes); // Notificações admin
+app.use('/api/cliente/manutencoes', manutencoesRoutes);      // Manutenções do cliente
+app.use('/api/manutencoes-admin', manutencoesAdminRoutes);   // Manutenções admin
 app.use('/api/cliente', clientePortalRoutes);   // portal do cliente (JWT role=CLIENTE)
 
 // Rota não encontrada

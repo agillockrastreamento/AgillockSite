@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Manutenções — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    .man-page-body { padding: 24px 28px; max-width: 1200px; }
+
+    /* ── Tabs principais ── */
+    .man-tabs { display: flex; gap: 0; border-bottom: 2px solid #e8e8e8; margin-bottom: 24px; }
+    html.dark-theme .man-tabs { border-bottom-color: #2d3748; }
+    .man-tab-btn {
+      padding: 10px 22px; font-size: 13px; font-weight: 700; color: #888;
+      background: none; border: none; border-bottom: 3px solid transparent;
+      margin-bottom: -2px; cursor: pointer; transition: color .15s, border-color .15s;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .man-tab-btn:hover { color: #2980b9; }
+    .man-tab-btn.active { color: #2980b9; border-bottom-color: #2980b9; }
+    html.dark-theme .man-tab-btn { color: #6c7a8f; }
+    html.dark-theme .man-tab-btn.active { color: #5dade2; border-bottom-color: #5dade2; }
+
+    /* ── Sub-tabs ── */
+    .man-subtabs { display: flex; gap: 6px; margin-bottom: 20px; }
+    .man-subtab-btn {
+      padding: 7px 16px; font-size: 12px; font-weight: 700; color: #888;
+      background: #f7f9fb; border: 1px solid #e0e6ef; border-radius: 7px;
+      cursor: pointer; transition: all .15s;
+    }
+    .man-subtab-btn:hover { background: #eaf1fb; color: #2980b9; border-color: #2980b9; }
+    .man-subtab-btn.active { background: #2980b9; border-color: #2980b9; color: #fff; }
+    html.dark-theme .man-subtab-btn { background: #252535; border-color: #3a3a5c; color: #6c7a8f; }
+    html.dark-theme .man-subtab-btn.active { background: #2980b9; border-color: #2980b9; color: #fff; }
+
+    /* ── Filter bar ── */
+    .man-filter-bar {
+      display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap;
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
+      padding: 16px 20px; margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    html.dark-theme .man-filter-bar { background: #1e2530; border-color: #2d3748; }
+    .man-filter-bar label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: #888; margin-bottom: 5px; display: block; }
+    html.dark-theme .man-filter-bar label { color: #6c7a8f; }
+    .man-filter-bar .form-control { border-radius: 7px; border: 1px solid #ddd; font-size: 13px; height: 36px; }
+    html.dark-theme .man-filter-bar .form-control { background: #252535; border-color: #3a3a5c; color: #e0e6f0; }
+    html.dark-theme .man-filter-bar .form-control option { background: #252535; }
+
+    /* ── Info box ── */
+    .man-info-box {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: rgba(41,128,185,.06); border: 1px solid rgba(41,128,185,.18);
+      border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+      font-size: 12px; color: #2980b9; line-height: 1.5;
+    }
+    html.dark-theme .man-info-box { background: rgba(41,128,185,.1); border-color: rgba(41,128,185,.25); color: #5dade2; }
+    .man-info-box i { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+
+    /* ── Section header ── */
+    .man-section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
+    }
+    .man-section-title { display: flex; align-items: center; gap: 10px; }
+    .man-section-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: rgba(41,128,185,.12); color: #2980b9;
+      display: flex; align-items: center; justify-content: center; font-size: 15px;
+    }
+    html.dark-theme .man-section-icon { background: rgba(41,128,185,.2); }
+    .man-section-title h5 { margin: 0; font-size: 15px; font-weight: 700; color: #2c3e50; }
+    html.dark-theme .man-section-title h5 { color: #e0e6f0; }
+    .man-section-title small { font-size: 11px; color: #888; display: block; margin-top: 1px; }
+    html.dark-theme .man-section-title small { color: #6c7a8f; }
+
+    /* ── Cards de registro ── */
+    .man-list { display: flex; flex-direction: column; gap: 12px; }
+    .man-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
+      padding: 16px 20px; transition: box-shadow .2s, border-color .2s;
+    }
+    html.dark-theme .man-card { background: #1e2530; border-color: #2d3748; }
+    .man-card:hover { border-color: #2980b9; box-shadow: 0 4px 14px rgba(41,128,185,.08); }
+    .man-card-top { display: flex; align-items: flex-start; gap: 12px; }
+    .man-card-icon {
+      width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 17px;
+    }
+    .man-card-icon.tipo-preventiva  { background: rgba(39,174,96,.12);  color: #27ae60; }
+    .man-card-icon.tipo-corretiva   { background: rgba(231,76,60,.12);  color: #e74c3c; }
+    .man-card-icon.tipo-revisao     { background: rgba(52,152,219,.12); color: #2980b9; }
+    .man-card-icon.tipo-personalizado { background: rgba(155,89,182,.12); color: #8e44ad; }
+    html.dark-theme .man-card-icon.tipo-preventiva  { background: rgba(39,174,96,.18);  }
+    html.dark-theme .man-card-icon.tipo-corretiva   { background: rgba(231,76,60,.18);  }
+    html.dark-theme .man-card-icon.tipo-revisao     { background: rgba(52,152,219,.18); }
+    html.dark-theme .man-card-icon.tipo-personalizado { background: rgba(155,89,182,.18); }
+    .man-card-body { flex: 1; min-width: 0; }
+    .man-card-title { font-size: 14px; font-weight: 700; color: #2c3e50; margin: 0 0 4px; }
+    html.dark-theme .man-card-title { color: #e0e6f0; }
+    .man-card-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: #8a9ab0; }
+    html.dark-theme .man-card-meta { color: #6c7a8f; }
+    .man-card-meta span { display: flex; align-items: center; gap: 4px; }
+    .man-card-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+    .man-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 700;
+    }
+    .man-badge-admin  { background: rgba(231,76,60,.1);  color: #e74c3c; }
+    .man-badge-cliente { background: rgba(39,174,96,.1); color: #27ae60; }
+    .man-badge-preventiva { background: rgba(39,174,96,.1); color: #27ae60; }
+    .man-badge-corretiva { background: rgba(231,76,60,.1); color: #e74c3c; }
+    .man-badge-revisao { background: rgba(52,152,219,.1); color: #2980b9; }
+    .man-badge-personalizado { background: rgba(155,89,182,.1); color: #8e44ad; }
+    html.dark-theme .man-badge-admin { background: rgba(231,76,60,.18); }
+    html.dark-theme .man-badge-cliente { background: rgba(39,174,96,.18); }
+    .man-card-extra { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+    html.dark-theme .man-card-extra { border-top-color: #2d3748; }
+    .man-card-notas { font-size: 12px; color: #4a5568; margin-bottom: 10px; white-space: pre-wrap; }
+    html.dark-theme .man-card-notas { color: #a0aec0; }
+    .man-fotos-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .man-foto-thumb {
+      width: 72px; height: 72px; border-radius: 7px; object-fit: cover; cursor: pointer;
+      border: 2px solid #e8e8e8; transition: border-color .15s;
+    }
+    .man-foto-thumb:hover { border-color: #2980b9; }
+    html.dark-theme .man-foto-thumb { border-color: #2d3748; }
+
+    /* ── Recorrência cards ── */
+    .man-rec-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
+      padding: 18px 20px; transition: box-shadow .2s, border-color .2s;
+    }
+    html.dark-theme .man-rec-card { background: #1e2530; border-color: #2d3748; }
+    .man-rec-card:hover { border-color: #2980b9; box-shadow: 0 4px 14px rgba(41,128,185,.08); }
+    .man-rec-top { display: flex; align-items: flex-start; gap: 12px; }
+    .man-rec-icon {
+      width: 40px; height: 40px; border-radius: 10px; background: rgba(230,126,34,.12);
+      color: #e67e22; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;
+    }
+    html.dark-theme .man-rec-icon { background: rgba(230,126,34,.2); }
+    .man-rec-body { flex: 1; min-width: 0; }
+    .man-rec-title { font-size: 14px; font-weight: 700; color: #2c3e50; margin: 0 0 4px; }
+    html.dark-theme .man-rec-title { color: #e0e6f0; }
+    .man-rec-sub { font-size: 11px; color: #8a9ab0; margin-bottom: 12px; }
+    html.dark-theme .man-rec-sub { color: #6c7a8f; }
+    .man-rec-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+    .man-progress-bar-bg { height: 8px; border-radius: 4px; background: #edf2f7; overflow: hidden; }
+    html.dark-theme .man-progress-bar-bg { background: #2d3748; }
+    .man-progress-bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    .fill-ok { background: #27ae60; } .fill-warn { background: #f39c12; }
+    .fill-urgent { background: #e67e22; } .fill-overdue { background: #e74c3c; }
+    .man-progress-info { display: flex; justify-content: space-between; font-size: 11px; color: #8a9ab0; margin-top: 5px; }
+    html.dark-theme .man-progress-info { color: #6c7a8f; }
+    .man-status-badge { display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; margin-top: 8px; }
+    .status-ok      { background: rgba(39,174,96,.12);  color: #27ae60; }
+    .status-warn    { background: rgba(243,156,18,.12); color: #e67e22; }
+    .status-urgent  { background: rgba(230,126,34,.12); color: #d35400; }
+    .status-overdue { background: rgba(231,76,60,.12);  color: #e74c3c; }
+    html.dark-theme .status-ok { background: rgba(39,174,96,.18); }
+    html.dark-theme .status-warn { background: rgba(243,156,18,.18); }
+    html.dark-theme .status-urgent { background: rgba(230,126,34,.18); }
+    html.dark-theme .status-overdue { background: rgba(231,76,60,.18); }
+
+    /* ── Table geral ── */
+    .man-table-wrap { overflow-x: auto; }
+    .man-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .man-table th { background: #f7f9fb; color: #8a9ab0; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .4px; padding: 10px 12px;
+      border-bottom: 2px solid #e8e8e8; text-align: left; }
+    html.dark-theme .man-table th { background: #252535; color: #6c7a8f; border-bottom-color: #2d3748; }
+    .man-table td { padding: 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; color: #2c3e50; }
+    html.dark-theme .man-table td { border-bottom-color: #2d3748; color: #c8d6e5; }
+    .man-table tr:hover td { background: rgba(41,128,185,.03); }
+    html.dark-theme .man-table tr:hover td { background: rgba(41,128,185,.06); }
+
+    /* ── Empty ── */
+    .man-empty { display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 70px 20px; text-align: center; }
+    .man-empty-icon { width: 72px; height: 72px; border-radius: 50%; background: #f0f4f8;
+      display: flex; align-items: center; justify-content: center; font-size: 28px; color: #c0c8d4; margin-bottom: 18px; }
+    html.dark-theme .man-empty-icon { background: #252535; color: #3a4458; }
+    .man-empty h6 { font-size: 15px; font-weight: 700; color: #4a5568; margin: 0 0 6px; }
+    html.dark-theme .man-empty h6 { color: #8892a4; }
+    .man-empty p { font-size: 13px; color: #8a9ab0; margin: 0; max-width: 320px; }
+    html.dark-theme .man-empty p { color: #6c7a8f; }
+
+    /* ── Modal ── */
+    .man-modal-label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .4px; color: #8a9ab0; margin-bottom: 5px; display: block; }
+    html.dark-theme .man-modal-label { color: #6c7a8f; }
+    .man-modal .form-control { border-radius: 7px; border: 1px solid #dde3ea; font-size: 13px; }
+    html.dark-theme .man-modal .form-control { background: #252535; border-color: #3a3a5c; color: #e0e6f0; }
+    html.dark-theme .man-modal .form-control option { background: #252535; }
+    html.dark-theme .modal-content { background: #1e2530; color: #e0e6f0; border-color: #2d3748; }
+    html.dark-theme .modal-header { border-bottom-color: #2d3748; }
+    html.dark-theme .modal-footer { border-top-color: #2d3748; }
+    html.dark-theme .modal-title { color: #e0e6f0; }
+    .man-foto-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .man-foto-preview-item { position: relative; }
+    .man-foto-preview-item img { width: 64px; height: 64px; object-fit: cover; border-radius: 7px; border: 2px solid #e8e8e8; }
+    html.dark-theme .man-foto-preview-item img { border-color: #3a3a5c; }
+    .man-foto-preview-item .btn-remove-foto {
+      position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+      border-radius: 50%; background: #e74c3c; color: #fff; border: none;
+      font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    /* ── Bulk cliente checkboxes ── */
+    .man-bulk-list { max-height: 200px; overflow-y: auto; border: 1px solid #e8e8e8;
+      border-radius: 7px; padding: 6px 0; }
+    html.dark-theme .man-bulk-list { border-color: #2d3748; }
+    .man-bulk-item { padding: 7px 14px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .man-bulk-item:hover { background: rgba(41,128,185,.05); }
+    html.dark-theme .man-bulk-item:hover { background: rgba(41,128,185,.1); }
+    /* ── Lightbox ── */
+    #man-lightbox { display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.85); align-items: center; justify-content: center; }
+    #man-lightbox.open { display: flex; }
+    #man-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+    #man-lightbox-close { position: absolute; top: 18px; right: 24px; color: #fff;
+      font-size: 28px; cursor: pointer; background: none; border: none; line-height: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown open">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+          <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li class="active"><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Main content -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Manutenções</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="man-page-body">
+
+      <!-- Tabs principais -->
+      <div class="man-tabs">
+        <button class="man-tab-btn active" data-tab="tab-por-cliente">
+          <i class="fa fa-user"></i> Por Cliente
+        </button>
+        <button class="man-tab-btn" data-tab="tab-geral">
+          <i class="fa fa-list"></i> Todos os Registros
+        </button>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           TAB: Por Cliente
+      ═══════════════════════════════════════════════════ -->
+      <div id="tab-por-cliente">
+
+        <!-- Filter bar: cliente + dispositivo -->
+        <div class="man-filter-bar">
+          <div style="flex:1;min-width:200px;max-width:340px;">
+            <label for="filtro-cliente"><i class="fa fa-user" style="margin-right:4px;"></i>Cliente</label>
+            <select id="filtro-cliente" class="form-control">
+              <option value="">Selecione um cliente...</option>
+            </select>
+          </div>
+          <div id="wrap-filtro-dispositivo" style="display:none;flex:1;min-width:180px;max-width:280px;">
+            <label for="filtro-dispositivo"><i class="fa fa-car" style="margin-right:4px;"></i>Dispositivo</label>
+            <select id="filtro-dispositivo" class="form-control">
+              <option value="">Selecione um dispositivo...</option>
+            </select>
+          </div>
+          <div id="wrap-acoes-cliente" style="display:none;display:flex;gap:8px;margin-left:auto;">
+            <button class="btn btn-success" id="btn-novo-registro" style="height:36px;padding:0 14px;font-size:13px;font-weight:700;border-radius:7px;" disabled>
+              <i class="fa fa-plus"></i> Registrar
+            </button>
+            <button class="btn btn-warning" id="btn-nova-recorrencia" style="height:36px;padding:0 14px;font-size:13px;font-weight:700;border-radius:7px;color:#fff;" disabled>
+              <i class="fa fa-repeat"></i> Recorrência
+            </button>
+            <button class="btn btn-info" id="btn-bulk-recorrencia" style="height:36px;padding:0 14px;font-size:13px;font-weight:700;border-radius:7px;">
+              <i class="fa fa-users"></i> Múltiplos Clientes
+            </button>
+          </div>
+        </div>
+
+        <!-- Loaded state -->
+        <div id="cliente-man-container" style="display:none;">
+
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+            <div style="width:36px;height:36px;border-radius:9px;background:rgba(41,128,185,.12);color:#2980b9;display:flex;align-items:center;justify-content:center;font-size:15px;"><i class="fa fa-user"></i></div>
+            <div>
+              <h5 style="margin:0;font-size:15px;font-weight:700;color:#2c3e50;" id="c-nome-cliente">—</h5>
+              <small style="font-size:11px;color:#888;" id="c-nome-dispositivo">—</small>
+            </div>
+          </div>
+
+          <!-- Sub-tabs -->
+          <div class="man-subtabs">
+            <button class="man-subtab-btn active" data-subtab="subtab-historico">
+              <i class="fa fa-history"></i> Histórico
+            </button>
+            <button class="man-subtab-btn" data-subtab="subtab-recorrencias">
+              <i class="fa fa-repeat"></i> Recorrências
+              <span id="c-badge-rec" class="badge" style="background:#e67e22;color:#fff;margin-left:4px;display:none;">0</span>
+            </button>
+          </div>
+
+          <!-- Sub-tab: Histórico -->
+          <div id="subtab-historico">
+            <div class="man-section-header">
+              <div class="man-section-title">
+                <div class="man-section-icon"><i class="fa fa-history"></i></div>
+                <div>
+                  <h5>Histórico de Manutenções</h5>
+                  <small>Registros do cliente e do admin para este dispositivo</small>
+                </div>
+              </div>
+            </div>
+            <div id="c-list-registros" class="man-list"></div>
+            <div id="c-empty-registros" class="man-empty" style="display:none;">
+              <div class="man-empty-icon"><i class="fa fa-wrench"></i></div>
+              <h6>Nenhuma manutenção registrada</h6>
+              <p>Clique em "Registrar" para adicionar um serviço realizado neste veículo do cliente.</p>
+            </div>
+          </div>
+
+          <!-- Sub-tab: Recorrências -->
+          <div id="subtab-recorrencias" style="display:none;">
+            <div class="man-info-box">
+              <i class="fa fa-info-circle"></i>
+              <span>Recorrências criadas por você (admin) ou pelo cliente aparecem aqui. Ao clicar em <strong>"Marcar como Feito"</strong> o contador é zerado e um registro de manutenção é gerado automaticamente — visível também para o cliente.</span>
+            </div>
+            <div id="c-list-recorrencias" class="man-list"></div>
+            <div id="c-empty-recorrencias" class="man-empty" style="display:none;">
+              <div class="man-empty-icon"><i class="fa fa-repeat"></i></div>
+              <h6>Nenhuma recorrência configurada</h6>
+              <p>Crie uma recorrência para alertar o cliente automaticamente por quilometragem.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Empty state -->
+        <div id="cliente-man-vazio" class="man-empty">
+          <div class="man-empty-icon"><i class="fa fa-user"></i></div>
+          <h6>Nenhum cliente selecionado</h6>
+          <p>Selecione um cliente e um dispositivo para gerenciar as manutenções.</p>
+        </div>
+
+      </div><!-- /tab-por-cliente -->
+
+      <!-- ═══════════════════════════════════════════════════
+           TAB: Todos os Registros
+      ═══════════════════════════════════════════════════ -->
+      <div id="tab-geral" style="display:none;">
+
+        <div class="man-filter-bar">
+          <div style="flex:1;min-width:160px;max-width:260px;">
+            <label><i class="fa fa-filter" style="margin-right:4px;"></i>Tipo</label>
+            <select id="g-filtro-tipo" class="form-control">
+              <option value="">Todos os tipos</option>
+              <option value="preventiva">Preventiva</option>
+              <option value="corretiva">Corretiva</option>
+              <option value="revisao">Revisão</option>
+              <option value="personalizado">Personalizado</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn btn-default" id="g-btn-buscar" style="height:36px;padding:0 18px;font-size:13px;font-weight:700;border-radius:7px;">
+              <i class="fa fa-search"></i> Buscar
+            </button>
+          </div>
+          <div style="margin-left:auto;font-size:12px;color:#8a9ab0;align-self:center;" id="g-total-label"></div>
+        </div>
+
+        <div class="man-table-wrap">
+          <table class="man-table">
+            <thead>
+              <tr>
+                <th>Veículo</th>
+                <th>Cliente</th>
+                <th>Título</th>
+                <th>Tipo</th>
+                <th>Data</th>
+                <th>Km</th>
+                <th>Origem</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="g-tbody"></tbody>
+          </table>
+        </div>
+        <div id="g-empty" class="man-empty" style="display:none;">
+          <div class="man-empty-icon"><i class="fa fa-list"></i></div>
+          <h6>Nenhum registro encontrado</h6>
+          <p>Nenhuma manutenção corresponde aos filtros selecionados.</p>
+        </div>
+        <div id="g-pagination" style="display:flex;justify-content:center;gap:8px;margin-top:20px;flex-wrap:wrap;"></div>
+
+      </div><!-- /tab-geral -->
+
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Registrar Manutenção (Admin) ═══ -->
+  <div class="modal fade man-modal" id="modalRegistro" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-wrench" style="color:#27ae60;margin-right:8px;"></i>Registrar Manutenção para o Cliente</h4>
+        </div>
+        <div class="modal-body">
+          <div class="man-info-box" style="margin-bottom:20px;">
+            <i class="fa fa-info-circle"></i>
+            <span>Este registro aparecerá no histórico do cliente com o indicador <strong>"Registrado pelo Administrador"</strong>. Preencha com as informações do serviço realizado.</span>
+          </div>
+          <div class="row">
+            <div class="col-sm-8">
+              <div class="form-group">
+                <label class="man-modal-label">Título do serviço <span style="color:#e74c3c;">*</span></label>
+                <input type="text" id="reg-titulo" class="form-control" placeholder="Ex: Troca de óleo, Revisão dos freios..." />
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label class="man-modal-label">Tipo</label>
+                <select id="reg-tipo" class="form-control">
+                  <option value="preventiva">Preventiva</option>
+                  <option value="corretiva">Corretiva</option>
+                  <option value="revisao">Revisão</option>
+                  <option value="personalizado">Personalizado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label class="man-modal-label">Data de realização <span style="color:#e74c3c;">*</span></label>
+                <input type="date" id="reg-data" class="form-control" />
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label class="man-modal-label">Km no momento</label>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <input type="number" id="reg-km" class="form-control" placeholder="52300" min="0" />
+                  <span style="font-size:12px;font-weight:700;color:#2980b9;white-space:nowrap;">km</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label class="man-modal-label">Custo (R$)</label>
+                <input type="number" id="reg-custo" class="form-control" placeholder="350,00" min="0" step="0.01" />
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Oficina / Prestador</label>
+            <input type="text" id="reg-oficina" class="form-control" placeholder="Nome da oficina ou prestador" />
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Descrição / Anotações</label>
+            <textarea id="reg-notas" class="form-control" rows="3" placeholder="Detalhes do serviço, peças trocadas, observações..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label"><i class="fa fa-camera" style="margin-right:4px;"></i>Fotos (opcional)</label>
+            <p style="font-size:11px;color:#8a9ab0;margin:0 0 8px;">Adicione fotos como nota fiscal ou comprovante. Máx. 5 fotos de até 2 MB cada.</p>
+            <input type="file" id="reg-fotos-input" accept="image/*" multiple style="display:none;" />
+            <button type="button" class="btn btn-default btn-sm" onclick="document.getElementById('reg-fotos-input').click()">
+              <i class="fa fa-upload"></i> Selecionar fotos
+            </button>
+            <div id="reg-fotos-preview" class="man-foto-preview"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success" id="btn-salvar-registro">
+            <i class="fa fa-save"></i> Salvar Registro
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Nova Recorrência (Admin) ═══ -->
+  <div class="modal fade man-modal" id="modalRecorrencia" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-repeat" style="color:#e67e22;margin-right:8px;"></i>Nova Recorrência para o Cliente</h4>
+        </div>
+        <div class="modal-body">
+          <div class="man-info-box" style="margin-bottom:20px;">
+            <i class="fa fa-info-circle"></i>
+            <span>Esta recorrência ficará visível para o cliente com a indicação <strong>"Configurado pelo Administrador"</strong>. O cliente receberá alertas e poderá marcar como feito.</span>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Título <span style="color:#e74c3c;">*</span></label>
+            <input type="text" id="rec-titulo" class="form-control" placeholder="Ex: Troca de óleo, Revisão de freios..." />
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Intervalo em km <span style="color:#e74c3c;">*</span></label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <input type="number" id="rec-intervalo" class="form-control" placeholder="Ex: 5000" min="100" max="500000" style="max-width:160px;" />
+              <span style="font-size:13px;font-weight:700;color:#e67e22;">km</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Descrição (opcional)</label>
+            <textarea id="rec-descricao" class="form-control" rows="2" placeholder="Detalhes ou instruções para o cliente..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-warning" id="btn-salvar-recorrencia" style="color:#fff;">
+            <i class="fa fa-repeat"></i> Criar Recorrência
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Múltiplos Clientes ═══ -->
+  <div class="modal fade man-modal" id="modalBulk" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-users" style="color:#2980b9;margin-right:8px;"></i>Recorrência para Múltiplos Clientes</h4>
+        </div>
+        <div class="modal-body">
+          <div class="man-info-box" style="margin-bottom:20px;">
+            <i class="fa fa-info-circle"></i>
+            <span>Crie uma recorrência de manutenção para vários clientes de uma só vez. Ela será aplicada a <strong>todos os dispositivos</strong> de cada cliente selecionado.</span>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Clientes <span style="color:#e74c3c;">*</span></label>
+            <div style="margin-bottom:6px;display:flex;gap:8px;">
+              <button type="button" class="btn btn-default btn-xs" id="bulk-selecionar-todos">Selecionar todos</button>
+              <button type="button" class="btn btn-default btn-xs" id="bulk-limpar-selecao">Limpar</button>
+            </div>
+            <div class="man-bulk-list" id="bulk-lista-clientes"></div>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Título <span style="color:#e74c3c;">*</span></label>
+            <input type="text" id="bulk-titulo" class="form-control" placeholder="Ex: Troca de óleo, Revisão geral..." />
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Intervalo em km <span style="color:#e74c3c;">*</span></label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <input type="number" id="bulk-intervalo" class="form-control" placeholder="Ex: 5000" min="100" style="max-width:160px;" />
+              <span style="font-size:13px;font-weight:700;color:#e67e22;">km</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Descrição (opcional)</label>
+            <textarea id="bulk-descricao" class="form-control" rows="2" placeholder="Instruções ou detalhes para os clientes..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btn-salvar-bulk">
+            <i class="fa fa-users"></i> Criar para Selecionados
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Marcar como Feito ═══ -->
+  <div class="modal fade man-modal" id="modalFeito" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-check-circle" style="color:#27ae60;margin-right:8px;"></i>Confirmar Manutenção Realizada</h4>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:13px;color:#4a5568;margin-bottom:16px;">
+            Confirme que o serviço <strong id="feito-titulo-label">—</strong> foi realizado. O contador será zerado e um registro de manutenção será criado automaticamente no histórico do cliente.
+          </p>
+          <div class="form-group">
+            <label class="man-modal-label">Anotações (opcional)</label>
+            <textarea id="feito-notas" class="form-control" rows="2" placeholder="Detalhes sobre a manutenção realizada..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success" id="btn-confirmar-feito">
+            <i class="fa fa-check"></i> Confirmar Realizado
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="man-lightbox">
+    <button id="man-lightbox-close">&times;</button>
+    <img id="man-lightbox-img" src="" alt="Foto" />
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN']);
+      if (!user) return;
+      document.getElementById('user-nome').textContent  = user.nome || '—';
+      document.getElementById('user-badge').textContent = user.role || '—';
+      document.getElementById('user-badge').className   = 'al-badge badge-ativo';
+      AL.initThemeToggle('btn-tema');
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      // Main tabs
+      document.querySelectorAll('.man-tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.man-tab-btn').forEach(function (b) { b.classList.remove('active'); });
+          this.classList.add('active');
+          var target = this.dataset.tab;
+          document.getElementById('tab-por-cliente').style.display = target === 'tab-por-cliente' ? 'block' : 'none';
+          document.getElementById('tab-geral').style.display       = target === 'tab-geral'       ? 'block' : 'none';
+          if (target === 'tab-geral') window.buscarTodosRegistros && window.buscarTodosRegistros();
+        });
+      });
+      // Sub-tabs
+      document.querySelectorAll('.man-subtab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.man-subtab-btn').forEach(function (b) { b.classList.remove('active'); });
+          this.classList.add('active');
+          var target = this.dataset.subtab;
+          document.getElementById('subtab-historico').style.display    = target === 'subtab-historico' ? 'block' : 'none';
+          document.getElementById('subtab-recorrencias').style.display = target === 'subtab-recorrencias' ? 'block' : 'none';
+          document.getElementById('btn-novo-registro').style.display   = target === 'subtab-historico' ? '' : 'none';
+          document.getElementById('btn-nova-recorrencia').style.display = target === 'subtab-recorrencias' ? '' : 'none';
+        });
+      });
+      document.getElementById('btn-nova-recorrencia').style.display = 'none';
+    })();
+  </script>
+  <script src="../js/manutencoes-admin.js"></script>
+</body>
+</html>

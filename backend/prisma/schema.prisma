@@ -63,6 +63,8 @@ model User {
   podeInativarLoginCliente Boolean @default(false)
   podeExcluirLoginCliente  Boolean @default(false)
 
+  manutencoesAdmin     ManutencaoRegistro[]    @relation("ManutencaoAdmin")
+  recorrenciasAdmin    ManutencaoRecorrencia[] @relation("RecorrenciaAdmin")
   clientesCriados      Cliente[]          @relation("ClienteCriador")
   clientesVendidos     Cliente[]          @relation("ClienteVendedor")
   carnesGerados        Carne[]            @relation("CarneGeradoPor")
@@ -272,6 +274,8 @@ model Dispositivo {
   preferenciasNotificacoes PreferenciaNotificacao[]
   eventosNotificacoes      EventoNotificacao[]
   estadosKmNotificacao     EstadoKmNotificacao[]
+  manutencoesRegistros     ManutencaoRegistro[]
+  manutencoesRecorrencias  ManutencaoRecorrencia[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -366,6 +370,8 @@ model ClienteLogin {
   preferenciasNotificacoes PreferenciaNotificacao[]
   eventosNotificacoes      EventoNotificacao[]
   estadosKmNotificacao     EstadoKmNotificacao[]
+  manutencoesRegistros     ManutencaoRegistro[]
+  manutencoesRecorrencias  ManutencaoRecorrencia[]
 }
 
 model PreferenciaNotificacao {
@@ -424,6 +430,51 @@ model EventoNotificacao {
 
   clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
   dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+}
+
+model ManutencaoRegistro {
+  id               String   @id @default(uuid())
+  dispositivoId    String
+  clienteLoginId   String?
+  criadoPorAdminId String?
+  titulo           String
+  tipo             String   @default("preventiva")
+  descricao        String?  @db.Text
+  dataRealizacao   DateTime
+  kmRealizacao     Float?
+  custo            Decimal? @db.Decimal(10, 2)
+  oficina          String?
+  notas            String?  @db.Text
+  fotos            Json     @default("[]")
+  origem           String   @default("CLIENTE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  dispositivo    Dispositivo   @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  clienteLogin   ClienteLogin? @relation(fields: [clienteLoginId], references: [id], onDelete: SetNull)
+  criadoPorAdmin User?         @relation("ManutencaoAdmin", fields: [criadoPorAdminId], references: [id], onDelete: SetNull)
+}
+
+model ManutencaoRecorrencia {
+  id               String   @id @default(uuid())
+  dispositivoId    String
+  clienteLoginId   String?
+  criadoPorAdminId String?
+  titulo           String
+  descricao        String?
+  intervaloKm      Int
+  kmBase           Float    @default(0)
+  alerta50Enviado  Boolean  @default(false)
+  alerta25Enviado  Boolean  @default(false)
+  alerta0Enviado   Boolean  @default(false)
+  ativa            Boolean  @default(true)
+  origem           String   @default("CLIENTE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  dispositivo    Dispositivo   @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  clienteLogin   ClienteLogin? @relation(fields: [clienteLoginId], references: [id], onDelete: SetNull)
+  criadoPorAdmin User?         @relation("RecorrenciaAdmin", fields: [criadoPorAdminId], references: [id], onDelete: SetNull)
 }
 
 model Contrato {

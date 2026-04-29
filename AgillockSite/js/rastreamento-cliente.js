@@ -81,8 +81,10 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'deviceUnlocked',label: 'Veículo Desbloqueado',        css: 'tipo-ignition' },
   { tipo: 'kmExcedida',    label: 'Km Excedida (Período)',       css: 'tipo-overspeed' },
   { tipo: 'kmReduzida',    label: 'Km Reduzida (Período)',       css: 'tipo-geofence' },
-  { tipo: 'trocaOleo',     label: 'Troca de Óleo',               css: 'tipo-alarm' },
-  { tipo: 'trocaOleoFeita', label: 'Troca de Óleo Realizada',   css: 'tipo-ignition' },
+  { tipo: 'trocaOleo',        label: 'Troca de Óleo',              css: 'tipo-alarm' },
+  { tipo: 'trocaOleoFeita',   label: 'Troca de Óleo Realizada',  css: 'tipo-ignition' },
+  { tipo: 'manutencao',       label: 'Alerta de Manutenção',      css: 'tipo-overspeed' },
+  { tipo: 'manutencaoFeita',  label: 'Manutenção Realizada',      css: 'tipo-ignition' },
 ];
 
 let _evtFiltros = new Set();

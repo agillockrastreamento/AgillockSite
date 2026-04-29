@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');
+    if(localStorage.getItem('al-sidebar-state')==='collapsed')document.documentElement.classList.add('al-sb-collapsed');
+  </script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Manutenções — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    .man-page-body { padding: 24px 28px; max-width: 1140px; }
+
+    /* ── Filter bar ── */
+    .man-filter-bar {
+      display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap;
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
+      padding: 16px 20px; margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    html.dark-theme .man-filter-bar { background: #1e2530; border-color: #2d3748; }
+    .man-filter-bar label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: #888; margin-bottom: 5px; display: block; }
+    html.dark-theme .man-filter-bar label { color: #6c7a8f; }
+    .man-filter-bar .form-control { border-radius: 7px; border: 1px solid #ddd; font-size: 13px; height: 36px; }
+    html.dark-theme .man-filter-bar .form-control { background: #252535; border-color: #3a3a5c; color: #e0e6f0; }
+    html.dark-theme .man-filter-bar .form-control option { background: #252535; }
+
+    /* ── Tabs ── */
+    .man-tabs { display: flex; gap: 0; border-bottom: 2px solid #e8e8e8; margin-bottom: 24px; }
+    html.dark-theme .man-tabs { border-bottom-color: #2d3748; }
+    .man-tab-btn {
+      padding: 10px 20px; font-size: 13px; font-weight: 700; color: #888;
+      background: none; border: none; border-bottom: 3px solid transparent;
+      margin-bottom: -2px; cursor: pointer; transition: color .15s, border-color .15s;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .man-tab-btn:hover { color: #2980b9; }
+    .man-tab-btn.active { color: #2980b9; border-bottom-color: #2980b9; }
+    html.dark-theme .man-tab-btn { color: #6c7a8f; }
+    html.dark-theme .man-tab-btn.active { color: #5dade2; border-bottom-color: #5dade2; }
+
+    /* ── Section header ── */
+    .man-section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
+    }
+    .man-section-title { display: flex; align-items: center; gap: 10px; }
+    .man-section-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: rgba(41,128,185,.12); color: #2980b9;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    html.dark-theme .man-section-icon { background: rgba(41,128,185,.2); }
+    .man-section-title h5 { margin: 0; font-size: 15px; font-weight: 700; color: #2c3e50; }
+    html.dark-theme .man-section-title h5 { color: #e0e6f0; }
+    .man-section-title small { font-size: 11px; color: #888; display: block; margin-top: 1px; }
+    html.dark-theme .man-section-title small { color: #6c7a8f; }
+
+    /* ── Info box ── */
+    .man-info-box {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: rgba(41,128,185,.06); border: 1px solid rgba(41,128,185,.18);
+      border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+      font-size: 12px; color: #2980b9; line-height: 1.5;
+    }
+    html.dark-theme .man-info-box { background: rgba(41,128,185,.1); border-color: rgba(41,128,185,.25); color: #5dade2; }
+    .man-info-box i { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+
+    /* ── Cards de registro ── */
+    .man-list { display: flex; flex-direction: column; gap: 12px; }
+    .man-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
+      padding: 16px 20px; transition: box-shadow .2s, border-color .2s;
+    }
+    html.dark-theme .man-card { background: #1e2530; border-color: #2d3748; }
+    .man-card:hover { border-color: #2980b9; box-shadow: 0 4px 14px rgba(41,128,185,.08); }
+    html.dark-theme .man-card:hover { box-shadow: 0 4px 14px rgba(41,128,185,.15); }
+    .man-card-top { display: flex; align-items: flex-start; gap: 12px; }
+    .man-card-icon {
+      width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 17px;
+    }
+    .man-card-icon.tipo-preventiva  { background: rgba(39,174,96,.12);  color: #27ae60; }
+    .man-card-icon.tipo-corretiva   { background: rgba(231,76,60,.12);  color: #e74c3c; }
+    .man-card-icon.tipo-revisao     { background: rgba(52,152,219,.12); color: #2980b9; }
+    .man-card-icon.tipo-personalizado { background: rgba(155,89,182,.12); color: #8e44ad; }
+    html.dark-theme .man-card-icon.tipo-preventiva  { background: rgba(39,174,96,.18);  }
+    html.dark-theme .man-card-icon.tipo-corretiva   { background: rgba(231,76,60,.18);  }
+    html.dark-theme .man-card-icon.tipo-revisao     { background: rgba(52,152,219,.18); }
+    html.dark-theme .man-card-icon.tipo-personalizado { background: rgba(155,89,182,.18); }
+    .man-card-body { flex: 1; min-width: 0; }
+    .man-card-title { font-size: 14px; font-weight: 700; color: #2c3e50; margin: 0 0 4px; }
+    html.dark-theme .man-card-title { color: #e0e6f0; }
+    .man-card-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: #8a9ab0; }
+    html.dark-theme .man-card-meta { color: #6c7a8f; }
+    .man-card-meta span { display: flex; align-items: center; gap: 4px; }
+    .man-card-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+    .man-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 700;
+    }
+    .man-badge-admin  { background: rgba(231,76,60,.1);  color: #e74c3c; }
+    .man-badge-preventiva { background: rgba(39,174,96,.1); color: #27ae60; }
+    .man-badge-corretiva { background: rgba(231,76,60,.1); color: #e74c3c; }
+    .man-badge-revisao { background: rgba(52,152,219,.1); color: #2980b9; }
+    .man-badge-personalizado { background: rgba(155,89,182,.1); color: #8e44ad; }
+    html.dark-theme .man-badge-admin { background: rgba(231,76,60,.18); }
+    html.dark-theme .man-badge-preventiva { background: rgba(39,174,96,.18); }
+    html.dark-theme .man-badge-corretiva { background: rgba(231,76,60,.18); }
+    html.dark-theme .man-badge-revisao { background: rgba(52,152,219,.18); }
+    html.dark-theme .man-badge-personalizado { background: rgba(155,89,182,.18); }
+    .man-card-extra { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+    html.dark-theme .man-card-extra { border-top-color: #2d3748; }
+    .man-card-notas { font-size: 12px; color: #4a5568; margin-bottom: 10px; white-space: pre-wrap; }
+    html.dark-theme .man-card-notas { color: #a0aec0; }
+    .man-fotos-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .man-foto-thumb {
+      width: 72px; height: 72px; border-radius: 7px; object-fit: cover; cursor: pointer;
+      border: 2px solid #e8e8e8; transition: border-color .15s;
+    }
+    .man-foto-thumb:hover { border-color: #2980b9; }
+    html.dark-theme .man-foto-thumb { border-color: #2d3748; }
+
+    /* ── Cards de recorrência ── */
+    .man-rec-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 10px;
+      padding: 18px 20px; transition: box-shadow .2s, border-color .2s;
+    }
+    html.dark-theme .man-rec-card { background: #1e2530; border-color: #2d3748; }
+    .man-rec-card:hover { border-color: #2980b9; box-shadow: 0 4px 14px rgba(41,128,185,.08); }
+    .man-rec-top { display: flex; align-items: flex-start; gap: 12px; }
+    .man-rec-icon {
+      width: 40px; height: 40px; border-radius: 10px; background: rgba(230,126,34,.12);
+      color: #e67e22; display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0;
+    }
+    html.dark-theme .man-rec-icon { background: rgba(230,126,34,.2); }
+    .man-rec-body { flex: 1; min-width: 0; }
+    .man-rec-title { font-size: 14px; font-weight: 700; color: #2c3e50; margin: 0 0 4px; }
+    html.dark-theme .man-rec-title { color: #e0e6f0; }
+    .man-rec-sub { font-size: 11px; color: #8a9ab0; margin-bottom: 12px; }
+    html.dark-theme .man-rec-sub { color: #6c7a8f; }
+    .man-rec-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+    .man-progress-wrap { margin-top: 10px; }
+    .man-progress-bar-bg {
+      height: 8px; border-radius: 4px; background: #edf2f7; overflow: hidden;
+    }
+    html.dark-theme .man-progress-bar-bg { background: #2d3748; }
+    .man-progress-bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    .fill-ok      { background: #27ae60; }
+    .fill-warn    { background: #f39c12; }
+    .fill-urgent  { background: #e67e22; }
+    .fill-overdue { background: #e74c3c; }
+    .man-progress-info { display: flex; justify-content: space-between; font-size: 11px;
+      color: #8a9ab0; margin-top: 5px; }
+    html.dark-theme .man-progress-info { color: #6c7a8f; }
+    .man-status-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; margin-top: 8px;
+    }
+    .status-ok      { background: rgba(39,174,96,.12);  color: #27ae60; }
+    .status-warn    { background: rgba(243,156,18,.12); color: #e67e22; }
+    .status-urgent  { background: rgba(230,126,34,.12); color: #d35400; }
+    .status-overdue { background: rgba(231,76,60,.12);  color: #e74c3c; }
+    html.dark-theme .status-ok      { background: rgba(39,174,96,.18); }
+    html.dark-theme .status-warn    { background: rgba(243,156,18,.18); }
+    html.dark-theme .status-urgent  { background: rgba(230,126,34,.18); }
+    html.dark-theme .status-overdue { background: rgba(231,76,60,.18); }
+
+    /* ── Empty state ── */
+    .man-empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 70px 20px; text-align: center;
+    }
+    .man-empty-icon {
+      width: 72px; height: 72px; border-radius: 50%; background: #f0f4f8;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: #c0c8d4; margin-bottom: 18px;
+    }
+    html.dark-theme .man-empty-icon { background: #252535; color: #3a4458; }
+    .man-empty h6 { font-size: 15px; font-weight: 700; color: #4a5568; margin: 0 0 6px; }
+    html.dark-theme .man-empty h6 { color: #8892a4; }
+    .man-empty p { font-size: 13px; color: #8a9ab0; margin: 0; max-width: 300px; }
+    html.dark-theme .man-empty p { color: #6c7a8f; }
+
+    /* ── Modal ── */
+    .man-modal-label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .4px; color: #8a9ab0; margin-bottom: 5px; display: block; }
+    html.dark-theme .man-modal-label { color: #6c7a8f; }
+    .man-modal .form-control { border-radius: 7px; border: 1px solid #dde3ea; font-size: 13px; }
+    html.dark-theme .man-modal .form-control { background: #252535; border-color: #3a3a5c; color: #e0e6f0; }
+    html.dark-theme .man-modal .form-control option { background: #252535; }
+    html.dark-theme .modal-content { background: #1e2530; color: #e0e6f0; border-color: #2d3748; }
+    html.dark-theme .modal-header { border-bottom-color: #2d3748; }
+    html.dark-theme .modal-footer { border-top-color: #2d3748; }
+    html.dark-theme .modal-title { color: #e0e6f0; }
+    .man-foto-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .man-foto-preview-item { position: relative; }
+    .man-foto-preview-item img { width: 64px; height: 64px; object-fit: cover; border-radius: 7px; border: 2px solid #e8e8e8; }
+    html.dark-theme .man-foto-preview-item img { border-color: #3a3a5c; }
+    .man-foto-preview-item .btn-remove-foto {
+      position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+      border-radius: 50%; background: #e74c3c; color: #fff; border: none;
+      font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+
+    /* ── Lightbox ── */
+    #man-lightbox {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.85); align-items: center; justify-content: center;
+    }
+    #man-lightbox.open { display: flex; }
+    #man-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+    #man-lightbox-close {
+      position: absolute; top: 18px; right: 24px; color: #fff; font-size: 28px;
+      cursor: pointer; background: none; border: none; line-height: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
+      <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> <span>Relatório</span></a></li>
+      <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> <span>Notificações</span></a></li>
+      <li class="active"><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> <span>Manutenções</span></a></li>
+      <li id="li-pagamentos" style="display:none;"><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span class="al-badge badge-ativo" style="margin-top:4px;">CLIENTE</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Main content -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Manutenções</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="man-page-body">
+
+      <!-- Vehicle filter -->
+      <div class="man-filter-bar">
+        <div style="flex:1;min-width:200px;max-width:360px;">
+          <label for="filtro-dispositivo"><i class="fa fa-car" style="margin-right:4px;"></i>Veículo</label>
+          <select id="filtro-dispositivo" class="form-control">
+            <option value="">Selecione um veículo...</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-left:auto;">
+          <button class="btn btn-success" id="btn-novo-registro" style="height:36px;padding:0 16px;font-size:13px;font-weight:700;border-radius:7px;" disabled>
+            <i class="fa fa-plus"></i> Registrar Manutenção
+          </button>
+          <button class="btn btn-warning" id="btn-nova-recorrencia" style="height:36px;padding:0 16px;font-size:13px;font-weight:700;border-radius:7px;color:#fff;" disabled>
+            <i class="fa fa-repeat"></i> Nova Recorrência
+          </button>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div id="man-container" style="display:none;">
+
+        <!-- Tabs -->
+        <div class="man-tabs">
+          <button class="man-tab-btn active" data-tab="tab-historico">
+            <i class="fa fa-history"></i> Histórico de Manutenções
+          </button>
+          <button class="man-tab-btn" data-tab="tab-recorrencias">
+            <i class="fa fa-repeat"></i> Recorrências
+            <span id="badge-rec" class="badge" style="background:#e67e22;color:#fff;margin-left:4px;display:none;">0</span>
+          </button>
+        </div>
+
+        <!-- ═══ TAB HISTÓRICO ═══ -->
+        <div id="tab-historico">
+          <div class="man-section-header">
+            <div class="man-section-title">
+              <div class="man-section-icon"><i class="fa fa-history"></i></div>
+              <div>
+                <h5>Histórico de Manutenções</h5>
+                <small>Registros de serviços e reparos realizados neste veículo</small>
+              </div>
+            </div>
+          </div>
+          <div id="list-registros" class="man-list"></div>
+          <div id="empty-registros" class="man-empty" style="display:none;">
+            <div class="man-empty-icon"><i class="fa fa-wrench"></i></div>
+            <h6>Nenhuma manutenção registrada</h6>
+            <p>Clique em "Registrar Manutenção" para adicionar o primeiro serviço realizado neste veículo.</p>
+          </div>
+        </div>
+
+        <!-- ═══ TAB RECORRÊNCIAS ═══ -->
+        <div id="tab-recorrencias" style="display:none;">
+          <div class="man-section-header">
+            <div class="man-section-title">
+              <div class="man-section-icon" style="background:rgba(230,126,34,.12);color:#e67e22;"><i class="fa fa-repeat"></i></div>
+              <div>
+                <h5>Recorrências de Manutenção</h5>
+                <small>Alertas automáticos por quilometragem para serviços periódicos</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="man-info-box">
+            <i class="fa fa-info-circle"></i>
+            <span>
+              Defina de quantos em quantos <strong>km</strong> você quer ser lembrado de realizar uma manutenção.
+              Você receberá notificações <strong>50 km</strong>, <strong>25 km</strong> e <strong>0 km</strong> antes do limite.
+              Ao clicar em <strong>"Marcar como Feito"</strong>, o contador é zerado e começa novamente a partir do km atual.
+              Se não confirmar, alertas continuarão a cada 50 km após o vencimento.
+            </span>
+          </div>
+
+          <div id="list-recorrencias" class="man-list"></div>
+          <div id="empty-recorrencias" class="man-empty" style="display:none;">
+            <div class="man-empty-icon"><i class="fa fa-repeat"></i></div>
+            <h6>Nenhuma recorrência configurada</h6>
+            <p>Clique em "Nova Recorrência" para criar um lembrete automático de manutenção por quilometragem.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Empty vehicle state -->
+      <div id="man-vazio" class="man-empty">
+        <div class="man-empty-icon"><i class="fa fa-car"></i></div>
+        <h6>Nenhum veículo selecionado</h6>
+        <p>Selecione um veículo acima para visualizar e gerenciar suas manutenções.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Registrar Manutenção ═══ -->
+  <div class="modal fade man-modal" id="modalRegistro" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-wrench" style="color:#27ae60;margin-right:8px;"></i>Registrar Manutenção</h4>
+        </div>
+        <div class="modal-body">
+          <div class="man-info-box" style="margin-bottom:20px;">
+            <i class="fa fa-info-circle"></i>
+            <span>Registre aqui serviços já realizados no veículo — troca de óleo, revisão de freios, alinhamento, etc. Você pode adicionar fotos e anotações como comprovante.</span>
+          </div>
+          <div class="row">
+            <div class="col-sm-8">
+              <div class="form-group">
+                <label class="man-modal-label">Título do serviço <span style="color:#e74c3c;">*</span></label>
+                <input type="text" id="reg-titulo" class="form-control" placeholder="Ex: Troca de óleo, Revisão dos freios..." />
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label class="man-modal-label">Tipo <span style="color:#e74c3c;">*</span></label>
+                <select id="reg-tipo" class="form-control">
+                  <option value="preventiva">Preventiva</option>
+                  <option value="corretiva">Corretiva</option>
+                  <option value="revisao">Revisão</option>
+                  <option value="personalizado">Personalizado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label class="man-modal-label">Data da realização <span style="color:#e74c3c;">*</span></label>
+                <input type="date" id="reg-data" class="form-control" />
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label class="man-modal-label">Km no momento</label>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <input type="number" id="reg-km" class="form-control" placeholder="Ex: 52300" min="0" />
+                  <span style="font-size:12px;font-weight:700;color:#2980b9;white-space:nowrap;">km</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="form-group">
+                <label class="man-modal-label">Custo (R$)</label>
+                <input type="number" id="reg-custo" class="form-control" placeholder="Ex: 350,00" min="0" step="0.01" />
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Oficina / Prestador</label>
+            <input type="text" id="reg-oficina" class="form-control" placeholder="Nome da oficina ou prestador de serviço" />
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Descrição / Anotações</label>
+            <textarea id="reg-notas" class="form-control" rows="3" placeholder="Detalhes do serviço, peças trocadas, observações..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label"><i class="fa fa-camera" style="margin-right:4px;"></i>Fotos (opcional)</label>
+            <p style="font-size:11px;color:#8a9ab0;margin:0 0 8px;">Adicione fotos como nota fiscal, comprovante ou registro do serviço. Máx. 5 fotos de até 2 MB cada.</p>
+            <input type="file" id="reg-fotos-input" accept="image/*" multiple style="display:none;" />
+            <button type="button" class="btn btn-default btn-sm" onclick="document.getElementById('reg-fotos-input').click()">
+              <i class="fa fa-upload"></i> Selecionar fotos
+            </button>
+            <div id="reg-fotos-preview" class="man-foto-preview"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success" id="btn-salvar-registro">
+            <i class="fa fa-save"></i> Salvar Registro
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Nova Recorrência ═══ -->
+  <div class="modal fade man-modal" id="modalRecorrencia" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-repeat" style="color:#e67e22;margin-right:8px;"></i>Nova Recorrência de Manutenção</h4>
+        </div>
+        <div class="modal-body">
+          <div class="man-info-box" style="margin-bottom:20px;">
+            <i class="fa fa-info-circle"></i>
+            <span>Uma recorrência define de <strong>quantos em quantos km</strong> você quer ser alertado para realizar um serviço específico. O sistema começará a contar a partir do km atual do veículo.</span>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Título da manutenção <span style="color:#e74c3c;">*</span></label>
+            <input type="text" id="rec-titulo" class="form-control" placeholder="Ex: Troca de óleo, Alinhamento, Revisão geral..." />
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Intervalo em km <span style="color:#e74c3c;">*</span></label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <input type="number" id="rec-intervalo" class="form-control" placeholder="Ex: 5000" min="100" max="500000" style="max-width:160px;" />
+              <span style="font-size:13px;font-weight:700;color:#e67e22;">km</span>
+            </div>
+            <p style="font-size:11px;color:#8a9ab0;margin:6px 0 0;">Você receberá alertas 50 km, 25 km e 0 km antes de atingir este intervalo.</p>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Descrição (opcional)</label>
+            <textarea id="rec-descricao" class="form-control" rows="2" placeholder="Descreva o serviço ou adicione instruções..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-warning" id="btn-salvar-recorrencia" style="color:#fff;">
+            <i class="fa fa-repeat"></i> Criar Recorrência
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Marcar como Feito ═══ -->
+  <div class="modal fade man-modal" id="modalFeito" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-check-circle" style="color:#27ae60;margin-right:8px;"></i>Confirmar Manutenção Realizada</h4>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:13px;color:#4a5568;margin-bottom:16px;">
+            Confirme que o serviço <strong id="feito-titulo-label">—</strong> foi realizado. O contador de km será zerado e recomeçará a contagem a partir do km atual do veículo.
+          </p>
+          <div class="form-group">
+            <label class="man-modal-label">Anotações (opcional)</label>
+            <textarea id="feito-notas" class="form-control" rows="2" placeholder="Detalhes adicionais sobre a manutenção realizada..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label"><i class="fa fa-camera" style="margin-right:4px;"></i>Fotos (opcional)</label>
+            <input type="file" id="feito-fotos-input" accept="image/*" multiple style="display:none;" />
+            <button type="button" class="btn btn-default btn-sm" onclick="document.getElementById('feito-fotos-input').click()">
+              <i class="fa fa-upload"></i> Adicionar fotos
+            </button>
+            <div id="feito-fotos-preview" class="man-foto-preview"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success" id="btn-confirmar-feito">
+            <i class="fa fa-check"></i> Confirmar Realizado
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="man-lightbox">
+    <button id="man-lightbox-close">&times;</button>
+    <img id="man-lightbox-img" src="" alt="Foto" />
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var user = AL_CLIENTE.requireAuth();
+      if (!user) return;
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      if (user.tipo === 'responsavel') {
+        document.getElementById('li-pagamentos').style.display = 'block';
+      }
+      AL_CLIENTE.initThemeToggle('btn-tema');
+      document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      // Tabs
+      document.querySelectorAll('.man-tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.man-tab-btn').forEach(function (b) { b.classList.remove('active'); });
+          this.classList.add('active');
+          var target = this.dataset.tab;
+          document.getElementById('tab-historico').style.display = target === 'tab-historico' ? 'block' : 'none';
+          document.getElementById('tab-recorrencias').style.display = target === 'tab-recorrencias' ? 'block' : 'none';
+          // sync buttons visibility
+          document.getElementById('btn-novo-registro').style.display = target === 'tab-historico' ? '' : 'none';
+          document.getElementById('btn-nova-recorrencia').style.display = target === 'tab-recorrencias' ? '' : 'none';
+        });
+      });
+      document.getElementById('btn-nova-recorrencia').style.display = 'none';
+    })();
+  </script>
+  <script src="../js/manutencoes-cliente.js"></script>
+</body>
+</html>

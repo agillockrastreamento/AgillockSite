@@ -1,0 +1,403 @@
+'use strict';
+
+import { Router } from 'express';
+import prisma from '../utils/prisma';
+import { authMiddleware } from '../middleware/auth.middleware';
+
+const router = Router();
+router.use(authMiddleware);
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function _dispositivoIdsDoClienteLogin(clienteLoginId: string): Promise<string[]> {
+  const login = await prisma.clienteLogin.findUnique({
+    where: { id: clienteLoginId },
+    include: {
+      cliente: {
+        include: {
+          dispositivos: { select: { id: true } },
+          dispositivosVinculados: { select: { dispositivoId: true } },
+        },
+      },
+    },
+  });
+  return [
+    ...(login?.cliente?.dispositivos ?? []).map(d => d.id),
+    ...(login?.cliente?.dispositivosVinculados ?? []).map(dv => dv.dispositivoId),
+  ];
+}
+
+async function _ativarNotificacaoManutencao(clienteLoginId: string, dispositivoId: string) {
+  try {
+    await prisma.preferenciaNotificacao.upsert({
+      where: {
+        clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'manutencao' },
+      },
+      update: { web: true, app: true, email: true },
+      create: { clienteLoginId, dispositivoId, tipoEvento: 'manutencao', web: true, app: true, email: true },
+    });
+  } catch (err) {
+    console.error('Erro ao ativar notificação de manutenção:', err);
+  }
+}
+
+// ── Clientes e dispositivos ───────────────────────────────────────────────────
+
+// GET /api/manutencoes-admin/clientes
+router.get('/clientes', async (_req, res) => {
+  try {
+    const logins = await prisma.clienteLogin.findMany({
+      where: { ativo: true },
+      select: {
+        id: true,
+        email: true,
+        cliente: { select: { nome: true } },
+      },
+      orderBy: { cliente: { nome: 'asc' } },
+    });
+    res.json(logins.map(l => ({ id: l.id, nome: l.cliente.nome, email: l.email })));
+  } catch (err) {
+    res.status(500).json({ message: 'Erro ao listar clientes.' });
+  }
+});
+
+// GET /api/manutencoes-admin/clientes/:clienteLoginId/dispositivos
+router.get('/clientes/:clienteLoginId/dispositivos', async (req, res) => {
+  try {
+    const { clienteLoginId } = req.params;
+    const ids = await _dispositivoIdsDoClienteLogin(clienteLoginId);
+
+    if (!ids.length) return res.json([]);
+
+    const dispositivos = await prisma.dispositivo.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, nome: true, placa: true, odometroSistemaMetros: true },
+      orderBy: { nome: 'asc' },
+    });
+
+    res.json(dispositivos);
+  } catch (err) {
+    res.status(500).json({ message: 'Erro ao listar dispositivos.' });
+  }
+});
+
+// ── Registros ─────────────────────────────────────────────────────────────────
+
+// GET /api/manutencoes-admin/clientes/:clienteLoginId/registros?dispositivoId=X
+router.get('/clientes/:clienteLoginId/registros', async (req, res) => {
+  try {
+    const { clienteLoginId } = req.params;
+    const { dispositivoId } = req.query as { dispositivoId?: string };
+
+    const idsPermitidos = await _dispositivoIdsDoClienteLogin(clienteLoginId);
+    if (!idsPermitidos.length) return res.json([]);
+
+    const filtroDispositivo = dispositivoId && idsPermitidos.includes(dispositivoId)
+      ? dispositivoId
+      : undefined;
+
+    const registros = await prisma.manutencaoRegistro.findMany({
+      where: {
+        dispositivoId: filtroDispositivo ?? { in: idsPermitidos },
+        OR: [
+          { clienteLoginId },
+          { origem: 'ADMIN', dispositivoId: filtroDispositivo ?? { in: idsPermitidos } },
+        ],
+      },
+      include: {
+        dispositivo: { select: { nome: true, placa: true } },
+      },
+      orderBy: { dataRealizacao: 'desc' },
+    });
+
+    res.json(registros);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao carregar registros.' });
+  }
+});
+
+// POST /api/manutencoes-admin/clientes/:clienteLoginId/registros
+router.post('/clientes/:clienteLoginId/registros', async (req: any, res) => {
+  try {
+    const adminId: string = req.user.userId;
+    const { clienteLoginId } = req.params;
+    const { dispositivoId, titulo, tipo, descricao, dataRealizacao, kmRealizacao, custo, oficina, notas, fotos } = req.body;
+
+    if (!dispositivoId || !titulo || !dataRealizacao) {
+      return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, dataRealizacao.' });
+    }
+
+    const idsPermitidos = await _dispositivoIdsDoClienteLogin(clienteLoginId);
+    if (!idsPermitidos.includes(dispositivoId)) {
+      return res.status(403).json({ message: 'Dispositivo não pertence a este cliente.' });
+    }
+
+    const registro = await prisma.manutencaoRegistro.create({
+      data: {
+        dispositivoId,
+        clienteLoginId,
+        criadoPorAdminId: adminId,
+        titulo,
+        tipo: tipo || 'preventiva',
+        descricao: descricao || null,
+        dataRealizacao: new Date(dataRealizacao),
+        kmRealizacao: kmRealizacao != null ? parseFloat(kmRealizacao) : null,
+        custo: custo != null ? parseFloat(custo) : null,
+        oficina: oficina || null,
+        notas: notas || null,
+        fotos: fotos || [],
+        origem: 'ADMIN',
+      },
+      include: { dispositivo: { select: { nome: true, placa: true } } },
+    });
+
+    res.json(registro);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao criar registro.' });
+  }
+});
+
+// DELETE /api/manutencoes-admin/registros/:id
+router.delete('/registros/:id', async (_req, res) => {
+  try {
+    const { id } = _req.params;
+    await prisma.manutencaoRegistro.delete({ where: { id } });
+    res.json({ message: 'Registro excluído com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao excluir registro.' });
+  }
+});
+
+// ── Recorrências ──────────────────────────────────────────────────────────────
+
+// GET /api/manutencoes-admin/clientes/:clienteLoginId/recorrencias?dispositivoId=X
+router.get('/clientes/:clienteLoginId/recorrencias', async (req, res) => {
+  try {
+    const { clienteLoginId } = req.params;
+    const { dispositivoId } = req.query as { dispositivoId?: string };
+
+    const idsPermitidos = await _dispositivoIdsDoClienteLogin(clienteLoginId);
+    if (!idsPermitidos.length) return res.json([]);
+
+    const filtroDispositivo = dispositivoId && idsPermitidos.includes(dispositivoId)
+      ? dispositivoId
+      : undefined;
+
+    const recorrencias = await prisma.manutencaoRecorrencia.findMany({
+      where: {
+        dispositivoId: filtroDispositivo ?? { in: idsPermitidos },
+        ativa: true,
+        OR: [
+          { clienteLoginId },
+          { origem: 'ADMIN', dispositivoId: filtroDispositivo ?? { in: idsPermitidos } },
+        ],
+      },
+      include: {
+        dispositivo: { select: { nome: true, placa: true, odometroSistemaMetros: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    res.json(recorrencias);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao carregar recorrências.' });
+  }
+});
+
+// POST /api/manutencoes-admin/clientes/:clienteLoginId/recorrencias
+router.post('/clientes/:clienteLoginId/recorrencias', async (req: any, res) => {
+  try {
+    const adminId: string = req.user.userId;
+    const { clienteLoginId } = req.params;
+    const { dispositivoId, titulo, descricao, intervaloKm } = req.body;
+
+    if (!dispositivoId || !titulo || !intervaloKm) {
+      return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, intervaloKm.' });
+    }
+
+    const idsPermitidos = await _dispositivoIdsDoClienteLogin(clienteLoginId);
+    if (!idsPermitidos.includes(dispositivoId)) {
+      return res.status(403).json({ message: 'Dispositivo não pertence a este cliente.' });
+    }
+
+    const dispositivo = await prisma.dispositivo.findUnique({
+      where: { id: dispositivoId },
+      select: { odometroSistemaMetros: true },
+    });
+    const kmBase = (dispositivo?.odometroSistemaMetros ?? 0) / 1000;
+
+    const recorrencia = await prisma.manutencaoRecorrencia.create({
+      data: {
+        dispositivoId,
+        clienteLoginId,
+        criadoPorAdminId: adminId,
+        titulo,
+        descricao: descricao || null,
+        intervaloKm: parseInt(intervaloKm),
+        kmBase,
+        origem: 'ADMIN',
+      },
+      include: { dispositivo: { select: { nome: true, placa: true, odometroSistemaMetros: true } } },
+    });
+
+    await _ativarNotificacaoManutencao(clienteLoginId, dispositivoId);
+
+    res.json(recorrencia);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao criar recorrência.' });
+  }
+});
+
+// POST /api/manutencoes-admin/clientes/:clienteLoginId/recorrencias/:id/feito
+router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any, res) => {
+  try {
+    const { clienteLoginId, id } = req.params;
+    const adminId: string = req.user.userId;
+    const { notas, fotos } = req.body;
+
+    const recorrencia = await prisma.manutencaoRecorrencia.findFirst({
+      where: { id },
+      include: { dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true } } },
+    });
+    if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
+
+    const kmAtual = (recorrencia.dispositivo.odometroSistemaMetros ?? 0) / 1000;
+
+    await prisma.manutencaoRecorrencia.update({
+      where: { id },
+      data: { kmBase: kmAtual, alerta50Enviado: false, alerta25Enviado: false, alerta0Enviado: false },
+    });
+
+    await prisma.manutencaoRegistro.create({
+      data: {
+        dispositivoId: recorrencia.dispositivoId,
+        clienteLoginId,
+        criadoPorAdminId: adminId,
+        titulo: `${recorrencia.titulo} — confirmado pelo admin`,
+        tipo: 'preventiva',
+        descricao: `Manutenção recorrente "${recorrencia.titulo}" confirmada como realizada pelo administrador.`,
+        dataRealizacao: new Date(),
+        kmRealizacao: kmAtual,
+        notas: notas || null,
+        fotos: fotos || [],
+        origem: 'ADMIN',
+      },
+    });
+
+    res.json({ message: 'Manutenção marcada como feita pelo admin. Contador reiniciado.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao confirmar manutenção.' });
+  }
+});
+
+// DELETE /api/manutencoes-admin/clientes/:clienteLoginId/recorrencias/:id
+router.delete('/clientes/:clienteLoginId/recorrencias/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.manutencaoRecorrencia.update({ where: { id }, data: { ativa: false } });
+    res.json({ message: 'Recorrência removida com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao remover recorrência.' });
+  }
+});
+
+// ── Todos os registros (visão geral) ─────────────────────────────────────────
+
+// GET /api/manutencoes-admin/todos/registros?page=1&limit=20&tipo=&dispositivoId=&clienteLoginId=
+router.get('/todos/registros', async (req, res) => {
+  try {
+    const { page = '1', limit = '20', tipo, dispositivoId, clienteLoginId } = req.query as Record<string, string>;
+    const take = Math.min(parseInt(limit) || 20, 100);
+    const skip = (parseInt(page) - 1) * take;
+
+    const where: any = {};
+    if (tipo) where.tipo = tipo;
+    if (dispositivoId) where.dispositivoId = dispositivoId;
+    if (clienteLoginId) where.clienteLoginId = clienteLoginId;
+
+    const [total, registros] = await Promise.all([
+      prisma.manutencaoRegistro.count({ where }),
+      prisma.manutencaoRegistro.findMany({
+        where,
+        include: {
+          dispositivo: { select: { nome: true, placa: true } },
+          clienteLogin: { select: { email: true, cliente: { select: { nome: true } } } },
+        },
+        orderBy: { dataRealizacao: 'desc' },
+        skip,
+        take,
+      }),
+    ]);
+
+    res.json({ total, registros });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao carregar registros.' });
+  }
+});
+
+// ── Criação em massa de recorrências ─────────────────────────────────────────
+
+// POST /api/manutencoes-admin/bulk/recorrencias
+// Body: { clienteLoginIds: [id,...], dispositivoId: id | null, titulo, descricao, intervaloKm }
+// Se dispositivoId for null → aplica a TODOS os dispositivos de CADA cliente
+router.post('/bulk/recorrencias', async (req: any, res) => {
+  try {
+    const adminId: string = req.user.userId;
+    const { clienteLoginIds, dispositivoId, titulo, descricao, intervaloKm } = req.body;
+
+    if (!clienteLoginIds?.length || !titulo || !intervaloKm) {
+      return res.status(400).json({ message: 'Campos obrigatórios: clienteLoginIds, titulo, intervaloKm.' });
+    }
+
+    const criados: string[] = [];
+    const erros: string[] = [];
+
+    for (const loginId of clienteLoginIds as string[]) {
+      try {
+        const ids = await _dispositivoIdsDoClienteLogin(loginId);
+        const alvoIds = dispositivoId && ids.includes(dispositivoId) ? [dispositivoId] : ids;
+
+        for (const devId of alvoIds) {
+          const dispositivo = await prisma.dispositivo.findUnique({
+            where: { id: devId },
+            select: { odometroSistemaMetros: true },
+          });
+          const kmBase = (dispositivo?.odometroSistemaMetros ?? 0) / 1000;
+
+          await prisma.manutencaoRecorrencia.create({
+            data: {
+              dispositivoId: devId,
+              clienteLoginId: loginId,
+              criadoPorAdminId: adminId,
+              titulo,
+              descricao: descricao || null,
+              intervaloKm: parseInt(intervaloKm),
+              kmBase,
+              origem: 'ADMIN',
+            },
+          });
+
+          await _ativarNotificacaoManutencao(loginId, devId);
+          criados.push(`${loginId}/${devId}`);
+        }
+      } catch (e) {
+        erros.push(loginId);
+      }
+    }
+
+    res.json({ message: `${criados.length} recorrência(s) criada(s).`, erros });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao criar recorrências em massa.' });
+  }
+});
+
+export default router;

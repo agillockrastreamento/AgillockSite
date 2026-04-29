@@ -211,7 +211,9 @@ const TIPOS_EVENTO_ADMIN = [
   { tipo: 'alarm',          label: 'Alarme',                     css: 'tipo-alarm'    },
   { tipo: 'textMessage',    label: 'Mensagem de Texto Recebida', css: 'tipo-text'     },
   { tipo: 'driverChanged',  label: 'Condutor Alterado',          css: 'tipo-driver'   },
-  { tipo: 'trocaOleoFeita', label: 'Troca de Óleo Realizada',   css: 'tipo-ignition' },
+  { tipo: 'trocaOleoFeita',  label: 'Troca de Óleo Realizada',  css: 'tipo-ignition' },
+  { tipo: 'manutencao',      label: 'Alerta de Manutenção',     css: 'tipo-overspeed' },
+  { tipo: 'manutencaoFeita', label: 'Manutenção Realizada',     css: 'tipo-ignition' },
 ];
 
 // Filtros ativos (null = todos)

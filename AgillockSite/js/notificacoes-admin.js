@@ -14,6 +14,7 @@
     { id: 'kmExcedida',     label: 'Km Excedida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'kmReduzida',     label: 'Km Reduzida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'trocaOleo',      label: 'Troca de Óleo',               icon: 'fa-tint',                 iconClass: 'ic-oleo' },
+    { id: 'manutencao',     label: 'Manutenções (Recorrências)',   icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
   ];
 
   const CANAIS_CLIENTE = [
