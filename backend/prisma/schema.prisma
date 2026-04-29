@@ -464,10 +464,11 @@ model ManutencaoRecorrencia {
   descricao        String?
   intervaloKm      Int
   kmBase           Float    @default(0)
-  alerta50Enviado  Boolean  @default(false)
-  alerta25Enviado  Boolean  @default(false)
-  alerta0Enviado   Boolean  @default(false)
-  ativa            Boolean  @default(true)
+  alerta50Enviado        Boolean  @default(false)
+  alerta25Enviado        Boolean  @default(false)
+  alerta0Enviado         Boolean  @default(false)
+  ultimaAlertaPostDueKm  Float    @default(-1)
+  ativa                  Boolean  @default(true)
   origem           String   @default("CLIENTE")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

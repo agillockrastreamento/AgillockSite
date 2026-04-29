@@ -290,6 +290,7 @@ class NotificationService {
         await this._verificarKmExcedida(clienteLogin.id, dispositivo, odometroMetros);
         await this._verificarKmReduzida(clienteLogin.id, dispositivo, odometroMetros);
         await this._verificarTrocaOleo(clienteLogin.id, dispositivo, odometroMetros);
+        await this._verificarManutencaoRecorrencias(clienteLogin.id, dispositivo, odometroMetros);
       }
     } catch (error) {
       console.error('Erro ao verificar km notificações:', error);
@@ -432,6 +433,78 @@ class NotificationService {
     });
   }
 
+  private async _verificarManutencaoRecorrencias(
+    clienteLoginId: string,
+    dispositivo: DispositivoBasico,
+    odometroMetros: number,
+  ) {
+    const pref = await prisma.preferenciaNotificacao.findUnique({
+      where: {
+        clienteLoginId_dispositivoId_tipoEvento: {
+          clienteLoginId,
+          dispositivoId: dispositivo.id,
+          tipoEvento: 'manutencao',
+        },
+      },
+    });
+    if (!pref || (!pref.web && !pref.app && !pref.email)) return;
+
+    const recorrencias = await prisma.manutencaoRecorrencia.findMany({
+      where: { dispositivoId: dispositivo.id, clienteLoginId, ativa: true },
+    });
+
+    const odometroKm = odometroMetros / 1000;
+    const nome = dispositivo.nome;
+    const pl = dispositivo.placa ? ` (${dispositivo.placa})` : '';
+
+    for (const rec of recorrencias) {
+      const kmPercorrido = odometroKm - rec.kmBase;
+      const intervalo = rec.intervaloKm;
+      const titulo = rec.titulo;
+
+      // Pre-due: 50 km before
+      if (!rec.alerta50Enviado && kmPercorrido >= intervalo - 50) {
+        const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
+        const mensagem = `Manutenção Próxima: "${titulo}" no veículo ${nome}${pl} — faltam ${kmRestante} km para o próximo serviço (intervalo: ${intervalo} km).`;
+        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencao', mensagem);
+        await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta50Enviado: true } });
+        rec.alerta50Enviado = true;
+      }
+
+      // Pre-due: 25 km before
+      if (!rec.alerta25Enviado && kmPercorrido >= intervalo - 25) {
+        const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
+        const mensagem = `Manutenção Urgente: "${titulo}" no veículo ${nome}${pl} — faltam apenas ${kmRestante} km para o próximo serviço!`;
+        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencao', mensagem);
+        await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta25Enviado: true } });
+        rec.alerta25Enviado = true;
+      }
+
+      // At limit
+      if (!rec.alerta0Enviado && kmPercorrido >= intervalo) {
+        const mensagem = `Manutenção Devida: "${titulo}" no veículo ${nome}${pl} atingiu o intervalo de ${intervalo} km. Realize o serviço!`;
+        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencao', mensagem);
+        await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta0Enviado: true } });
+        rec.alerta0Enviado = true;
+      }
+
+      // Post-due: every 50 km after the limit
+      if (kmPercorrido > intervalo) {
+        const blocos = Math.floor((kmPercorrido - intervalo) / 50);
+        const ultima = rec.ultimaAlertaPostDueKm ?? -1;
+        for (let i = 1; i <= blocos; i++) {
+          const kmAtrasado = i * 50;
+          if (ultima < kmAtrasado) {
+            const mensagem = `Manutenção Atrasada: "${titulo}" no veículo ${nome}${pl} está ${kmAtrasado} km acima do intervalo recomendado (${intervalo} km). Realize o serviço urgente!`;
+            await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencao', mensagem);
+            await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { ultimaAlertaPostDueKm: kmAtrasado } });
+            break;
+          }
+        }
+      }
+    }
+  }
+
   private async _salvarEEnviar(
     clienteLoginId: string,
     dispositivo: DispositivoBasico,
@@ -474,6 +547,7 @@ class NotificationService {
       kmExcedida:    'Quilometragem Excedida',
       kmReduzida:    'Quilometragem Reduzida',
       trocaOleo:     'Troca de Óleo',
+      manutencao:    'Manutenção',
     };
     return labels[tipo] || tipo;
   }
