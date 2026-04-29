@@ -751,11 +751,11 @@ async function exportarRelatorio() {
   try {
     let url;
     if (document.getElementById('sel-dispositivo')) {
-      const params = new URLSearchParams({ from: from.toISOString(), to: to.toISOString(), type: tipo });
+      const params = new URLSearchParams({ from: isoComFuso(from), to: isoComFuso(to), type: tipo });
       adicionarDeviceIdsQuery(params, dispositivoIdsAtuais);
       url = `${_BASE}/api/cliente/rastreamento/relatorios/exportar?${params.toString()}`;
     } else {
-      url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&type=${encodeURIComponent(tipo)}`;
+      url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(isoComFuso(from))}&to=${encodeURIComponent(isoComFuso(to))}&type=${encodeURIComponent(tipo)}`;
     }
     const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + _token } });
     if (!res.ok) {

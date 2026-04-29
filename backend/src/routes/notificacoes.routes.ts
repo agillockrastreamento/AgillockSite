@@ -199,27 +199,23 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
     const { periodo } = req.query;
 
     let dateFilter = {};
-    const agora = new Date();
     const { de, ate } = req.query as { de?: string; ate?: string };
 
+    const meiaNoBrasil = (offsetMs = 0) => {
+      const d = new Date(Date.now() + offsetMs);
+      const s = d.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      return new Date(s + 'T00:00:00-03:00');
+    };
+
     if (periodo === 'hoje') {
-      dateFilter = { gte: new Date(agora.setHours(0, 0, 0, 0)) };
+      dateFilter = { gte: meiaNoBrasil(), lt: meiaNoBrasil(86400000) };
     } else if (periodo === 'ontem') {
-      const ontem = new Date(agora);
-      ontem.setDate(agora.getDate() - 1);
-      dateFilter = {
-        gte: new Date(ontem.setHours(0, 0, 0, 0)),
-        lt: new Date(agora.setHours(0, 0, 0, 0)),
-      };
+      dateFilter = { gte: meiaNoBrasil(-86400000), lt: meiaNoBrasil() };
     } else if (periodo === '7dias') {
-      const seteDias = new Date(agora);
-      seteDias.setDate(agora.getDate() - 7);
-      dateFilter = { gte: seteDias };
+      dateFilter = { gte: meiaNoBrasil(-7 * 86400000) };
     } else if (periodo === 'custom' && de && ate) {
-      const inicio = new Date(de as string);
-      inicio.setHours(0, 0, 0, 0);
-      const fim = new Date(ate as string);
-      fim.setHours(23, 59, 59, 999);
+      const inicio = new Date((de as string) + 'T00:00:00-03:00');
+      const fim    = new Date((ate as string) + 'T23:59:59-03:00');
       if (!isNaN(inicio.getTime()) && !isNaN(fim.getTime())) {
         dateFilter = { gte: inicio, lte: fim };
       }

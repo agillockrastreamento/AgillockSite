@@ -675,8 +675,8 @@ async function exportarRelatorio() {
   try {
     const token = localStorage.getItem('al-token') || localStorage.getItem('al_token');
     const params = new URLSearchParams({
-      from: from.toISOString(),
-      to: to.toISOString(),
+      from: isoComFuso(from),
+      to: isoComFuso(to),
       type: tipo,
     });
     adicionarDeviceIdsQuery(params, selecionados);
