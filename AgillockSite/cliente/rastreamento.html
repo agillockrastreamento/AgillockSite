@@ -716,6 +716,16 @@
       white-space: nowrap; pointer-events: none;
     }
 
+    /* Cor padrão (tema claro) */
+    .texto-confirmacao {
+        color: #2c3e50;
+    }
+
+    /* Cor no tema escuro */
+    html.dark-theme .texto-confirmacao {
+        color: #c9d1d9;
+    }
+
     /* ── Tooltip de cerca ── */
     .dcard-summary-grid {
       display: grid;
@@ -991,7 +1001,7 @@
           </h4>
         </div>
         <div class="modal-body" style="padding:20px 24px;">
-          <p style="font-size:13px;color:#2c3e50;margin-bottom:8px;">
+          <p style="font-size:13px;margin-bottom:8px;" class="texto-confirmacao">
             Confirmar que <strong id="modal-feito-card-titulo">esta manutenção</strong> foi realizada?
           </p>
           <p style="font-size:12px;color:#e67e22;font-weight:700;margin-bottom:8px;">

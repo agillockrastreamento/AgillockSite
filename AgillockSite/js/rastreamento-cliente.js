@@ -1040,15 +1040,18 @@ function conectarWebSocket() {
   const wsUrl = `${apiBase.replace(/^http/, 'ws')}/ws/rastreamento`;
   const token = AL_CLIENTE.getToken();
   ws = new WebSocket(token ? `${wsUrl}?token=${token}` : wsUrl);
-  setWsStatus('reconectando', 'Conectando...');
+  //setWsStatus('reconectando', 'Conectando...');
 
-  ws.onopen = () => { wsReconectando = false; setWsStatus('conectado', 'Tempo real ativo'); };
+  ws.onopen = () => { 
+    wsReconectando = false; 
+    //setWsStatus('conectado', 'Tempo real ativo'); 
+  };
   ws.onmessage = (ev) => {
     let msg; try { msg = JSON.parse(ev.data); } catch { return; }
     processarMensagemWs(msg);
   };
   ws.onclose = () => {
-    setWsStatus('desconectado', 'Reconectando...');
+    //setWsStatus('desconectado', 'Reconectando...');
     if (!wsReconectando) { wsReconectando = true; wsReconectTimer = setTimeout(conectarWebSocket, 5000); }
   };
   ws.onerror = () => ws.close();
@@ -1121,13 +1124,13 @@ function processarMensagemWs(msg) {
   renderSidebar();
 }
 
-function setWsStatus(estado, texto) {
-  const el = document.getElementById('ws-status');
-  if (el) {
-    el.className = estado;
-    el.innerHTML = `<i class="fa fa-circle"></i> ${texto}`;
-  }
-}
+// function setWsStatus(estado, texto) {
+//   const el = document.getElementById('ws-status');
+//  if (el) {
+//    el.className = estado;
+//    el.innerHTML = `<i class="fa fa-circle"></i> ${texto}`;
+//  }
+// }
 
 // ── Cluster / Spider ─────────────────────────────────────────────────────────
 

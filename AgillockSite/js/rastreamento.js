@@ -1584,11 +1584,11 @@ function conectarWebSocket() {
   const url = token ? `${wsUrl}?token=${token}` : wsUrl;
 
   ws = new WebSocket(url);
-  setWsStatus('reconectando', 'Conectando...');
+  // setWsStatus('reconectando', 'Conectando...');
 
   ws.onopen = () => {
     wsReconectando = false;
-    setWsStatus('conectado', 'Tempo real ativo');
+    // setWsStatus('conectado', 'Tempo real ativo');
   };
 
   ws.onmessage = (event) => {
@@ -1598,7 +1598,7 @@ function conectarWebSocket() {
   };
 
   ws.onclose = () => {
-    setWsStatus('desconectado', 'Reconectando...');
+    // setWsStatus('desconectado', 'Reconectando...');
     if (!wsReconectando) {
       wsReconectando = true;
       wsReconectTimer = setTimeout(conectarWebSocket, 5000);
@@ -1696,11 +1696,11 @@ function processarMensagemWs(msg) {
   renderSidebar();
 }
 
-function setWsStatus(estado, texto) {
-  const el = document.getElementById('ws-status');
-  el.className = estado;
-  el.innerHTML = `<i class="fa fa-circle"></i> ${texto}`;
-}
+//function setWsStatus(estado, texto) {
+//  const el = document.getElementById('ws-status');
+//  el.className = estado;
+//  el.innerHTML = `<i class="fa fa-circle"></i> ${texto}`;
+//}
 
 // ── Cluster ───────────────────────────────────────────────────────────────────
 
