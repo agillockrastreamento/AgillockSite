@@ -474,10 +474,12 @@
           <button class="btn btn-default btn-sm periodo-btn" data-periodo="custom">Personalizado</button>
         </div>
 
-        <div id="custom-datas" style="display:none; gap:10px; align-items:center;">
+        <div id="custom-datas" style="display:none; gap:6px; align-items:center; flex-wrap:wrap;">
           <input type="date" id="dt-de" class="form-control input-sm">
-          <span>até</span>
+          <input type="time" id="hr-de" class="form-control input-sm" value="00:00" style="width:100px">
+          <span style="color:#888">até</span>
           <input type="date" id="dt-ate" class="form-control input-sm">
+          <input type="time" id="hr-ate" class="form-control input-sm" value="23:59" style="width:100px">
         </div>
 
         <button class="btn btn-primary btn-sm" id="btn-carregar" style="display:none" title="Carregar">
