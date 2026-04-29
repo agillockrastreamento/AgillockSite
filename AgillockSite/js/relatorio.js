@@ -149,8 +149,8 @@ function configurarPeriodo() {
   const hoje = new Date();
   const dtStr = formatarData(hoje);
   const elDe = document.getElementById('dt-de'), elAte = document.getElementById('dt-ate');
-  if (elDe) elDe.value = dtStr;
-  if (elAte) elAte.value = dtStr;
+  if (elDe) elDe.value = dtStr + 'T00:00';
+  if (elAte) elAte.value = dtStr + 'T23:59';
 }
 
 function formatarData(d) {
@@ -173,11 +173,9 @@ function calcularIntervalo() {
   }
   const deVal  = document.getElementById('dt-de').value;
   const ateVal = document.getElementById('dt-ate').value;
-  const hrDe   = document.getElementById('hr-de')?.value  || '00:00';
-  const hrAte  = document.getElementById('hr-ate')?.value || '23:59';
   return {
-    from: deVal  ? new Date(deVal  + 'T' + hrDe  + ':00') : hoje,
-    to:   ateVal ? new Date(ateVal + 'T' + hrAte + ':59') : amanha,
+    from: deVal  ? new Date(deVal  + ':00') : hoje,
+    to:   ateVal ? new Date(ateVal + ':59') : amanha,
   };
 }
 

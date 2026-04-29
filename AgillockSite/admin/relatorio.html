@@ -85,6 +85,11 @@
       color: #c9d1d9;
       border-color: #3a3a5c;
     }
+    html.dark-theme input[type="date"]::-webkit-calendar-picker-indicator,
+    html.dark-theme input[type="time"]::-webkit-calendar-picker-indicator,
+    html.dark-theme input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+    }
     html.dark-theme .form-control:focus {
       background: #2a2a40;
       color: #e0e6f0;
@@ -475,11 +480,9 @@
         </div>
 
         <div id="custom-datas" style="display:none; gap:6px; align-items:center; flex-wrap:wrap;">
-          <input type="date" id="dt-de" class="form-control input-sm">
-          <input type="time" id="hr-de" class="form-control input-sm" value="00:00" style="width:100px">
+          <input type="datetime-local" id="dt-de" class="form-control input-sm">
           <span style="color:#888">até</span>
-          <input type="date" id="dt-ate" class="form-control input-sm">
-          <input type="time" id="hr-ate" class="form-control input-sm" value="23:59" style="width:100px">
+          <input type="datetime-local" id="dt-ate" class="form-control input-sm">
         </div>
 
         <button class="btn btn-primary btn-sm" id="btn-carregar" style="display:none" title="Carregar">

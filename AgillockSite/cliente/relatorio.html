@@ -197,6 +197,11 @@
 
     html.dark-theme .form-control { background: #252535; color: #c9d1d9; border-color: #3a3a5c; }
     html.dark-theme .form-control:focus { background: #2a2a40; border-color: #fab32c; box-shadow: none; }
+    html.dark-theme input[type="date"]::-webkit-calendar-picker-indicator,
+    html.dark-theme input[type="time"]::-webkit-calendar-picker-indicator,
+    html.dark-theme input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+    }
     #grafico-content > div { height: 350px !important; }
     #sel-dispositivo { min-width: 200px; max-width: 280px; }
   </style>
@@ -247,11 +252,9 @@
         <button class="btn btn-default btn-sm periodo-btn" data-periodo="custom">Personalizado</button>
       </div>
       <div id="custom-datas" style="display:none;gap:6px;align-items:center;flex-wrap:wrap">
-        <input type="date" id="dt-de"  class="form-control input-sm" style="width:130px" />
-        <input type="time" id="hr-de"  class="form-control input-sm" value="00:00" style="width:95px" />
+        <input type="datetime-local" id="dt-de"  class="form-control input-sm" />
         <span style="color:#888;font-size:12px">até</span>
-        <input type="date" id="dt-ate" class="form-control input-sm" style="width:130px" />
-        <input type="time" id="hr-ate" class="form-control input-sm" value="23:59" style="width:95px" />
+        <input type="datetime-local" id="dt-ate" class="form-control input-sm" />
       </div>
       <button class="btn btn-primary btn-sm" id="btn-carregar" style="display:none" title="Carregar"><i class="fa fa-search"></i></button>
     </div>
