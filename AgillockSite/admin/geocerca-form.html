@@ -12,9 +12,11 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="../css/admin.css" />
   <style>
-    /* Override: allow page to scroll normally */
-    body { overflow: auto !important; height: auto !important; }
+    /* Topbar fixo, body scrolla, barra do navegador no canto direito */
+    body { overflow-y: scroll !important; height: auto !important; }
     .admin-content { height: auto !important; min-height: 100vh; overflow: visible !important; flex-direction: column; display: flex; }
+    /* Garante que o topbar fique ACIMA dos controles do Leaflet (z-index 800-1000) */
+    .admin-topbar { z-index: 2000 !important; }
 
     /* Page body */
     .gf-body {

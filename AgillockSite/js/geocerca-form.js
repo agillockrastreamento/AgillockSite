@@ -118,15 +118,64 @@
       document.getElementById('geo-notif-sistemas').classList.toggle('visivel', this.checked);
     });
 
-    // Busca de dispositivos com debounce
+    // Busca de dispositivos com debounce + suporte a vírgulas (multi-IMEI)
     var searchTimer = null;
-    document.getElementById('geo-devices-search').addEventListener('input', function () {
+    var searchEl = document.getElementById('geo-devices-search');
+
+    searchEl.addEventListener('input', function () {
       clearTimeout(searchTimer);
       var q = this.value.trim();
       if (!q) { document.getElementById('geo-devices-results').style.display = 'none'; return; }
+      // Com vírgula: mostrar dica para pressionar Enter
+      if (q.indexOf(',') !== -1) {
+        var resultsEl = document.getElementById('geo-devices-results');
+        resultsEl.innerHTML = '<div style="padding:9px 13px;font-size:12px;color:#888;font-style:italic;">' +
+          '<i class="fa fa-info-circle" style="color:#fab32c;margin-right:5px;"></i>' +
+          'Pressione Enter para adicionar todos os valores separados por vírgula</div>';
+        resultsEl.style.display = 'block';
+        return;
+      }
       searchTimer = setTimeout(function () { pesquisarDispositivos(q); }, 200);
     });
-    document.getElementById('geo-devices-search').addEventListener('blur', function () {
+
+    searchEl.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      var raw = this.value.trim();
+      if (!raw) return;
+
+      if (raw.indexOf(',') !== -1) {
+        // Modo multi: dividir por vírgula, buscar cada termo
+        var termos = raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        var adicionados = 0, naoEncontrados = [];
+        termos.forEach(function (termo) {
+          var lower = termo.toLowerCase();
+          var encontrado = todosDispositivos.find(function (d) {
+            return (d.identificador && d.identificador.toLowerCase() === lower) ||
+                   (d.placa && d.placa.toLowerCase() === lower) ||
+                   (d.nome && d.nome.toLowerCase() === lower);
+          });
+          if (encontrado && !dispositivosSelecionados.find(function (s) { return s.id === encontrado.id; })) {
+            dispositivosSelecionados.push(encontrado);
+            adicionados++;
+          } else if (!encontrado) {
+            naoEncontrados.push(termo);
+          }
+        });
+        renderizarTags();
+        this.value = '';
+        document.getElementById('geo-devices-results').style.display = 'none';
+        var msg = adicionados + ' dispositivo(s) adicionado(s)';
+        if (naoEncontrados.length) msg += '. Não encontrados: ' + naoEncontrados.join(', ');
+        AL.showAlert(msg, naoEncontrados.length ? 'warning' : 'success');
+      } else {
+        // Modo simples: selecionar primeiro resultado visível
+        var primeiro = document.querySelector('.gf-device-result');
+        if (primeiro) primeiro.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      }
+    });
+
+    searchEl.addEventListener('blur', function () {
       setTimeout(function () { document.getElementById('geo-devices-results').style.display = 'none'; }, 200);
     });
   }
@@ -478,9 +527,13 @@
     results.innerHTML = filtrados.map(function (d) {
       return '<div class="gf-device-result" data-id="' + esc(d.id) + '">' +
         '<i class="fa fa-car" style="opacity:.45;color:#fab32c"></i>' +
-        '<span>' + esc(d.nome) +
-        (d.placa ? ' <span style="opacity:.65;font-size:11px">(' + esc(d.placa) + ')</span>' : '') +
-        '</span>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-weight:600;">' + esc(d.nome) + '</div>' +
+          '<div style="font-size:11px;color:#999;margin-top:1px;">' +
+            (d.placa ? '<span style="margin-right:8px;"><i class="fa fa-id-card-o"></i> ' + esc(d.placa) + '</span>' : '') +
+            (d.identificador ? '<span style="font-family:monospace;"><i class="fa fa-barcode"></i> ' + esc(d.identificador) + '</span>' : '') +
+          '</div>' +
+        '</div>' +
         '</div>';
     }).join('');
 
@@ -498,7 +551,7 @@
       });
     });
 
-    results.style.display = '';
+    results.style.display = 'block';
   }
 
   function renderizarTags() {
