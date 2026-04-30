@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Geocerca — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    /* Override: allow page to scroll normally */
+    body { overflow: auto !important; height: auto !important; }
+    .admin-content { height: auto !important; min-height: 100vh; overflow: visible !important; flex-direction: column; display: flex; }
+
+    /* Page body */
+    .gf-body {
+      flex: 1;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background: #f5f6fa;
+    }
+    html.dark-theme .gf-body { background: #111827; }
+
+    /* Section cards */
+    .gf-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      overflow: hidden;
+    }
+    html.dark-theme .gf-card { background: #1e2530; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+
+    .gf-card-header {
+      padding: 11px 18px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #eee;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    html.dark-theme .gf-card-header { background: #1c2230; border-color: #2a3040; color: #8b949e; }
+
+    .gf-card-body { padding: 18px; }
+
+    /* Form groups */
+    .gf-form-group { margin-bottom: 14px; }
+    .gf-form-group:last-child { margin-bottom: 0; }
+    .gf-form-group label {
+      display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 5px;
+    }
+    html.dark-theme .gf-form-group label { color: #9ca3af; }
+    .gf-form-group .form-control { font-size: 13px; }
+    html.dark-theme .gf-form-group .form-control { background: #252535; color: #c9d1d9; border-color: #3a3a5c; }
+    html.dark-theme input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+    /* Devices search */
+    .gf-devices-search-wrap { position: relative; margin-bottom: 10px; }
+    #geo-devices-results {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 600;
+      background: #fff; border: 1px solid #ddd; border-top: none;
+      border-radius: 0 0 8px 8px; max-height: 220px; overflow-y: auto;
+      box-shadow: 0 6px 18px rgba(0,0,0,.12);
+      display: none;
+    }
+    html.dark-theme #geo-devices-results { background: #1e2530; border-color: #3a3a5c; }
+    .gf-device-result {
+      padding: 9px 13px; cursor: pointer; font-size: 12px; color: #333;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid #f0f0f0; transition: background .1s;
+    }
+    html.dark-theme .gf-device-result { color: #c9d1d9; border-color: #2a2a3e; }
+    .gf-device-result:hover { background: #fef8ec; }
+    html.dark-theme .gf-device-result:hover { background: #2a2020; }
+    .gf-device-result:last-child { border-bottom: none; }
+
+    /* Device tags */
+    #geo-devices-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+    .gf-device-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #fff3e0; border: 1.5px solid rgba(250,179,44,.4);
+      color: #8a5700; border-radius: 14px; padding: 3px 10px 3px 12px;
+      font-size: 11px; font-weight: 600;
+    }
+    html.dark-theme .gf-device-tag { background: #2e2000; border-color: #fab32c; color: #fab32c; }
+    .gf-device-tag button {
+      background: none; border: none; padding: 0 0 0 2px; cursor: pointer;
+      font-size: 13px; line-height: 1; color: #b07800; display: flex; align-items: center;
+    }
+    html.dark-theme .gf-device-tag button { color: #fab32c; }
+    .gf-device-tag button:hover { color: #e74c3c; }
+    #geo-devices-empty { font-size: 12px; color: #aaa; padding: 4px 0 0; }
+
+    /* Tile switcher */
+    .gf-tile-bar {
+      background: #f0f2f5;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #e4e6ea;
+    }
+    html.dark-theme .gf-tile-bar { background: #1c2230; border-color: #2a3040; }
+    .gf-tile-bar label { font-size: 12px; font-weight: 600; color: #666; margin: 0; }
+    html.dark-theme .gf-tile-bar label { color: #8b949e; }
+    .tile-btn {
+      padding: 4px 14px; border-radius: 20px; border: 1.5px solid #ccc;
+      background: #fff; color: #555; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    html.dark-theme .tile-btn { background: #252535; border-color: #444; color: #c9d1d9; }
+    .tile-btn:hover { border-color: #fab32c; color: #fab32c; }
+    .tile-btn.ativo { background: #fab32c; border-color: #fab32c; color: #222; }
+    .tile-btn.ativo:hover { background: #e8a21a; border-color: #e8a21a; }
+
+    /* Draw toolbar */
+    .gf-draw-bar {
+      background: #fff;
+      padding: 10px 14px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    html.dark-theme .gf-draw-bar { background: #1e2530; border-color: #2a3040; }
+    .gf-draw-bar > label { font-size: 12px; font-weight: 600; color: #666; margin: 0 4px 0 0; }
+    html.dark-theme .gf-draw-bar > label { color: #8b949e; }
+
+    .draw-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1.5px solid #ccc; border-radius: 16px;
+      padding: 6px 14px; font-size: 13px; font-weight: 600;
+      background: #fff; color: #555; cursor: pointer; transition: all .15s;
+    }
+    html.dark-theme .draw-btn { background: #252535; border-color: #444; color: #c9d1d9; }
+    .draw-btn:hover { border-color: #fab32c; color: #fab32c; }
+    .draw-btn.ativo { background: #fab32c; border-color: #fab32c; color: #222; }
+    .draw-btn.ativo:hover { background: #e8a21a; }
+    .draw-btn-clear { border-color: #e0b0b0 !important; color: #c0392b !important; }
+    html.dark-theme .draw-btn-clear { border-color: #5c1a1a !important; color: #e74c3c !important; }
+    .draw-btn-clear:hover { background: #fdecea !important; border-color: #e74c3c !important; }
+    html.dark-theme .draw-btn-clear:hover { background: #2e0d0d !important; }
+
+    #geo-draw-hint { font-size: 12px; color: #888; font-style: italic; margin-left: 4px; }
+    html.dark-theme #geo-draw-hint { color: #6b7280; }
+
+    /* Circle radius */
+    #geo-circle-raio-wrap {
+      background: #f8f9fa;
+      padding: 10px 14px;
+      border-bottom: 1px solid #eee;
+      display: none;
+    }
+    html.dark-theme #geo-circle-raio-wrap { background: #1c2230; border-color: #2a3040; }
+    #geo-circle-raio-wrap label { font-size: 12px; font-weight: 600; color: #555; margin: 0; white-space: nowrap; }
+    html.dark-theme #geo-circle-raio-wrap label { color: #9ca3af; }
+
+    /* Map */
+    #geo-mapa { height: 480px; }
+    .leaflet-container { font-family: 'Montserrat', sans-serif !important; }
+    .leaflet-bar { box-shadow: 0 2px 8px rgba(0,0,0,.15) !important; border-radius: 8px !important; border: 1px solid #ddd !important; overflow: hidden !important; }
+    .leaflet-bar a { width: 34px !important; height: 34px !important; line-height: 34px !important; border-bottom: 1px solid #eee !important; color: #444 !important; font-size: 16px !important; display: flex !important; align-items: center !important; justify-content: center !important; text-decoration: none !important; }
+    .leaflet-bar a:last-child { border-bottom: none !important; }
+    .leaflet-bar a:hover { background: #f0f0f0 !important; }
+
+    /* Toggle rows */
+    .gf-toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    html.dark-theme .gf-toggle-row { border-color: #2a3040; }
+    .gf-toggle-row:last-of-type { border-bottom: none; padding-bottom: 0; }
+    .gf-toggle-label { font-size: 13px; color: #333; font-weight: 600; }
+    html.dark-theme .gf-toggle-label { color: #c9d1d9; }
+    .gf-toggle-sub { font-size: 11px; color: #888; margin-top: 3px; font-weight: 400; }
+    html.dark-theme .gf-toggle-sub { color: #6b7280; }
+
+    /* iOS Switch */
+    .gf-switch { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; }
+    .gf-switch input { opacity: 0; width: 0; height: 0; }
+    .gf-slider {
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc; transition: .3s; border-radius: 24px;
+    }
+    .gf-slider:before {
+      position: absolute; content: "";
+      height: 18px; width: 18px; left: 3px; bottom: 3px;
+      background: #fff; transition: .3s; border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    }
+    .gf-switch input:checked + .gf-slider { background: #fab32c; }
+    .gf-switch input:checked + .gf-slider:before { transform: translateX(18px); }
+
+    /* Notification systems */
+    #geo-notif-sistemas {
+      display: none;
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    html.dark-theme #geo-notif-sistemas { background: #252535; }
+    #geo-notif-sistemas.visivel { display: flex; }
+    .gf-check-label {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13px; color: #333; cursor: pointer; font-weight: 500;
+    }
+    html.dark-theme .gf-check-label { color: #c9d1d9; }
+    .gf-check-label input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #fab32c; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown open">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+          <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
+          <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li class="active"><a href="geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <a href="geocerca.html" class="btn btn-default btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+          <i class="fa fa-arrow-left"></i> Voltar
+        </a>
+        <h2 class="topbar-title" id="geo-titulo">Nova Geocerca</h2>
+      </div>
+      <div>
+        <button class="btn btn-primary-al" id="btn-salvar">
+          <i class="fa fa-check"></i> Salvar Geocerca
+        </button>
+      </div>
+    </div>
+
+    <div class="gf-body">
+
+      <!-- Seção 1: Identificação -->
+      <div class="gf-card">
+        <div class="gf-card-header">
+          <i class="fa fa-tag"></i> Identificação
+        </div>
+        <div class="gf-card-body">
+          <div class="gf-form-group">
+            <label for="geo-nome">Nome <span style="color:#e74c3c">*</span></label>
+            <input type="text" id="geo-nome" class="form-control" placeholder="Ex: Área do Depósito, Rota Principal..." />
+          </div>
+          <div class="gf-form-group">
+            <label for="geo-data-inicio">Data/hora de início</label>
+            <input type="datetime-local" id="geo-data-inicio" class="form-control" style="max-width:280px;" />
+          </div>
+          <div class="gf-form-group">
+            <label for="geo-descricao">Descrição</label>
+            <textarea id="geo-descricao" class="form-control" rows="3" placeholder="Descrição opcional..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seção 2: Dispositivos -->
+      <div class="gf-card">
+        <div class="gf-card-header">
+          <i class="fa fa-car"></i> Dispositivos
+        </div>
+        <div class="gf-card-body">
+          <div class="gf-devices-search-wrap">
+            <input type="text" id="geo-devices-search" class="form-control" placeholder="Pesquisar dispositivo, placa ou IMEI..." />
+            <div id="geo-devices-results"></div>
+          </div>
+          <div id="geo-devices-selected"></div>
+          <div id="geo-devices-empty">Nenhum dispositivo adicionado</div>
+        </div>
+      </div>
+
+      <!-- Seção 3: Área no mapa -->
+      <div class="gf-card">
+        <div class="gf-card-header">
+          <i class="fa fa-map"></i> Área no mapa
+          <span style="font-size:10px;font-weight:400;color:#e74c3c;margin-left:6px;">* Obrigatório</span>
+        </div>
+
+        <!-- Tile switcher -->
+        <div class="gf-tile-bar">
+          <label>Mapa base:</label>
+          <button class="tile-btn ativo" data-tile="google-mapa">Mapa</button>
+          <button class="tile-btn" data-tile="google-sat">Satélite</button>
+          <button class="tile-btn" data-tile="carto">CartoDB</button>
+        </div>
+
+        <!-- Draw toolbar -->
+        <div class="gf-draw-bar">
+          <label>Desenhar:</label>
+          <button class="draw-btn" id="btn-draw-polygon" title="Clique para adicionar vértices; duplo-clique para fechar">
+            <i class="fa fa-pencil-square-o"></i> Polígono
+          </button>
+          <button class="draw-btn" id="btn-draw-circle" title="Clique para definir o centro; depois ajuste o raio">
+            <i class="fa fa-circle-o"></i> Círculo
+          </button>
+          <button class="draw-btn" id="btn-draw-line" title="Clique para adicionar pontos; duplo-clique para finalizar">
+            <i class="fa fa-minus"></i> Linha
+          </button>
+          <button class="draw-btn draw-btn-clear" id="btn-draw-clear" title="Limpar desenho atual">
+            <i class="fa fa-trash"></i> Limpar
+          </button>
+          <span id="geo-draw-hint"></span>
+        </div>
+
+        <!-- Circle radius -->
+        <div id="geo-circle-raio-wrap">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <label>Raio (m):</label>
+            <input type="number" id="geo-circle-raio" class="form-control input-sm" value="500" min="50" max="100000" style="width:110px;" />
+            <button class="btn btn-default btn-sm" id="btn-circle-aplicar">Aplicar</button>
+          </div>
+        </div>
+
+        <!-- Leaflet map -->
+        <div id="geo-mapa"></div>
+      </div>
+
+      <!-- Seção 4: Visibilidade e Notificações -->
+      <div class="gf-card">
+        <div class="gf-card-header">
+          <i class="fa fa-eye"></i> Visibilidade e Notificações
+        </div>
+        <div class="gf-card-body">
+
+          <div class="gf-toggle-row">
+            <div>
+              <div class="gf-toggle-label">Visível para o cliente</div>
+              <div class="gf-toggle-sub">A geocerca aparecerá na tela de rastreamento e relatório do cliente</div>
+            </div>
+            <label class="gf-switch">
+              <input type="checkbox" id="geo-visivel-cliente" />
+              <span class="gf-slider"></span>
+            </label>
+          </div>
+
+          <div class="gf-toggle-row">
+            <div>
+              <div class="gf-toggle-label">Notificar cliente</div>
+              <div class="gf-toggle-sub">Enviar notificação ao entrar/sair desta geocerca</div>
+            </div>
+            <label class="gf-switch">
+              <input type="checkbox" id="geo-notificar-cliente" />
+              <span class="gf-slider"></span>
+            </label>
+          </div>
+
+          <div id="geo-notif-sistemas">
+            <label class="gf-check-label">
+              <input type="checkbox" id="geo-notif-email" checked /> E-mail
+            </label>
+            <label class="gf-check-label">
+              <input type="checkbox" id="geo-notif-whatsapp" /> WhatsApp
+            </label>
+            <label class="gf-check-label">
+              <input type="checkbox" id="geo-notif-app" checked /> App / Web
+            </label>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /gf-body -->
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+      if (!user) return;
+      document.getElementById('user-nome').textContent = user.nome || user.email || '—';
+      var badge = document.getElementById('user-badge');
+      badge.textContent = user.role;
+      badge.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+    })();
+  </script>
+  <script src="../js/geocerca-form.js"></script>
+
+</body>
+</html>

@@ -680,6 +680,27 @@ router.delete('/cercas/:id/dispositivos/:dispositivoId', requireRoles('ADMIN', '
   res.json({ ok: true });
 });
 
+// ── GET /api/rastreamento/geocercas/:id ──────────────────────────────────────
+router.get('/geocercas/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const g = await prisma.geocerca.findUnique({
+    where: { id },
+    include: {
+      dispositivos: {
+        include: { dispositivo: { select: { id: true, nome: true, placa: true, identificador: true } } },
+      },
+    },
+  });
+  if (!g) { res.status(404).json({ error: 'Geocerca não encontrada.' }); return; }
+  res.json({
+    id: g.id, traccarId: g.traccarId, nome: g.nome, descricao: g.descricao,
+    area: g.area, tipo: g.tipo, visivelCliente: g.visivelCliente,
+    notificarCliente: g.notificarCliente, sistemasNotif: g.sistemasNotif,
+    dataInicio: g.dataInicio, ativa: g.ativa, createdAt: g.createdAt,
+    dispositivos: g.dispositivos.map(d => d.dispositivo),
+  });
+});
+
 // ── GET /api/rastreamento/geocercas ──────────────────────────────────────────
 router.get('/geocercas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
   const geocercas = await prisma.geocerca.findMany({
