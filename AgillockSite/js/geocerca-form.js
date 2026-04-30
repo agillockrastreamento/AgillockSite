@@ -215,6 +215,45 @@
     mapa.on('dblclick', onMapDblClick);
     mapa.on('mousemove', onMapMouseMove);
 
+    // Controle de localização do usuário
+    var marcadorLocalizacao = null;
+    var LocateControl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function (map) {
+        var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        var link = L.DomUtil.create('a', '', container);
+        link.href = '#';
+        link.title = 'Minha localização';
+        link.setAttribute('role', 'button');
+        link.innerHTML = '<i class="fa fa-location-arrow" style="font-size:13px;"></i>';
+        link.style.display = 'flex';
+        link.style.alignItems = 'center';
+        link.style.justifyContent = 'center';
+
+        L.DomEvent.on(link, 'click', function (e) {
+          L.DomEvent.preventDefault(e);
+          link.innerHTML = '<i class="fa fa-spinner fa-spin" style="font-size:13px;color:#fab32c;"></i>';
+          map.locate({ setView: true, maxZoom: 15 });
+        });
+
+        map.on('locationfound', function (e) {
+          link.innerHTML = '<i class="fa fa-location-arrow" style="font-size:13px;color:#fab32c;"></i>';
+          if (marcadorLocalizacao) map.removeLayer(marcadorLocalizacao);
+          marcadorLocalizacao = L.circleMarker(e.latlng, {
+            radius: 8, color: '#fff', fillColor: '#2980b9', fillOpacity: 1, weight: 3
+          }).addTo(map).bindPopup('Você está aqui').openPopup();
+        });
+
+        map.on('locationerror', function () {
+          link.innerHTML = '<i class="fa fa-location-arrow" style="font-size:13px;"></i>';
+          AL.showAlert('Não foi possível obter sua localização.', 'warning');
+        });
+
+        return container;
+      }
+    });
+    new LocateControl().addTo(mapa);
+
     setTimeout(function () { if (mapa) mapa.invalidateSize(); }, 300);
   }
 

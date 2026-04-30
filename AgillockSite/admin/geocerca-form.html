@@ -34,9 +34,10 @@
       background: #fff;
       border-radius: 10px;
       box-shadow: 0 2px 8px rgba(0,0,0,.07);
-      overflow: hidden;
+      overflow: visible;
     }
     html.dark-theme .gf-card { background: #1e2530; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+    .gf-card-overflow-hidden { overflow: hidden !important; }
 
     .gf-card-header {
       padding: 11px 18px;
@@ -50,6 +51,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      border-radius: 10px 10px 0 0;
     }
     html.dark-theme .gf-card-header { background: #1c2230; border-color: #2a3040; color: #8b949e; }
 
@@ -69,10 +71,10 @@
     /* Devices search */
     .gf-devices-search-wrap { position: relative; margin-bottom: 10px; }
     #geo-devices-results {
-      position: absolute; top: 100%; left: 0; right: 0; z-index: 600;
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 1500;
       background: #fff; border: 1px solid #ddd; border-top: none;
-      border-radius: 0 0 8px 8px; max-height: 220px; overflow-y: auto;
-      box-shadow: 0 6px 18px rgba(0,0,0,.12);
+      border-radius: 0 0 8px 8px; max-height: 260px; overflow-y: auto;
+      box-shadow: 0 6px 18px rgba(0,0,0,.15);
       display: none;
     }
     html.dark-theme #geo-devices-results { background: #1e2530; border-color: #3a3a5c; }
@@ -103,7 +105,7 @@
     .gf-device-tag button:hover { color: #e74c3c; }
     #geo-devices-empty { font-size: 12px; color: #aaa; padding: 4px 0 0; }
 
-    /* Tile switcher */
+    /* Tile switcher — não precisa de border-radius pois vem depois do header */
     .gf-tile-bar {
       background: #f0f2f5;
       padding: 8px 14px;
@@ -327,7 +329,7 @@
       </div>
 
       <!-- Seção 3: Área no mapa -->
-      <div class="gf-card">
+      <div class="gf-card gf-card-overflow-hidden">
         <div class="gf-card-header">
           <i class="fa fa-map"></i> Área no mapa
           <span style="font-size:10px;font-weight:400;color:#e74c3c;margin-left:6px;">* Obrigatório</span>
