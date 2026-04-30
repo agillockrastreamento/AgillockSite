@@ -185,7 +185,9 @@ function isoComFuso(d) {
   const sign = off <= 0 ? '+' : '-';
   const hh = String(Math.floor(abs / 60)).padStart(2, '0');
   const mm = String(abs % 60).padStart(2, '0');
-  return d.toISOString().replace('Z', '') + sign + hh + ':' + mm;
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` +
+         `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${hh}:${mm}`;
 }
 
 // ── Carregamento ──────────────────────────────────────────────────────────────
