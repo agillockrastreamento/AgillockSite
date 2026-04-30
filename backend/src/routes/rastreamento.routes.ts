@@ -851,12 +851,7 @@ router.get('/relatorios/exportar', requireRoles('ADMIN', 'COLABORADOR'), async (
   if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
 
   try {
-    const response = await traccarExportReport(
-      type as any,
-      ids,
-      new Date(from),
-      new Date(to)
-    );
+    const response = await traccarExportReport(type as any, ids, from, to);
 
     const buffer = await response.arrayBuffer();
     

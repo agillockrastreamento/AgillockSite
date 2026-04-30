@@ -170,13 +170,10 @@ export async function traccarGetStops(
 export async function traccarExportReport(
   type: 'route' | 'events' | 'trips' | 'stops' | 'summary',
   deviceIds: number[],
-  from: Date,
-  to: Date,
+  from: string,
+  to: string,
 ): Promise<Response> {
-  const params = new URLSearchParams({
-    from: from.toISOString(),
-    to: to.toISOString(),
-  });
+  const params = new URLSearchParams({ from, to });
   deviceIds.forEach(id => params.append('deviceId', String(id)));
   
   const res = await fetch(`${TRACCAR_URL}/api/reports/${type}?${params}`, {

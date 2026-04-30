@@ -792,7 +792,7 @@ router.get('/rastreamento/dispositivos/:id/exportar', async (req: ClienteRequest
   }
 
   try {
-    const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', [traccarDevice.id], new Date(from), new Date(to));
+    const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', [traccarDevice.id], from, to);
     const buffer = await response.arrayBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);
@@ -820,7 +820,7 @@ router.get('/rastreamento/relatorios/exportar', async (req: ClienteRequest, res:
   try {
     const { traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
-    const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', traccarIds, new Date(from), new Date(to));
+    const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', traccarIds, from, to);
     const buffer = await response.arrayBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);
