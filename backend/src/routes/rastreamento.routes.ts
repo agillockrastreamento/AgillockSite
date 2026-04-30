@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { requireRoles } from '../middleware/roles.middleware';
 import { param, query } from '../utils/params';
+import { Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
 import {
   traccarGetDevices,
@@ -16,6 +17,7 @@ import {
   traccarGetCommandTypes,
   traccarGetGeofences,
   traccarCreateGeofence,
+  traccarUpdateGeofence,
   traccarDeleteGeofence,
   traccarLinkGeofenceToDevice,
   traccarUnlinkGeofenceFromDevice,
@@ -567,11 +569,21 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
   });
 });
 
-// ── GET /api/rastreamento/cercas ──────────────────────────────────────────────
+// ── GET /api/rastreamento/cercas ─────────────────────────────────────────────
+// Returns only ADMIN-owned geofences (for the rastreamento map view)
 router.get('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const cercas = await traccarGetGeofences();
-    res.json(cercas);
+    const geocercas = await prisma.geocerca.findMany({
+      where: { origemTipo: 'ADMIN', ativa: true },
+      select: { id: true, traccarId: true, nome: true, descricao: true, area: true },
+    });
+    res.json(geocercas.map(g => ({
+      id: g.traccarId,
+      geocercaLocalId: g.id,
+      name: g.nome,
+      description: g.descricao ?? '',
+      area: g.area,
+    })));
   } catch {
     res.json([]);
   }
@@ -580,59 +592,69 @@ router.get('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthReq
 // ── GET /api/rastreamento/dispositivos/:id/cercas ─────────────────────────────
 router.get('/dispositivos/:id/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
-  const dispositivo = await prisma.dispositivo.findUnique({
-    where: { id },
-    select: { identificador: true },
-  });
-  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
-
-  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
-  if (!traccarDevice) { res.json([]); return; }
-
   try {
-    const cercas = await traccarGetGeofences(traccarDevice.id);
-    res.json(cercas);
+    const geocercas = await prisma.geocerca.findMany({
+      where: {
+        origemTipo: 'ADMIN',
+        ativa: true,
+        dispositivos: { some: { dispositivoId: id } },
+      },
+      select: { traccarId: true, nome: true, descricao: true, area: true },
+    });
+    res.json(geocercas.map(g => ({ id: g.traccarId, name: g.nome, description: g.descricao ?? '', area: g.area })));
   } catch {
     res.json([]);
   }
 });
 
 // ── POST /api/rastreamento/cercas ─────────────────────────────────────────────
+// Quick cerca creation from the rastreamento map (single device, circle only)
 router.post('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const { nome, area, dispositivoId } = req.body as { nome: string; area: string; dispositivoId?: string };
-
   if (!nome || !area) { res.status(400).json({ error: 'Campos "nome" e "area" são obrigatórios.' }); return; }
 
   try {
     const cerca = await traccarCreateGeofence(nome, area);
 
+    // Persist locally as ADMIN geofence
+    const geocerca = await prisma.geocerca.create({
+      data: {
+        traccarId: cerca.id,
+        nome,
+        area,
+        tipo: area.toUpperCase().startsWith('CIRCLE') ? 'circulo' : area.toUpperCase().startsWith('POLYGON') ? 'poligono' : 'linha',
+        origemTipo: 'ADMIN',
+        visivelCliente: false,
+        notificarCliente: false,
+      },
+    });
+
     if (dispositivoId) {
-      const dispositivo = await prisma.dispositivo.findUnique({
-        where: { id: dispositivoId },
-        select: { identificador: true },
-      });
+      const dispositivo = await prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { identificador: true } });
       if (dispositivo) {
         const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
         if (traccarDevice) {
           await traccarLinkGeofenceToDevice(cerca.id, traccarDevice.id).catch(() => {});
         }
+        await prisma.geocercaDispositivo.create({ data: { geocercaId: geocerca.id, dispositivoId } }).catch(() => {});
       }
     }
 
-    res.json(cerca);
+    res.json({ ...cerca, geocercaLocalId: geocerca.id });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Erro ao criar cerca: ${msg}` });
   }
 });
 
-// ── DELETE /api/rastreamento/cercas/:id ───────────────────────────────────────
+// ── DELETE /api/rastreamento/cercas/:id ──────────────────────────────────────
 router.delete('/cercas/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
-  const id = parseInt(param(req, 'id'));
-  if (isNaN(id)) { res.status(400).json({ error: 'ID inválido.' }); return; }
+  const traccarId = parseInt(param(req, 'id'));
+  if (isNaN(traccarId)) { res.status(400).json({ error: 'ID inválido.' }); return; }
 
   try {
-    await traccarDeleteGeofence(id);
+    await traccarDeleteGeofence(traccarId);
+    await prisma.geocerca.deleteMany({ where: { traccarId } });
     res.json({ ok: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -640,23 +662,181 @@ router.delete('/cercas/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: A
   }
 });
 
-// ── DELETE /api/rastreamento/cercas/:id/dispositivos/:dispositivoId ───────────
+// ── DELETE /api/rastreamento/cercas/:id/dispositivos/:dispositivoId ──────────
 router.delete('/cercas/:id/dispositivos/:dispositivoId', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const geofenceId = parseInt(param(req, 'id'));
   const dispositivoId = param(req, 'dispositivoId');
   if (isNaN(geofenceId)) { res.status(400).json({ error: 'ID inválido.' }); return; }
 
-  const dispositivo = await prisma.dispositivo.findUnique({
-    where: { id: dispositivoId },
-    select: { identificador: true },
-  });
+  const dispositivo = await prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { identificador: true } });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
   const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
-  if (traccarDevice) {
-    await traccarUnlinkGeofenceFromDevice(geofenceId, traccarDevice.id).catch(() => {});
-  }
+  if (traccarDevice) await traccarUnlinkGeofenceFromDevice(geofenceId, traccarDevice.id).catch(() => {});
 
+  const geocerca = await prisma.geocerca.findFirst({ where: { traccarId: geofenceId } });
+  if (geocerca) await prisma.geocercaDispositivo.delete({ where: { geocercaId_dispositivoId: { geocercaId: geocerca.id, dispositivoId } } }).catch(() => {});
+
+  res.json({ ok: true });
+});
+
+// ── GET /api/rastreamento/geocercas ──────────────────────────────────────────
+router.get('/geocercas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
+  const geocercas = await prisma.geocerca.findMany({
+    where: { origemTipo: 'ADMIN' },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      dispositivos: {
+        include: { dispositivo: { select: { id: true, nome: true, placa: true, identificador: true } } },
+      },
+    },
+  });
+  res.json(geocercas.map(g => ({
+    id: g.id,
+    traccarId: g.traccarId,
+    nome: g.nome,
+    descricao: g.descricao,
+    area: g.area,
+    tipo: g.tipo,
+    visivelCliente: g.visivelCliente,
+    notificarCliente: g.notificarCliente,
+    sistemasNotif: g.sistemasNotif,
+    dataInicio: g.dataInicio,
+    ativa: g.ativa,
+    createdAt: g.createdAt,
+    dispositivos: g.dispositivos.map(d => d.dispositivo),
+  })));
+});
+
+// ── POST /api/rastreamento/geocercas ─────────────────────────────────────────
+router.post('/geocercas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { nome, descricao, area, tipo, dispositivos: dispositivoIds, visivelCliente, notificarCliente, sistemasNotif, dataInicio } =
+    req.body as {
+      nome: string; descricao?: string; area: string; tipo?: string;
+      dispositivos?: string[]; visivelCliente?: boolean; notificarCliente?: boolean;
+      sistemasNotif?: Record<string, boolean>; dataInicio?: string;
+    };
+
+  if (!nome || !area) { res.status(400).json({ error: 'Nome e área são obrigatórios.' }); return; }
+
+  try {
+    const traccarGeofence = await traccarCreateGeofence(nome, area);
+
+    const geocerca = await prisma.geocerca.create({
+      data: {
+        traccarId: traccarGeofence.id,
+        nome,
+        descricao: descricao ?? null,
+        area,
+        tipo: tipo ?? 'circulo',
+        origemTipo: 'ADMIN',
+        visivelCliente: !!visivelCliente,
+        notificarCliente: !!notificarCliente,
+        sistemasNotif: sistemasNotif ?? Prisma.JsonNull,
+        dataInicio: dataInicio ? new Date(dataInicio) : null,
+      },
+    });
+
+    // Link to devices in Traccar and local DB
+    if (Array.isArray(dispositivoIds) && dispositivoIds.length > 0) {
+      const dispositivos = await prisma.dispositivo.findMany({
+        where: { id: { in: dispositivoIds } },
+        select: { id: true, identificador: true },
+      });
+      await Promise.all(
+        dispositivos.map(async d => {
+          const td = await traccarGetDeviceByImei(d.identificador).catch(() => null);
+          if (td) await traccarLinkGeofenceToDevice(traccarGeofence.id, td.id).catch(() => {});
+          await prisma.geocercaDispositivo.create({ data: { geocercaId: geocerca.id, dispositivoId: d.id } }).catch(() => {});
+        }),
+      );
+    }
+
+    res.json({ id: geocerca.id, traccarId: geocerca.traccarId });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao criar geocerca: ${msg}` });
+  }
+});
+
+// ── PUT /api/rastreamento/geocercas/:id ──────────────────────────────────────
+router.put('/geocercas/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const { nome, descricao, area, tipo, dispositivos: dispositivoIds, visivelCliente, notificarCliente, sistemasNotif, dataInicio, ativa } =
+    req.body as {
+      nome?: string; descricao?: string; area?: string; tipo?: string;
+      dispositivos?: string[]; visivelCliente?: boolean; notificarCliente?: boolean;
+      sistemasNotif?: Record<string, boolean>; dataInicio?: string; ativa?: boolean;
+    };
+
+  const geocerca = await prisma.geocerca.findUnique({ where: { id } });
+  if (!geocerca) { res.status(404).json({ error: 'Geocerca não encontrada.' }); return; }
+
+  try {
+    const novoNome = nome ?? geocerca.nome;
+    const novaArea = area ?? geocerca.area;
+
+    await traccarUpdateGeofence(geocerca.traccarId, novoNome, novaArea, descricao ?? geocerca.descricao ?? undefined);
+
+    await prisma.geocerca.update({
+      where: { id },
+      data: {
+        nome: novoNome,
+        descricao: descricao !== undefined ? descricao : geocerca.descricao,
+        area: novaArea,
+        tipo: tipo ?? geocerca.tipo,
+        visivelCliente: visivelCliente !== undefined ? visivelCliente : geocerca.visivelCliente,
+        notificarCliente: notificarCliente !== undefined ? notificarCliente : geocerca.notificarCliente,
+        sistemasNotif: sistemasNotif !== undefined ? (sistemasNotif ?? Prisma.JsonNull) : (geocerca.sistemasNotif ?? Prisma.JsonNull),
+        dataInicio: dataInicio !== undefined ? (dataInicio ? new Date(dataInicio) : null) : geocerca.dataInicio,
+        ativa: ativa !== undefined ? ativa : geocerca.ativa,
+      },
+    });
+
+    // Sync devices if provided
+    if (Array.isArray(dispositivoIds)) {
+      const existentes = await prisma.geocercaDispositivo.findMany({ where: { geocercaId: id }, select: { dispositivoId: true } });
+      const existentesIds = existentes.map(e => e.dispositivoId);
+
+      const aRemover = existentesIds.filter(eid => !dispositivoIds.includes(eid));
+      const aAdicionar = dispositivoIds.filter(did => !existentesIds.includes(did));
+
+      for (const did of aRemover) {
+        const d = await prisma.dispositivo.findUnique({ where: { id: did }, select: { identificador: true } });
+        if (d) {
+          const td = await traccarGetDeviceByImei(d.identificador).catch(() => null);
+          if (td) await traccarUnlinkGeofenceFromDevice(geocerca.traccarId, td.id).catch(() => {});
+        }
+        await prisma.geocercaDispositivo.delete({ where: { geocercaId_dispositivoId: { geocercaId: id, dispositivoId: did } } }).catch(() => {});
+      }
+
+      const novosDispo = await prisma.dispositivo.findMany({ where: { id: { in: aAdicionar } }, select: { id: true, identificador: true } });
+      for (const d of novosDispo) {
+        const td = await traccarGetDeviceByImei(d.identificador).catch(() => null);
+        if (td) await traccarLinkGeofenceToDevice(geocerca.traccarId, td.id).catch(() => {});
+        await prisma.geocercaDispositivo.create({ data: { geocercaId: id, dispositivoId: d.id } }).catch(() => {});
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao atualizar geocerca: ${msg}` });
+  }
+});
+
+// ── DELETE /api/rastreamento/geocercas/:id ───────────────────────────────────
+router.delete('/geocercas/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+
+  const geocerca = await prisma.geocerca.findUnique({ where: { id } });
+  if (!geocerca) { res.status(404).json({ error: 'Geocerca não encontrada.' }); return; }
+
+  try {
+    await traccarDeleteGeofence(geocerca.traccarId);
+  } catch { /* Traccar may already not have it */ }
+
+  await prisma.geocerca.delete({ where: { id } });
   res.json({ ok: true });
 });
 
@@ -792,14 +972,24 @@ router.get('/relatorios/batch/eventos', requireRoles('ADMIN', 'COLABORADOR'), as
   if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
   try {
     const eventos = await traccarGetEvents(ids, new Date(from), new Date(to));
-    res.json(eventos.map(e => ({
-      id: e.id,
-      deviceId: e.deviceId,
-      tipo: e.type,
-      tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
-      hora: e.eventTime,
-      atributos: e.attributes,
-    })));
+
+    const allowedGeocercas = await prisma.geocerca.findMany({
+      where: { origemTipo: 'ADMIN' },
+      select: { traccarId: true },
+    });
+    const allowedSet = new Set(allowedGeocercas.map(g => g.traccarId));
+
+    res.json(eventos
+      .filter(e => !(e.type === 'geofenceEnter' || e.type === 'geofenceExit') || allowedSet.has(e.geofenceId))
+      .map(e => ({
+        id: e.id,
+        deviceId: e.deviceId,
+        tipo: e.type,
+        tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
+        hora: e.eventTime,
+        atributos: e.attributes,
+        geofenceId: e.geofenceId,
+      })));
   } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar eventos.' }); }
 });
 

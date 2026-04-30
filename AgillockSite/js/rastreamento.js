@@ -1679,6 +1679,11 @@ function processarMensagemWs(msg) {
     msg.events.forEach(function (e) {
       const dispositivoId = traccarIdParaDispositivoId[e.deviceId];
       const pos = dispositivoId ? veiculosMap[dispositivoId]?.posicao : null;
+
+      if ((e.type === 'geofenceEnter' || e.type === 'geofenceExit') && e.geofenceId) {
+        if (!_cercasPermitidas.has(e.geofenceId)) return;
+      }
+
       adicionarEvento({
         dispositivoId: dispositivoId || null,
         tipo: e.type,
@@ -1689,6 +1694,7 @@ function processarMensagemWs(msg) {
         lat: e.lat ?? pos?.latitude ?? null,
         lng: e.lng ?? pos?.longitude ?? null,
         endereco: e.endereco ?? null,
+        geofenceId: e.geofenceId,
       });
     });
   }

@@ -126,6 +126,7 @@ model Cliente {
   carnes                 Carne[]
   contratos              Contrato[]
   login                  ClienteLogin?
+  geocercas              Geocerca[]
 }
 
 model Placa {
@@ -276,6 +277,7 @@ model Dispositivo {
   estadosKmNotificacao     EstadoKmNotificacao[]
   manutencoesRegistros     ManutencaoRegistro[]
   manutencoesRecorrencias  ManutencaoRecorrencia[]
+  geocercas                GeocercaDispositivo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -476,6 +478,37 @@ model ManutencaoRecorrencia {
   dispositivo    Dispositivo   @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
   clienteLogin   ClienteLogin? @relation(fields: [clienteLoginId], references: [id], onDelete: SetNull)
   criadoPorAdmin User?         @relation("RecorrenciaAdmin", fields: [criadoPorAdminId], references: [id], onDelete: SetNull)
+}
+
+model Geocerca {
+  id               String    @id @default(cuid())
+  traccarId        Int       @unique
+  nome             String
+  descricao        String?
+  area             String    @db.Text
+  tipo             String    @default("circulo")
+  origemTipo       String    // "ADMIN" | "CLIENTE"
+  clienteId        String?
+  visivelCliente   Boolean   @default(false)
+  notificarCliente Boolean   @default(false)
+  sistemasNotif    Json?
+  dataInicio       DateTime?
+  ativa            Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  dispositivos     GeocercaDispositivo[]
+  cliente          Cliente?  @relation(fields: [clienteId], references: [id])
+}
+
+model GeocercaDispositivo {
+  geocercaId    String
+  dispositivoId String
+
+  geocerca      Geocerca    @relation(fields: [geocercaId], references: [id], onDelete: Cascade)
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id])
+
+  @@id([geocercaId, dispositivoId])
 }
 
 model Contrato {

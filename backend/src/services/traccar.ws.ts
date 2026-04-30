@@ -140,6 +140,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
     tipoLabel: string;
     serverTime: string;
     positionId?: number;
+    geofenceId?: number;
   }> = [];
 
   if (msg.devices?.length) {
@@ -312,6 +313,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
             tipoLabel: EVENT_TYPE_LABELS.geofenceExit ?? 'geofenceExit',
             serverTime: eventTime,
             positionId,
+            geofenceId: parseInt(geofenceKey, 10),
           });
         }
       }
@@ -334,6 +336,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       tipoLabel: string;
       serverTime: string;
       positionId?: number;
+      geofenceId?: number;
       lat?: number | null;
       lng?: number | null;
       endereco?: string | null;
@@ -343,6 +346,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
       serverTime: e.eventTime || e.serverTime,
       positionId: e.positionId,
+      geofenceId: e.geofenceId,
     }));
     const eventosComLocal = realtimeEvents.concat(syntheticEvents);
 
@@ -416,6 +420,7 @@ interface TraccarWsMessage {
     type: string;
     eventTime?: string;
     serverTime: string;
+    geofenceId?: number;
   }>;
 }
 

@@ -565,13 +565,28 @@ router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest,
   const toDate = to ? new Date(to) : new Date();
   const eventos = await traccarGetEvents([traccarDevice.id], fromDate, toDate);
 
-  res.json(eventos.map(e => ({
-    id: e.id,
-    tipo: e.type,
-    tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
-    hora: e.eventTime,
-    posicaoId: e.positionId,
-    atributos: e.attributes,
+  const allowedGeocercas = await prisma.geocerca.findMany({
+    where: {
+      ativa: true,
+      OR: [
+        { origemTipo: 'CLIENTE', clienteId },
+        { origemTipo: 'ADMIN', visivelCliente: true, dispositivos: { some: { dispositivoId: dispositivo.id } } },
+      ],
+    },
+    select: { traccarId: true },
+  });
+  const allowedSet = new Set(allowedGeocercas.map(g => g.traccarId));
+
+  res.json(eventos
+    .filter(e => !(e.type === 'geofenceEnter' || e.type === 'geofenceExit') || allowedSet.has(e.geofenceId))
+    .map(e => ({
+      id: e.id,
+      tipo: e.type,
+      tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
+      hora: e.eventTime,
+      posicaoId: e.positionId,
+      atributos: e.attributes,
+      geofenceId: e.geofenceId,
   })));
 });
 
@@ -1008,99 +1023,85 @@ router.post('/dispositivos/:dispositivoId/comandos', async (req: ClienteRequest,
   }
 });
 
-// ── GET /api/cliente/rastreamento/cercas ──────────────────────────────────────
-// Retorna cercas vinculadas a dispositivos deste cliente
+// ── GET /api/cliente/rastreamento/cercas ─────────────────────────────────────
+// Returns: client's own geofences + admin geofences marked visivelCliente=true
 router.get('/rastreamento/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
-
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
-  const dispositivos = await prisma.dispositivo.findMany({
+  const dispositivosIds = (await prisma.dispositivo.findMany({
+    where: { OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] },
+    select: { id: true },
+  })).map(d => d.id);
+
+  const geocercas = await prisma.geocerca.findMany({
     where: {
+      ativa: true,
       OR: [
-        { clienteId: clienteId },
-        { clientesVinculados: { some: { clienteId: clienteId } } }
-      ]
+        { origemTipo: 'CLIENTE', clienteId },
+        { origemTipo: 'ADMIN', visivelCliente: true, dispositivos: { some: { dispositivoId: { in: dispositivosIds } } } },
+      ],
     },
-    select: { identificador: true },
+    select: { traccarId: true, nome: true, descricao: true, area: true },
   });
 
-  const todasCercas: unknown[] = [];
-  const vistos = new Set<number>();
-
-  for (const d of dispositivos) {
-    const td = await traccarGetDeviceByImei(d.identificador).catch(() => null);
-    if (!td) continue;
-    const cercas = await traccarGetGeofences(td.id).catch(() => []);
-    for (const c of cercas) {
-      if (!vistos.has(c.id)) {
-        vistos.add(c.id);
-        todasCercas.push(c);
-      }
-    }
-  }
-
-  res.json(todasCercas);
+  res.json(geocercas.map(g => ({ id: g.traccarId, name: g.nome, description: g.descricao ?? '', area: g.area })));
 });
 
 router.get('/rastreamento/dispositivos/:dispositivoId/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const dispositivoId = param(req, 'dispositivoId');
-
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
   const dispositivo = await prisma.dispositivo.findFirst({
-    where: {
-      id: dispositivoId,
-      OR: [
-        { clienteId },
-        { clientesVinculados: { some: { clienteId } } },
-      ],
-    },
-    select: { identificador: true },
+    where: { id: dispositivoId, OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] },
+    select: { id: true },
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
-  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
-  if (!traccarDevice) { res.json([]); return; }
+  const geocercas = await prisma.geocerca.findMany({
+    where: {
+      ativa: true,
+      OR: [
+        { origemTipo: 'CLIENTE', clienteId, dispositivos: { some: { dispositivoId } } },
+        { origemTipo: 'ADMIN', visivelCliente: true, dispositivos: { some: { dispositivoId } } },
+      ],
+    },
+    select: { traccarId: true, nome: true, descricao: true, area: true },
+  });
 
-  try {
-    const cercas = await traccarGetGeofences(traccarDevice.id);
-    res.json(cercas);
-  } catch {
-    res.json([]);
-  }
+  res.json(geocercas.map(g => ({ id: g.traccarId, name: g.nome, description: g.descricao ?? '', area: g.area })));
 });
 
 // ── POST /api/cliente/rastreamento/cercas ─────────────────────────────────────
 router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
-
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
   const { nome, area, dispositivoId } = req.body as { nome: string; area: string; dispositivoId?: string };
   if (!nome || !area) { res.status(400).json({ error: 'Campos "nome" e "area" são obrigatórios.' }); return; }
 
-  // Verifica que o dispositivo pertence ao cliente (direta ou indiretamente)
   if (dispositivoId) {
     const dispositivo = await prisma.dispositivo.findFirst({
-      where: {
-        id: dispositivoId,
-        OR: [
-          { clienteId: clienteId },
-          { clientesVinculados: { some: { clienteId: clienteId } } }
-        ]
-      },
-      select: { identificador: true },
+      where: { id: dispositivoId, OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] },
+      select: { id: true, identificador: true },
     });
     if (!dispositivo) { res.status(403).json({ error: 'Dispositivo não autorizado.' }); return; }
 
     try {
       const cerca = await traccarCreateGeofence(nome, area);
       const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
-      if (traccarDevice) {
-        await traccarLinkGeofenceToDevice(cerca.id, traccarDevice.id).catch(() => {});
-      }
+      if (traccarDevice) await traccarLinkGeofenceToDevice(cerca.id, traccarDevice.id).catch(() => {});
+
+      const geocerca = await prisma.geocerca.create({
+        data: {
+          traccarId: cerca.id, nome, area,
+          tipo: area.toUpperCase().startsWith('CIRCLE') ? 'circulo' : 'poligono',
+          origemTipo: 'CLIENTE', clienteId,
+          visivelCliente: false, notificarCliente: false,
+        },
+      });
+      await prisma.geocercaDispositivo.create({ data: { geocercaId: geocerca.id, dispositivoId: dispositivo.id } }).catch(() => {});
       res.json(cerca);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1111,6 +1112,14 @@ router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): 
 
   try {
     const cerca = await traccarCreateGeofence(nome, area);
+    await prisma.geocerca.create({
+      data: {
+        traccarId: cerca.id, nome, area,
+        tipo: area.toUpperCase().startsWith('CIRCLE') ? 'circulo' : 'poligono',
+        origemTipo: 'CLIENTE', clienteId,
+        visivelCliente: false, notificarCliente: false,
+      },
+    });
     res.json(cerca);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -1118,17 +1127,21 @@ router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): 
   }
 });
 
-// ── DELETE /api/cliente/rastreamento/cercas/:id ───────────────────────────────
+// ── DELETE /api/cliente/rastreamento/cercas/:id ──────────────────────────────
 router.delete('/rastreamento/cercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
-
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
   const geofenceId = parseInt(param(req, 'id'));
   if (isNaN(geofenceId)) { res.status(400).json({ error: 'ID inválido.' }); return; }
 
+  // Only allow deleting client's own geofences
+  const geocerca = await prisma.geocerca.findFirst({ where: { traccarId: geofenceId, origemTipo: 'CLIENTE', clienteId } });
+  if (!geocerca) { res.status(403).json({ error: 'Não autorizado a remover esta cerca.' }); return; }
+
   try {
     await traccarDeleteGeofence(geofenceId);
+    await prisma.geocerca.delete({ where: { id: geocerca.id } });
     res.json({ ok: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

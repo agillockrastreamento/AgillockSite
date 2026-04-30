@@ -469,6 +469,16 @@ export async function traccarCreateGeofence(name: string, area: string): Promise
   return res.json() as Promise<TraccarGeofence>;
 }
 
+export async function traccarUpdateGeofence(id: number, name: string, area: string, description?: string): Promise<TraccarGeofence> {
+  const res = await fetch(`${TRACCAR_URL}/api/geofences/${id}`, {
+    method: 'PUT',
+    headers: defaultHeaders,
+    body: JSON.stringify({ id, name, area, description: description ?? '' }),
+  });
+  if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
+  return res.json() as Promise<TraccarGeofence>;
+}
+
 export async function traccarDeleteGeofence(id: number): Promise<void> {
   const res = await fetch(`${TRACCAR_URL}/api/geofences/${id}`, {
     method: 'DELETE',

@@ -150,7 +150,13 @@ function _ajustarAlturaCardDispositivo() {
 
 // ── Inicialização ─────────────────────────────────────────────────────────────
 
+let _cercasPermitidas = new Set();
+
 document.addEventListener('DOMContentLoaded', function () {
+  AL_CLIENTE.apiGet('/api/cliente/rastreamento/cercas').then(cercas => {
+    cercas.forEach(c => _cercasPermitidas.add(c.id));
+  }).catch(() => {});
+
   verificarAcesso().then(function (bloqueado) {
     if (bloqueado) return;
     inicializarMapa();
@@ -2509,3 +2515,4 @@ window.addEventListener('popstate', (e) => {
     if (btnExportar) btnExportar.style.display = 'none';
   }
 });
+

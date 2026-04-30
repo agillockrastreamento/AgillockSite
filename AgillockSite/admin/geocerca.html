@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Geocercas — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Layout principal ── */
+    #geo-layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Painel esquerdo: lista ── */
+    #geo-list-panel {
+      width: 320px;
+      min-width: 320px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #e0e0e0;
+      background: #fff;
+      overflow: hidden;
+    }
+    html.dark-theme #geo-list-panel { background: #1e1e2e; border-color: #333; }
+
+    #geo-list-header {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid #eee;
+      flex-shrink: 0;
+    }
+    html.dark-theme #geo-list-header { border-color: #333; }
+    #geo-list-header h5 { font-size: 15px; font-weight: 700; margin: 0 0 10px; color: #333; }
+    html.dark-theme #geo-list-header h5 { color: #f0f2f5; }
+
+    #geo-list-body {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    #geo-empty {
+      padding: 30px 16px;
+      text-align: center;
+      color: #aaa;
+      font-size: 13px;
+    }
+
+    .geo-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      transition: background .12s;
+    }
+    html.dark-theme .geo-item { border-color: #2a2a3e; }
+    .geo-item:hover { background: #f7f7f7; }
+    html.dark-theme .geo-item:hover { background: #252535; }
+    .geo-item.ativo { background: #e8f4fd; border-left: 3px solid #2980b9; }
+    html.dark-theme .geo-item.ativo { background: #1a3a5c; }
+    .geo-item-nome { font-weight: 700; font-size: 13px; color: #222; margin-bottom: 3px; }
+    html.dark-theme .geo-item-nome { color: #f0f2f5; }
+    .geo-item-meta { font-size: 11px; color: #888; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 4px; }
+    .geo-item-devices { font-size: 11px; color: #777; }
+    html.dark-theme .geo-item-devices { color: #aaa; }
+    .geo-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .geo-badge-tipo { background: #e8f4fd; color: #2980b9; }
+    html.dark-theme .geo-badge-tipo { background: #1a3a5c; color: #87c7ff; }
+    .geo-badge-visivel { background: #d4edda; color: #155724; }
+    html.dark-theme .geo-badge-visivel { background: #1a3a2a; color: #5dbd7a; }
+    .geo-badge-inativa { background: #f8d7da; color: #721c24; }
+    .geo-item-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .geo-btn-action {
+      font-size: 11px; padding: 2px 8px; border-radius: 4px;
+      border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer;
+      transition: all .12s;
+    }
+    html.dark-theme .geo-btn-action { background: #252535; border-color: #444; color: #ccc; }
+    .geo-btn-action:hover { border-color: #2980b9; color: #2980b9; background: #eef6fc; }
+    html.dark-theme .geo-btn-action:hover { background: #1a3a5c; }
+    .geo-btn-danger:hover { border-color: #e74c3c !important; color: #e74c3c !important; background: #fdf0f0 !important; }
+
+    /* ── Painel direito: formulário ── */
+    #geo-form-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #f5f6fa;
+    }
+    html.dark-theme #geo-form-panel { background: #141820; }
+
+    #geo-empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #bbb;
+      gap: 12px;
+      font-size: 14px;
+    }
+    html.dark-theme #geo-empty-state { color: #555; }
+    #geo-empty-state i { font-size: 48px; }
+
+    #geo-form-wrap {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #geo-form-wrap.ativo { display: flex; }
+
+    #geo-form-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
+    html.dark-theme #geo-form-topbar { background: #1e2530; border-color: #2d3748; }
+    #geo-form-titulo { font-size: 15px; font-weight: 700; color: #333; }
+    html.dark-theme #geo-form-titulo { color: #f0f2f5; }
+
+    #geo-form-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .geo-section {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      overflow: hidden;
+    }
+    html.dark-theme .geo-section { background: #1e2530; }
+    .geo-section-header {
+      padding: 10px 16px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #eee;
+      font-size: 12px;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    html.dark-theme .geo-section-header { background: #1c2230; border-color: #2a3040; color: #8b949e; }
+    .geo-section-body { padding: 16px; }
+
+    /* Form fields */
+    .geo-form-group { margin-bottom: 12px; }
+    .geo-form-group:last-child { margin-bottom: 0; }
+    .geo-form-group label {
+      display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 5px;
+    }
+    html.dark-theme .geo-form-group label { color: #adb5bd; }
+    .geo-form-group .form-control {
+      font-size: 13px;
+    }
+    html.dark-theme .geo-form-group .form-control {
+      background: #252535; color: #c9d1d9; border-color: #3a3a5c;
+    }
+    html.dark-theme input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+    /* Dispositivos search */
+    #geo-devices-search-wrap { position: relative; margin-bottom: 10px; }
+    #geo-devices-search { padding-right: 36px; }
+    #geo-devices-results {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 500;
+      background: #fff; border: 1px solid #ddd; border-top: none;
+      border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }
+    html.dark-theme #geo-devices-results { background: #1e2530; border-color: #3a3a5c; }
+    .geo-device-result {
+      padding: 8px 12px; cursor: pointer; font-size: 12px; color: #333;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    html.dark-theme .geo-device-result { color: #c9d1d9; border-color: #2a2a3e; }
+    .geo-device-result:hover { background: #eef6fc; }
+    html.dark-theme .geo-device-result:hover { background: #1a3a5c; }
+    .geo-device-result:last-child { border-bottom: none; }
+    #geo-devices-selected { display: flex; flex-wrap: wrap; gap: 6px; }
+    .geo-device-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #e8f4fd; border: 1px solid rgba(41,128,185,.25);
+      color: #2980b9; border-radius: 14px; padding: 3px 8px 3px 10px;
+      font-size: 11px; font-weight: 600;
+    }
+    html.dark-theme .geo-device-tag { background: #1a3a5c; border-color: #2980b9; color: #87c7ff; }
+    .geo-device-tag button {
+      background: none; border: none; padding: 0; cursor: pointer;
+      font-size: 13px; line-height: 1; color: #2980b9; display: flex; align-items: center;
+    }
+    html.dark-theme .geo-device-tag button { color: #87c7ff; }
+    .geo-device-tag button:hover { color: #e74c3c; }
+    #geo-devices-empty { font-size: 12px; color: #aaa; padding: 6px 0; }
+
+    /* ── Mapa ── */
+    #geo-mapa {
+      height: 340px;
+      border-radius: 0;
+    }
+    .leaflet-grab { cursor: crosshair !important; }
+    .leaflet-drag-target { cursor: grabbing !important; }
+    .leaflet-bar { box-shadow: none !important; background: #fff !important; border-radius: 20px !important; border: 2px solid #c2c1c1 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+    .leaflet-bar a { width: 35px !important; height: 35px !important; border-radius: 0 !important; border: none !important; border-bottom: 1px solid #c2c1c1 !important; background: transparent !important; color: #555 !important; font-size: 18px !important; display: flex !important; align-items: center !important; justify-content: center !important; text-decoration: none !important; line-height: 1 !important; }
+    .leaflet-bar a:last-child { border-bottom: none !important; }
+    .leaflet-bar a:hover { background: #f0f0f0 !important; }
+    html.dark-theme .leaflet-bar { background: #1e2530 !important; border-color: #3a3a5c !important; }
+    html.dark-theme .leaflet-bar a { color: #c9d1d9 !important; border-bottom-color: #3a3a5c !important; }
+
+    #geo-draw-tools {
+      padding: 10px 16px;
+      background: #fff;
+      border-top: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    html.dark-theme #geo-draw-tools { background: #1e2530; border-top-color: #2a3040; }
+    #geo-draw-tools span { font-size: 11px; color: #888; font-weight: 600; margin-right: 4px; }
+    .geo-draw-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 16px;
+      border: 1.5px solid #ccc; background: #fff; color: #555;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: all .12s;
+    }
+    html.dark-theme .geo-draw-btn { background: #252535; border-color: #444; color: #c9d1d9; }
+    .geo-draw-btn:hover { border-color: #2980b9; color: #2980b9; }
+    .geo-draw-btn.ativo { background: #2980b9; border-color: #2980b9; color: #fff; }
+    .geo-draw-btn.ativo:hover { background: #1f6a9a; }
+    .geo-draw-btn-clear { border-color: #e74c3c !important; color: #e74c3c !important; }
+    .geo-draw-btn-clear:hover { background: #e74c3c !important; color: #fff !important; }
+    #geo-draw-hint {
+      font-size: 11px; color: #888; margin-left: 4px;
+    }
+    html.dark-theme #geo-draw-hint { color: #555; }
+
+    /* Cliente settings */
+    .geo-toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    html.dark-theme .geo-toggle-row { border-color: #2a3040; }
+    .geo-toggle-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .geo-toggle-label { font-size: 13px; color: #333; }
+    html.dark-theme .geo-toggle-label { color: #c9d1d9; }
+    .geo-toggle-sub { font-size: 11px; color: #888; margin-top: 2px; }
+
+    /* iOS-style toggle */
+    .geo-switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+    .geo-switch input { opacity: 0; width: 0; height: 0; }
+    .geo-slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc; transition: .3s; border-radius: 22px;
+    }
+    .geo-slider:before {
+      position: absolute; content: ""; height: 16px; width: 16px;
+      left: 3px; bottom: 3px; background: #fff;
+      transition: .3s; border-radius: 50%;
+    }
+    input:checked + .geo-slider { background: #2980b9; }
+    input:checked + .geo-slider:before { transform: translateX(18px); }
+
+    #geo-notif-sistemas {
+      display: none;
+      margin-top: 10px;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      gap: 12px;
+    }
+    html.dark-theme #geo-notif-sistemas { background: #252535; }
+    #geo-notif-sistemas.visivel { display: flex; flex-wrap: wrap; gap: 14px; }
+    .geo-check-label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: #333; cursor: pointer;
+    }
+    html.dark-theme .geo-check-label { color: #c9d1d9; }
+
+    /* Form footer */
+    #geo-form-footer {
+      padding: 12px 20px;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    html.dark-theme #geo-form-footer { background: #1e2530; border-color: #2d3748; }
+  </style>
+</head>
+<body>
+
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown open">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+          <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
+          <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li class="active"><a href="geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Geocercas</h2>
+      </div>
+    </div>
+
+    <div id="geo-layout">
+
+      <!-- Painel esquerdo: lista -->
+      <div id="geo-list-panel">
+        <div id="geo-list-header">
+          <h5>Geocercas</h5>
+          <button class="btn btn-primary btn-sm btn-block" id="btn-nova-geocerca">
+            <i class="fa fa-plus"></i> Nova Geocerca
+          </button>
+        </div>
+        <div id="geo-list-body">
+          <div id="geo-empty">
+            <i class="fa fa-circle-o" style="font-size:28px;display:block;margin-bottom:8px;color:#ddd"></i>
+            Nenhuma geocerca cadastrada
+          </div>
+        </div>
+      </div>
+
+      <!-- Painel direito: formulário / estado vazio -->
+      <div id="geo-form-panel">
+
+        <!-- Estado vazio -->
+        <div id="geo-empty-state">
+          <i class="fa fa-map-o"></i>
+          <span>Selecione uma geocerca ou crie uma nova</span>
+        </div>
+
+        <!-- Formulário de criação/edição -->
+        <div id="geo-form-wrap">
+
+          <div id="geo-form-topbar">
+            <span id="geo-form-titulo">Nova Geocerca</span>
+            <button class="btn btn-default btn-sm" id="btn-cancelar-geo">
+              <i class="fa fa-times"></i> Cancelar
+            </button>
+          </div>
+
+          <div id="geo-form-body">
+
+            <!-- Seção 1: Identificação -->
+            <div class="geo-section">
+              <div class="geo-section-header">
+                <i class="fa fa-tag"></i> Identificação
+              </div>
+              <div class="geo-section-body">
+                <div class="geo-form-group">
+                  <label for="geo-nome">Nome <span style="color:#e74c3c">*</span></label>
+                  <input type="text" id="geo-nome" class="form-control" placeholder="Ex: Área do Depósito, Rota Principal..." />
+                </div>
+                <div class="geo-form-group">
+                  <label for="geo-data-inicio">Data/hora de início</label>
+                  <input type="datetime-local" id="geo-data-inicio" class="form-control" />
+                </div>
+                <div class="geo-form-group">
+                  <label for="geo-descricao">Descrição</label>
+                  <textarea id="geo-descricao" class="form-control" rows="2" placeholder="Descrição opcional..."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Seção 2: Dispositivos -->
+            <div class="geo-section">
+              <div class="geo-section-header">
+                <i class="fa fa-car"></i> Dispositivos
+              </div>
+              <div class="geo-section-body">
+                <div id="geo-devices-search-wrap">
+                  <input type="text" id="geo-devices-search" class="form-control" placeholder="Pesquisar dispositivo, placa ou IMEI..." />
+                  <div id="geo-devices-results" style="display:none"></div>
+                </div>
+                <div id="geo-devices-selected"></div>
+                <div id="geo-devices-empty">Nenhum dispositivo adicionado</div>
+              </div>
+            </div>
+
+            <!-- Seção 3: Mapa e desenho -->
+            <div class="geo-section">
+              <div class="geo-section-header">
+                <i class="fa fa-map"></i> Área no mapa <span style="font-size:10px;font-weight:400;color:#e74c3c;margin-left:6px">* Obrigatório</span>
+              </div>
+              <div id="geo-mapa"></div>
+              <div id="geo-draw-tools">
+                <span>Desenhar:</span>
+                <button class="geo-draw-btn" id="btn-draw-polygon" title="Clique para adicionar vértices; duplo-clique para fechar">
+                  <i class="fa fa-pencil-square-o"></i> Polígono
+                </button>
+                <button class="geo-draw-btn" id="btn-draw-circle" title="Clique para definir o centro; depois ajuste o raio">
+                  <i class="fa fa-circle-o"></i> Círculo
+                </button>
+                <button class="geo-draw-btn" id="btn-draw-line" title="Clique para adicionar pontos; duplo-clique para finalizar">
+                  <i class="fa fa-minus"></i> Linha
+                </button>
+                <button class="geo-draw-btn geo-draw-btn-clear" id="btn-draw-clear" title="Limpar desenho atual">
+                  <i class="fa fa-trash"></i> Limpar
+                </button>
+                <span id="geo-draw-hint"></span>
+              </div>
+
+              <!-- Raio (somente para círculo) -->
+              <div id="geo-circle-raio-wrap" style="display:none;padding:10px 16px;border-top:1px solid #eee;background:#fff;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <label style="font-size:12px;font-weight:600;color:#555;margin:0;white-space:nowrap">Raio (m):</label>
+                  <input type="number" id="geo-circle-raio" class="form-control input-sm" value="500" min="50" max="100000" style="width:100px;" />
+                  <button class="btn btn-default btn-xs" id="btn-circle-aplicar">Aplicar</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Seção 4: Configurações do cliente -->
+            <div class="geo-section">
+              <div class="geo-section-header">
+                <i class="fa fa-user"></i> Visibilidade e Notificações
+              </div>
+              <div class="geo-section-body">
+
+                <div class="geo-toggle-row">
+                  <div>
+                    <div class="geo-toggle-label">Visível para o cliente</div>
+                    <div class="geo-toggle-sub">A geocerca aparecerá na tela de rastreamento e relatório do cliente</div>
+                  </div>
+                  <label class="geo-switch">
+                    <input type="checkbox" id="geo-visivel-cliente" />
+                    <span class="geo-slider"></span>
+                  </label>
+                </div>
+
+                <div class="geo-toggle-row">
+                  <div>
+                    <div class="geo-toggle-label">Notificar cliente</div>
+                    <div class="geo-toggle-sub">Enviar notificação ao entrar/sair desta geocerca</div>
+                  </div>
+                  <label class="geo-switch">
+                    <input type="checkbox" id="geo-notificar-cliente" />
+                    <span class="geo-slider"></span>
+                  </label>
+                </div>
+
+                <div id="geo-notif-sistemas">
+                  <label class="geo-check-label">
+                    <input type="checkbox" id="geo-notif-email" checked /> E-mail
+                  </label>
+                  <label class="geo-check-label">
+                    <input type="checkbox" id="geo-notif-whatsapp" /> WhatsApp
+                  </label>
+                  <label class="geo-check-label">
+                    <input type="checkbox" id="geo-notif-app" checked /> App / Web
+                  </label>
+                </div>
+
+              </div>
+            </div>
+
+          </div><!-- /geo-form-body -->
+
+          <div id="geo-form-footer">
+            <button class="btn btn-default btn-sm" id="btn-cancelar-geo2">Cancelar</button>
+            <button class="btn btn-primary btn-sm" id="btn-salvar-geo">
+              <i class="fa fa-check"></i> Salvar Geocerca
+            </button>
+          </div>
+
+        </div><!-- /geo-form-wrap -->
+
+      </div><!-- /geo-form-panel -->
+
+    </div><!-- /geo-layout -->
+
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+      if (!user) return;
+      document.getElementById('user-nome').textContent = user.nome || user.email || '—';
+      var badge = document.getElementById('user-badge');
+      badge.textContent = user.role;
+      badge.className = 'al-badge ' + (user.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+    })();
+  </script>
+  <script src="../js/geocerca.js"></script>
+
+</body>
+</html>
