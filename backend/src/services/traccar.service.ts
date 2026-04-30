@@ -173,7 +173,10 @@ export async function traccarExportReport(
   from: string,
   to: string,
 ): Promise<Response> {
-  const params = new URLSearchParams({ from, to });
+  // Traccar sempre exibe Period em UTC; substituir o offset pelo Z faz o horário
+  // local aparecer diretamente como UTC no cabeçalho do Excel.
+  const semFuso = (s: string) => s.replace(/[+-]\d{2}:\d{2}$/, 'Z');
+  const params = new URLSearchParams({ from: semFuso(from), to: semFuso(to) });
   deviceIds.forEach(id => params.append('deviceId', String(id)));
   
   const res = await fetch(`${TRACCAR_URL}/api/reports/${type}?${params}`, {
