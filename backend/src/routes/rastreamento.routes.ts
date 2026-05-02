@@ -14,6 +14,7 @@ import {
   traccarGetEvents,
   traccarGetSummary,
   traccarSendCommand,
+  traccarUpdateDeviceAccumulators,
   traccarGetCommandTypes,
   traccarGetGeofences,
   traccarCreateGeofence,
@@ -490,6 +491,14 @@ router.patch('/dispositivos/:id/medidores', requireRoles('ADMIN', 'COLABORADOR')
       horimetroSistemaSegundos: true,
     },
   });
+
+  if (traccarDevice && atualizado.odometroSistemaMetros != null) {
+    traccarUpdateDeviceAccumulators(
+      traccarDevice.id,
+      atualizado.odometroSistemaMetros,
+      atualizado.horimetroSistemaSegundos * 1000,
+    ).catch(err => console.error('[Traccar] Falha ao sincronizar acumuladores:', err.message));
+  }
 
   res.json({
     id: atualizado.id,
