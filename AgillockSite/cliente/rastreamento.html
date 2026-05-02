@@ -264,25 +264,6 @@
       box-shadow: 0 2px 12px rgba(0,0,0,.28);
     }
     #mapa { flex: 1; border-radius: 8px; overflow: hidden; }
-    #rast-legenda {
-      position: absolute;
-      right: 14px;
-      bottom: 14px;
-      z-index: 900;
-      background: rgba(255,255,255,.92);
-      backdrop-filter: blur(4px);
-      border-radius: 8px;
-      padding: 8px 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.15);
-      font-size: 11px;
-      pointer-events: none;
-    }
-    .rast-legenda-item { display: flex; align-items: center; gap: 7px; padding: 2px 0; color: #333; }
-    .rast-legenda-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    html.dark-theme #rast-legenda,
-    html.dark-theme #rast-legenda-modal-box { background: rgba(30,37,48,.94); color: #e2e8f0; }
-    html.dark-theme .rast-legenda-item { color: #e2e8f0; }
-    #rast-legenda-btn, #rast-legenda-modal { display: none; }
     .leaflet-grab { cursor: crosshair !important; }
     .leaflet-drag-target { cursor: grabbing !important; }
 
@@ -848,46 +829,6 @@
       #topbar-counters { display: none; }
       #rastreamento-layout { position: relative; }
       #mapa-area { width: 100%; height: 100%; margin: 8px; border-radius: 8px; }
-      #rast-legenda { display: none; }
-      #rast-legenda-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: absolute;
-        top: 12px;
-        left: 12px;
-        z-index: 2200;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: 1.5px solid rgba(200,200,200,.85);
-        background: rgba(255,255,255,.94);
-        color: #555;
-        font-size: 15px;
-        cursor: pointer;
-        box-shadow: 0 2px 6px rgba(0,0,0,.15);
-      }
-      html.dark-theme #rast-legenda-btn {
-        background: #1e2530;
-        border-color: #3a3a5c;
-        color: #c9d1d9;
-      }
-      #rast-legenda-modal.aberto { display: block; }
-      #rast-legenda-modal-overlay { position: fixed; inset: 0; z-index: 3001; }
-      #rast-legenda-modal-box {
-        position: fixed;
-        top: 98px;
-        left: 18px;
-        z-index: 3002;
-        background: #fff;
-        border-radius: 10px;
-        padding: 14px 16px;
-        box-shadow: 0 4px 16px rgba(0,0,0,.2);
-        min-width: 188px;
-      }
-      #rast-legenda-modal-box h6 { font-size: 13px; font-weight: 700; margin: 0 0 10px; color: #222; }
-      html.dark-theme #rast-legenda-modal-box h6 { color: #f0f2f5; }
-      #rast-legenda-modal-box .rast-legenda-item { font-size: 12px; padding: 3px 0; }
       .leaflet-control-attribution { display: none !important; }
       .leaflet-control-container .leaflet-top.leaflet-right { top: 4px; right: 4px; }
       .leaflet-control-layers,
@@ -1094,25 +1035,6 @@
           <button class="ml-btn ativo" id="ml-labels"><span class="ml-btn-icon"><i class="fa fa-comment"></i></span> Labels</button>
           <button class="ml-btn" id="ml-cercas"><span class="ml-btn-icon"><i class="fa fa-circle-o"></i></span> Cercas</button>
           <button class="ml-btn" id="ml-rastro"><span class="ml-btn-icon"><i class="fa fa-ellipsis-h"></i></span> Rastro</button>
-        </div>
-
-        <!-- Legenda de cores dos ícones -->
-        <div id="rast-legenda">
-          <div class="rast-legenda-item"><span class="rast-legenda-dot" style="background:#2980b9"></span> Em movimento ou ignição ligada</div>
-          <div class="rast-legenda-item"><span class="rast-legenda-dot" style="background:#27ae60"></span> Parado</div>
-          <div class="rast-legenda-item"><span class="rast-legenda-dot" style="background:#95a5a6"></span> Offline ou sem posição</div>
-        </div>
-        <button type="button" id="rast-legenda-btn" onclick="toggleLegendaRastreamento()" title="Legenda">
-          <i class="fa fa-info-circle"></i>
-        </button>
-        <div id="rast-legenda-modal">
-          <div id="rast-legenda-modal-overlay" onclick="toggleLegendaRastreamento()"></div>
-          <div id="rast-legenda-modal-box">
-            <h6>Legenda</h6>
-            <div class="rast-legenda-item"><span class="rast-legenda-dot" style="background:#2980b9"></span> Em movimento ou ignição ligada</div>
-            <div class="rast-legenda-item"><span class="rast-legenda-dot" style="background:#27ae60"></span> Parado</div>
-            <div class="rast-legenda-item"><span class="rast-legenda-dot" style="background:#95a5a6"></span> Offline ou sem posição</div>
-          </div>
         </div>
 
         <!-- Card flutuante do dispositivo selecionado -->
@@ -1387,12 +1309,6 @@
     </div>
   </div>
 
-  <script>
-    function toggleLegendaRastreamento() {
-      var modal = document.getElementById('rast-legenda-modal');
-      if (modal) modal.classList.toggle('aberto');
-    }
-  </script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="../js/rastreamento-cliente.js"></script>
 
