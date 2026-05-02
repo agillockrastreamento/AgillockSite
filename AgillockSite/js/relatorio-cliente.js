@@ -24,8 +24,10 @@ let rotaLayerGroup = null;
 let routePlayerControl = null;
 let routePlayerMarker = null;
 let routePlayerTimer = null;
+let routePlayerFrame = null;
 let routePlayerPath = [];
 let routePlayerIndex = 0;
+let routeEndpointMarkers = [];
 let chartVelocidade = null;
 let periodoAtual = 'hoje';
 let _googleMapLayers = {};
@@ -178,6 +180,7 @@ function renderSemDispositivoSelecionado() {
   if (rotaStats) rotaStats.innerHTML = '';
   pararRoutePlayer(true);
   if (rotaLayerGroup) rotaLayerGroup.clearLayers();
+  routeEndpointMarkers = [];
   setRoutePlayerPath([]);
 }
 
@@ -508,8 +511,8 @@ function inicializarRoutePlayerControl() {
       L.DomEvent.on(wrap.querySelector('[data-route-player-speed]'), 'change', function (e) {
         L.DomEvent.stop(e);
         if (routePlayerTimer) {
-          clearInterval(routePlayerTimer);
-          routePlayerTimer = setInterval(avancarRoutePlayer, getRoutePlayerSpeed());
+          if (routePlayerFrame) cancelAnimationFrame(routePlayerFrame);
+          animarProximoRoutePlayer();
         }
       });
       return wrap;
@@ -538,6 +541,7 @@ function setRoutePlayerPath(posicoes) {
         lat: Number(p.latitude),
         lng: Number(p.longitude),
         course: Number(p.course ?? p.attributes?.course ?? 0),
+        time: p.fixTime || p.deviceTime || p.hora || p.serverTime || null,
         categoria: dInfo.categoria || 'carro',
       };
     });
@@ -577,10 +581,13 @@ function iniciarRoutePlayer() {
   if (routePlayerPath.length < 2) return;
   if (routePlayerIndex >= routePlayerPath.length - 1) routePlayerIndex = 0;
   const ponto = routePlayerPath[routePlayerIndex];
+  setMarcadoresExtremosVisiveis(false);
   if (!routePlayerMarker) {
     routePlayerMarker = L.marker([ponto.lat, ponto.lng], { icon: criarIconeRoutePlayer(ponto), zIndexOffset: 900 }).addTo(mapaRota);
+    routePlayerMarker.bindTooltip(fmtHora(ponto.time), { permanent: true, direction: 'top', offset: [0, -18], className: 'route-player-time' }).openTooltip();
   } else {
     routePlayerMarker.setLatLng([ponto.lat, ponto.lng]).setIcon(criarIconeRoutePlayer(ponto));
+    routePlayerMarker.setTooltipContent(fmtHora(ponto.time));
   }
   const btn = getRoutePlayerButton();
   if (btn) {
@@ -588,7 +595,8 @@ function iniciarRoutePlayer() {
     btn.title = 'Pausar trajeto';
     btn.innerHTML = '<i class="fa fa-pause"></i>';
   }
-  routePlayerTimer = setInterval(avancarRoutePlayer, getRoutePlayerSpeed());
+  routePlayerTimer = true;
+  animarProximoRoutePlayer();
 }
 
 function avancarRoutePlayer() {
@@ -599,11 +607,53 @@ function avancarRoutePlayer() {
   }
   const ponto = routePlayerPath[routePlayerIndex];
   routePlayerMarker.setLatLng([ponto.lat, ponto.lng]).setIcon(criarIconeRoutePlayer(ponto));
+  routePlayerMarker.setTooltipContent(fmtHora(ponto.time));
+  animarProximoRoutePlayer();
+}
+
+function calcularBearing(a, b) {
+  const lat1 = a.lat * Math.PI / 180;
+  const lat2 = b.lat * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function animarProximoRoutePlayer() {
+  if (!routePlayerTimer || routePlayerIndex >= routePlayerPath.length - 1) return;
+  const origem = routePlayerPath[routePlayerIndex];
+  const destino = routePlayerPath[routePlayerIndex + 1];
+  const inicio = performance.now();
+  const duracao = getRoutePlayerSpeed();
+  const bearing = destino.course || calcularBearing(origem, destino);
+  const animar = function (agora) {
+    if (!routePlayerTimer) return;
+    const progresso = Math.min((agora - inicio) / duracao, 1);
+    const lat = origem.lat + (destino.lat - origem.lat) * progresso;
+    const lng = origem.lng + (destino.lng - origem.lng) * progresso;
+    routePlayerMarker.setLatLng([lat, lng]).setIcon(criarIconeRoutePlayer({ ...destino, course: bearing }));
+    routePlayerMarker.setTooltipContent(fmtHora(destino.time));
+    if (progresso < 1) {
+      routePlayerFrame = requestAnimationFrame(animar);
+    } else {
+      avancarRoutePlayer();
+    }
+  };
+  routePlayerFrame = requestAnimationFrame(animar);
+}
+
+function setMarcadoresExtremosVisiveis(visivel) {
+  routeEndpointMarkers.forEach(function (m) {
+    if (m?.setOpacity) m.setOpacity(visivel ? 1 : 0);
+  });
 }
 
 function pararRoutePlayer(removerMarcador) {
-  if (routePlayerTimer) clearInterval(routePlayerTimer);
+  if (routePlayerFrame) cancelAnimationFrame(routePlayerFrame);
+  routePlayerFrame = null;
   routePlayerTimer = null;
+  setMarcadoresExtremosVisiveis(true);
   const btn = getRoutePlayerButton();
   if (btn) {
     btn.classList.remove('playing');
@@ -619,6 +669,7 @@ function pararRoutePlayer(removerMarcador) {
 function renderRota(data, paradas) {
   pararRoutePlayer(true);
   if (rotaLayerGroup) rotaLayerGroup.clearLayers();
+  routeEndpointMarkers = [];
   setRoutePlayerPath(data?.posicoes || []);
   if (!data || !data.posicoes || !data.posicoes.length) {
     document.getElementById('rota-stats').innerHTML = 'Nenhuma posição encontrada.';
@@ -658,9 +709,10 @@ function renderRota(data, paradas) {
       iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
       iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
     });
-    L.marker([ini.latitude, ini.longitude], { icon: iconeIni })
+    const markerInicio = L.marker([ini.latitude, ini.longitude], { icon: iconeIni })
       .bindPopup(`<b>Início: ${dInfo.nome}</b><br>${fmtHora(ini.fixTime)}`)
       .addTo(rotaLayerGroup);
+    routeEndpointMarkers.push(markerInicio);
       
     const iconeFim = L.divIcon({
       html: window.AL_ICONS_3D.getSvgHtml(cat, '#e74c3c', 0),
@@ -668,9 +720,10 @@ function renderRota(data, paradas) {
       iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
       iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
     });
-    L.marker([fim.latitude, fim.longitude], { icon: iconeFim })
+    const markerFim = L.marker([fim.latitude, fim.longitude], { icon: iconeFim })
       .bindPopup(`<b>Fim: ${dInfo.nome}</b><br>${fmtHora(fim.fixTime)}`)
       .addTo(rotaLayerGroup);
+    routeEndpointMarkers.push(markerFim);
       
     idx++;
   }

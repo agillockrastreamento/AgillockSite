@@ -331,16 +331,22 @@ router.get('/dispositivos/:id/paradas', requireRoles('ADMIN', 'COLABORADOR'), as
   const paradas = await traccarGetStops([traccarDevice.id], fromDate, toDate);
   const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
   const paradasComMedidores = aplicarParadasComMedidores(paradas, historico);
+  const historicoPorId = new Map(historico.map(p => [p.id, p]));
 
-  res.json(paradasComMedidores.map(p => ({
-    inicio: p.startTime,
-    fim: p.endTime,
-    endereco: p.address,
-    latitude: p.lat,
-    longitude: p.lon,
-    duracao: Math.round(p.duration / 60000),
-    horasMotor: Math.round((p.engineHours || 0) / 3600000 * 10) / 10,
-  })));
+  res.json(paradasComMedidores.map(p => {
+    const posicao = historicoPorId.get(p.positionId)
+      || posicaoMaisProxima(historico, traccarDevice.id, p.startTime)
+      || posicaoMaisProxima(historico, traccarDevice.id, p.endTime);
+    return {
+      inicio: p.startTime,
+      fim: p.endTime,
+      endereco: temEndereco(p.address) ? p.address : posicao?.address || null,
+      latitude: p.lat || posicao?.latitude || 0,
+      longitude: p.lon || posicao?.longitude || 0,
+      duracao: Math.round(p.duration / 60000),
+      horasMotor: Math.round((p.engineHours || 0) / 3600000 * 10) / 10,
+    };
+  }));
 });
 
 // ── GET /api/rastreamento/dispositivos/:id/eventos ────────────────────────────
