@@ -782,6 +782,156 @@
     html.dark-theme #modal-troca-oleo .btn-default { background: #252535; border-color: #3a3a5c; color: #c9d1d9; }
     html.dark-theme #modal-confirmar-troca-oleo .btn-default:hover,
     html.dark-theme #modal-troca-oleo .btn-default:hover { background: #2d3748; }
+
+    #tracking-drawer-handle { display: none; }
+
+    @media (max-width: 700px) {
+      html, body { width: 100%; height: 100%; overflow: hidden; }
+      .admin-content { height: 100dvh; }
+      .admin-topbar {
+        min-height: 52px;
+        height: auto;
+        padding: 6px 8px;
+        gap: 6px;
+      }
+      .admin-topbar > div:first-child { gap: 6px !important; }
+      .topbar-title {
+        font-size: 15px !important;
+        max-width: 118px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #topbar-busca-wrap {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+      }
+      #filtro {
+        height: 32px;
+        font-size: 12px;
+        padding: 5px 8px;
+      }
+      #topbar-counters { display: none; }
+      #rastreamento-layout { position: relative; }
+      #mapa-area { width: 100%; height: 100%; }
+      .leaflet-control-attribution { display: none !important; }
+      .leaflet-control-container .leaflet-top.leaflet-right { top: 4px; right: 4px; }
+      #mapa-tray {
+        top: 8px;
+        right: 48px;
+        max-width: calc(100vw - 64px);
+        overflow-x: auto;
+        padding: 8px;
+      }
+      .ml-btn { padding: 4px; gap: 0; }
+      .ml-btn > span:not(.ml-btn-icon) { display: none; }
+      .ml-btn-icon { width: 32px; height: 32px; }
+
+      #barra-veiculos-wrap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 28vh;
+        z-index: 900;
+      }
+      #barra-veiculos {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        max-height: none;
+        padding: 8px 10px;
+        scrollbar-width: none;
+      }
+      #barra-veiculos::-webkit-scrollbar { display: none; }
+      .card-veiculo {
+        width: 92px;
+        min-height: 88px;
+        padding: 7px 5px;
+        border-radius: 8px;
+      }
+      .card-veiculo .cv-foto,
+      .card-veiculo .cv-icone,
+      .card-veiculo .btn-foto-wrap {
+        width: 30px;
+        height: 30px;
+      }
+
+      #device-detail-card {
+        position: fixed !important;
+        top: auto !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: none !important;
+        height: 32vh !important;
+        border-radius: 16px 16px 0 0 !important;
+        box-shadow: 0 -4px 24px rgba(0,0,0,.24) !important;
+        z-index: 6500 !important;
+        transition: height .28s cubic-bezier(.4,0,.2,1);
+        will-change: height;
+      }
+      #device-detail-card.drawer-aberta { height: 58vh !important; }
+      #tracking-drawer-handle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 0 4px;
+        flex-shrink: 0;
+        cursor: grab;
+        touch-action: none;
+      }
+      #tracking-drawer-handle::before {
+        content: "";
+        width: 38px;
+        height: 4px;
+        border-radius: 2px;
+        background: #c9ced6;
+      }
+      .dcard-header { padding-top: 6px; }
+      .dcard-body { padding-bottom: 18px; }
+
+      #eventos-panel {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: 42vh;
+        max-height: 70vh;
+        border-left: none;
+        border-top: 1px solid #ddd;
+        border-radius: 16px 16px 0 0;
+        z-index: 6200;
+        transform: translateY(0);
+        transition: transform .22s ease;
+      }
+      #eventos-panel.minimizado {
+        width: 100% !important;
+        min-width: 0 !important;
+        height: 0;
+        border-top: none;
+        transform: translateY(100%);
+      }
+      #eventos-header { padding: 10px 10px 0; }
+      #eventos-lista { min-height: 0; }
+      #evento-popup-mapa {
+        bottom: calc(32vh + 10px);
+        max-width: calc(100vw - 24px);
+      }
+      #dlg-cerca {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: calc(32vh + 12px);
+        transform: none;
+        min-width: 0;
+      }
+      #ws-status { bottom: calc(32vh + 10px); right: 10px; }
+    }
   </style>
 </head>
 <body>

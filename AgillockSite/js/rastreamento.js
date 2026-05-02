@@ -127,11 +127,73 @@ function _htmlBotaoStreetView(lat, lng) {
   return `<a href="${_urlStreetView(lat, lng)}" target="_blank" rel="noopener noreferrer" class="dcard-streetview-btn" title="Abrir no Street View"><i class="fa fa-street-view"></i></a>`;
 }
 
+function _isMobileTracking() { return window.innerWidth <= 700; }
+
+let _trackingDrawerAberta = false;
+let _trackingDrawerDragY = null;
+let _trackingDrawerStartHeight = null;
+
+function _abrirTrackingDrawer() {
+  const card = document.getElementById('device-detail-card');
+  if (!card) return;
+  _trackingDrawerAberta = true;
+  card.classList.add('drawer-aberta');
+  if (map) setTimeout(function () { map.invalidateSize(); }, 280);
+}
+
+function _fecharTrackingDrawer() {
+  const card = document.getElementById('device-detail-card');
+  if (!card) return;
+  _trackingDrawerAberta = false;
+  card.classList.remove('drawer-aberta');
+  if (map) setTimeout(function () { map.invalidateSize(); }, 280);
+}
+
+function _prepararTrackingDrawer() {
+  const card = document.getElementById('device-detail-card');
+  const handle = document.getElementById('tracking-drawer-handle');
+  if (!card || !handle || handle.dataset.drawerReady === '1') return;
+  handle.dataset.drawerReady = '1';
+
+  handle.addEventListener('click', function () {
+    if (!_isMobileTracking()) return;
+    if (_trackingDrawerAberta) _fecharTrackingDrawer();
+    else _abrirTrackingDrawer();
+  });
+  handle.addEventListener('touchstart', function (e) {
+    if (!_isMobileTracking()) return;
+    _trackingDrawerDragY = e.touches[0].clientY;
+    _trackingDrawerStartHeight = card.getBoundingClientRect().height;
+    card.style.transition = 'none';
+  }, { passive: true });
+  handle.addEventListener('touchmove', function (e) {
+    if (_trackingDrawerDragY === null || !_isMobileTracking()) return;
+    e.preventDefault();
+    const dy = _trackingDrawerDragY - e.touches[0].clientY;
+    const nextHeight = Math.min(Math.max(_trackingDrawerStartHeight + dy, window.innerHeight * 0.22), window.innerHeight * 0.82);
+    card.style.height = `${nextHeight}px`;
+  }, { passive: false });
+  handle.addEventListener('touchend', function () {
+    if (_trackingDrawerDragY === null || !_isMobileTracking()) return;
+    card.style.transition = '';
+    const h = card.getBoundingClientRect().height;
+    if (h > window.innerHeight * 0.42) _abrirTrackingDrawer();
+    else _fecharTrackingDrawer();
+    card.style.height = '';
+    _trackingDrawerDragY = null;
+  }, { passive: true });
+}
+
 function _ajustarAlturaCardDispositivo() {
   const card = document.getElementById('device-detail-card');
   const mapaEl = document.getElementById('mapa');
   const area = document.getElementById('mapa-area') || mapaEl;
   if (!card || !mapaEl || !area || card.style.display === 'none') return;
+  if (_isMobileTracking()) {
+    card.style.top = '';
+    card.style.maxHeight = '';
+    return;
+  }
   const mapRect = mapaEl.getBoundingClientRect();
   const areaRect = area.getBoundingClientRect();
   const topGap = 12;
@@ -709,14 +771,18 @@ function inicializarMapa() {
   map.on('popupclose', function (e) {
     if (_togglingPopup || _modoDesenho) return; // Não fecha o card se estiver desenhando a cerca
     if (ativoId && marcadores[ativoId] && e.popup === marcadores[ativoId].getPopup()) {
-      fecharCardDispositivo(true);
+      if (_isMobileTracking()) _fecharTrackingDrawer();
+      else fecharCardDispositivo(true);
     }
   });
 
   map.on('click', function () {
     if (!_modoDesenho) {
       _fecharSpider();
-      if (ativoId) fecharCardDispositivo(true);
+      if (ativoId) {
+        if (_isMobileTracking()) _fecharTrackingDrawer();
+        else fecharCardDispositivo(true);
+      }
     }
   });
 
@@ -2515,6 +2581,7 @@ function mostrarCardDispositivo(id) {
   const tagColor = isDark ? '#adb5bd' : '#666';
 
   card.innerHTML = `
+    <div id="tracking-drawer-handle"></div>
     ${imgHtml}
     <div class="dcard-header">
       <div style="flex:1;min-width:0">
@@ -2566,6 +2633,8 @@ function mostrarCardDispositivo(id) {
 
   card.style.display = 'block';
   card.style.display = 'flex';
+  _fecharTrackingDrawer();
+  _prepararTrackingDrawer();
   _ajustarAlturaCardDispositivo();
 
   if (_cardAdminExpandido) {
@@ -2659,7 +2728,10 @@ window.fecharCardDispositivo = function (skipClosePopup) {
   }
   if (modoFoco) desativarFoco();
   _cancelarDesenhoCirculo();
-  document.getElementById('device-detail-card').style.display = 'none';
+  const detailCard = document.getElementById('device-detail-card');
+  detailCard.classList.remove('drawer-aberta');
+  detailCard.style.display = 'none';
+  _trackingDrawerAberta = false;
   const attrsCard = document.getElementById('device-attrs-card');
   _attrsTrayOpen = false;
   if (attrsCard) {
