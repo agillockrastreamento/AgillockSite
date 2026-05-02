@@ -11,7 +11,7 @@ window.API_URL = 'https://api.agillock.com.br';
  * Vista superior com efeitos de profundidade, gradientes e sombras.
  */
 window.AL_ICONS_3D = {
-  SIZE: 48,
+  SIZE: 50,
 
   getSvgHtml: function(categoria, cor, course) {
     const angle = course || 0;
