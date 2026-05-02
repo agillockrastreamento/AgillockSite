@@ -1783,8 +1783,8 @@ function buildOleoStatusHtml(p, v) {
     const kmAbs = Math.abs(kmRestante);
     const cor = pastDue ? '#e74c3c' : '#f39c12';
     const texto = pastDue
-      ? `ultrapassou ${kmAbs.toLocaleString('pt-BR')} kms da(o) ${r.titulo}`
-      : `falta ${kmAbs.toLocaleString('pt-BR')} kms para ${r.titulo}`;
+      ? `Ultrapassou ${kmAbs.toLocaleString('pt-BR')} kms da(o) ${r.titulo}`
+      : `Faltam ${kmAbs.toLocaleString('pt-BR')} kms para ${r.titulo}`;
     const btn = podeGerenciar ? `<button onclick="abrirModalFeitoCard('${r.id}','${r.titulo.replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Marcar como feito"><i class="fa fa-check"></i></button>` : '';
     return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-wrench" style="flex-shrink:0;"></i>${texto}${btn}</span>`;
   }).join('<br>');

@@ -2456,8 +2456,8 @@ function _buildManutencoesAdminHtml(dispositivoId) {
         const kmAbs = Math.abs(kmRestante);
         const cor = atrasada ? '#e74c3c' : '#f39c12';
         const texto = atrasada
-          ? `ultrapassou ${kmAbs.toLocaleString('pt-BR')} km da(o) ${esc(r.titulo)}`
-          : `falta ${kmAbs.toLocaleString('pt-BR')} km para ${esc(r.titulo)}`;
+          ? `Ultrapassou ${kmAbs.toLocaleString('pt-BR')} km da(o) ${esc(r.titulo)}`
+          : `Faltam ${kmAbs.toLocaleString('pt-BR')} km para ${esc(r.titulo)}`;
         return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-wrench" style="flex-shrink:0;"></i>${texto}<button onclick="abrirModalFeitoCardAdmin('${r.id}','${String(r.titulo || '').replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Confirmar manutencao"><i class="fa fa-check"></i></button></span>`;
       }).join('<br>')}
     </div>`;
