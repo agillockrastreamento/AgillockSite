@@ -9,22 +9,60 @@ router.use(clienteAuthMiddleware);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function _dispositivoIdsDoCliente(clienteLoginId: string): Promise<string[]> {
+type DispositivoAcessivel = {
+  id: string;
+  clienteId: string | null;
+};
+
+async function _dispositivosDoCliente(clienteLoginId: string): Promise<{
+  clienteId: string | null;
+  dispositivos: DispositivoAcessivel[];
+}> {
   const login = await prisma.clienteLogin.findUnique({
     where: { id: clienteLoginId },
-    include: {
-      cliente: {
-        include: {
-          dispositivos: { select: { id: true } },
-          dispositivosVinculados: { select: { dispositivoId: true } },
-        },
-      },
-    },
+    select: { clienteId: true },
   });
-  return [
-    ...(login?.cliente?.dispositivos ?? []).map(d => d.id),
-    ...(login?.cliente?.dispositivosVinculados ?? []).map(dv => dv.dispositivoId),
-  ];
+  if (!login?.clienteId) return { clienteId: null, dispositivos: [] };
+
+  const dispositivos = await prisma.dispositivo.findMany({
+    where: {
+      OR: [
+        { clienteId: login.clienteId },
+        { clientesVinculados: { some: { clienteId: login.clienteId } } },
+      ],
+    },
+    select: { id: true, clienteId: true },
+  });
+
+  return { clienteId: login.clienteId, dispositivos };
+}
+
+async function _dispositivoIdsDoCliente(clienteLoginId: string): Promise<string[]> {
+  const dados = await _dispositivosDoCliente(clienteLoginId);
+  return dados.dispositivos.map(d => d.id);
+}
+
+async function _podeGerenciarManutencao(clienteLoginId: string, dispositivoId: string): Promise<boolean> {
+  const dados = await _dispositivosDoCliente(clienteLoginId);
+  return dados.dispositivos.some(d => d.id === dispositivoId && d.clienteId === dados.clienteId);
+}
+
+function _filtroManutencoesVisiveis(dispositivos: DispositivoAcessivel[], filtroDispositivo?: string) {
+  const idsPermitidos = dispositivos.map(d => d.id);
+  const idsAlvo = filtroDispositivo ? [filtroDispositivo] : idsPermitidos;
+  const clienteIdsResponsaveis = Array.from(new Set(
+    dispositivos
+      .filter(d => idsAlvo.includes(d.id) && d.clienteId)
+      .map(d => d.clienteId as string)
+  ));
+
+  return {
+    dispositivoId: filtroDispositivo ?? { in: idsPermitidos },
+    OR: [
+      { origem: 'ADMIN' },
+      { clienteLogin: { clienteId: { in: clienteIdsResponsaveis } } },
+    ],
+  };
 }
 
 async function _ativarNotificacaoManutencao(clienteLoginId: string, dispositivoId: string) {
@@ -49,7 +87,8 @@ router.get('/registros', async (req: any, res) => {
     const clienteLoginId: string = req.cliente.sub;
     const { dispositivoId } = req.query as { dispositivoId?: string };
 
-    const idsPermitidos = await _dispositivoIdsDoCliente(clienteLoginId);
+    const { dispositivos } = await _dispositivosDoCliente(clienteLoginId);
+    const idsPermitidos = dispositivos.map(d => d.id);
     if (!idsPermitidos.length) return res.json([]);
 
     const filtroDispositivo = dispositivoId && idsPermitidos.includes(dispositivoId)
@@ -57,13 +96,7 @@ router.get('/registros', async (req: any, res) => {
       : undefined;
 
     const registros = await prisma.manutencaoRegistro.findMany({
-      where: {
-        dispositivoId: filtroDispositivo ?? { in: idsPermitidos },
-        OR: [
-          { clienteLoginId },
-          { origem: 'ADMIN' },
-        ],
-      },
+      where: _filtroManutencoesVisiveis(dispositivos, filtroDispositivo),
       include: { dispositivo: { select: { nome: true, placa: true } } },
       orderBy: { dataRealizacao: 'desc' },
     });
@@ -85,9 +118,8 @@ router.post('/registros', async (req: any, res) => {
       return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, dataRealizacao.' });
     }
 
-    const idsPermitidos = await _dispositivoIdsDoCliente(clienteLoginId);
-    if (!idsPermitidos.includes(dispositivoId)) {
-      return res.status(403).json({ message: 'Acesso negado a este dispositivo.' });
+    if (!await _podeGerenciarManutencao(clienteLoginId, dispositivoId)) {
+      return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
 
     const registro = await prisma.manutencaoRegistro.create({
@@ -126,6 +158,10 @@ router.delete('/registros/:id', async (req: any, res) => {
     });
     if (!registro) return res.status(404).json({ message: 'Registro não encontrado ou não pode ser excluído.' });
 
+    if (!await _podeGerenciarManutencao(clienteLoginId, registro.dispositivoId)) {
+      return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
+    }
+
     await prisma.manutencaoRegistro.delete({ where: { id } });
     res.json({ message: 'Registro excluído com sucesso.' });
   } catch (err) {
@@ -142,7 +178,8 @@ router.get('/recorrencias', async (req: any, res) => {
     const clienteLoginId: string = req.cliente.sub;
     const { dispositivoId } = req.query as { dispositivoId?: string };
 
-    const idsPermitidos = await _dispositivoIdsDoCliente(clienteLoginId);
+    const { dispositivos } = await _dispositivosDoCliente(clienteLoginId);
+    const idsPermitidos = dispositivos.map(d => d.id);
     if (!idsPermitidos.length) return res.json([]);
 
     const filtroDispositivo = dispositivoId && idsPermitidos.includes(dispositivoId)
@@ -151,12 +188,8 @@ router.get('/recorrencias', async (req: any, res) => {
 
     const recorrencias = await prisma.manutencaoRecorrencia.findMany({
       where: {
-        dispositivoId: filtroDispositivo ?? { in: idsPermitidos },
+        ..._filtroManutencoesVisiveis(dispositivos, filtroDispositivo),
         ativa: true,
-        OR: [
-          { clienteLoginId },
-          { origem: 'ADMIN' },
-        ],
       },
       include: {
         dispositivo: {
@@ -183,9 +216,8 @@ router.post('/recorrencias', async (req: any, res) => {
       return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, intervaloKm.' });
     }
 
-    const idsPermitidos = await _dispositivoIdsDoCliente(clienteLoginId);
-    if (!idsPermitidos.includes(dispositivoId)) {
-      return res.status(403).json({ message: 'Acesso negado a este dispositivo.' });
+    if (!await _podeGerenciarManutencao(clienteLoginId, dispositivoId)) {
+      return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
 
     const dispositivo = await prisma.dispositivo.findUnique({
@@ -227,7 +259,10 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
     const recorrencia = await prisma.manutencaoRecorrencia.findFirst({
       where: {
         id,
-        OR: [{ clienteLoginId }, { origem: 'ADMIN' }],
+        OR: [
+          { origem: 'ADMIN' },
+          { clienteLogin: { clienteId: req.cliente.clienteId } },
+        ],
       },
       include: {
         dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true } },
@@ -235,9 +270,8 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
 
-    const idsPermitidos = await _dispositivoIdsDoCliente(clienteLoginId);
-    if (!idsPermitidos.includes(recorrencia.dispositivoId)) {
-      return res.status(403).json({ message: 'Acesso negado.' });
+    if (!await _podeGerenciarManutencao(clienteLoginId, recorrencia.dispositivoId)) {
+      return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode confirmar manutencoes deste dispositivo.' });
     }
 
     const kmAtual = (recorrencia.dispositivo.odometroSistemaMetros ?? 0) / 1000;
@@ -297,6 +331,9 @@ router.put('/registros/:id', async (req: any, res) => {
       where: { id, clienteLoginId, origem: 'CLIENTE' },
     });
     if (!existing) return res.status(404).json({ message: 'Registro não encontrado.' });
+    if (!await _podeGerenciarManutencao(clienteLoginId, existing.dispositivoId)) {
+      return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
+    }
     const updated = await prisma.manutencaoRegistro.update({
       where: { id },
       data: {
@@ -328,6 +365,9 @@ router.put('/recorrencias/:id', async (req: any, res) => {
       where: { id, clienteLoginId, origem: 'CLIENTE' },
     });
     if (!existing) return res.status(404).json({ message: 'Recorrência não encontrada.' });
+    if (!await _podeGerenciarManutencao(clienteLoginId, existing.dispositivoId)) {
+      return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
+    }
     const updated = await prisma.manutencaoRecorrencia.update({
       where: { id },
       data: {
@@ -354,6 +394,10 @@ router.delete('/recorrencias/:id', async (req: any, res) => {
       where: { id, clienteLoginId, origem: 'CLIENTE' },
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada ou não pode ser excluída.' });
+
+    if (!await _podeGerenciarManutencao(clienteLoginId, recorrencia.dispositivoId)) {
+      return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
+    }
 
     await prisma.manutencaoRecorrencia.update({ where: { id }, data: { ativa: false } });
     res.json({ message: 'Recorrência removida com sucesso.' });

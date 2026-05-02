@@ -1695,6 +1695,7 @@ function buildOleoStatusHtml(p, v) {
   if (!p || p.odometro == null) return '';
   const recs = v?._recorrencias;
   if (!recs || !recs.length) return '';
+  const podeGerenciar = !!v?.podeGerenciarManutencao;
   const odoKm = p.odometro / 1000;
   const isDark = document.documentElement.classList.contains('dark-theme');
   const btnBg = isDark ? '#2d3748' : '#e9ecef';
@@ -1716,7 +1717,8 @@ function buildOleoStatusHtml(p, v) {
     const texto = pastDue
       ? `ultrapassou ${kmAbs.toLocaleString('pt-BR')} kms da(o) ${r.titulo}`
       : `falta ${kmAbs.toLocaleString('pt-BR')} kms para ${r.titulo}`;
-    return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-wrench" style="flex-shrink:0;"></i>${texto}<button onclick="abrirModalFeitoCard('${r.id}','${r.titulo.replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Marcar como feito"><i class="fa fa-check"></i></button></span>`;
+    const btn = podeGerenciar ? `<button onclick="abrirModalFeitoCard('${r.id}','${r.titulo.replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Marcar como feito"><i class="fa fa-check"></i></button>` : '';
+    return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-wrench" style="flex-shrink:0;"></i>${texto}${btn}</span>`;
   }).join('<br>');
 }
 

@@ -173,7 +173,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
         categoria: true, marca: true, modeloVeiculo: true, cor: true, limiteVelocidade: true, imagemUrl: true,
         telefoneRastreador: true, operadora: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
-        cliente: { select: { id: true, nome: true } },
+        cliente: { select: { id: true, nome: true, login: { select: { id: true } } } },
         motoristasVinculados: {
           include: { motorista: { select: { id: true, nome: true } } }
         },
@@ -230,7 +230,8 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
       telefoneRastreador: d.telefoneRastreador,
       operadora: d.operadora,
       limiteVelocidade: d.limiteVelocidade,
-      cliente: d.cliente,
+      cliente: d.cliente ? { id: d.cliente.id, nome: d.cliente.nome } : null,
+      clienteLoginId: d.cliente?.login?.id ?? null,
       motorista: motorista,
       traccarId: traccar?.id ?? null,
       status: traccar?.status ?? 'unknown',

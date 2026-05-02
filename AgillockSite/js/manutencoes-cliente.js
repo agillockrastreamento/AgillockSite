@@ -15,6 +15,25 @@
   let excluirId = null;
   let excluirTipo = null; // 'registro' | 'recorrencia'
 
+  function podeGerenciarManutencao() {
+    const v = veiculos.find(v => v.dispositivoId === dispositivoIdAtivo);
+    return !!(v && v.podeGerenciarManutencao);
+  }
+
+  function aplicarPermissaoManutencao() {
+    const pode = podeGerenciarManutencao();
+    const btnRegistro = document.getElementById('btn-novo-registro');
+    const btnRecorrencia = document.getElementById('btn-nova-recorrencia');
+    if (btnRegistro) {
+      btnRegistro.disabled = !dispositivoIdAtivo || !pode;
+      btnRegistro.title = pode ? '' : 'Apenas o responsavel pelo faturamento pode registrar manutencoes.';
+    }
+    if (btnRecorrencia) {
+      btnRecorrencia.disabled = !dispositivoIdAtivo || !pode;
+      btnRecorrencia.title = pode ? '' : 'Apenas o responsavel pelo faturamento pode criar recorrencias.';
+    }
+  }
+
   const TIPO_ICON = {
     preventiva:'fa-shield', corretiva:'fa-wrench',
     revisao:'fa-search', personalizado:'fa-star',
@@ -55,8 +74,7 @@
         document.getElementById('btn-nova-recorrencia').disabled = true;
         return;
       }
-      document.getElementById('btn-novo-registro').disabled = false;
-      document.getElementById('btn-nova-recorrencia').disabled = false;
+      aplicarPermissaoManutencao();
       document.getElementById('man-vazio').style.display = 'none';
       document.getElementById('man-container').style.display = 'block';
       carregarDados(id);
@@ -117,6 +135,7 @@
       const dataStr = new Date(r.dataRealizacao).toLocaleDateString('pt-BR');
       const fotos = Array.isArray(r.fotos) ? r.fotos : [];
       const isAdmin = r.origem === 'ADMIN';
+      const podeGerenciar = podeGerenciarManutencao();
 
       return `
         <div class="man-card" data-id="${r.id}">
@@ -136,8 +155,8 @@
               </div>
             </div>
             <div class="man-card-actions">
-              ${!isAdmin ? `<button class="btn btn-info btn-xs" onclick="_editarRegistro('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
-              ${!isAdmin ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','registro')" title="Excluir"><i class="fa fa-trash"></i></button>` : ''}
+              ${podeGerenciar && !isAdmin ? `<button class="btn btn-info btn-xs" onclick="_editarRegistro('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
+              ${podeGerenciar && !isAdmin ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','registro')" title="Excluir"><i class="fa fa-trash"></i></button>` : ''}
               ${(r.notas || fotos.length) ? `<button class="btn btn-default btn-xs" onclick="_toggleExtra(this)" title="Ver mais"><i class="fa fa-chevron-down"></i></button>` : ''}
             </div>
           </div>
@@ -175,6 +194,7 @@
       const kmRestante = r.intervaloKm - kmPercorrido;
       const pct = Math.min(100, Math.max(0, (kmPercorrido / r.intervaloKm) * 100));
       const isAdmin = r.origem === 'ADMIN';
+      const podeGerenciar = podeGerenciarManutencao();
 
       let statusClass, statusLabel, fillClass, statusIcon;
       if (kmRestante > 50) {
@@ -214,11 +234,11 @@
               </div>
             </div>
             <div class="man-rec-actions">
-              <button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}', ${JSON.stringify(_esc(r.titulo))})">
+              ${podeGerenciar ? `<button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}', ${JSON.stringify(_esc(r.titulo))})">
                 <i class="fa fa-check"></i> Feito
-              </button>
-              ${!isAdmin ? `<button class="btn btn-info btn-xs" onclick="_editarRecorrencia('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
-              ${!isAdmin ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','recorrencia')" title="Cancelar"><i class="fa fa-times"></i></button>` : ''}
+              </button>` : ''}
+              ${podeGerenciar && !isAdmin ? `<button class="btn btn-info btn-xs" onclick="_editarRecorrencia('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
+              ${podeGerenciar && !isAdmin ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','recorrencia')" title="Cancelar"><i class="fa fa-times"></i></button>` : ''}
             </div>
           </div>
         </div>
@@ -260,6 +280,7 @@
 
   // ── Modais ────────────────────────────────────────────────────────────────────
   function abrirModalRegistro() {
+    if (!podeGerenciarManutencao()) { AL_CLIENTE.showAlert('Apenas o responsavel pelo faturamento pode registrar manutencoes deste dispositivo.', 'warning'); return; }
     editandoRegistroId = null;
     document.getElementById('modalRegistro-title').textContent = 'Registrar Manutenção';
     document.getElementById('btn-salvar-registro').innerHTML = '<i class="fa fa-save"></i> Salvar Registro';
@@ -284,6 +305,7 @@
   }
 
   function abrirModalRecorrencia() {
+    if (!podeGerenciarManutencao()) { AL_CLIENTE.showAlert('Apenas o responsavel pelo faturamento pode criar recorrencias deste dispositivo.', 'warning'); return; }
     editandoRecorrenciaId = null;
     document.getElementById('modalRecorrencia-title').textContent = 'Nova Recorrência de Manutenção';
     document.getElementById('btn-salvar-recorrencia').innerHTML = '<i class="fa fa-repeat"></i> Criar Recorrência';
@@ -292,6 +314,7 @@
   }
 
   window._editarRegistro = function (id) {
+    if (!podeGerenciarManutencao()) return;
     const r = registros.find(x => x.id === id);
     if (!r) return;
     editandoRegistroId = id;
@@ -310,6 +333,7 @@
   };
 
   window._editarRecorrencia = function (id) {
+    if (!podeGerenciarManutencao()) return;
     const r = recorrencias.find(x => x.id === id);
     if (!r) return;
     editandoRecorrenciaId = id;
@@ -323,12 +347,14 @@
   };
 
   window._abrirFeito = function (id, titulo) {
+    if (!podeGerenciarManutencao()) return;
     recorrenciaFeitoId = id;
     document.getElementById('feito-titulo-label').textContent = titulo;
     $('#modalFeito').modal('show');
   };
 
   window._confirmarExcluir = function (id, tipo) {
+    if (!podeGerenciarManutencao()) return;
     excluirId = id;
     excluirTipo = tipo;
     const msg = tipo === 'registro'
