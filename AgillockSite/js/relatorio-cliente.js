@@ -20,6 +20,12 @@ function apiGet(endpoint) {
 }
 
 let mapaRota = null;
+let rotaLayerGroup = null;
+let routePlayerControl = null;
+let routePlayerMarker = null;
+let routePlayerTimer = null;
+let routePlayerPath = [];
+let routePlayerIndex = 0;
 let chartVelocidade = null;
 let periodoAtual = 'hoje';
 let _googleMapLayers = {};
@@ -170,6 +176,9 @@ function renderSemDispositivoSelecionado() {
   });
   const rotaStats = document.getElementById('rota-stats');
   if (rotaStats) rotaStats.innerHTML = '';
+  pararRoutePlayer(true);
+  if (rotaLayerGroup) rotaLayerGroup.clearLayers();
+  setRoutePlayerPath([]);
 }
 
 function configurarPeriodo() {
@@ -319,7 +328,7 @@ async function carregarRelatorio() {
       apiGet(`${base}/resumo?${qs}`),
     ]);
 
-    renderRota(historico.status === 'fulfilled' ? historico.value : null);
+    renderRota(historico.status === 'fulfilled' ? historico.value : null, paradas.status === 'fulfilled' ? paradas.value : null);
     renderEventos(eventos.status === 'fulfilled' ? eventos.value : null);
     await renderViagens(viagens.status === 'fulfilled' ? viagens.value : null);
     await renderParadas(paradas.status === 'fulfilled' ? paradas.value : null);
@@ -359,6 +368,8 @@ function inicializarMapaRota() {
   _adicionarControleTipoGoogle();
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(mapaRota);
   mapaRota.on('baselayerchange', function () { _atualizarControleTipoGoogle(); });
+  rotaLayerGroup = L.layerGroup().addTo(mapaRota);
+  inicializarRoutePlayerControl();
 
 }
 
@@ -448,8 +459,167 @@ function _atualizarControleTipoGoogle() {
   });
 }
 
-function renderRota(data) {
-  mapaRota.eachLayer(layer => { if (layer instanceof L.Polyline || layer instanceof L.CircleMarker) mapaRota.removeLayer(layer); });
+function criarIconeParada() {
+  return L.divIcon({
+    className: 'stop-marker-icon',
+    html: '<div class="stop-pin"><span>P</span></div>',
+    iconSize: [30, 38],
+    iconAnchor: [15, 34],
+    popupAnchor: [0, -32],
+  });
+}
+
+function criarPopupParadaMapa(p, index) {
+  const d = dispositivosMap[p.deviceId] || { nome: p.nome || 'Dispositivo' };
+  const duracao = p.duracao != null ? p.duracao : Math.round((Number(p.duration) || 0) / 60000);
+  return `<b>${d.nome} - Parada ${index + 1}</b><br>${fmtHora(p.inicio || p.startTime)} - ${fmtHora(p.fim || p.endTime)}<br>${fmtDuracao(duracao)}`;
+}
+
+function renderMarcadoresParada(paradas, group) {
+  (paradas || []).forEach(function (p, index) {
+    const lat = Number(p.latitude ?? p.lat);
+    const lng = Number(p.longitude ?? p.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    L.marker([lat, lng], { icon: criarIconeParada(), zIndexOffset: 700 })
+      .bindPopup(criarPopupParadaMapa(p, index))
+      .addTo(group);
+  });
+}
+
+function inicializarRoutePlayerControl() {
+  if (routePlayerControl) return;
+  const PlayerControl = L.Control.extend({
+    onAdd() {
+      const wrap = L.DomUtil.create('div', 'leaflet-control route-player-control');
+      wrap.innerHTML = `
+        <button type="button" data-route-player-toggle title="Iniciar trajeto" disabled><i class="fa fa-play"></i></button>
+        <select data-route-player-speed title="Velocidade">
+          <option value="900">1x</option>
+          <option value="450">2x</option>
+          <option value="220">4x</option>
+          <option value="110">8x</option>
+        </select>`;
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.disableScrollPropagation(wrap);
+      L.DomEvent.on(wrap.querySelector('[data-route-player-toggle]'), 'click', function (e) {
+        L.DomEvent.stop(e);
+        toggleRoutePlayer();
+      });
+      L.DomEvent.on(wrap.querySelector('[data-route-player-speed]'), 'change', function (e) {
+        L.DomEvent.stop(e);
+        if (routePlayerTimer) {
+          clearInterval(routePlayerTimer);
+          routePlayerTimer = setInterval(avancarRoutePlayer, getRoutePlayerSpeed());
+        }
+      });
+      return wrap;
+    },
+    onRemove() {},
+  });
+  routePlayerControl = new PlayerControl({ position: 'topleft' }).addTo(mapaRota);
+}
+
+function getRoutePlayerButton() {
+  return document.querySelector('.route-player-control [data-route-player-toggle]');
+}
+
+function getRoutePlayerSpeed() {
+  const sel = document.querySelector('.route-player-control [data-route-player-speed]');
+  return Number(sel?.value || 450);
+}
+
+function setRoutePlayerPath(posicoes) {
+  routePlayerPath = (posicoes || [])
+    .filter(p => p.valida !== false && p.latitude && p.longitude)
+    .sort((a, b) => new Date(a.fixTime || a.deviceTime || 0).getTime() - new Date(b.fixTime || b.deviceTime || 0).getTime())
+    .map(p => {
+      const dInfo = dispositivosMap[p.deviceId] || {};
+      return {
+        lat: Number(p.latitude),
+        lng: Number(p.longitude),
+        course: Number(p.course ?? p.attributes?.course ?? 0),
+        categoria: dInfo.categoria || 'carro',
+      };
+    });
+  routePlayerIndex = 0;
+  const btn = getRoutePlayerButton();
+  if (btn) btn.disabled = routePlayerPath.length < 2;
+}
+
+function criarIconeRoutePlayer(ponto) {
+  const cat = ponto?.categoria || 'carro';
+  const course = ponto?.course || 0;
+  if (window.AL_ICONS_3D?.getSvgHtml) {
+    return L.divIcon({
+      html: window.AL_ICONS_3D.getSvgHtml(cat, '#f39c12', course),
+      className: 'route-player-marker',
+      iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
+      iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2],
+    });
+  }
+  return L.divIcon({
+    className: 'route-player-marker',
+    html: '<div class="route-player-fallback"><i class="fa fa-car"></i></div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
+function toggleRoutePlayer() {
+  if (routePlayerTimer) {
+    pararRoutePlayer(false);
+    return;
+  }
+  iniciarRoutePlayer();
+}
+
+function iniciarRoutePlayer() {
+  if (routePlayerPath.length < 2) return;
+  if (routePlayerIndex >= routePlayerPath.length - 1) routePlayerIndex = 0;
+  const ponto = routePlayerPath[routePlayerIndex];
+  if (!routePlayerMarker) {
+    routePlayerMarker = L.marker([ponto.lat, ponto.lng], { icon: criarIconeRoutePlayer(ponto), zIndexOffset: 900 }).addTo(mapaRota);
+  } else {
+    routePlayerMarker.setLatLng([ponto.lat, ponto.lng]).setIcon(criarIconeRoutePlayer(ponto));
+  }
+  const btn = getRoutePlayerButton();
+  if (btn) {
+    btn.classList.add('playing');
+    btn.title = 'Pausar trajeto';
+    btn.innerHTML = '<i class="fa fa-pause"></i>';
+  }
+  routePlayerTimer = setInterval(avancarRoutePlayer, getRoutePlayerSpeed());
+}
+
+function avancarRoutePlayer() {
+  routePlayerIndex += 1;
+  if (routePlayerIndex >= routePlayerPath.length) {
+    pararRoutePlayer(false);
+    return;
+  }
+  const ponto = routePlayerPath[routePlayerIndex];
+  routePlayerMarker.setLatLng([ponto.lat, ponto.lng]).setIcon(criarIconeRoutePlayer(ponto));
+}
+
+function pararRoutePlayer(removerMarcador) {
+  if (routePlayerTimer) clearInterval(routePlayerTimer);
+  routePlayerTimer = null;
+  const btn = getRoutePlayerButton();
+  if (btn) {
+    btn.classList.remove('playing');
+    btn.title = 'Iniciar trajeto';
+    btn.innerHTML = '<i class="fa fa-play"></i>';
+  }
+  if (removerMarcador && routePlayerMarker) {
+    mapaRota.removeLayer(routePlayerMarker);
+    routePlayerMarker = null;
+  }
+}
+
+function renderRota(data, paradas) {
+  pararRoutePlayer(true);
+  if (rotaLayerGroup) rotaLayerGroup.clearLayers();
+  setRoutePlayerPath(data?.posicoes || []);
   if (!data || !data.posicoes || !data.posicoes.length) {
     document.getElementById('rota-stats').innerHTML = 'Nenhuma posição encontrada.';
     return;
@@ -475,7 +645,7 @@ function renderRota(data) {
     const cor = _COLORS[idx % _COLORS.length];
     const dInfo = dispositivosMap[did] || { nome: did };
     const coords = pos.map(p => [p.latitude, p.longitude]);
-    const poly = L.polyline(coords, { color: cor, weight: 4, opacity: 0.8 }).bindTooltip(`<b>${dInfo.nome}</b>`).addTo(mapaRota);
+    const poly = L.polyline(coords, { color: cor, weight: 4, opacity: 0.8 }).bindTooltip(`<b>${dInfo.nome}</b>`).addTo(rotaLayerGroup);
     group.addLayer(poly);
     const ini = pos[0], fim = pos[pos.length - 1];
     
@@ -490,7 +660,7 @@ function renderRota(data) {
     });
     L.marker([ini.latitude, ini.longitude], { icon: iconeIni })
       .bindPopup(`<b>Início: ${dInfo.nome}</b><br>${fmtHora(ini.fixTime)}`)
-      .addTo(mapaRota);
+      .addTo(rotaLayerGroup);
       
     const iconeFim = L.divIcon({
       html: window.AL_ICONS_3D.getSvgHtml(cat, '#e74c3c', 0),
@@ -500,11 +670,12 @@ function renderRota(data) {
     });
     L.marker([fim.latitude, fim.longitude], { icon: iconeFim })
       .bindPopup(`<b>Fim: ${dInfo.nome}</b><br>${fmtHora(fim.fixTime)}`)
-      .addTo(mapaRota);
+      .addTo(rotaLayerGroup);
       
     idx++;
   }
 
+  renderMarcadoresParada(paradas || [], rotaLayerGroup);
   if (group.getLayers().length > 0) {
     mapaRota.fitBounds(group.getBounds().pad(0.1));
     mapaRota.invalidateSize();

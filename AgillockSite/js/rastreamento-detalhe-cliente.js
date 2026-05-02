@@ -9,6 +9,12 @@ const BASE = window.API_URL || 'http://localhost:3000';
 
 let map;
 let polylineRota = null, polylineDestaque = null, marcadorInicio = null, marcadorFim = null, marcadorAtual = null;
+let marcadoresParadaLayer = null;
+let routePlayerControl = null;
+let routePlayerMarker = null;
+let routePlayerTimer = null;
+let routePlayerPath = [];
+let routePlayerIndex = 0;
 let historicoCache = [];
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
@@ -59,6 +65,8 @@ function inicializarMapa() {
   _adicionarControleTipoGoogle();
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
   map.on('baselayerchange', function () { _atualizarControleTipoGoogle(); });
+  marcadoresParadaLayer = L.layerGroup().addTo(map);
+  inicializarRoutePlayerControl();
 
 }
 
@@ -191,14 +199,16 @@ async function carregarDados() {
     const fromISO = isoComFuso(from, false), toISO = isoComFuso(to, true);
     const enc = encodeURIComponent;
 
-    const [resHistorico, viagens] = await Promise.all([
+    const [resHistorico, viagens, paradas] = await Promise.all([
       apiGet(`/api/cliente/rastreamento/dispositivos/${dispositivoId}/historico?from=${enc(fromISO)}&to=${enc(toISO)}`),
       apiGet(`/api/cliente/rastreamento/dispositivos/${dispositivoId}/viagens?from=${enc(fromISO)}&to=${enc(toISO)}`),
+      apiGet(`/api/cliente/rastreamento/dispositivos/${dispositivoId}/paradas?from=${enc(fromISO)}&to=${enc(toISO)}`),
     ]);
 
     historicoCache = resHistorico.posicoes || [];
+    window._veiculoDetalhe = resHistorico.dispositivo || {};
     renderInfoVeiculo(resHistorico.dispositivo);
-    renderMapa(historicoCache, null);
+    renderMapa(historicoCache, paradas || []);
     renderStats(viagens || []);
     renderViagens(viagens || []);
   } catch (err) {
@@ -216,12 +226,16 @@ function renderInfoVeiculo(d) {
 }
 
 function limparMapa() {
+  pararRoutePlayer(true);
   [polylineRota, polylineDestaque, marcadorInicio, marcadorFim, marcadorAtual].forEach(l => { if (l) map.removeLayer(l); });
+  if (marcadoresParadaLayer) marcadoresParadaLayer.clearLayers();
   polylineRota = polylineDestaque = marcadorInicio = marcadorFim = marcadorAtual = null;
+  setRoutePlayerPath([]);
 }
 
-function renderMapa(posicoes) {
+function renderMapa(posicoes, paradas) {
   const validas = posicoes.filter(p => p.valida !== false && p.latitude && p.longitude);
+  setRoutePlayerPath(validas);
   if (!validas.length) { document.getElementById('mapa-sem-dados').style.display = 'flex'; return; }
   document.getElementById('mapa-sem-dados').style.display = 'none';
 
@@ -248,7 +262,156 @@ function renderMapa(posicoes) {
   marcadorFim = L.marker([ult.latitude, ult.longitude], { icon: iconeFim })
     .bindTooltip('Fim')
     .addTo(map);
+  renderMarcadoresParada(paradas || []);
   map.fitBounds(polylineRota.getBounds().pad(0.15));
+}
+
+function criarIconeParada() {
+  return L.divIcon({
+    className: 'stop-marker-icon',
+    html: '<div class="stop-pin"><span>P</span></div>',
+    iconSize: [30, 38],
+    iconAnchor: [15, 34],
+    popupAnchor: [0, -32],
+  });
+}
+
+function renderMarcadoresParada(paradas) {
+  if (!marcadoresParadaLayer) marcadoresParadaLayer = L.layerGroup().addTo(map);
+  marcadoresParadaLayer.clearLayers();
+  paradas.forEach(function (p) {
+    const lat = Number(p.latitude ?? p.lat);
+    const lng = Number(p.longitude ?? p.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const duracao = p.duracao != null ? p.duracao : Math.round((Number(p.duration) || 0) / 60000);
+    L.marker([lat, lng], { icon: criarIconeParada(), zIndexOffset: 700 })
+      .bindPopup(`<b>Parada</b><br>${fmtHora(p.inicio || p.startTime)} - ${fmtHora(p.fim || p.endTime)}<br>${fmtDur(duracao)}`)
+      .addTo(marcadoresParadaLayer);
+  });
+}
+
+function inicializarRoutePlayerControl() {
+  if (routePlayerControl) return;
+  const PlayerControl = L.Control.extend({
+    onAdd() {
+      const wrap = L.DomUtil.create('div', 'leaflet-control route-player-control');
+      wrap.innerHTML = `
+        <button type="button" data-route-player-toggle title="Iniciar trajeto" disabled><i class="fa fa-play"></i></button>
+        <select data-route-player-speed title="Velocidade">
+          <option value="900">1x</option>
+          <option value="450">2x</option>
+          <option value="220">4x</option>
+          <option value="110">8x</option>
+        </select>`;
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.disableScrollPropagation(wrap);
+      L.DomEvent.on(wrap.querySelector('[data-route-player-toggle]'), 'click', function (e) {
+        L.DomEvent.stop(e);
+        toggleRoutePlayer();
+      });
+      L.DomEvent.on(wrap.querySelector('[data-route-player-speed]'), 'change', function (e) {
+        L.DomEvent.stop(e);
+        if (routePlayerTimer) {
+          clearInterval(routePlayerTimer);
+          routePlayerTimer = setInterval(avancarRoutePlayer, getRoutePlayerSpeed());
+        }
+      });
+      return wrap;
+    },
+    onRemove() {},
+  });
+  routePlayerControl = new PlayerControl({ position: 'topleft' }).addTo(map);
+}
+
+function getRoutePlayerButton() {
+  return document.querySelector('.route-player-control [data-route-player-toggle]');
+}
+
+function getRoutePlayerSpeed() {
+  const sel = document.querySelector('.route-player-control [data-route-player-speed]');
+  return Number(sel?.value || 450);
+}
+
+function setRoutePlayerPath(posicoes) {
+  routePlayerPath = (posicoes || []).filter(p => p.latitude && p.longitude).map(p => ({
+    lat: Number(p.latitude),
+    lng: Number(p.longitude),
+    course: Number(p.course ?? p.attributes?.course ?? 0),
+    categoria: window._veiculoDetalhe?.categoria || 'carro',
+  }));
+  routePlayerIndex = 0;
+  const btn = getRoutePlayerButton();
+  if (btn) btn.disabled = routePlayerPath.length < 2;
+}
+
+function criarIconeRoutePlayer(ponto) {
+  const cat = ponto?.categoria || 'carro';
+  const course = ponto?.course || 0;
+  if (window.AL_ICONS_3D?.getSvgHtml) {
+    return L.divIcon({
+      html: window.AL_ICONS_3D.getSvgHtml(cat, '#f39c12', course),
+      className: 'route-player-marker',
+      iconSize: [window.AL_ICONS_3D.SIZE, window.AL_ICONS_3D.SIZE],
+      iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2],
+    });
+  }
+  return L.divIcon({
+    className: 'route-player-marker',
+    html: '<div class="route-player-fallback"><i class="fa fa-car"></i></div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
+function toggleRoutePlayer() {
+  if (routePlayerTimer) {
+    pararRoutePlayer(false);
+    return;
+  }
+  iniciarRoutePlayer();
+}
+
+function iniciarRoutePlayer() {
+  if (routePlayerPath.length < 2) return;
+  if (routePlayerIndex >= routePlayerPath.length - 1) routePlayerIndex = 0;
+  const ponto = routePlayerPath[routePlayerIndex];
+  if (!routePlayerMarker) {
+    routePlayerMarker = L.marker([ponto.lat, ponto.lng], { icon: criarIconeRoutePlayer(ponto), zIndexOffset: 900 }).addTo(map);
+  } else {
+    routePlayerMarker.setLatLng([ponto.lat, ponto.lng]).setIcon(criarIconeRoutePlayer(ponto));
+  }
+  const btn = getRoutePlayerButton();
+  if (btn) {
+    btn.classList.add('playing');
+    btn.title = 'Pausar trajeto';
+    btn.innerHTML = '<i class="fa fa-pause"></i>';
+  }
+  routePlayerTimer = setInterval(avancarRoutePlayer, getRoutePlayerSpeed());
+}
+
+function avancarRoutePlayer() {
+  routePlayerIndex += 1;
+  if (routePlayerIndex >= routePlayerPath.length) {
+    pararRoutePlayer(false);
+    return;
+  }
+  const ponto = routePlayerPath[routePlayerIndex];
+  routePlayerMarker.setLatLng([ponto.lat, ponto.lng]).setIcon(criarIconeRoutePlayer(ponto));
+}
+
+function pararRoutePlayer(removerMarcador) {
+  if (routePlayerTimer) clearInterval(routePlayerTimer);
+  routePlayerTimer = null;
+  const btn = getRoutePlayerButton();
+  if (btn) {
+    btn.classList.remove('playing');
+    btn.title = 'Iniciar trajeto';
+    btn.innerHTML = '<i class="fa fa-play"></i>';
+  }
+  if (removerMarcador && routePlayerMarker) {
+    map.removeLayer(routePlayerMarker);
+    routePlayerMarker = null;
+  }
 }
 
 function destacarViagem(inicio, fim) {
