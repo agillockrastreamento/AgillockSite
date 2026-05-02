@@ -606,7 +606,7 @@
   <script src="../js/auth-guard.js"></script>
   <script>
     (function () {
-      var user = AL.requireAuth(['ADMIN']);
+      var user = AL.requireAuth(['ADMIN', 'COLABORADOR']);
       if (!user) return;
       document.getElementById('user-nome').textContent  = user.nome || '—';
       document.getElementById('user-badge').textContent = user.role || '—';

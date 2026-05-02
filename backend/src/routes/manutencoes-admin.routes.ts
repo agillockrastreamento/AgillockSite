@@ -3,9 +3,11 @@
 import { Router } from 'express';
 import prisma from '../utils/prisma';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
 
 const router = Router();
 router.use(authMiddleware);
+router.use(requireMonitoramentoAccess);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

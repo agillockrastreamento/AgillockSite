@@ -242,6 +242,10 @@
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-excluir-contrato" checked /> Pode excluir contratos
                 </label>
+                <div class="perm-group-label" style="margin-top:8px;">Monitoramento</div>
+                <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" id="f-pode-acessar-monitoramento" /> Pode acessar a Área de Controle
+                </label>
                 <div class="perm-group-label" style="margin-top:8px;">Login do Cliente</div>
                 <label style="font-weight:400;margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
                   <input type="checkbox" id="f-pode-criar-login-cliente" checked /> Pode criar login de cliente
@@ -356,6 +360,7 @@
       if (c.podeCriarContrato)     icons.push('<span title="Criar contratos" style="color:#27ae60;"><i class="fa fa-file-text-o"></i></span>');
       if (c.podeEditarContrato)    icons.push('<span title="Editar contratos" style="color:#8e44ad;"><i class="fa fa-pencil-square-o"></i></span>');
       if (c.podeExcluirContrato)   icons.push('<span title="Excluir contratos" style="color:#c0392b;"><i class="fa fa-file-excel-o"></i></span>');
+      if (c.podeAcessarMonitoramento) icons.push('<span title="Área de Controle" style="color:#2980b9;"><i class="fa fa-tv"></i></span>');
       if (c.podeCriarLoginCliente)    icons.push('<span title="Criar login de cliente" style="color:#1abc9c;"><i class="fa fa-key"></i></span>');
       if (c.podeEditarLoginCliente)   icons.push('<span title="Editar login de cliente" style="color:#16a085;"><i class="fa fa-edit"></i></span>');
       if (c.podeInativarLoginCliente) icons.push('<span title="Inativar/ativar login de cliente" style="color:#d35400;"><i class="fa fa-lock"></i></span>');
@@ -428,6 +433,8 @@
       document.getElementById('f-pode-inativar-placa').checked         = true;
       document.getElementById('f-pode-criar-dispositivo').checked      = true;
       document.getElementById('f-pode-editar-dispositivo').checked     = true;
+      document.getElementById('f-pode-excluir-dispositivo').checked    = true;
+      document.getElementById('f-pode-inativar-dispositivo').checked   = true;
       document.getElementById('f-pode-desvincular-dispositivo').checked = true;
       document.getElementById('f-pode-baixa').checked                  = true;
       document.getElementById('f-pode-cancelar').checked          = true;
@@ -435,6 +442,11 @@
       document.getElementById('f-pode-criar-contrato').checked    = true;
       document.getElementById('f-pode-editar-contrato').checked   = true;
       document.getElementById('f-pode-excluir-contrato').checked  = true;
+      document.getElementById('f-pode-acessar-monitoramento').checked = false;
+      document.getElementById('f-pode-criar-login-cliente').checked = true;
+      document.getElementById('f-pode-editar-login-cliente').checked = true;
+      document.getElementById('f-pode-inativar-login-cliente').checked = false;
+      document.getElementById('f-pode-excluir-login-cliente').checked = false;
 
       if (id) {
         document.getElementById('modal-titulo').textContent = 'Editar Colaborador';
@@ -461,6 +473,7 @@
           document.getElementById('f-pode-criar-contrato').checked    = c.podeCriarContrato     !== false;
           document.getElementById('f-pode-editar-contrato').checked   = c.podeEditarContrato    !== false;
           document.getElementById('f-pode-excluir-contrato').checked  = c.podeExcluirContrato   !== false;
+          document.getElementById('f-pode-acessar-monitoramento').checked = c.podeAcessarMonitoramento === true;
           document.getElementById('f-pode-criar-login-cliente').checked    = c.podeCriarLoginCliente    !== false;
           document.getElementById('f-pode-editar-login-cliente').checked   = c.podeEditarLoginCliente   !== false;
           document.getElementById('f-pode-inativar-login-cliente').checked = c.podeInativarLoginCliente === true;
@@ -514,6 +527,7 @@
         podeCriarContrato:     document.getElementById('f-pode-criar-contrato').checked,
         podeEditarContrato:    document.getElementById('f-pode-editar-contrato').checked,
         podeExcluirContrato:   document.getElementById('f-pode-excluir-contrato').checked,
+        podeAcessarMonitoramento: document.getElementById('f-pode-acessar-monitoramento').checked,
         podeCriarLoginCliente:    document.getElementById('f-pode-criar-login-cliente').checked,
         podeEditarLoginCliente:   document.getElementById('f-pode-editar-login-cliente').checked,
         podeInativarLoginCliente: document.getElementById('f-pode-inativar-login-cliente').checked,

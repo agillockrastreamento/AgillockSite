@@ -47,6 +47,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       payload.podeCriarContrato      = user.podeCriarContrato;
       payload.podeEditarContrato     = user.podeEditarContrato;
       payload.podeExcluirContrato    = user.podeExcluirContrato;
+      payload.podeAcessarMonitoramento = user.podeAcessarMonitoramento;
       payload.podeCriarLoginCliente    = user.podeCriarLoginCliente;
       payload.podeEditarLoginCliente   = user.podeEditarLoginCliente;
       payload.podeInativarLoginCliente = user.podeInativarLoginCliente;

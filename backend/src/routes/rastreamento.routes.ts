@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
-import { requireRoles } from '../middleware/roles.middleware';
+import { requireMonitoramentoAccess, requireRoles } from '../middleware/roles.middleware';
 import { param, query } from '../utils/params';
 import { Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
@@ -38,6 +38,7 @@ import {
 
 const router = Router();
 router.use(authMiddleware);
+router.use(requireMonitoramentoAccess);
 
 type RelatorioPosicaoBasica = {
   id: number;
@@ -874,7 +875,7 @@ router.delete('/geocercas/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req
 // ── GET /api/rastreamento/logs ─────────────────────────────────────────────────
 // Retorna as últimas linhas do log do servidor Traccar.
 // O frontend pode filtrar por identificador/IMEI do dispositivo.
-router.get('/logs', requireRoles('ADMIN'), async (_req: AuthRequest, res: Response): Promise<void> => {
+router.get('/logs', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const logText = await traccarGetServerLog();
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');

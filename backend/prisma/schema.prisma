@@ -57,6 +57,7 @@ model User {
   podeCriarContrato   Boolean @default(true)
   podeEditarContrato  Boolean @default(true)
   podeExcluirContrato Boolean @default(true)
+  podeAcessarMonitoramento Boolean @default(false)
   // Permissões de login do cliente (padrão conservador para inativar/excluir)
   podeCriarLoginCliente    Boolean @default(true)
   podeEditarLoginCliente   Boolean @default(true)

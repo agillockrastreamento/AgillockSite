@@ -25,6 +25,7 @@ export interface JwtPayload {
   podeCriarContrato?: boolean;
   podeEditarContrato?: boolean;
   podeExcluirContrato?: boolean;
+  podeAcessarMonitoramento?: boolean;
   podeCriarLoginCliente?: boolean;
   podeEditarLoginCliente?: boolean;
   podeInativarLoginCliente?: boolean;

@@ -61,6 +61,29 @@
     return (user.exp * 1000) > Date.now();
   }
 
+  var MONITORAMENTO_PAGES = {
+    'rastreamento.html': true,
+    'rastreamento-detalhe.html': true,
+    'relatorio.html': true,
+    'comandos.html': true,
+    'motoristas.html': true,
+    'logs-dispositivos.html': true,
+    'manutencoes.html': true,
+    'notificacoes.html': true,
+    'geocerca.html': true,
+    'geocerca-form.html': true,
+  };
+
+  function isMonitoramentoPage() {
+    var parts = window.location.pathname.split('/');
+    var page = parts[parts.length - 1] || '';
+    return !!MONITORAMENTO_PAGES[page];
+  }
+
+  function podeAcessarMonitoramento(user) {
+    return !!(user && (user.role === 'ADMIN' || user.podeAcessarMonitoramento === true));
+  }
+
   // ─── Guard de rota ───────────────────────────────────────────────────────
 
   /**
@@ -76,6 +99,10 @@
     var user = getUser();
     if (roles && roles.length > 0 && roles.indexOf(user.role) === -1) {
       window.location.href = _adminBase + '/login.html';
+      return null;
+    }
+    if (user.role === 'COLABORADOR' && isMonitoramentoPage() && !podeAcessarMonitoramento(user)) {
+      window.location.href = _adminBase + '/colaborador/clientes.html';
       return null;
     }
     return user;
@@ -332,6 +359,7 @@
     setToken: setToken,
     getUser: getUser,
     isAuthenticated: isAuthenticated,
+    podeAcessarMonitoramento: podeAcessarMonitoramento,
     requireAuth: requireAuth,
     logout: logout,
     apiGet: apiGet,
@@ -373,6 +401,55 @@
     // ─── Sidebar collapse (minimizar) ──────────────────────────────────────
     var sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
+    var sidebarUser = getUser();
+
+    function areaControleHtml(prefix) {
+      return '' +
+        '<li class="sidebar-dropdown" data-monitoramento-menu="1">' +
+          '<a href="#" class="dropdown-toggle-link">' +
+            '<i class="fa fa-tv fa-fw"></i>' +
+            '<span style="flex:1">Área de Controle</span>' +
+            '<i class="fa fa-chevron-down sidebar-arrow"></i>' +
+          '</a>' +
+          '<ul class="sidebar-submenu">' +
+            '<li><a href="' + prefix + 'rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>' +
+            '<li><a href="' + prefix + 'relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>' +
+            '<li><a href="' + prefix + 'comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>' +
+            '<li><a href="' + prefix + 'motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>' +
+            '<li><a href="' + prefix + 'logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>' +
+            '<li><a href="' + prefix + 'manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>' +
+            '<li><a href="' + prefix + 'notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>' +
+            '<li><a href="' + prefix + 'geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>' +
+          '</ul>' +
+        '</li>';
+    }
+
+    if (sidebarUser && sidebarUser.role === 'COLABORADOR') {
+      var nav = sidebar.querySelector('.sidebar-nav');
+      var menuControle = nav ? Array.from(nav.querySelectorAll('.sidebar-dropdown')).find(function (li) {
+        return /Área de Controle|Area de Controle/i.test(li.textContent || '');
+      }) : null;
+      if (!podeAcessarMonitoramento(sidebarUser)) {
+        if (menuControle) menuControle.parentNode.removeChild(menuControle);
+      } else if (nav && !menuControle) {
+        var dispositivosItem = Array.from(nav.children).find(function (li) {
+          return /Dispositivos/i.test(li.textContent || '');
+        });
+        var wrap = document.createElement('div');
+        var prefix = window.location.pathname.indexOf('/colaborador/') !== -1 ? '../admin/' : '';
+        wrap.innerHTML = areaControleHtml(prefix);
+        var menu = wrap.firstChild;
+        if (dispositivosItem && dispositivosItem.nextSibling) nav.insertBefore(menu, dispositivosItem.nextSibling);
+        else nav.appendChild(menu);
+        var menuToggle = menu.querySelector('.dropdown-toggle-link');
+        if (menuToggle) {
+          menuToggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            menu.classList.toggle('open');
+          });
+        }
+      }
+    }
 
     var LOGO_FULL = '../img/logo_agillock_white_new.png';
     var LOGO_ICON = '../favicon.ico';

@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
-import { requireRoles } from '../middleware/roles.middleware';
+import { requireMonitoramentoAccess, requireRoles } from '../middleware/roles.middleware';
 import { param } from '../utils/params';
 import prisma from '../utils/prisma';
 import { 
@@ -14,6 +14,7 @@ import {
 
 const router = Router();
 router.use(authMiddleware);
+router.use(requireMonitoramentoAccess);
 
 // ── GET /api/motoristas ────────────────────────────────────────────────────────
 router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
@@ -61,7 +62,7 @@ router.get('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
 });
 
 // ── POST /api/motoristas ───────────────────────────────────────────────────────
-router.post('/', requireRoles('ADMIN'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const { nome, identificador, cnh, telefone, dispositivoId } = req.body as {
     nome: string; identificador?: string; cnh?: string; telefone?: string; dispositivoId?: string;
   };
@@ -121,7 +122,7 @@ router.post('/', requireRoles('ADMIN'), async (req: AuthRequest, res: Response):
 });
 
 // ── PUT /api/motoristas/:id ────────────────────────────────────────────────────
-router.put('/:id', requireRoles('ADMIN'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
   const { nome, identificador, cnh, telefone, ativo } = req.body as {
     nome?: string; identificador?: string; cnh?: string; telefone?: string; ativo?: boolean;
@@ -173,7 +174,7 @@ router.put('/:id', requireRoles('ADMIN'), async (req: AuthRequest, res: Response
 });
 
 // ── PATCH /api/motoristas/:id/status ──────────────────────────────────────────
-router.patch('/:id/status', requireRoles('ADMIN'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.patch('/:id/status', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
   const motorista = await prisma.motorista.findUnique({ where: { id } });
   if (!motorista) { res.status(404).json({ error: 'Motorista não encontrado.' }); return; }
@@ -185,7 +186,7 @@ router.patch('/:id/status', requireRoles('ADMIN'), async (req: AuthRequest, res:
 });
 
 // ── DELETE /api/motoristas/:id ─────────────────────────────────────────────────
-router.delete('/:id', requireRoles('ADMIN'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
   const motorista = await prisma.motorista.findUnique({ where: { id } });
   if (!motorista) { res.status(404).json({ error: 'Motorista não encontrado.' }); return; }

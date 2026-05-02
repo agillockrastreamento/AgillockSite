@@ -231,7 +231,7 @@
   <script src="../js/auth-guard.js"></script>
   <script>
   (function () {
-    var currentUser = AL.requireAuth(['ADMIN']);
+    var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
     if (!currentUser) return;
 
     document.getElementById('user-nome').textContent = currentUser.nome || '—';
