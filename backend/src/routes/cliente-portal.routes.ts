@@ -5,6 +5,7 @@ import multer from 'multer';
 import { clienteAuthMiddleware, requireResponsavel, ClienteRequest } from '../middleware/cliente-auth.middleware';
 import { query, param } from '../utils/params';
 import prisma from '../utils/prisma';
+import { Prisma } from '@prisma/client';
 import {
   traccarGetDevices,
   traccarGetDeviceByImei,
@@ -19,6 +20,7 @@ import {
   traccarSendCommand,
   traccarGetGeofences,
   traccarCreateGeofence,
+  traccarUpdateGeofence,
   traccarDeleteGeofence,
   traccarLinkGeofenceToDevice,
   traccarUnlinkGeofenceFromDevice,
@@ -1146,6 +1148,213 @@ router.delete('/rastreamento/cercas/:id', async (req: ClienteRequest, res: Respo
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Erro ao remover cerca: ${msg}` });
+  }
+});
+
+// ── GET /api/cliente/rastreamento/geocercas ───────────────────────────────────
+// Full-data list for the geocercas management page (only client's own)
+router.get('/rastreamento/geocercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const geocercas = await prisma.geocerca.findMany({
+    where: { origemTipo: 'CLIENTE', clienteId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      dispositivos: {
+        include: { dispositivo: { select: { id: true, nome: true, placa: true, identificador: true } } },
+      },
+    },
+  });
+
+  res.json(geocercas.map(g => ({
+    id: g.id,
+    traccarId: g.traccarId,
+    nome: g.nome,
+    descricao: g.descricao,
+    area: g.area,
+    tipo: g.tipo,
+    notificarCliente: g.notificarCliente,
+    sistemasNotif: g.sistemasNotif,
+    dataInicio: g.dataInicio,
+    ativa: g.ativa,
+    createdAt: g.createdAt,
+    dispositivos: g.dispositivos.map(d => d.dispositivo),
+  })));
+});
+
+// ── GET /api/cliente/rastreamento/geocercas/:id ───────────────────────────────
+router.get('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const id = param(req, 'id');
+  const g = await prisma.geocerca.findFirst({
+    where: { id, origemTipo: 'CLIENTE', clienteId },
+    include: {
+      dispositivos: {
+        include: { dispositivo: { select: { id: true, nome: true, placa: true, identificador: true } } },
+      },
+    },
+  });
+  if (!g) { res.status(404).json({ error: 'Geocerca não encontrada.' }); return; }
+
+  res.json({
+    id: g.id,
+    traccarId: g.traccarId,
+    nome: g.nome,
+    descricao: g.descricao,
+    area: g.area,
+    tipo: g.tipo,
+    notificarCliente: g.notificarCliente,
+    sistemasNotif: g.sistemasNotif,
+    dataInicio: g.dataInicio,
+    ativa: g.ativa,
+    createdAt: g.createdAt,
+    dispositivos: g.dispositivos.map(d => d.dispositivo),
+  });
+});
+
+// ── POST /api/cliente/rastreamento/geocercas ──────────────────────────────────
+router.post('/rastreamento/geocercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const { nome, descricao, area, tipo, dispositivos: dispositivoIds, notificarCliente, sistemasNotif, dataInicio } =
+    req.body as {
+      nome: string; descricao?: string; area: string; tipo?: string;
+      dispositivos?: string[]; notificarCliente?: boolean;
+      sistemasNotif?: Record<string, boolean>; dataInicio?: string;
+    };
+
+  if (!nome || !area) { res.status(400).json({ error: 'Campos "nome" e "area" são obrigatórios.' }); return; }
+
+  try {
+    const cerca = await traccarCreateGeofence(nome, area);
+    if (descricao) await traccarUpdateGeofence(cerca.id, nome, area, descricao).catch(() => {});
+
+    const tipoForma = tipo || (area.toUpperCase().startsWith('CIRCLE') ? 'circulo' :
+                      area.toUpperCase().startsWith('LINESTRING') ? 'linha' : 'poligono');
+
+    const geocerca = await prisma.geocerca.create({
+      data: {
+        traccarId: cerca.id, nome, area,
+        descricao: descricao ?? null,
+        tipo: tipoForma,
+        origemTipo: 'CLIENTE', clienteId,
+        visivelCliente: false,
+        notificarCliente: notificarCliente ?? false,
+        sistemasNotif: sistemasNotif ?? Prisma.JsonNull,
+        dataInicio: dataInicio ? new Date(dataInicio) : null,
+      },
+    });
+
+    // Vincular dispositivos
+    if (Array.isArray(dispositivoIds) && dispositivoIds.length) {
+      for (const dispositivoId of dispositivoIds) {
+        const dispositivo = await prisma.dispositivo.findFirst({
+          where: { id: dispositivoId, OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] },
+          select: { id: true, identificador: true },
+        });
+        if (!dispositivo) continue;
+        const td = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+        if (td) await traccarLinkGeofenceToDevice(cerca.id, td.id).catch(() => {});
+        await prisma.geocercaDispositivo.create({ data: { geocercaId: geocerca.id, dispositivoId } }).catch(() => {});
+      }
+    }
+
+    res.json({ id: geocerca.id, traccarId: geocerca.traccarId });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao criar geocerca: ${msg}` });
+  }
+});
+
+// ── PUT /api/cliente/rastreamento/geocercas/:id ───────────────────────────────
+router.put('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const id = param(req, 'id');
+  const geocerca = await prisma.geocerca.findFirst({ where: { id, origemTipo: 'CLIENTE', clienteId } });
+  if (!geocerca) { res.status(404).json({ error: 'Geocerca não encontrada.' }); return; }
+
+  const { nome, descricao, area, tipo, dispositivos: dispositivoIds, notificarCliente, sistemasNotif, dataInicio, ativa } =
+    req.body as {
+      nome?: string; descricao?: string; area?: string; tipo?: string;
+      dispositivos?: string[]; notificarCliente?: boolean;
+      sistemasNotif?: Record<string, boolean>; dataInicio?: string; ativa?: boolean;
+    };
+
+  try {
+    const novoNome = nome ?? geocerca.nome;
+    const novaArea = area ?? geocerca.area;
+
+    await traccarUpdateGeofence(geocerca.traccarId, novoNome, novaArea, descricao ?? geocerca.descricao ?? undefined);
+
+    const tipoForma = tipo ?? (novaArea.toUpperCase().startsWith('CIRCLE') ? 'circulo' :
+                      novaArea.toUpperCase().startsWith('LINESTRING') ? 'linha' : 'poligono');
+
+    await prisma.geocerca.update({
+      where: { id },
+      data: {
+        nome: novoNome, area: novaArea,
+        descricao: descricao !== undefined ? (descricao || null) : geocerca.descricao,
+        tipo: tipoForma,
+        notificarCliente: notificarCliente ?? geocerca.notificarCliente,
+        sistemasNotif: sistemasNotif !== undefined ? (sistemasNotif ?? Prisma.JsonNull) : (geocerca.sistemasNotif ?? Prisma.JsonNull),
+        dataInicio: dataInicio !== undefined ? (dataInicio ? new Date(dataInicio) : null) : geocerca.dataInicio,
+        ativa: ativa !== undefined ? ativa : geocerca.ativa,
+      },
+    });
+
+    // Reconciliar dispositivos
+    if (Array.isArray(dispositivoIds)) {
+      const atuais = await prisma.geocercaDispositivo.findMany({ where: { geocercaId: id }, select: { dispositivoId: true } });
+      const idsAtuais = new Set(atuais.map(d => d.dispositivoId));
+      const idsNovos = new Set(dispositivoIds);
+
+      for (const dispositivoId of idsAtuais) {
+        if (!idsNovos.has(dispositivoId)) {
+          const d = await prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { identificador: true } });
+          if (d) { const td = await traccarGetDeviceByImei(d.identificador).catch(() => null); if (td) await traccarUnlinkGeofenceFromDevice(geocerca.traccarId, td.id).catch(() => {}); }
+          await prisma.geocercaDispositivo.delete({ where: { geocercaId_dispositivoId: { geocercaId: id, dispositivoId } } }).catch(() => {});
+        }
+      }
+      for (const dispositivoId of idsNovos) {
+        if (!idsAtuais.has(dispositivoId)) {
+          const d = await prisma.dispositivo.findFirst({ where: { id: dispositivoId, OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] }, select: { identificador: true } });
+          if (!d) continue;
+          const td = await traccarGetDeviceByImei(d.identificador).catch(() => null);
+          if (td) await traccarLinkGeofenceToDevice(geocerca.traccarId, td.id).catch(() => {});
+          await prisma.geocercaDispositivo.create({ data: { geocercaId: id, dispositivoId } }).catch(() => {});
+        }
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao atualizar geocerca: ${msg}` });
+  }
+});
+
+// ── DELETE /api/cliente/rastreamento/geocercas/:id ────────────────────────────
+router.delete('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const id = param(req, 'id');
+  const geocerca = await prisma.geocerca.findFirst({ where: { id, origemTipo: 'CLIENTE', clienteId } });
+  if (!geocerca) { res.status(403).json({ error: 'Não autorizado a remover esta geocerca.' }); return; }
+
+  try {
+    await traccarDeleteGeofence(geocerca.traccarId);
+    await prisma.geocerca.delete({ where: { id } });
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Erro ao remover geocerca: ${msg}` });
   }
 });
 

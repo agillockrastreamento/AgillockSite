@@ -1114,6 +1114,11 @@ function processarMensagemWs(msg) {
       // Trava de segurança: só processa o evento se o veículo estiver no mapa deste cliente
       if (!did || !veiculosMap[did]) return;
 
+      // Filtrar eventos de geofence: mostrar só cercas que o cliente tem permissão
+      if ((e.type === 'geofenceEnter' || e.type === 'geofenceExit') && e.geofenceId) {
+        if (!_cercasPermitidas.has(e.geofenceId)) return;
+      }
+
       const pos = veiculosMap[did]?.posicao;
       adicionarEvento({
         dispositivoId: did || null,

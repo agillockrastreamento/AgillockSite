@@ -37,6 +37,8 @@ const _alarmeBadges = {};
 // Cercas: geofenceId → { camada: L.Layer, dados: {...} }
 const _cercasLayer = {};
 let _cercasCarregadas = false;
+// IDs Traccar das cercas que o admin tem permissão de ver (filtra eventos WS)
+let _cercasPermitidas = new Set();
 
 // Modo desenho de cerca
 let _modoDesenho = null; // null | { dispositivoId, etapa: 'centro'|'confirmar', circle, center }
@@ -1322,6 +1324,7 @@ async function carregarCercas() {
   try {
     const cercas = await window.AL.apiGet('/api/rastreamento/cercas');
     cercas.forEach(function (c) {
+      if (c.id) _cercasPermitidas.add(c.id); // c.id = traccarId numérico
       if (_cercasLayer[c.id]) return;
       const camada = _criarCamadaCerca(c);
       if (camada) {

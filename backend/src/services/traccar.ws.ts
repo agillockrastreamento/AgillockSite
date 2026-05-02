@@ -301,6 +301,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
             tipoLabel: EVENT_TYPE_LABELS.geofenceEnter ?? 'geofenceEnter',
             serverTime: eventTime,
             positionId,
+            geofenceId: parseInt(geofenceKey, 10),
           });
         }
       }
