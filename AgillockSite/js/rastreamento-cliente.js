@@ -160,6 +160,7 @@ document.addEventListener('DOMContentLoaded', function () {
   verificarAcesso().then(function (bloqueado) {
     if (bloqueado) return;
     inicializarMapa();
+    _aplicarPreferenciasOverlay();
     inicializarEventosPanel();
     inicializarBarraVeiculos();
     carregarPosicoes();
@@ -693,7 +694,12 @@ function inicializarMapa() {
   map.on('baselayerchange', function () {
     _atualizarControleTipoGoogle();
   });
-  map.on('click', function () { if (!_modoDesenho) _fecharSpider(); });
+  map.on('click', function () {
+    if (!_modoDesenho) {
+      _fecharSpider();
+      if (ativoId) fecharCardDispositivo(true);
+    }
+  });
   map.on('zoomend', function () { _fecharSpider(); if (!modoFoco) renderMarcadores(); });
 
   requestAnimationFrame(function () {
@@ -806,6 +812,32 @@ function _atualizarControleTipoGoogle() {
   });
 }
 
+// ── Persistência de preferências de overlay ───────────────────────────────────
+
+function _salvarPreferenciasOverlay() {
+  try {
+    localStorage.setItem('al-overlay-pref', JSON.stringify({
+      labels: _overlay.labels, cercas: _overlay.cercas,
+      rastro: _overlay.rastro, alarmes: _overlay.alarmes,
+    }));
+  } catch(e) {}
+}
+
+function _aplicarPreferenciasOverlay() {
+  try {
+    const pref = JSON.parse(localStorage.getItem('al-overlay-pref') || '{}');
+    if (pref.labels  !== undefined) { _overlay.labels  = pref.labels;  _mostrarPopup = _overlay.labels; }
+    if (pref.cercas  !== undefined)   _overlay.cercas  = pref.cercas;
+    if (pref.rastro  !== undefined)   _overlay.rastro  = pref.rastro;
+    if (pref.alarmes !== undefined)   _overlay.alarmes = pref.alarmes;
+    document.getElementById('ml-labels') ?.classList.toggle('ativo', _overlay.labels);
+    document.getElementById('ml-cercas') ?.classList.toggle('ativo', _overlay.cercas);
+    document.getElementById('ml-rastro') ?.classList.toggle('ativo', _overlay.rastro);
+    document.getElementById('ml-alarmes')?.classList.toggle('ativo', _overlay.alarmes);
+    if (_overlay.cercas) carregarCercas().then(mostrarCercas);
+  } catch(e) {}
+}
+
 // ── Botões de camadas ─────────────────────────────────────────────────────────
 
 function _adicionarBotoesCamadas() {
@@ -862,6 +894,7 @@ function _adicionarBotoesCamadas() {
     _overlay.alarmes = !_overlay.alarmes;
     this.classList.toggle('ativo', _overlay.alarmes);
     _atualizarAlarmeBadges();
+    _salvarPreferenciasOverlay();
   });
 
   document.getElementById('ml-dispositivos').addEventListener('click', function () {
@@ -873,18 +906,21 @@ function _adicionarBotoesCamadas() {
     this.classList.toggle('ativo', _overlay.labels);
     _mostrarPopup = _overlay.labels;
     _atualizarBindingsPopup();
+    _salvarPreferenciasOverlay();
   });
 
   document.getElementById('ml-cercas').addEventListener('click', function () {
     _overlay.cercas = !_overlay.cercas;
     this.classList.toggle('ativo', _overlay.cercas);
     if (_overlay.cercas) carregarCercas().then(mostrarCercas); else ocultarCercas();
+    _salvarPreferenciasOverlay();
   });
 
   document.getElementById('ml-rastro').addEventListener('click', function () {
     _overlay.rastro = !_overlay.rastro;
     this.classList.toggle('ativo', _overlay.rastro);
     if (_overlay.rastro) _carregarRastros(); else _limparRastros();
+    _salvarPreferenciasOverlay();
   });
 }
 
