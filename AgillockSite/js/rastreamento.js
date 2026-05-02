@@ -132,6 +132,8 @@ function _isMobileTracking() { return window.innerWidth <= 700; }
 let _trackingDrawerAberta = false;
 let _trackingDrawerDragY = null;
 let _trackingDrawerStartHeight = null;
+let _trackingDrawerGlobalReady = false;
+let _trackingDrawerMoved = false;
 
 function _abrirTrackingDrawer() {
   const card = document.getElementById('device-detail-card');
@@ -154,26 +156,32 @@ function _prepararTrackingDrawer() {
   const handle = document.getElementById('tracking-drawer-handle');
   if (!card || !handle || handle.dataset.drawerReady === '1') return;
   handle.dataset.drawerReady = '1';
+  const dragTargets = [handle, card.querySelector('.dcard-header')].filter(Boolean);
 
-  handle.addEventListener('click', function () {
+  function toggleDrawer() {
     if (!_isMobileTracking()) return;
+    if (_trackingDrawerMoved) {
+      _trackingDrawerMoved = false;
+      return;
+    }
     if (_trackingDrawerAberta) _fecharTrackingDrawer();
     else _abrirTrackingDrawer();
-  });
-  handle.addEventListener('touchstart', function (e) {
+  }
+  function startDrag(clientY) {
     if (!_isMobileTracking()) return;
-    _trackingDrawerDragY = e.touches[0].clientY;
+    _trackingDrawerDragY = clientY;
     _trackingDrawerStartHeight = card.getBoundingClientRect().height;
+    _trackingDrawerMoved = false;
     card.style.transition = 'none';
-  }, { passive: true });
-  handle.addEventListener('touchmove', function (e) {
+  }
+  function moveDrag(clientY) {
     if (_trackingDrawerDragY === null || !_isMobileTracking()) return;
-    e.preventDefault();
-    const dy = _trackingDrawerDragY - e.touches[0].clientY;
+    const dy = _trackingDrawerDragY - clientY;
+    if (Math.abs(dy) > 8) _trackingDrawerMoved = true;
     const nextHeight = Math.min(Math.max(_trackingDrawerStartHeight + dy, window.innerHeight * 0.22), window.innerHeight * 0.82);
     card.style.height = `${nextHeight}px`;
-  }, { passive: false });
-  handle.addEventListener('touchend', function () {
+  }
+  function endDrag() {
     if (_trackingDrawerDragY === null || !_isMobileTracking()) return;
     card.style.transition = '';
     const h = card.getBoundingClientRect().height;
@@ -181,7 +189,45 @@ function _prepararTrackingDrawer() {
     else _fecharTrackingDrawer();
     card.style.height = '';
     _trackingDrawerDragY = null;
-  }, { passive: true });
+  }
+
+  dragTargets.forEach(function (target) {
+    target.addEventListener('click', toggleDrawer);
+    target.addEventListener('touchstart', function (e) {
+      startDrag(e.touches[0].clientY);
+    }, { passive: true });
+    target.addEventListener('touchmove', function (e) {
+      if (_trackingDrawerDragY === null || !_isMobileTracking()) return;
+      e.preventDefault();
+      moveDrag(e.touches[0].clientY);
+    }, { passive: false });
+    target.addEventListener('touchend', endDrag, { passive: true });
+    target.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'touch') return;
+      startDrag(e.clientY);
+    });
+  });
+  if (!_trackingDrawerGlobalReady) {
+    _trackingDrawerGlobalReady = true;
+    document.addEventListener('pointermove', function (e) {
+      if (_trackingDrawerDragY === null || !_isMobileTracking()) return;
+      moveDrag(e.clientY);
+    });
+    document.addEventListener('pointerup', endDrag);
+  }
+}
+
+function _instalarMobileOutsideClick() {
+  document.addEventListener('click', function (e) {
+    const busca = document.getElementById('filtro');
+    const buscaWrap = document.getElementById('topbar-busca-wrap');
+    if (busca && buscaWrap && !buscaWrap.contains(e.target)) busca.blur();
+    if (!_isMobileTracking() || !ativoId) return;
+    const card = document.getElementById('device-detail-card');
+    if (!card || card.style.display === 'none') return;
+    const ignorar = e.target.closest('#device-detail-card, .leaflet-control, .admin-topbar, #eventos-panel, #dlg-cerca, .modal, .modal-backdrop');
+    if (!ignorar) fecharCardDispositivo(true);
+  }, true);
 }
 
 function _ajustarAlturaCardDispositivo() {
@@ -300,6 +346,7 @@ document.addEventListener('DOMContentLoaded', function () {
   _aplicarPreferenciasOverlay();
   inicializarEventosPanel();
   carregarPosicoes();
+  _instalarMobileOutsideClick();
   document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
 
   new MutationObserver(function () {
@@ -806,14 +853,16 @@ function inicializarMapa() {
 }
 
 function _criarCamadasGoogle() {
-  const scale = window.devicePixelRatio >= 2 ? 2 : 1;
+  const scale = window.devicePixelRatio > 1 ? 2 : 1;
   const opts = {
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     attribution: 'Map data © Google',
     maxNativeZoom: 20,
     maxZoom: 21,
-    tileSize: scale === 2 ? 512 : 256,
-    zoomOffset: scale === 2 ? -1 : 0,
+    tileSize: 256,
+    zoomOffset: 0,
+    updateWhenIdle: false,
+    updateWhenZooming: false,
   };
   return Object.keys(GOOGLE_MAP_TYPES).reduce(function (acc, tipo) {
     acc[tipo] = L.tileLayer(
