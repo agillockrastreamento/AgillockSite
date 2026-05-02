@@ -532,7 +532,7 @@ function getRoutePlayerSpeed() {
 }
 
 function setRoutePlayerPath(posicoes) {
-  routePlayerPath = (posicoes || [])
+  routePlayerPath = compactarRoutePlayerPath((posicoes || [])
     .filter(p => p.valida !== false && p.latitude && p.longitude)
     .sort((a, b) => new Date(a.fixTime || a.deviceTime || 0).getTime() - new Date(b.fixTime || b.deviceTime || 0).getTime())
     .map(p => {
@@ -544,10 +544,30 @@ function setRoutePlayerPath(posicoes) {
         time: p.fixTime || p.deviceTime || p.hora || p.serverTime || null,
         categoria: dInfo.categoria || 'carro',
       };
-    });
+    }));
   routePlayerIndex = 0;
   const btn = getRoutePlayerButton();
   if (btn) btn.disabled = routePlayerPath.length < 2;
+}
+
+function distanciaMetros(a, b) {
+  const r = 6371000;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const lat1 = a.lat * Math.PI / 180;
+  const lat2 = b.lat * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * r * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function compactarRoutePlayerPath(pontos) {
+  const filtrados = [];
+  pontos.forEach(function (ponto) {
+    const anterior = filtrados[filtrados.length - 1];
+    if (!anterior || distanciaMetros(anterior, ponto) >= 10) filtrados.push(ponto);
+    else anterior.time = ponto.time || anterior.time;
+  });
+  return filtrados;
 }
 
 function criarIconeRoutePlayer(ponto) {
@@ -608,6 +628,10 @@ function avancarRoutePlayer() {
   const ponto = routePlayerPath[routePlayerIndex];
   routePlayerMarker.setLatLng([ponto.lat, ponto.lng]).setIcon(criarIconeRoutePlayer(ponto));
   routePlayerMarker.setTooltipContent(fmtHora(ponto.time));
+  if (routePlayerIndex >= routePlayerPath.length - 1) {
+    pararRoutePlayer(false);
+    return;
+  }
   animarProximoRoutePlayer();
 }
 
@@ -627,13 +651,14 @@ function animarProximoRoutePlayer() {
   const inicio = performance.now();
   const duracao = getRoutePlayerSpeed();
   const bearing = destino.course || calcularBearing(origem, destino);
+  routePlayerMarker.setIcon(criarIconeRoutePlayer({ ...destino, course: bearing }));
+  routePlayerMarker.setTooltipContent(fmtHora(destino.time));
   const animar = function (agora) {
     if (!routePlayerTimer) return;
     const progresso = Math.min((agora - inicio) / duracao, 1);
     const lat = origem.lat + (destino.lat - origem.lat) * progresso;
     const lng = origem.lng + (destino.lng - origem.lng) * progresso;
-    routePlayerMarker.setLatLng([lat, lng]).setIcon(criarIconeRoutePlayer({ ...destino, course: bearing }));
-    routePlayerMarker.setTooltipContent(fmtHora(destino.time));
+    routePlayerMarker.setLatLng([lat, lng]);
     if (progresso < 1) {
       routePlayerFrame = requestAnimationFrame(animar);
     } else {
