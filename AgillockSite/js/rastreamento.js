@@ -2383,7 +2383,7 @@ function _buildManutencoesAdminHtml(dispositivoId) {
 
   return `
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
-      <div class="dcard-section-title-title">MANUTENCOES</div>
+      <div class="dcard-section-title">Manutenções</div>
       ${visiveis.map(r => {
         const kmRestante = Math.round(r.intervaloKm - (odoKm - r.kmBase));
         const atrasada = kmRestante < 0;
@@ -2392,7 +2392,7 @@ function _buildManutencoesAdminHtml(dispositivoId) {
         const texto = atrasada
           ? `ultrapassou ${kmAbs.toLocaleString('pt-BR')} km da(o) ${esc(r.titulo)}`
           : `falta ${kmAbs.toLocaleString('pt-BR')} km para ${esc(r.titulo)}`;
-        return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-wrench" style="flex-shrink:0;"></i>${texto}<button onclick="abrirModalFeitoCardAdmin('${r.id}','${String(r.titulo || '').replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Confirmar manutencao"><i class="fa fa-check"></i> Confirmar</button></span>`;
+        return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-wrench" style="flex-shrink:0;"></i>${texto}<button onclick="abrirModalFeitoCardAdmin('${r.id}','${String(r.titulo || '').replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Confirmar manutencao"><i class="fa fa-check"></i></button></span>`;
       }).join('<br>')}
     </div>`;
 }
