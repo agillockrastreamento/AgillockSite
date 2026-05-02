@@ -75,26 +75,26 @@ window.AL_ICONS_3D = {
     // 1. CARROS E DERIVADOS (Detalhados)
     // ==========================================
     carro: (cor, grad) => `
-      <!-- Rodas -->
-      <rect x="-18" y="-22" width="4" height="12" rx="2" fill="#111" />
-      <rect x="14" y="-22" width="4" height="12" rx="2" fill="#111" />
-      <rect x="-18" y="15" width="4" height="12" rx="2" fill="#111" />
-      <rect x="14" y="15" width="4" height="12" rx="2" fill="#111" />
+      <ellipse cx="0" cy="4" rx="22" ry="41" fill="#000" opacity="0.16" />
+      <rect x="-20" y="-24" width="6" height="17" rx="3" fill="#15191f" />
+      <rect x="14" y="-24" width="6" height="17" rx="3" fill="#15191f" />
+      <rect x="-20" y="13" width="6" height="18" rx="3" fill="#15191f" />
+      <rect x="14" y="13" width="6" height="18" rx="3" fill="#15191f" />
       <!-- Corpo principal -->
-      <path d="M-15,-36 Q0,-40 15,-36 L16,30 Q0,36 -16,30 Z" fill="${cor}" />
-      <path d="M-15,-36 Q0,-40 15,-36 L16,30 Q0,36 -16,30 Z" fill="${grad}" opacity="0.6" />
+      <path d="M-12,-39 Q0,-44 12,-39 Q16,-30 16,-9 L15,23 Q10,35 0,37 Q-10,35 -15,23 L-16,-9 Q-16,-30 -12,-39 Z" fill="${cor}" />
+      <path d="M-12,-39 Q0,-44 12,-39 Q16,-30 16,-9 L15,23 Q10,35 0,37 Q-10,35 -15,23 L-16,-9 Q-16,-30 -12,-39 Z" fill="${grad}" opacity="0.55" />
       <!-- Para-brisa e Teto -->
-      <path d="M-12,-18 Q0,-22 12,-18 L13.5,3 Q0,0 -13.5,3 Z" fill="url(#grad-glass)" />
-      <rect x="-10" y="-3" width="20" height="20" rx="3" fill="#fff" opacity="0.1" />
-      <path d="M-11,21 Q0,17 11,21 L10,27 Q0,30 -10,27 Z" fill="url(#grad-glass)" />
+      <path d="M-9,-29 Q0,-34 9,-29 L12,-17 Q0,-20 -12,-17 Z" fill="url(#grad-glass)" />
+      <path d="M-12,-14 Q0,-17 12,-14 L12,5 Q0,9 -12,5 Z" fill="${cor}" opacity="0.34" />
+      <path d="M-11,8 Q0,4 11,8 L9,24 Q0,27 -9,24 Z" fill="url(#grad-glass)" />
       <!-- Retrovisores -->
-      <path d="M-15,-10 L-19,-8 L-18,-4 L-15,-6 Z" fill="${cor}" />
-      <path d="M15,-10 L19,-8 L18,-4 L15,-6 Z" fill="${cor}" />
+      <path d="M-15,-13 L-22,-10 L-21,-5 L-15,-7 Z" fill="#1b2026" />
+      <path d="M15,-13 L22,-10 L21,-5 L15,-7 Z" fill="#1b2026" />
       <!-- Faróis e Lanternas -->
-      <rect x="-13" y="-38" width="7" height="3" rx="1" fill="#fff" opacity="0.9" />
-      <rect x="6" y="-38" width="7" height="3" rx="1" fill="#fff" opacity="0.9" />
-      <rect x="-14" y="31" width="6" height="2" fill="red" opacity="0.8" />
-      <rect x="8" y="31" width="6" height="2" fill="red" opacity="0.8" />
+      <path d="M-13,-39 L-6,-41" stroke="#fff" stroke-width="3.2" opacity="0.9" stroke-linecap="round" />
+      <path d="M6,-41 L13,-39" stroke="#fff" stroke-width="3.2" opacity="0.9" stroke-linecap="round" />
+      <rect x="-13" y="32" width="7" height="3" rx="1.5" fill="#e53935" opacity="0.95" />
+      <rect x="6" y="32" width="7" height="3" rx="1.5" fill="#e53935" opacity="0.95" />
     `,
     carro_executivo: (cor, grad) => window.AL_ICONS_3D.shapes.carro('#2c3e50', 'url(#grad-dark)') + `
       <rect x="-8" y="-3" width="16" height="20" fill="#000" opacity="0.3" />
@@ -128,15 +128,15 @@ window.AL_ICONS_3D = {
     // 2. PICKUPS E VANS
     // ==========================================
     carro_assistencia: (cor, grad) => `
-      <!-- Rodas Robustas de Pickup All-Terrain -->
-      <rect x="-19" y="-26" width="6" height="15" rx="2" fill="#111" />
-      <rect x="13" y="-26" width="6" height="15" rx="2" fill="#111" />
-      <rect x="-19" y="16" width="6" height="15" rx="2" fill="#111" />
-      <rect x="13" y="16" width="6" height="15" rx="2" fill="#111" />
+      <ellipse cx="0" cy="6" rx="24" ry="43" fill="#000" opacity="0.17" />
+      <rect x="-22" y="-27" width="8" height="18" rx="3" fill="#12161b" />
+      <rect x="14" y="-27" width="8" height="18" rx="3" fill="#12161b" />
+      <rect x="-22" y="18" width="8" height="20" rx="3" fill="#12161b" />
+      <rect x="14" y="18" width="8" height="20" rx="3" fill="#12161b" />
       
       <!-- Estribos Laterais (Running Boards) -->
-      <rect x="-18" y="-8" width="3" height="20" rx="1" fill="#333" />
-      <rect x="15" y="-8" width="3" height="20" rx="1" fill="#333" />
+      <rect x="-19" y="-5" width="4" height="22" rx="2" fill="#20262d" />
+      <rect x="15" y="-5" width="4" height="22" rx="2" fill="#20262d" />
       
       <!-- Capô Frontal Longo (Estilo Hilux/Amarok) -->
       <path d="M-15,-36 Q0,-41 15,-36 L17,-16 L-17,-16 Z" fill="${cor}" />
@@ -171,8 +171,8 @@ window.AL_ICONS_3D = {
       <path d="M-16,9 L16,9 L15,38 L-15,38 Z" fill="url(#grad-metal)" opacity="0.4" />
       
       <!-- Interior da Caçamba com ranhuras mais realistas -->
-      <rect x="-13" y="11" width="26" height="25" rx="1" fill="#151515" />
-      <path d="M-10,13 V34 M-5,13 V34 M0,13 V34 M5,13 V34 M10,13 V34" stroke="#2a2a2a" stroke-width="1.5" />
+      <rect x="-13" y="11" width="26" height="25" rx="2" fill="#161b20" />
+      <path d="M-10,13 V34 M-5,13 V34 M0,13 V34 M5,13 V34 M10,13 V34" stroke="#313840" stroke-width="1.4" />
       
       <!-- Santantônio (Barra tubular 3D) -->
       <path d="M-15,8 L15,8 L13,13 L-13,13 Z" fill="url(#grad-metal)" opacity="0.9" />
@@ -199,6 +199,7 @@ window.AL_ICONS_3D = {
       <rect x="-12" y="38" width="24" height="4" rx="1" fill="#1a1a1a" />
       <rect x="-6" y="38" width="12" height="5" rx="1" fill="#222" /> <!-- Degrau do para-choque -->
     `,
+    pickup: (cor, grad) => window.AL_ICONS_3D.shapes.carro_assistencia(cor, grad),
     van: (cor, grad) => `
       <rect x="-18" y="-28" width="4" height="14" rx="2" fill="#111" />
       <rect x="14" y="-28" width="4" height="14" rx="2" fill="#111" />
@@ -228,50 +229,48 @@ window.AL_ICONS_3D = {
     // ==========================================
     motocicleta_cruzada: (cor, grad) => `
       <!-- Rodas Slick Larga (MotoGP) -->
-      <rect x="-3.5" y="-38" width="7" height="16" rx="3" fill="#111" />
-      <rect x="-5.5" y="22" width="11" height="18" rx="4" fill="#111" />
+      <ellipse cx="0" cy="4" rx="15" ry="40" fill="#000" opacity="0.16" />
+      <rect x="-4" y="-40" width="8" height="17" rx="4" fill="#11161b" />
+      <rect x="-5" y="24" width="10" height="18" rx="5" fill="#11161b" />
       
       <!-- Para-lama dianteiro aerodinâmico -->
-      <path d="M-4.5,-29 Q0,-32 4.5,-29 L4.5,-22 Q0,-24 -4.5,-22 Z" fill="${cor}" />
+      <path d="M-5,-32 Q0,-37 5,-32 L5,-24 Q0,-27 -5,-24 Z" fill="${cor}" />
       
       <!-- Asas Aerodinâmicas Laterais (Winglets MotoGP) -->
-      <path d="M-12,-22 L-22,-18 L-14,-12 Z" fill="#1a1a1a" />
-      <path d="M12,-22 L22,-18 L14,-12 Z" fill="#1a1a1a" />
+      <path d="M-13,-24 L-23,-19 L-14,-13 Z" fill="#171c22" />
+      <path d="M13,-24 L23,-19 L14,-13 Z" fill="#171c22" />
       
       <!-- Carenagem Frontal Larga e Agressiva -->
-      <path d="M-12,-25 Q0,-38 12,-25 L15,-8 Q0,-10 -15,-8 Z" fill="${cor}" />
-      <path d="M-12,-25 Q0,-38 12,-25 L15,-8 Q0,-10 -15,-8 Z" fill="${grad}" opacity="0.8" />
+      <path d="M-11,-27 Q0,-42 11,-27 L15,-9 Q0,-12 -15,-9 Z" fill="${cor}" />
+      <path d="M-11,-27 Q0,-42 11,-27 L15,-9 Q0,-12 -15,-9 Z" fill="${grad}" opacity="0.76" />
       
       <!-- Para-brisa (Bolha Racing) -->
-      <path d="M-7,-24 Q0,-32 7,-24 L8,-16 Q0,-18 -8,-16 Z" fill="url(#grad-glass)" opacity="0.9" />
+      <path d="M-6,-27 Q0,-35 6,-27 L7,-18 Q0,-20 -7,-18 Z" fill="url(#grad-glass)" />
       
       <!-- Guidão clip-on racing (recolhido) -->
-      <path d="M-12,-15 L-6,-12 M12,-15 L6,-12" stroke="#222" stroke-width="3" stroke-linecap="round" />
+      <path d="M-14,-16 L-5,-11 M14,-16 L5,-11" stroke="#252b31" stroke-width="3.2" stroke-linecap="round" />
       
       <!-- Tanque de Combustível Robusto -->
-      <path d="M-10,-8 Q0,-16 10,-8 L8,6 Q0,10 -8,6 Z" fill="${cor}" />
-      <path d="M-10,-8 Q0,-16 10,-8 L8,6 Q0,10 -8,6 Z" fill="url(#grad-metal)" opacity="0.4" />
+      <path d="M-10,-10 Q0,-18 10,-10 L8,6 Q0,11 -8,6 Z" fill="${cor}" />
+      <path d="M-10,-10 Q0,-18 10,-10 L8,6 Q0,11 -8,6 Z" fill="url(#grad-metal)" opacity="0.34" />
       
       <!-- Duplo Escapamento esportivo lateral (Carbono/Titânio) -->
       <!-- Escapamento 1 -->
-      <path d="M5,10 L13,24" stroke="#222" stroke-width="4.5" stroke-linecap="round" />
-      <path d="M6,12 L12,23" stroke="url(#grad-metal)" stroke-width="2" stroke-linecap="round" />
-      <circle cx="13" cy="24" r="1.5" fill="#000" />
-      <!-- Escapamento 2 (um pouco mais longo/baixo) -->
-      <path d="M5,12 L14,27" stroke="#222" stroke-width="4.5" stroke-linecap="round" />
-      <path d="M6,14 L13,26" stroke="url(#grad-metal)" stroke-width="2" stroke-linecap="round" />
-      <circle cx="14" cy="27" r="1.5" fill="#000" />
+      <path d="M6,11 L15,28" stroke="#1b2026" stroke-width="5" stroke-linecap="round" />
+      <path d="M7,12 L14,27" stroke="url(#grad-metal)" stroke-width="2.2" stroke-linecap="round" />
+      <circle cx="15" cy="28" r="1.4" fill="#000" />
       
       <!-- Banco do piloto solo (Racing) -->
-      <path d="M-6,4 Q0,-2 6,4 L4,16 Q0,20 -4,16 Z" fill="#1a1a1a" />
+      <path d="M-5,4 Q0,-3 5,4 L4,18 Q0,22 -4,18 Z" fill="#161b20" />
       
       <!-- Rabeta traseira pontiaguda (Solo/Sem garupa) -->
-      <path d="M-4,16 Q0,12 4,16 L1,32 Q0,35 -1,32 Z" fill="${cor}" />
+      <path d="M-4,18 Q0,13 4,18 L2,34 Q0,38 -2,34 Z" fill="${cor}" />
       
       <!-- Luz Traseira de LED (Brake light) -->
-      <path d="M-2,31 Q0,33 2,31 L1,33 Q0,34 -1,33 Z" fill="#ff0000" opacity="0.9" />
-      <circle cx="0" cy="32.5" r="1" fill="#fff" opacity="0.5" />
+      <path d="M-2,33 Q0,35 2,33" stroke="#ff2b2b" stroke-width="2.2" stroke-linecap="round" />
+      <circle cx="0" cy="-31" r="1.8" fill="#fff" opacity="0.9" />
     `,
+    motocicleta: (cor, grad) => window.AL_ICONS_3D.shapes.motocicleta_cruzada(cor, grad),
     bicicleta: (cor) => `
       <rect x="-1.5" y="-30" width="3" height="60" fill="#333" />
       <rect x="-12" y="-20" width="24" height="2" fill="#7f8c8d" />
