@@ -29,21 +29,70 @@ export async function traccarGetDeviceByImei(imei: string): Promise<TraccarDevic
   return devices[0] ?? null;
 }
 
-export async function traccarCreateDevice(name: string, imei: string): Promise<TraccarDevice> {
+export type TraccarDeviceSyncData = {
+  name: string;
+  uniqueId: string;
+  category?: string | null;
+  model?: string | null;
+  phone?: string | null;
+  attributes?: Record<string, unknown>;
+};
+
+function buildTraccarDevicePayload(data: TraccarDeviceSyncData, id?: number, currentAttributes?: Record<string, unknown>) {
+  return {
+    ...(id !== undefined ? { id } : {}),
+    name: data.name,
+    uniqueId: data.uniqueId,
+    category: data.category || 'car',
+    model: data.model || null,
+    phone: data.phone || null,
+    attributes: {
+      ...(currentAttributes || {}),
+      ...(data.attributes || {}),
+    },
+  };
+}
+
+export async function traccarUpdateDeviceAccumulators(
+  traccarId: number,
+  totalDistanceMeters: number,
+  hoursMilliseconds?: number | null,
+): Promise<void> {
+  const body = {
+    deviceId: traccarId,
+    totalDistance: Math.max(0, Math.round(totalDistanceMeters)),
+    ...(typeof hoursMilliseconds === 'number' && Number.isFinite(hoursMilliseconds)
+      ? { hours: Math.max(0, Math.round(hoursMilliseconds)) }
+      : {}),
+  };
+
+  const res = await fetch(`${TRACCAR_URL}/api/devices/${traccarId}/accumulators`, {
+    method: 'PUT',
+    headers: defaultHeaders,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
+}
+
+export async function traccarCreateDevice(data: TraccarDeviceSyncData): Promise<TraccarDevice> {
   const res = await fetch(`${TRACCAR_URL}/api/devices`, {
     method: 'POST',
     headers: defaultHeaders,
-    body: JSON.stringify({ name, uniqueId: imei, category: 'car' }),
+    body: JSON.stringify(buildTraccarDevicePayload(data)),
   });
   if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
   return res.json() as Promise<TraccarDevice>;
 }
 
-export async function traccarUpdateDevice(traccarId: number, name: string, imei: string): Promise<TraccarDevice> {
+export async function traccarUpdateDevice(
+  traccarId: number,
+  data: TraccarDeviceSyncData,
+  currentAttributes?: Record<string, unknown>,
+): Promise<TraccarDevice> {
   const res = await fetch(`${TRACCAR_URL}/api/devices/${traccarId}`, {
     method: 'PUT',
     headers: defaultHeaders,
-    body: JSON.stringify({ id: traccarId, name, uniqueId: imei, category: 'car' }),
+    body: JSON.stringify(buildTraccarDevicePayload(data, traccarId, currentAttributes)),
   });
   if (!res.ok) throw new Error(`Traccar ${res.status}: ${await res.text()}`);
   return res.json() as Promise<TraccarDevice>;
@@ -248,6 +297,8 @@ export interface TraccarDevice {
   positionId: number;
   groupId: number;
   category: string;
+  model?: string | null;
+  phone?: string | null;
   disabled: boolean;
   attributes: Record<string, unknown>;
 }

@@ -10,8 +10,10 @@ import { DISPOSITIVOS_UPLOADS_DIR } from '../utils/upload-paths';
 import {
   traccarCreateDevice,
   traccarUpdateDevice,
+  traccarUpdateDeviceAccumulators,
   traccarDeleteDevice,
   traccarGetDeviceByImei,
+  type TraccarDeviceSyncData,
 } from '../services/traccar.service';
 
 const router = Router();
@@ -65,6 +67,48 @@ function mapDispositivoResponse(dispositivo: Record<string, unknown>) {
     ...dispositivo,
     odometro: typeof dispositivo.odometroSistemaMetros === 'number' ? Math.round(dispositivo.odometroSistemaMetros) / 1000 : null,
     horimetro: typeof dispositivo.horimetroSistemaSegundos === 'number' ? Math.round((dispositivo.horimetroSistemaSegundos / 3600) * 10) / 10 : 0,
+  };
+}
+
+function numberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const numero = Number(value);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function buildTraccarAccumulatorData(dispositivo: Record<string, unknown>) {
+  const odometroMetros = numberOrNull(dispositivo.odometroSistemaMetros);
+  const horimetroSegundos = numberOrNull(dispositivo.horimetroSistemaSegundos);
+  return {
+    odometroMetros,
+    horimetroMilissegundos: horimetroSegundos != null ? horimetroSegundos * 1000 : null,
+  };
+}
+
+async function syncTraccarAccumulators(traccarId: number, dispositivo: Record<string, unknown>): Promise<void> {
+  const { odometroMetros, horimetroMilissegundos } = buildTraccarAccumulatorData(dispositivo);
+  if (odometroMetros == null) return;
+  await traccarUpdateDeviceAccumulators(traccarId, odometroMetros, horimetroMilissegundos);
+}
+
+function buildTraccarDeviceSyncData(dispositivo: Record<string, unknown>): TraccarDeviceSyncData {
+  const odometroMetros = numberOrNull(dispositivo.odometroSistemaMetros);
+  const limiteVelocidade = numberOrNull(dispositivo.limiteVelocidade);
+  return {
+    name: String(dispositivo.nome || '').trim(),
+    uniqueId: String(dispositivo.identificador || '').trim(),
+    category: dispositivo.categoria ? String(dispositivo.categoria) : 'car',
+    model: dispositivo.modeloRastreador ? String(dispositivo.modeloRastreador) : null,
+    phone: dispositivo.telefoneRastreador ? String(dispositivo.telefoneRastreador) : null,
+    attributes: {
+      iccid: dispositivo.iccid || null,
+      operadoraChip: dispositivo.operadora || null,
+      odometroAtualKm: odometroMetros != null ? Math.round((odometroMetros / 1000) * 10) / 10 : null,
+      consumo: dispositivo.consumo || null,
+      limiteVelocidadeKmh: limiteVelocidade,
+      speedLimit: limiteVelocidade,
+      senha: dispositivo.senha || null,
+    },
   };
 }
 
@@ -216,7 +260,8 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
   }
 
   // Registrar na Traccar (best-effort — falha não bloqueia criação)
-  traccarCreateDevice(dispositivo.nome, dispositivo.identificador)
+  traccarCreateDevice(buildTraccarDeviceSyncData(dispositivo))
+    .then(td => syncTraccarAccumulators(td.id, dispositivo))
     .catch(err => console.error('[Traccar] Falha ao criar dispositivo:', err.message));
 
   res.status(201).json(mapDispositivoResponse(dispositivo));
@@ -330,12 +375,15 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
   }
 
   // Atualizar na Traccar — se não existir, cria (best-effort)
-  const nomeFinal = dispositivo.nome;
-  const imeiFinal = dispositivo.identificador;
+  const traccarData = buildTraccarDeviceSyncData(dispositivo);
   traccarGetDeviceByImei(existe.identificador)
     .then(td => {
-      if (td) return traccarUpdateDevice(td.id, nomeFinal, imeiFinal);
-      return traccarCreateDevice(nomeFinal, imeiFinal);
+      if (td) {
+        return traccarUpdateDevice(td.id, traccarData, td.attributes)
+          .then(updated => syncTraccarAccumulators(updated.id, dispositivo));
+      }
+      return traccarCreateDevice(traccarData)
+        .then(created => syncTraccarAccumulators(created.id, dispositivo));
     })
     .catch(err => console.error('[Traccar] Falha ao sincronizar dispositivo:', err.message));
 

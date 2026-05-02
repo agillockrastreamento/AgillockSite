@@ -7,6 +7,7 @@ const MIN_DISTANCE_METERS = 10;
 const MAX_METERS_PER_SECOND = 70;
 
 export const DISPOSITIVO_MEDIDORES_SELECT = {
+  ignorarOdometro: true,
   odometroSistemaMetros: true,
   horimetroSistemaSegundos: true,
   telemetriaUltimaPosicaoEm: true,
@@ -18,6 +19,7 @@ export const DISPOSITIVO_MEDIDORES_SELECT = {
 type DispositivoMedidores = {
   id: string;
   identificador: string;
+  ignorarOdometro?: boolean;
   odometroSistemaMetros: number | null;
   horimetroSistemaSegundos: number;
   telemetriaUltimaPosicaoEm: Date | null;
@@ -66,8 +68,8 @@ function isPlausibleDistance(distanceMeters: number, deltaMs: number): boolean {
   return distanceMeters <= maxDistance;
 }
 
-export function usaOdometroSistema(dispositivo: Pick<DispositivoMedidores, 'odometroSistemaMetros'>): boolean {
-  return dispositivo.odometroSistemaMetros != null;
+export function usaOdometroSistema(dispositivo: Pick<DispositivoMedidores, 'ignorarOdometro' | 'odometroSistemaMetros'>): boolean {
+  return dispositivo.ignorarOdometro !== true && dispositivo.odometroSistemaMetros != null;
 }
 
 function aplicarPosicaoAoEstado(
@@ -168,15 +170,17 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
 }
 
 export function decorarPosicaoComMedidores(
-  dispositivo: Pick<DispositivoMedidores, 'odometroSistemaMetros' | 'horimetroSistemaSegundos' | 'telemetriaUltimaIgnicao'>,
+  dispositivo: Pick<DispositivoMedidores, 'ignorarOdometro' | 'odometroSistemaMetros' | 'horimetroSistemaSegundos' | 'telemetriaUltimaIgnicao'>,
   posicao: TraccarPosition,
 ): PosicaoDecorada {
   const normalizado = normalizeAttributes(posicao.attributes ?? {});
   
   // Garantir que campos cruciais não fiquem nulos se o dispositivo tiver a informação no banco
-  const odometro = usaOdometroSistema(dispositivo) 
-    ? dispositivo.odometroSistemaMetros 
-    : (normalizado.odometro ?? (dispositivo as any).odometro_snapshot);
+  const odometro = dispositivo.ignorarOdometro === true
+    ? null
+    : (usaOdometroSistema(dispositivo)
+      ? dispositivo.odometroSistemaMetros
+      : (normalizado.odometro ?? (dispositivo as any).odometro_snapshot));
 
   const horas_motor = Math.round(((dispositivo.horimetroSistemaSegundos ?? 0) / 3600) * 10) / 10;
   
@@ -281,7 +285,7 @@ function filtrarPosicoesNoIntervalo(
 }
 
 export function aplicarResumoComMedidores(
-  dispositivo: Pick<DispositivoMedidores, 'odometroSistemaMetros'>,
+  dispositivo: Pick<DispositivoMedidores, 'ignorarOdometro' | 'odometroSistemaMetros'>,
   resumo: TraccarSummary,
   posicoes: TraccarPosition[],
 ): TraccarSummary {
@@ -294,7 +298,7 @@ export function aplicarResumoComMedidores(
 }
 
 export function aplicarViagensComMedidores(
-  dispositivo: Pick<DispositivoMedidores, 'odometroSistemaMetros'>,
+  dispositivo: Pick<DispositivoMedidores, 'ignorarOdometro' | 'odometroSistemaMetros'>,
   viagens: TraccarTrip[],
   posicoes: TraccarPosition[],
 ): TraccarTrip[] {
