@@ -1790,6 +1790,7 @@ function _abrirSpider(chave, centroLatLng) {
     _spider.linhas.push(linha);
     const sm = L.marker(spiderLatLng, { icon: criarIcone(v), zIndexOffset: 1000 });
     if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+    if (_overlay.labels) sm.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
     sm.on('click', function (e) {
       L.DomEvent.stopPropagation(e);
       _fecharSpider();
@@ -1828,6 +1829,7 @@ function renderMarcadores() {
         marcadoresIconeKey[id] = _iconeKey(v);
         const marker = L.marker([latitude, longitude], { icon: icone });
         if (_mostrarPopup) marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+        if (_overlay.labels) marker.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
         marker.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = marker;
         if (visivel) marker.addTo(map);
@@ -1983,9 +1985,15 @@ function criarPopupSimples(v) {
 function _atualizarBindingsPopup() {
   _togglingPopup = true;
   Object.entries(marcadores).forEach(([id, m]) => {
-    if (_mostrarPopup) {
-      const v = veiculosMap[id];
-      if (v) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+    const v = veiculosMap[id];
+    if (_overlay.labels && v) {
+      m.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
+      if (id === ativoId) m.closeTooltip();
+    } else {
+      if (m.getTooltip()) { m.closeTooltip(); m.unbindTooltip(); }
+    }
+    if (_mostrarPopup && v) {
+      m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
     } else {
       m.closePopup();
       m.unbindPopup();
@@ -2472,12 +2480,6 @@ function mostrarCardDispositivo(id) {
   window.AL.apiGet(`/api/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
     const btn = document.querySelector('.dcard-acao[data-acao="cerca"]');
     if (btn) btn.classList.toggle('ativo', cercas.length > 0);
-    if (cercas.length > 0 && !_overlay.cercas) {
-      _overlay.cercas = true;
-      const btnCercas = document.getElementById('ml-cercas');
-      if (btnCercas) btnCercas.classList.add('ativo');
-      carregarCercas().then(mostrarCercas);
-    }
   }).catch(() => {});
 }
 
@@ -2528,6 +2530,10 @@ async function compartilharDispositivo(dispositivoId) {
 }
 
 window.fecharCardDispositivo = function (skipClosePopup) {
+  if (_overlay.labels && ativoId && marcadores[ativoId]) {
+    const mf = marcadores[ativoId];
+    if (mf.getTooltip()) mf.openTooltip();
+  }
   if (modoFoco) desativarFoco();
   _cancelarDesenhoCirculo();
   document.getElementById('device-detail-card').style.display = 'none';
@@ -2624,8 +2630,18 @@ function desativarFoco() {
 // ── Foco / Interações ─────────────────────────────────────────────────────────
 
 window.focar = function (dispositivoId, opts = {}) {
+  const prevAtivoId = ativoId;
   _salvarFocoAdmin(dispositivoId);
   mostrarCardDispositivo(dispositivoId);
+
+  if (_overlay.labels && prevAtivoId && prevAtivoId !== dispositivoId && marcadores[prevAtivoId]) {
+    const mp = marcadores[prevAtivoId];
+    if (mp.getTooltip()) mp.openTooltip();
+  }
+  if (_overlay.labels && marcadores[dispositivoId]) {
+    const mn = marcadores[dispositivoId];
+    if (mn.getTooltip()) mn.closeTooltip();
+  }
 
   const v = veiculosMap[dispositivoId];
   if (!v?.posicao) return;

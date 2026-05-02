@@ -1190,6 +1190,7 @@ function _abrirSpider(chave, centroLatLng) {
     _spider.linhas.push(linha);
     const sm = L.marker(sp, { icon: criarIcone(v), zIndexOffset: 1000 });
     if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+    if (_overlay.labels) sm.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
     sm.on('click', function (e) { L.DomEvent.stopPropagation(e); _fecharSpider(); focar(id); });
     sm.addTo(map); _spider.markers.push(sm);
   });
@@ -1214,6 +1215,7 @@ function renderMarcadores() {
       if (!marcadores[id]) {
         const m = L.marker([latitude, longitude], { icon: criarIcone(v) });
         if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+        if (_overlay.labels) m.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
         m.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = m; marcadoresIconeKey[id] = _iconeKey(id);
         if (visivel) m.addTo(map);
@@ -1342,9 +1344,15 @@ function criarPopupSimples(v) {
 function _atualizarBindingsPopup() {
   _togglingPopup = true;
   Object.entries(marcadores).forEach(([id, m]) => {
-    if (_mostrarPopup) {
-      const v = veiculosMap[id];
-      if (v) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+    const v = veiculosMap[id];
+    if (_overlay.labels && v) {
+      m.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
+      if (id === ativoId) m.closeTooltip();
+    } else {
+      if (m.getTooltip()) { m.closeTooltip(); m.unbindTooltip(); }
+    }
+    if (_mostrarPopup && v) {
+      m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
     } else {
       m.closePopup();
       m.unbindPopup();
@@ -1940,12 +1948,6 @@ function mostrarCardDispositivo(id) {
   AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
     const btnCerca = card.querySelector('.dcard-acao[data-acao="cerca"]');
     if (btnCerca) btnCerca.classList.toggle('ativo', !!(cercas && cercas.length > 0));
-    if (cercas && cercas.length > 0 && !_overlay.cercas) {
-      _overlay.cercas = true;
-      const btnCercas = document.getElementById('ml-cercas');
-      if (btnCercas) btnCercas.classList.add('ativo');
-      mostrarCercas();
-    }
   }).catch(() => {});
 
   // Carrega tipos de comandos (Bloqueio/Desbloqueio)
@@ -1991,6 +1993,10 @@ window.enviarComandoDaSidebar = async function(did, tipo) {
 };
 
 window.fecharCardDispositivo = function (skipClosePopup) {
+  if (_overlay.labels && ativoId && marcadores[ativoId]) {
+    const mf = marcadores[ativoId];
+    if (mf.getTooltip()) mf.openTooltip();
+  }
   if (modoFoco) desativarFoco();
   _cancelarDesenhoCirculo();
   document.getElementById('device-detail-card').style.display = 'none';
@@ -2132,8 +2138,19 @@ function moverCardParaInicio(did) {
 }
 
 window.focar = function (did, opts = {}) {
+  const prevAtivoId = ativoId;
   _salvarFocoCliente(did);
   mostrarCardDispositivo(did); moverCardParaInicio(did);
+
+  if (_overlay.labels && prevAtivoId && prevAtivoId !== did && marcadores[prevAtivoId]) {
+    const mp = marcadores[prevAtivoId];
+    if (mp.getTooltip()) mp.openTooltip();
+  }
+  if (_overlay.labels && marcadores[did]) {
+    const mn = marcadores[did];
+    if (mn.getTooltip()) mn.closeTooltip();
+  }
+
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.toggle('ativo', el.dataset.did === did));
   const v = veiculosMap[did]; if (!v?.posicao) return;
   ativarFoco(did);

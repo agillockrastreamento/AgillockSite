@@ -726,6 +726,29 @@
         color: #c9d1d9;
     }
 
+    /* Remove outline ao clicar em cerca */
+    .leaflet-interactive:focus { outline: none; }
+
+    /* Label permanente sobre todos os veículos */
+    .leaflet-tooltip.label-veiculo {
+      background: #fff;
+      border: 1px solid rgba(0,0,0,0.15);
+      border-radius: 4px;
+      color: #333;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.18);
+      white-space: nowrap;
+    }
+    .leaflet-tooltip.label-veiculo::before { display: none; }
+    html.dark-theme .leaflet-tooltip.label-veiculo {
+      background: #1e2530;
+      color: #f0f2f5;
+      border-color: rgba(255,255,255,0.1);
+    }
+
     /* ── Tooltip de cerca ── */
     .dcard-summary-grid {
       display: grid;
