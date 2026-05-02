@@ -396,7 +396,7 @@ router.get('/rastreamento/dispositivos/:id/historico', async (req: ClienteReques
         { clientesVinculados: { some: { clienteId } } },
       ],
     },
-    select: { id: true, nome: true, identificador: true, placa: true, ...DISPOSITIVO_MEDIDORES_SELECT },
+    select: { id: true, nome: true, identificador: true, placa: true, categoria: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
 
   if (!dispositivo) {
@@ -416,7 +416,7 @@ router.get('/rastreamento/dispositivos/:id/historico', async (req: ClienteReques
   const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate);
 
   res.json({
-    dispositivo: { id: dispositivo.id, nome: dispositivo.nome, placa: dispositivo.placa },
+    dispositivo: { id: dispositivo.id, nome: dispositivo.nome, placa: dispositivo.placa, categoria: dispositivo.categoria },
     total: historico.length,
     posicoes: historico.map(p => decorarPosicaoComMedidores(dispositivo, p)),
   });
