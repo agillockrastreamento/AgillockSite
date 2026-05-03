@@ -300,9 +300,11 @@ Webhook EFI esperado:
 | GET | `/contratos/:id` | ADMIN, COLABORADOR | Detalhe |
 | GET | `/contratos/:id/download` | ADMIN, COLABORADOR | Download |
 | GET | `/contratos/:id/pdf` | ADMIN, COLABORADOR | PDF |
+| POST | `/contratos/sincronizar-clicksign` | ADMIN, COLABORADOR | Sincroniza todos os contratos pendentes com a ClickSign |
 | POST | `/contratos` | ADMIN, COLABORADOR | Cria contrato |
 | PUT | `/contratos/:id` | ADMIN, COLABORADOR | Edita |
 | POST | `/contratos/:id/enviar` | ADMIN, COLABORADOR | Envia para assinatura Clicksign |
+| POST | `/contratos/:id/sincronizar-clicksign` | ADMIN, COLABORADOR | Sincroniza um contrato com a ClickSign |
 | GET | `/contratos/:id/debug-signers` | ADMIN, COLABORADOR | Diagnóstico de signatários |
 | POST | `/contratos/:id/notificar/:signerId` | ADMIN, COLABORADOR | Reenvia notificação |
 | POST | `/contratos/:id/cancelar` | ADMIN, COLABORADOR | Cancela |

@@ -7,6 +7,49 @@ const router = Router();
 
 const WEBHOOK_SECRET = process.env.CLICKSIGN_WEBHOOK_SECRET || '';
 
+function asArray<T>(value: T | T[] | null | undefined): T[] {
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
+}
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.filter((v): v is string => Boolean(v?.trim())).map((v) => v.trim())));
+}
+
+function extractClicksignIds(payload: any): { documentIds: string[]; envelopeIds: string[] } {
+  const documents = asArray(payload?.document);
+  const data = payload?.data;
+  const relationships = data?.relationships || payload?.relationships || {};
+
+  return {
+    documentIds: uniqueStrings([
+      ...documents.flatMap((doc: any) => [doc?.key, doc?.id, doc?.document_key]),
+      payload?.document?.key,
+      payload?.document?.id,
+      data?.type === 'documents' ? data?.id : null,
+      relationships?.document?.data?.id,
+      payload?.event?.data?.document?.key,
+      payload?.event?.data?.document?.id,
+    ]),
+    envelopeIds: uniqueStrings([
+      payload?.envelope?.id,
+      payload?.envelope?.key,
+      data?.type === 'envelopes' ? data?.id : null,
+      relationships?.envelope?.data?.id,
+      payload?.event?.data?.envelope?.id,
+      payload?.event?.data?.envelope?.key,
+    ]),
+  };
+}
+
+function isDocumentoFinalizado(payload: any, eventName: string): boolean {
+  const finalEvents = new Set(['close', 'auto_close', 'document_closed']);
+  if (finalEvents.has(eventName)) return true;
+
+  const documents = asArray(payload?.document);
+  return documents.some((doc: any) => String(doc?.status || '').toLowerCase() === 'closed');
+}
+
 router.post('/clicksign',
   express.raw({ type: '*/*' }),
   async (req: Request, res: Response): Promise<void> => {
@@ -42,36 +85,39 @@ router.post('/clicksign',
       return;
     }
 
-    // ClickSign V3 webhook format:
-    // { event: { name: "cancel"|"close"|"auto_close"|"sign"|..., ... }, document: { key: "uuid", ... } }
+    // ClickSign webhook format:
+    // { event: { name: "cancel"|"close"|"auto_close"|"document_closed"|"sign"|..., ... }, document: { key: "uuid", ... } }
     const eventName: string = payload?.event?.name || '';
-    const documentKey: string = payload?.document?.key || '';
+    const { documentIds, envelopeIds } = extractClicksignIds(payload);
 
-    console.log(`[Webhook ClickSign] event=${eventName} documentKey=${documentKey}`);
+    console.log(`[Webhook ClickSign] event=${eventName} documentIds=${documentIds.join(',') || '-'} envelopeIds=${envelopeIds.join(',') || '-'}`);
 
-    if (!documentKey) {
+    if (!documentIds.length && !envelopeIds.length) {
       res.status(200).json({ ok: true });
       return;
     }
 
-    // Busca por documentKey em clicksignDocumentoId (campo primário) ou clicksignEnvelopeId (fallback)
+    // Busca pelos IDs enviados pela ClickSign em diferentes formatos do webhook.
     const where = {
       OR: [
-        { clicksignDocumentoId: documentKey },
-        { clicksignEnvelopeId: documentKey },
+        ...(documentIds.length ? [{ clicksignDocumentoId: { in: documentIds } }] : []),
+        ...(envelopeIds.length ? [{ clicksignEnvelopeId: { in: envelopeIds } }] : []),
+        ...(documentIds.length ? [{ clicksignEnvelopeId: { in: documentIds } }] : []),
       ],
     };
 
-    if (eventName === 'close' || eventName === 'auto_close') {
-      await prisma.contrato.updateMany({
+    if (isDocumentoFinalizado(payload, eventName)) {
+      const result = await prisma.contrato.updateMany({
         where,
         data: { status: 'ASSINADO', assinadoEm: new Date() },
       });
+      console.log(`[Webhook ClickSign] contratos assinados atualizados=${result.count}`);
     } else if (eventName === 'cancel') {
-      await prisma.contrato.updateMany({
+      const result = await prisma.contrato.updateMany({
         where,
         data: { status: 'CANCELADO' },
       });
+      console.log(`[Webhook ClickSign] contratos cancelados atualizados=${result.count}`);
     }
 
     res.status(200).json({ ok: true });

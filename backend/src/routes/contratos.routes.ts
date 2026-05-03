@@ -6,6 +6,7 @@ import { param, query } from '../utils/params';
 import { preencherTemplate, DadosContrato } from '../services/contrato-template.service';
 import { htmlParaPdf } from '../services/pdf.service';
 import * as clicksign from '../services/clicksign.service';
+import ContratoClicksignSyncService from '../services/contrato-clicksign-sync.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -40,6 +41,16 @@ router.post('/view-pdf', async (req: AuthRequest, res: Response): Promise<void> 
     res.send(pdfBuffer);
   } catch (e: any) {
     res.status(500).json({ error: `Erro ao gerar PDF: ${e.message}` });
+  }
+});
+
+// POST /api/contratos/sincronizar-clicksign — sincroniza todos os contratos pendentes
+router.post('/sincronizar-clicksign', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const resultado = await ContratoClicksignSyncService.sincronizarPendentes();
+    res.json(resultado);
+  } catch (e: any) {
+    res.status(502).json({ error: `Erro ClickSign: ${e.message}` });
   }
 });
 
@@ -113,6 +124,17 @@ router.get('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
     }
     });
 
+
+    // POST /api/contratos/:id/sincronizar-clicksign - consulta status atual na ClickSign
+    router.post('/:id/sincronizar-clicksign', async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+    const id = param(req, 'id');
+    const resultado = await ContratoClicksignSyncService.sincronizarPorId(id);
+    res.json(resultado);
+    } catch (e: any) {
+    res.status(e.statusCode || 502).json({ error: e.statusCode ? e.message : `Erro ClickSign: ${e.message}` });
+    }
+    });
 
     // GET /api/contratos/:id/pdf — gera PDF do conteúdo salvo e retorna stream
     router.get('/:id/pdf', async (req: AuthRequest, res: Response): Promise<void> => {

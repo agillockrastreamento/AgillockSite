@@ -71,6 +71,9 @@
         <h2 class="topbar-title">Contratos</h2>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-default" id="btn-sync-clicksign" title="Sincronizar contratos pendentes com a ClickSign">
+          <i class="fa fa-refresh"></i> Sincronizar ClickSign
+        </button>
         <a href="contrato-form.html" class="btn btn-primary-al" id="btn-novo">
           <i class="fa fa-plus"></i> Novo Contrato
         </a>
@@ -202,6 +205,7 @@
         document.getElementById('sidebar-overlay').classList.remove('open');
       });
       document.getElementById('btn-filtrar').onclick = carregarContratos;
+      document.getElementById('btn-sync-clicksign').onclick = sincronizarClicksignPendentes;
       document.getElementById('busca').addEventListener('keypress', function(e) { if (e.which === 13) carregarContratos(); });
     });
 
@@ -220,6 +224,23 @@
         })
         .catch(function(err) {
           document.getElementById('tbody-contratos').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Erro ao carregar contratos.</td></tr>';
+        });
+    }
+
+    function sincronizarClicksignPendentes() {
+      var btn = document.getElementById('btn-sync-clicksign');
+      var oldHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Sincronizando';
+      window.AL.apiPost('/api/contratos/sincronizar-clicksign', {})
+        .then(function(res) {
+          window.AL.showAlert('Sincronização concluída. Verificados: ' + res.verificados + '. Atualizados: ' + res.atualizados + '.', res.erros && res.erros.length ? 'warning' : 'success');
+          carregarContratos();
+        })
+        .catch(function(err) { window.AL.showAlert('Erro ao sincronizar ClickSign: ' + err.message, 'danger'); })
+        .finally(function() {
+          btn.innerHTML = oldHtml;
+          btn.disabled = false;
         });
     }
 
