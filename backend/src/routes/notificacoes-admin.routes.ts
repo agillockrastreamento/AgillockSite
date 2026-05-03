@@ -264,7 +264,6 @@ router.get('/eventos', async (req, res) => {
     ]);
     const adminPrefs = (adminPrefsRow?.prefs as Record<string, any>) ?? {};
     const eventosPermitidos = eventos.filter(e => {
-      if (e.origemTipo !== 'CLIENTE') return true;
       return !!adminPrefs[tipoPreferenciaAdmin(e.tipoEvento)];
     });
 
