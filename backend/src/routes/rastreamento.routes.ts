@@ -40,6 +40,11 @@ const router = Router();
 router.use(authMiddleware);
 router.use(requireMonitoramentoAccess);
 
+function parseDataInicioSaoPaulo(dataInicio?: string): Date | null {
+  if (!dataInicio) return null;
+  return new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(dataInicio) ? dataInicio : `${dataInicio}:00-03:00`);
+}
+
 type RelatorioPosicaoBasica = {
   id: number;
   deviceId: number;
@@ -591,7 +596,7 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
 router.get('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const geocercas = await prisma.geocerca.findMany({
-      where: { origemTipo: 'ADMIN', ativa: true },
+      where: { origemTipo: 'ADMIN', ativa: true, OR: [{ dataInicio: null }, { dataInicio: { lte: new Date() } }] },
       select: { id: true, traccarId: true, nome: true, descricao: true, area: true },
     });
     res.json(geocercas.map(g => ({
@@ -614,6 +619,7 @@ router.get('/dispositivos/:id/cercas', requireRoles('ADMIN', 'COLABORADOR'), asy
       where: {
         origemTipo: 'ADMIN',
         ativa: true,
+        OR: [{ dataInicio: null }, { dataInicio: { lte: new Date() } }],
         dispositivos: { some: { dispositivoId: id } },
       },
       select: { traccarId: true, nome: true, descricao: true, area: true },
@@ -771,7 +777,7 @@ router.post('/geocercas', requireRoles('ADMIN', 'COLABORADOR'), async (req: Auth
         visivelCliente: !!visivelCliente,
         notificarCliente: !!notificarCliente,
         sistemasNotif: sistemasNotif ?? Prisma.JsonNull,
-        dataInicio: dataInicio ? new Date(dataInicio) : null,
+        dataInicio: parseDataInicioSaoPaulo(dataInicio),
       },
     });
 
@@ -826,7 +832,7 @@ router.put('/geocercas/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: A
         visivelCliente: visivelCliente !== undefined ? visivelCliente : geocerca.visivelCliente,
         notificarCliente: notificarCliente !== undefined ? notificarCliente : geocerca.notificarCliente,
         sistemasNotif: sistemasNotif !== undefined ? (sistemasNotif ?? Prisma.JsonNull) : (geocerca.sistemasNotif ?? Prisma.JsonNull),
-        dataInicio: dataInicio !== undefined ? (dataInicio ? new Date(dataInicio) : null) : geocerca.dataInicio,
+        dataInicio: dataInicio !== undefined ? parseDataInicioSaoPaulo(dataInicio) : geocerca.dataInicio,
         ativa: ativa !== undefined ? ativa : geocerca.ativa,
       },
     });

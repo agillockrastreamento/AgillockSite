@@ -30,6 +30,14 @@ const geofenceCache = new Map<number, { at: number; items: Array<{ id: number; a
 const GEOFENCE_CACHE_TTL_MS = 30_000;
 const eventAddressCache = new Map<string, string>();
 
+export function broadcastTrackingEvents(events: any[]) {
+  if (!events.length) return;
+  const outgoing = JSON.stringify({ events });
+  frontendClients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) client.send(outgoing);
+  });
+}
+
 // ── Iniciar o servidor WebSocket para o frontend ──────────────────────────────
 
 export function initTraccarWebSocket(httpServer: Server): WebSocketServer {
@@ -229,10 +237,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
           .then(evts => {
             if (evts && evts.length > 0) {
               const payload = { events: evts };
-              const outgoing = JSON.stringify(payload);
-              frontendClients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) client.send(outgoing);
-              });
+              broadcastTrackingEvents(payload.events);
             }
           })
           .catch(err => console.error(`[Notif] Erro na verificação proativa (${identificador}):`, err.message));
@@ -244,10 +249,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         NotificationService.verificarKmNotificacoes(identificador, disp.odometroSistemaMetros)
           .then(evts => {
             if (evts && evts.length > 0) {
-              const outgoing = JSON.stringify({ events: evts });
-              frontendClients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) client.send(outgoing);
-              });
+              broadcastTrackingEvents(evts);
             }
           })
           .catch(err => console.error('[KM Notif] Erro:', err.message));

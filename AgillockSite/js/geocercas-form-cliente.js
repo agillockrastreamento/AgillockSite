@@ -18,6 +18,7 @@
   var dispositivosSelecionados = [];
   var todosDispositivos = [];
   var editandoId = null;
+  var areaPendenteEdicao = null;
 
   // ── Init ───────────────────────────────────────────────────────────────────
   function init() {
@@ -39,10 +40,10 @@
   }
 
   function carregarDispositivos() {
-    return AL_CLIENTE.apiGet('/api/cliente/rastreamento/posicoes').then(function (data) {
+    return AL_CLIENTE.apiGet('/api/cliente/rastreamento/geocercas/dispositivos').then(function (data) {
       todosDispositivos = (data || []).map(function (d) {
         return {
-          id: d.dispositivoId,
+          id: d.dispositivoId || d.id,
           nome: d.nome || '',
           placa: d.placa || '',
           identificador: d.identificador || ''
@@ -70,16 +71,16 @@
       });
       renderizarTags();
 
-      document.getElementById('geo-notificar-cliente').checked = !!geo.notificarCliente;
-      document.getElementById('geo-notif-sistemas').classList.toggle('visivel', !!geo.notificarCliente);
+      setChecked('geo-notificar-cliente', !!geo.notificarCliente);
+      var notifSistemas = document.getElementById('geo-notif-sistemas');
+      if (notifSistemas) notifSistemas.classList.toggle('visivel', !!geo.notificarCliente);
 
       var sn = (geo.sistemasNotif && typeof geo.sistemasNotif === 'object') ? geo.sistemasNotif : {};
-      document.getElementById('geo-notif-email').checked    = sn.email !== false;
-      document.getElementById('geo-notif-whatsapp').checked = !!sn.whatsapp;
-      document.getElementById('geo-notif-app').checked      = sn.app !== false;
+      setChecked('geo-notif-email', sn.email !== false);
+      setChecked('geo-notif-app', sn.app !== false);
 
       if (geo.area) {
-        setTimeout(function () { desenharAreaExistente(geo.area, geo.tipo); }, 400);
+        agendarDesenhoAreaExistente(geo.area, geo.tipo);
       }
     });
   }
@@ -224,6 +225,26 @@
     new LocateControl().addTo(mapa);
 
     setTimeout(function () { if (mapa) mapa.invalidateSize(); }, 300);
+    if (areaPendenteEdicao) agendarDesenhoAreaExistente(areaPendenteEdicao.area, areaPendenteEdicao.tipo);
+  }
+
+  function agendarDesenhoAreaExistente(area, tipo, tentativa) {
+    areaPendenteEdicao = { area: area, tipo: tipo };
+    tentativa = tentativa || 0;
+    if (!mapa || !mapaIniciado) {
+      if (tentativa < 20) setTimeout(function () { agendarDesenhoAreaExistente(area, tipo, tentativa + 1); }, 150);
+      return;
+    }
+    setTimeout(function () {
+      try { mapa.invalidateSize(); } catch (e) {}
+      if (desenharAreaExistente(area, tipo)) {
+        areaPendenteEdicao = null;
+      } else if (tentativa < 20) {
+        agendarDesenhoAreaExistente(area, tipo, tentativa + 1);
+      } else {
+        AL_CLIENTE.showAlert('Não foi possível desenhar a área salva desta geocerca.', 'warning');
+      }
+    }, 120);
   }
 
   function trocarTile(nome) {
@@ -390,7 +411,7 @@
     try {
       if (tipo === 'circulo' || /^CIRCLE/i.test(area)) {
         var mc = area.match(/CIRCLE\s*\(\s*([\d.\-]+)\s+([\d.\-]+)\s*,\s*([\d.\-]+)\s*\)/i);
-        if (!mc) return;
+        if (!mc) return false;
         var clat = parseFloat(mc[1]), clng = parseFloat(mc[2]), craio = parseFloat(mc[3]);
         circuloCenter = { lat: clat, lng: clng };
         document.getElementById('geo-circle-raio').value = Math.round(craio);
@@ -400,8 +421,8 @@
         document.getElementById('geo-circle-raio-wrap').style.display = '';
         document.getElementById('geo-draw-hint').textContent = 'Círculo carregado.';
       } else if (tipo === 'poligono' || /^POLYGON/i.test(area)) {
-        var inner = area.match(/POLYGON\s*\(\((.+?)\)\)/i);
-        if (!inner) return;
+        var inner = area.match(/POLYGON\s*\(\(([\s\S]+?)\)\)/i);
+        if (!inner) return false;
         var pts = inner[1].trim().split(',').map(function (pair) {
           var parts = pair.trim().split(/\s+/);
           return [parseFloat(parts[1]), parseFloat(parts[0])];
@@ -416,8 +437,8 @@
         areaWkt = area; tipoForma = 'poligono';
         document.getElementById('geo-draw-hint').textContent = 'Polígono carregado.';
       } else if (tipo === 'linha' || /^LINESTRING/i.test(area)) {
-        var li = area.match(/LINESTRING\s*\((.+?)\)/i);
-        if (!li) return;
+        var li = area.match(/LINESTRING\s*\(([\s\S]+?)\)/i);
+        if (!li) return false;
         var lpts = li[1].trim().split(',').map(function (pair) {
           var parts = pair.trim().split(/\s+/);
           return [parseFloat(parts[1]), parseFloat(parts[0])];
@@ -428,7 +449,8 @@
         areaWkt = area; tipoForma = 'linha';
         document.getElementById('geo-draw-hint').textContent = 'Linha carregada.';
       }
-    } catch (e) {}
+    } catch (e) { console.warn('Erro ao desenhar geocerca existente:', e); }
+    return !!areaWkt;
   }
 
   // ── Pesquisa de dispositivos ───────────────────────────────────────────────
@@ -506,9 +528,8 @@
       dispositivos: dispositivosSelecionados.map(function (d) { return d.id; }),
       notificarCliente: document.getElementById('geo-notificar-cliente').checked,
       sistemasNotif: {
-        email:    document.getElementById('geo-notif-email').checked,
-        whatsapp: document.getElementById('geo-notif-whatsapp').checked,
-        app:      document.getElementById('geo-notif-app').checked
+        email:    getChecked('geo-notif-email'),
+        app:      getChecked('geo-notif-app')
       }
     };
 
@@ -542,6 +563,14 @@
   }
 
   function pad(n) { return String(n).padStart(2, '0'); }
+  function setChecked(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.checked = !!value;
+  }
+  function getChecked(id) {
+    var el = document.getElementById(id);
+    return !!(el && el.checked);
+  }
 
   document.addEventListener('DOMContentLoaded', init);
 })();

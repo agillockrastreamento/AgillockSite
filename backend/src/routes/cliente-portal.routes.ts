@@ -41,6 +41,11 @@ import { CLIENTE_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 const router = Router();
 router.use(clienteAuthMiddleware);
 
+function parseDataInicioSaoPaulo(dataInicio?: string): Date | null {
+  if (!dataInicio) return null;
+  return new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(dataInicio) ? dataInicio : `${dataInicio}:00-03:00`);
+}
+
 type RelatorioPosicaoBasica = {
   id: number;
   deviceId: number;
@@ -571,6 +576,7 @@ router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest,
   const allowedGeocercas = await prisma.geocerca.findMany({
     where: {
       ativa: true,
+      AND: [{ OR: [{ dataInicio: null }, { dataInicio: { lte: new Date() } }] }],
       OR: [
         { origemTipo: 'CLIENTE', clienteId },
         { origemTipo: 'ADMIN', visivelCliente: true, dispositivos: { some: { dispositivoId: dispositivo.id } } },
@@ -1040,6 +1046,7 @@ router.get('/rastreamento/cercas', async (req: ClienteRequest, res: Response): P
   const geocercas = await prisma.geocerca.findMany({
     where: {
       ativa: true,
+      AND: [{ OR: [{ dataInicio: null }, { dataInicio: { lte: new Date() } }] }],
       OR: [
         { origemTipo: 'CLIENTE', clienteId },
         { origemTipo: 'ADMIN', visivelCliente: true, dispositivos: { some: { dispositivoId: { in: dispositivosIds } } } },
@@ -1154,6 +1161,31 @@ router.delete('/rastreamento/cercas/:id', async (req: ClienteRequest, res: Respo
 
 // ── GET /api/cliente/rastreamento/geocercas ───────────────────────────────────
 // Full-data list for the geocercas management page (only client's own)
+router.get('/rastreamento/geocercas/dispositivos', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const dispositivos = await prisma.dispositivo.findMany({
+    where: {
+      ativo: true,
+      OR: [
+        { clienteId },
+        { clientesVinculados: { some: { clienteId } } },
+      ],
+    },
+    select: { id: true, nome: true, placa: true, identificador: true },
+    orderBy: [{ nome: 'asc' }, { placa: 'asc' }],
+  });
+
+  res.json(dispositivos.map(d => ({
+    id: d.id,
+    dispositivoId: d.id,
+    nome: d.nome,
+    placa: d.placa,
+    identificador: d.identificador,
+  })));
+});
+
 router.get('/rastreamento/geocercas', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
@@ -1246,7 +1278,7 @@ router.post('/rastreamento/geocercas', async (req: ClienteRequest, res: Response
         visivelCliente: false,
         notificarCliente: notificarCliente ?? false,
         sistemasNotif: sistemasNotif ?? Prisma.JsonNull,
-        dataInicio: dataInicio ? new Date(dataInicio) : null,
+        dataInicio: parseDataInicioSaoPaulo(dataInicio),
       },
     });
 
@@ -1304,7 +1336,7 @@ router.put('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Respo
         tipo: tipoForma,
         notificarCliente: notificarCliente ?? geocerca.notificarCliente,
         sistemasNotif: sistemasNotif !== undefined ? (sistemasNotif ?? Prisma.JsonNull) : (geocerca.sistemasNotif ?? Prisma.JsonNull),
-        dataInicio: dataInicio !== undefined ? (dataInicio ? new Date(dataInicio) : null) : geocerca.dataInicio,
+        dataInicio: dataInicio !== undefined ? parseDataInicioSaoPaulo(dataInicio) : geocerca.dataInicio,
         ativa: ativa !== undefined ? ativa : geocerca.ativa,
       },
     });

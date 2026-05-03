@@ -400,11 +400,14 @@ let _panelAbertoAdmin = false;
 
 let _ultimaLeituraAdmin = 0;
 let _eventosLimposAteAdmin = 0;
+let _eventosLimposRangesAdmin = [];
+let _periodoEventosAdmin = { periodo: 'hoje', de: null, ate: null };
 
 async function carregarUltimaLeituraAdmin() {
   try {
     _ultimaLeituraAdmin = parseInt(localStorage.getItem('al_last_notif_admin') || '0', 10) || 0;
     _eventosLimposAteAdmin = parseInt(localStorage.getItem('al_clear_notif_admin') || '0', 10) || 0;
+    _eventosLimposRangesAdmin = JSON.parse(localStorage.getItem('al_clear_notif_admin_ranges') || '[]') || [];
   } catch (e) {}
   try {
     const data = await window.AL.apiGet('/api/notificacoes-admin/admin-prefs');
@@ -413,6 +416,9 @@ async function carregarUltimaLeituraAdmin() {
     }
     if (data && data.prefs && data.prefs.al_clear_notif_admin) {
       _eventosLimposAteAdmin = parseInt(data.prefs.al_clear_notif_admin, 10) || 0;
+    }
+    if (data && data.prefs && data.prefs.al_clear_notif_admin_ranges) {
+      _eventosLimposRangesAdmin = JSON.parse(data.prefs.al_clear_notif_admin_ranges) || [];
     }
   } catch (e) {}
   _atualizarBadgeNotificacoesAdmin();
@@ -424,6 +430,39 @@ function _getUltimaLeituraAdmin() {
 
 function _maxEventoTsAdmin() {
   return Math.max(Date.now(), ..._eventos.map(e => new Date(e.serverTime || Date.now()).getTime()).filter(Number.isFinite));
+}
+
+function _rotuloTipoEventoAdmin(tipo) {
+  const item = TIPOS_EVENTO_ADMIN_FILTRO.find(t => t.tipo === tipo);
+  return item ? item.label : tipo;
+}
+
+function _normalizarEventoAdmin(evt) {
+  if (!evt) return evt;
+  if (evt.tipo === 'deviceOverspeed') evt = { ...evt, tipo: 'overspeed' };
+  if (!evt.tipoLabel || evt.tipoLabel === evt.tipo || evt.tipoLabel === 'Limite de Velocidade') {
+    evt = { ...evt, tipoLabel: _rotuloTipoEventoAdmin(evt.tipo) };
+  }
+  return evt;
+}
+
+function _intervaloPeriodoEventosAdmin(cutoff) {
+  const periodo = _periodoEventosAdmin.periodo || 'hoje';
+  const agora = new Date();
+  const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime();
+  if (periodo === 'ontem') return { de: inicioHoje - 86400000, ate: inicioHoje - 1 };
+  if (periodo === '7dias') return { de: inicioHoje - 7 * 86400000, ate: cutoff };
+  if (periodo === 'custom' && _periodoEventosAdmin.de && _periodoEventosAdmin.ate) {
+    const de = new Date(_periodoEventosAdmin.de + 'T00:00:00').getTime();
+    const ate = new Date(_periodoEventosAdmin.ate + 'T23:59:59').getTime();
+    return { de, ate: Math.min(ate, cutoff) };
+  }
+  return { de: inicioHoje, ate: cutoff };
+}
+
+function _eventoLimpoAdmin(evt) {
+  const time = new Date(evt.serverTime || Date.now()).getTime();
+  return _eventosLimposRangesAdmin.some(r => time >= Number(r.de) && time <= Number(r.ate));
 }
 
 function _setUltimaLeituraAdmin(ts) {
@@ -498,15 +537,18 @@ function inicializarEventosPanel() {
   // Limpar eventos
   document.getElementById('evt-btn-limpar').addEventListener('click', function () {
     const cutoff = _maxEventoTsAdmin();
-    _eventosLimposAteAdmin = cutoff;
+    const range = _intervaloPeriodoEventosAdmin(cutoff);
+    _eventosLimposRangesAdmin.push(range);
     try {
-      localStorage.setItem('al_clear_notif_admin', String(cutoff));
+      localStorage.setItem('al_clear_notif_admin_ranges', JSON.stringify(_eventosLimposRangesAdmin));
       localStorage.setItem('al_last_notif_admin', String(cutoff));
       window.AL.apiPost('/api/notificacoes-admin/admin-prefs/merge', {
-        prefs: { al_clear_notif_admin: cutoff, al_last_notif_admin: cutoff },
+        prefs: { al_clear_notif_admin_ranges: JSON.stringify(_eventosLimposRangesAdmin), al_last_notif_admin: cutoff },
       });
     } catch (e) {}
-    _eventos.length = 0;
+    for (let i = _eventos.length - 1; i >= 0; i--) {
+      if (_eventoLimpoAdmin(_eventos[i])) _eventos.splice(i, 1);
+    }
     _setUltimaLeituraAdmin(cutoff);
     _atualizarBadgeNotificacoesAdmin();
     renderEventosLista();
@@ -555,6 +597,7 @@ function _aplicarEstadoPainelEventos() {
 }
 
 async function carregarHistoricoEventos(periodo, de, ate) {
+  _periodoEventosAdmin = { periodo: periodo || 'hoje', de: de || null, ate: ate || null };
   const lista = document.getElementById('eventos-lista');
   lista.innerHTML = '<div style="padding:20px;text-align:center;color:#999"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
   try {
@@ -563,10 +606,10 @@ async function carregarHistoricoEventos(periodo, de, ate) {
     const data = await AL.apiGet(url);
     _eventos.length = 0;
     if (data && data.length) data.forEach(e => {
-      if (e.tipo === 'deviceOverspeed') e = { ...e, tipo: 'overspeed' };
+      e = _normalizarEventoAdmin(e);
       const time = new Date(e.serverTime || Date.now()).getTime();
       const tiposPermitidos = TIPOS_EVENTO_ADMIN_FILTRO.map(t => t.tipo);
-      if (time <= _eventosLimposAteAdmin || !tiposPermitidos.includes(e.tipo)) return;
+      if (_eventoLimpoAdmin(e) || !tiposPermitidos.includes(e.tipo)) return;
       _eventos.push(e);
     });
     renderEventosLista();
@@ -593,10 +636,10 @@ function _atualizarFiltrosTipo() {
 }
 
 function adicionarEvento(evt) {
-  if (evt.tipo === 'deviceOverspeed') evt = { ...evt, tipo: 'overspeed' };
+  evt = _normalizarEventoAdmin(evt);
   const time = new Date(evt.serverTime || Date.now()).getTime();
   const tiposPermitidos = TIPOS_EVENTO_ADMIN_FILTRO.map(t => t.tipo);
-  if (time <= _eventosLimposAteAdmin || !tiposPermitidos.includes(evt.tipo)) return;
+  if (_eventoLimpoAdmin(evt) || !tiposPermitidos.includes(evt.tipo)) return;
   _eventos.unshift(evt);
   if (_eventos.length > MAX_EVENTOS) _eventos.length = MAX_EVENTOS;
   renderEventosLista();
@@ -2949,6 +2992,11 @@ window.focar = function (dispositivoId, opts = {}) {
   setTimeout(() => {
     if (opts.abrirPopup === false) return;
     if (_mostrarPopup && marcadores[dispositivoId] && map.hasLayer(marcadores[dispositivoId])) {
+      const marker = marcadores[dispositivoId];
+      const className = marker.getPopup()?.options?.className || '';
+      if (className.includes('popup-evento-moderno')) {
+        marker.bindPopup(criarPopupSimples(veiculosMap[dispositivoId]), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+      }
       marcadores[dispositivoId].openPopup();
     }
   }, 900);

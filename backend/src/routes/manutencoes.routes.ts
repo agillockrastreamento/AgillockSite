@@ -3,6 +3,7 @@
 import { Router } from 'express';
 import prisma from '../utils/prisma';
 import { clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
+import { broadcastTrackingEvents } from '../services/traccar.ws';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
@@ -275,7 +276,7 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
         ],
       },
       include: {
-        dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true } },
+        dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true } },
       },
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
@@ -310,6 +311,7 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
     const prefFeita = await prisma.preferenciaNotificacao.findUnique({
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
     });
+    const mensagemFeita = `Manutenção "${recorrencia.titulo}" realizada! Contador reiniciado a partir de ${Math.round(kmAtual).toLocaleString('pt-BR')} km.`;
     if (prefFeita && (prefFeita.web || prefFeita.app)) {
       await prisma.eventoNotificacao.create({
         data: {
@@ -322,6 +324,17 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
           velocidade: null,
         },
       });
+      broadcastTrackingEvents([{
+        deviceId: recorrencia.dispositivo.traccarId,
+        dispositivoId: recorrencia.dispositivoId,
+        type: 'manutencaoFeita',
+        tipoLabel: 'Manutenção Realizada',
+        serverTime: new Date().toISOString(),
+        mensagem: mensagemFeita,
+        lat: null,
+        lng: null,
+        endereco: null,
+      }]);
     }
 
     res.json({ message: 'Manutenção marcada como feita. Contador reiniciado.' });

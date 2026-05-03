@@ -4,6 +4,7 @@ import { Router } from 'express';
 import prisma from '../utils/prisma';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
+import { broadcastTrackingEvents } from '../services/traccar.ws';
 
 const router = Router();
 router.use(authMiddleware);
@@ -374,7 +375,7 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
 
     const recorrencia = await prisma.manutencaoRecorrencia.findFirst({
       where: { id },
-      include: { dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true } } },
+      include: { dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true } } },
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
 
@@ -406,6 +407,7 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
     const prefFeita = await prisma.preferenciaNotificacao.findUnique({
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId: clienteLoginIdCanonical, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
     });
+    const mensagemFeita = `Manutenção "${recorrencia.titulo}" realizada! Contador reiniciado a partir de ${Math.round(kmAtual).toLocaleString('pt-BR')} km.`;
     if (prefFeita && (prefFeita.web || prefFeita.app)) {
       await prisma.eventoNotificacao.create({
         data: {
@@ -418,6 +420,17 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
           velocidade: null,
         },
       });
+      broadcastTrackingEvents([{
+        deviceId: recorrencia.dispositivo.traccarId,
+        dispositivoId: recorrencia.dispositivoId,
+        type: 'manutencaoFeita',
+        tipoLabel: 'Manutenção Realizada',
+        serverTime: new Date().toISOString(),
+        mensagem: mensagemFeita,
+        lat: null,
+        lng: null,
+        endereco: null,
+      }]);
     }
 
     res.json({ message: 'Manutenção marcada como feita pelo admin. Contador reiniciado.' });

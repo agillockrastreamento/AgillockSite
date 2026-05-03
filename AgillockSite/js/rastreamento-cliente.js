@@ -326,11 +326,14 @@ let _panelAbertoCliente = false;
 
 let _ultimaLeituraCliente = 0;
 let _eventosLimposAteCliente = 0;
+let _eventosLimposRangesCliente = [];
+let _periodoEventosCliente = { periodo: 'hoje', de: null, ate: null };
 
 async function carregarUltimaLeituraCliente() {
   try {
     _ultimaLeituraCliente = parseInt(localStorage.getItem('al_last_notif_client') || '0', 10) || 0;
     _eventosLimposAteCliente = parseInt(localStorage.getItem('al_clear_notif_client') || '0', 10) || 0;
+    _eventosLimposRangesCliente = JSON.parse(localStorage.getItem('al_clear_notif_client_ranges') || '[]') || [];
   } catch (e) {}
   try {
     const data = await AL_CLIENTE.apiGet('/api/cliente/rastreamento/prefs');
@@ -339,6 +342,9 @@ async function carregarUltimaLeituraCliente() {
     }
     if (data && data.prefs && data.prefs.al_clear_notif_client) {
       _eventosLimposAteCliente = parseInt(data.prefs.al_clear_notif_client, 10) || 0;
+    }
+    if (data && data.prefs && data.prefs.al_clear_notif_client_ranges) {
+      _eventosLimposRangesCliente = JSON.parse(data.prefs.al_clear_notif_client_ranges) || [];
     }
   } catch (e) {}
   _atualizarBadgeNotificacoesCliente();
@@ -350,6 +356,39 @@ function _getUltimaLeituraCliente() {
 
 function _maxEventoTsCliente() {
   return Math.max(Date.now(), ..._eventos.map(e => new Date(e.serverTime || Date.now()).getTime()).filter(Number.isFinite));
+}
+
+function _rotuloTipoEventoCliente(tipo) {
+  const item = TIPOS_EVENTO_CLIENTE_FILTRO.find(t => t.tipo === tipo);
+  return item ? item.label : tipo;
+}
+
+function _normalizarEventoCliente(evt) {
+  if (!evt) return evt;
+  if (evt.tipo === 'deviceOverspeed') evt = { ...evt, tipo: 'overspeed' };
+  if (!evt.tipoLabel || evt.tipoLabel === evt.tipo || evt.tipoLabel === 'Limite de Velocidade') {
+    evt = { ...evt, tipoLabel: _rotuloTipoEventoCliente(evt.tipo) };
+  }
+  return evt;
+}
+
+function _intervaloPeriodoEventosCliente(cutoff) {
+  const periodo = _periodoEventosCliente.periodo || 'hoje';
+  const agora = new Date();
+  const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime();
+  if (periodo === 'ontem') return { de: inicioHoje - 86400000, ate: inicioHoje - 1 };
+  if (periodo === '7dias') return { de: inicioHoje - 7 * 86400000, ate: cutoff };
+  if (periodo === 'custom' && _periodoEventosCliente.de && _periodoEventosCliente.ate) {
+    const de = new Date(_periodoEventosCliente.de + 'T00:00:00').getTime();
+    const ate = new Date(_periodoEventosCliente.ate + 'T23:59:59').getTime();
+    return { de, ate: Math.min(ate, cutoff) };
+  }
+  return { de: inicioHoje, ate: cutoff };
+}
+
+function _eventoLimpoCliente(evt) {
+  const time = new Date(evt.serverTime || Date.now()).getTime();
+  return _eventosLimposRangesCliente.some(r => time >= Number(r.de) && time <= Number(r.ate));
 }
 
 function _setUltimaLeituraCliente(ts) {
@@ -420,15 +459,18 @@ function inicializarEventosPanel() {
 
   document.getElementById('evt-btn-limpar').addEventListener('click', function () {
     const cutoff = _maxEventoTsCliente();
-    _eventosLimposAteCliente = cutoff;
+    const range = _intervaloPeriodoEventosCliente(cutoff);
+    _eventosLimposRangesCliente.push(range);
     try {
-      localStorage.setItem('al_clear_notif_client', String(cutoff));
+      localStorage.setItem('al_clear_notif_client_ranges', JSON.stringify(_eventosLimposRangesCliente));
       localStorage.setItem('al_last_notif_client', String(cutoff));
       AL_CLIENTE.apiPost('/api/cliente/rastreamento/prefs/merge', {
-        prefs: { al_clear_notif_client: cutoff, al_last_notif_client: cutoff },
+        prefs: { al_clear_notif_client_ranges: JSON.stringify(_eventosLimposRangesCliente), al_last_notif_client: cutoff },
       });
     } catch (e) {}
-    _eventos.length = 0;
+    for (let i = _eventos.length - 1; i >= 0; i--) {
+      if (_eventoLimpoCliente(_eventos[i])) _eventos.splice(i, 1);
+    }
     _setUltimaLeituraCliente(cutoff);
     _atualizarBadgeNotificacoesCliente();
     renderEventosLista();
@@ -472,6 +514,7 @@ function inicializarEventosPanel() {
 }
 
 async function carregarHistoricoEventos(periodo, de, ate) {
+  _periodoEventosCliente = { periodo: periodo || 'hoje', de: de || null, ate: ate || null };
   const lista = document.getElementById('eventos-lista');
   lista.innerHTML = '<div style="padding:20px;text-align:center;color:#999"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
 
@@ -482,10 +525,10 @@ async function carregarHistoricoEventos(periodo, de, ate) {
     _eventos.length = 0;
     if (data && data.length) {
       data.forEach(e => {
-        if (e.tipo === 'deviceOverspeed') e = { ...e, tipo: 'overspeed' };
+        e = _normalizarEventoCliente(e);
         const time = new Date(e.serverTime || Date.now()).getTime();
         const tiposPermitidos = TIPOS_EVENTO_CLIENTE_FILTRO.map(t => t.tipo);
-        if (time <= _eventosLimposAteCliente || !tiposPermitidos.includes(e.tipo)) return;
+        if (_eventoLimpoCliente(e) || !tiposPermitidos.includes(e.tipo)) return;
         _eventos.push(e);
       });
     }
@@ -555,10 +598,10 @@ function _atualizarFiltrosTipo() {
 }
 
 function adicionarEvento(evt) {
-  if (evt.tipo === 'deviceOverspeed') evt = { ...evt, tipo: 'overspeed' };
+  evt = _normalizarEventoCliente(evt);
   const time = new Date(evt.serverTime || Date.now()).getTime();
   const tiposPermitidos = TIPOS_EVENTO_CLIENTE_FILTRO.map(t => t.tipo);
-  if (time <= _eventosLimposAteCliente || !tiposPermitidos.includes(evt.tipo)) return;
+  if (_eventoLimpoCliente(evt) || !tiposPermitidos.includes(evt.tipo)) return;
   _eventos.unshift(evt);
   if (_eventos.length > MAX_EVENTOS) _eventos.length = MAX_EVENTOS;
   renderEventosLista();
@@ -2354,7 +2397,14 @@ window.focar = function (did, opts = {}) {
   _centralizarDispositivo(v.posicao, 16, opts.offsetPx || 0, true, opts.offsetY || 0);
   setTimeout(() => {
     if (opts.abrirPopup === false) return;
-    if (_mostrarPopup && marcadores[did] && map.hasLayer(marcadores[did])) marcadores[did].openPopup();
+    if (_mostrarPopup && marcadores[did] && map.hasLayer(marcadores[did])) {
+      const marker = marcadores[did];
+      const className = marker.getPopup()?.options?.className || '';
+      if (className.includes('popup-evento-moderno')) {
+        marker.bindPopup(criarPopupSimples(veiculosMap[did]), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+      }
+      marker.openPopup();
+    }
   }, 900);
 };
 
