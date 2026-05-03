@@ -323,6 +323,8 @@ const TIPOS_EVENTO_ADMIN = [
   { tipo: 'alarm',          label: 'Alarme',                     css: 'tipo-alarm'    },
   { tipo: 'textMessage',    label: 'Mensagem de Texto Recebida', css: 'tipo-text'     },
   { tipo: 'driverChanged',  label: 'Condutor Alterado',          css: 'tipo-driver'   },
+  { tipo: 'manutencaoAlerta', label: 'Alerta de Manutencao',    css: 'tipo-fuel' },
+  { tipo: 'manutencaoAtrasada', label: 'Manutencao Atrasada',   css: 'tipo-overspeed' },
   { tipo: 'trocaOleoFeita',  label: 'Troca de Óleo Realizada',  css: 'tipo-ignition' },
   { tipo: 'manutencao',      label: 'Alerta de Manutenção',     css: 'tipo-overspeed' },
   { tipo: 'manutencaoFeita', label: 'Manutenção Realizada',     css: 'tipo-ignition' },
@@ -604,8 +606,10 @@ function renderEventosLista() {
       case 'ignitionOff': return { color: '#e67e22', icon: 'fa-power-off' };
       case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c', icon: 'fa-exclamation-triangle' };
       case 'geofenceEnter': case 'kmReduzida': return { color: '#2980b9', icon: 'fa-sign-in' };
-      case 'geofenceExit': case 'trocaOleo': return { color: '#e67e22', icon: 'fa-sign-out' };
+      case 'geofenceExit': case 'trocaOleo': case 'manutencaoAlerta': return { color: '#e67e22', icon: tipo === 'manutencaoAlerta' ? 'fa-wrench' : 'fa-sign-out' };
+      case 'manutencaoAtrasada': return { color: '#e74c3c', icon: 'fa-exclamation-triangle' };
       case 'trocaOleoFeita': return { color: '#27ae60', icon: 'fa-check-circle' };
+      case 'manutencaoFeita': return { color: '#27ae60', icon: 'fa-check-circle' };
       default: return { color: '#2980b9', icon: 'fa-bell' };
     }
   };
@@ -657,7 +661,9 @@ window.clicarEvento = function (idx) {
     switch (e.tipo) {
       case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60' };
       case 'ignitionOff': return { color: '#e67e22' };
-      case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c' };
+      case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': case 'manutencaoAtrasada': return { color: '#e74c3c' };
+      case 'manutencaoAlerta': return { color: '#e67e22' };
+      case 'manutencaoFeita': return { color: '#27ae60' };
       default: return { color: '#2980b9' };
     }
   })();

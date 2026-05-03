@@ -79,6 +79,16 @@ async function _ativarNotificacaoManutencao(clienteLoginId: string, dispositivoI
   }
 }
 
+function _deduplicarRecorrencias<T extends { titulo: string; intervaloKm: number; kmBase: number }>(recorrencias: T[]): T[] {
+  const vistos = new Set<string>();
+  return recorrencias.filter((rec) => {
+    const chave = `${rec.titulo.trim().toLowerCase()}|${rec.intervaloKm}|${Math.round(rec.kmBase)}`;
+    if (vistos.has(chave)) return false;
+    vistos.add(chave);
+    return true;
+  });
+}
+
 // ── Registros ─────────────────────────────────────────────────────────────────
 
 // GET /api/cliente/manutencoes/registros?dispositivoId=X
@@ -199,7 +209,7 @@ router.get('/recorrencias', async (req: any, res) => {
       orderBy: { createdAt: 'asc' },
     });
 
-    res.json(recorrencias);
+    res.json(_deduplicarRecorrencias(recorrencias));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao carregar recorrências.' });

@@ -254,7 +254,17 @@ router.get('/eventos', async (req, res) => {
       },
     });
 
-    res.json(eventos.map(e => ({
+    const vistos = new Set<string>();
+    const eventosUnicos = eventos.filter((e) => {
+      const minuto = new Date(e.createdAt);
+      minuto.setSeconds(0, 0);
+      const chave = `${e.tipoEvento}|${e.dispositivoId || ''}|${e.mensagem}|${minuto.toISOString()}`;
+      if (vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+
+    res.json(eventosUnicos.map(e => ({
       id:               e.id,
       dispositivoId:    e.dispositivoId,
       tipo:             e.tipoEvento,

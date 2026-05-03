@@ -29,6 +29,59 @@ async function _dispositivoIdsDoClienteLogin(clienteLoginId: string): Promise<st
   ];
 }
 
+async function _dispositivosDoClienteLogin(clienteLoginId: string): Promise<Array<{
+  id: string;
+  clienteId: string | null;
+  responsavelLoginId: string | null;
+}>> {
+  const login = await prisma.clienteLogin.findUnique({
+    where: { id: clienteLoginId },
+    select: { clienteId: true },
+  });
+  if (!login) return [];
+
+  const dispositivos = await prisma.dispositivo.findMany({
+    where: {
+      OR: [
+        { clienteId: login.clienteId },
+        { clientesVinculados: { some: { clienteId: login.clienteId } } },
+      ],
+    },
+    select: {
+      id: true,
+      clienteId: true,
+      cliente: { select: { login: { select: { id: true } } } },
+    },
+  });
+
+  return dispositivos.map(d => ({
+    id: d.id,
+    clienteId: d.clienteId,
+    responsavelLoginId: d.cliente?.login?.id ?? null,
+  }));
+}
+
+async function _contextoDispositivoCliente(clienteLoginId: string, dispositivoId?: string): Promise<{
+  idsPermitidos: string[];
+  filtroDispositivo: string | undefined;
+  responsavelLoginIds: string[];
+  responsavelClienteIds: string[];
+  loginCanonicalPorDispositivo: Map<string, string>;
+}> {
+  const dispositivos = await _dispositivosDoClienteLogin(clienteLoginId);
+  const idsPermitidos = dispositivos.map(d => d.id);
+  const filtroDispositivo = dispositivoId && idsPermitidos.includes(dispositivoId) ? dispositivoId : undefined;
+  const alvoIds = filtroDispositivo ? [filtroDispositivo] : idsPermitidos;
+  const alvo = dispositivos.filter(d => alvoIds.includes(d.id));
+  return {
+    idsPermitidos,
+    filtroDispositivo,
+    responsavelLoginIds: Array.from(new Set(alvo.map(d => d.responsavelLoginId).filter((v): v is string => !!v))),
+    responsavelClienteIds: Array.from(new Set(alvo.map(d => d.clienteId).filter((v): v is string => !!v))),
+    loginCanonicalPorDispositivo: new Map(dispositivos.map(d => [d.id, d.responsavelLoginId || clienteLoginId])),
+  };
+}
+
 async function _ativarNotificacaoManutencao(clienteLoginId: string, dispositivoId: string) {
   try {
     await prisma.preferenciaNotificacao.upsert({
@@ -41,6 +94,16 @@ async function _ativarNotificacaoManutencao(clienteLoginId: string, dispositivoI
   } catch (err) {
     console.error('Erro ao ativar notificação de manutenção:', err);
   }
+}
+
+function _deduplicarRecorrencias<T extends { titulo: string; intervaloKm: number; kmBase: number }>(recorrencias: T[]): T[] {
+  const vistos = new Set<string>();
+  return recorrencias.filter((rec) => {
+    const chave = `${rec.titulo.trim().toLowerCase()}|${rec.intervaloKm}|${Math.round(rec.kmBase)}`;
+    if (vistos.has(chave)) return false;
+    vistos.add(chave);
+    return true;
+  });
 }
 
 // ── Clientes e dispositivos ───────────────────────────────────────────────────
@@ -91,19 +154,16 @@ router.get('/clientes/:clienteLoginId/registros', async (req, res) => {
     const { clienteLoginId } = req.params;
     const { dispositivoId } = req.query as { dispositivoId?: string };
 
-    const idsPermitidos = await _dispositivoIdsDoClienteLogin(clienteLoginId);
-    if (!idsPermitidos.length) return res.json([]);
-
-    const filtroDispositivo = dispositivoId && idsPermitidos.includes(dispositivoId)
-      ? dispositivoId
-      : undefined;
+    const ctx = await _contextoDispositivoCliente(clienteLoginId, dispositivoId);
+    if (!ctx.idsPermitidos.length) return res.json([]);
 
     const registros = await prisma.manutencaoRegistro.findMany({
       where: {
-        dispositivoId: filtroDispositivo ?? { in: idsPermitidos },
+        dispositivoId: ctx.filtroDispositivo ?? { in: ctx.idsPermitidos },
         OR: [
-          { clienteLoginId },
-          { origem: 'ADMIN', dispositivoId: filtroDispositivo ?? { in: idsPermitidos } },
+          { origem: 'ADMIN' },
+          { clienteLoginId: { in: ctx.responsavelLoginIds } },
+          { clienteLogin: { clienteId: { in: ctx.responsavelClienteIds } } },
         ],
       },
       include: {
@@ -130,15 +190,16 @@ router.post('/clientes/:clienteLoginId/registros', async (req: any, res) => {
       return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, dataRealizacao.' });
     }
 
-    const idsPermitidos = await _dispositivoIdsDoClienteLogin(clienteLoginId);
-    if (!idsPermitidos.includes(dispositivoId)) {
+    const ctx = await _contextoDispositivoCliente(clienteLoginId, dispositivoId);
+    if (!ctx.idsPermitidos.includes(dispositivoId)) {
       return res.status(403).json({ message: 'Dispositivo não pertence a este cliente.' });
     }
+    const clienteLoginIdCanonical = ctx.loginCanonicalPorDispositivo.get(dispositivoId) || clienteLoginId;
 
     const registro = await prisma.manutencaoRegistro.create({
       data: {
         dispositivoId,
-        clienteLoginId,
+        clienteLoginId: clienteLoginIdCanonical,
         criadoPorAdminId: adminId,
         titulo,
         tipo: tipo || 'preventiva',
@@ -181,20 +242,17 @@ router.get('/clientes/:clienteLoginId/recorrencias', async (req, res) => {
     const { clienteLoginId } = req.params;
     const { dispositivoId } = req.query as { dispositivoId?: string };
 
-    const idsPermitidos = await _dispositivoIdsDoClienteLogin(clienteLoginId);
-    if (!idsPermitidos.length) return res.json([]);
-
-    const filtroDispositivo = dispositivoId && idsPermitidos.includes(dispositivoId)
-      ? dispositivoId
-      : undefined;
+    const ctx = await _contextoDispositivoCliente(clienteLoginId, dispositivoId);
+    if (!ctx.idsPermitidos.length) return res.json([]);
 
     const recorrencias = await prisma.manutencaoRecorrencia.findMany({
       where: {
-        dispositivoId: filtroDispositivo ?? { in: idsPermitidos },
+        dispositivoId: ctx.filtroDispositivo ?? { in: ctx.idsPermitidos },
         ativa: true,
         OR: [
-          { clienteLoginId },
-          { origem: 'ADMIN', dispositivoId: filtroDispositivo ?? { in: idsPermitidos } },
+          { origem: 'ADMIN' },
+          { clienteLoginId: { in: ctx.responsavelLoginIds } },
+          { clienteLogin: { clienteId: { in: ctx.responsavelClienteIds } } },
         ],
       },
       include: {
@@ -203,7 +261,7 @@ router.get('/clientes/:clienteLoginId/recorrencias', async (req, res) => {
       orderBy: { createdAt: 'asc' },
     });
 
-    res.json(recorrencias);
+    res.json(_deduplicarRecorrencias(recorrencias));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao carregar recorrências.' });
@@ -221,10 +279,11 @@ router.post('/clientes/:clienteLoginId/recorrencias', async (req: any, res) => {
       return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, intervaloKm.' });
     }
 
-    const idsPermitidos = await _dispositivoIdsDoClienteLogin(clienteLoginId);
-    if (!idsPermitidos.includes(dispositivoId)) {
+    const ctx = await _contextoDispositivoCliente(clienteLoginId, dispositivoId);
+    if (!ctx.idsPermitidos.includes(dispositivoId)) {
       return res.status(403).json({ message: 'Dispositivo não pertence a este cliente.' });
     }
+    const clienteLoginIdCanonical = ctx.loginCanonicalPorDispositivo.get(dispositivoId) || clienteLoginId;
 
     const dispositivo = await prisma.dispositivo.findUnique({
       where: { id: dispositivoId },
@@ -235,7 +294,7 @@ router.post('/clientes/:clienteLoginId/recorrencias', async (req: any, res) => {
     const recorrencia = await prisma.manutencaoRecorrencia.create({
       data: {
         dispositivoId,
-        clienteLoginId,
+        clienteLoginId: clienteLoginIdCanonical,
         criadoPorAdminId: adminId,
         titulo,
         descricao: descricao || null,
@@ -246,7 +305,7 @@ router.post('/clientes/:clienteLoginId/recorrencias', async (req: any, res) => {
       include: { dispositivo: { select: { nome: true, placa: true, odometroSistemaMetros: true } } },
     });
 
-    await _ativarNotificacaoManutencao(clienteLoginId, dispositivoId);
+    await _ativarNotificacaoManutencao(clienteLoginIdCanonical, dispositivoId);
 
     res.json(recorrencia);
   } catch (err) {
@@ -319,6 +378,7 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
 
+    const clienteLoginIdCanonical = recorrencia.clienteLoginId || clienteLoginId;
     const kmAtual = (recorrencia.dispositivo.odometroSistemaMetros ?? 0) / 1000;
 
     await prisma.manutencaoRecorrencia.update({
@@ -329,7 +389,7 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
     await prisma.manutencaoRegistro.create({
       data: {
         dispositivoId: recorrencia.dispositivoId,
-        clienteLoginId,
+        clienteLoginId: clienteLoginIdCanonical,
         criadoPorAdminId: adminId,
         titulo: `${recorrencia.titulo} — confirmado pelo admin`,
         tipo: 'preventiva',
@@ -344,12 +404,12 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
 
     // Notificação verde: manutenção realizada
     const prefFeita = await prisma.preferenciaNotificacao.findUnique({
-      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
+      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId: clienteLoginIdCanonical, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
     });
     if (prefFeita && (prefFeita.web || prefFeita.app)) {
       await prisma.eventoNotificacao.create({
         data: {
-          clienteLoginId,
+          clienteLoginId: clienteLoginIdCanonical,
           dispositivoId: recorrencia.dispositivoId,
           tipoEvento: 'manutencaoFeita',
           mensagem: `Manutenção "${recorrencia.titulo}" realizada! Contador reiniciado a partir de ${Math.round(kmAtual).toLocaleString('pt-BR')} km.`,
@@ -433,10 +493,11 @@ router.post('/bulk/recorrencias', async (req: any, res) => {
 
     for (const loginId of clienteLoginIds as string[]) {
       try {
-        const ids = await _dispositivoIdsDoClienteLogin(loginId);
-        const alvoIds = dispositivoId && ids.includes(dispositivoId) ? [dispositivoId] : ids;
+        const ctx = await _contextoDispositivoCliente(loginId, dispositivoId || undefined);
+        const alvoIds = dispositivoId && ctx.idsPermitidos.includes(dispositivoId) ? [dispositivoId] : ctx.idsPermitidos;
 
         for (const devId of alvoIds) {
+          const clienteLoginIdCanonical = ctx.loginCanonicalPorDispositivo.get(devId) || loginId;
           const dispositivo = await prisma.dispositivo.findUnique({
             where: { id: devId },
             select: { odometroSistemaMetros: true },
@@ -446,7 +507,7 @@ router.post('/bulk/recorrencias', async (req: any, res) => {
           await prisma.manutencaoRecorrencia.create({
             data: {
               dispositivoId: devId,
-              clienteLoginId: loginId,
+              clienteLoginId: clienteLoginIdCanonical,
               criadoPorAdminId: adminId,
               titulo,
               descricao: descricao || null,
@@ -456,8 +517,8 @@ router.post('/bulk/recorrencias', async (req: any, res) => {
             },
           });
 
-          await _ativarNotificacaoManutencao(loginId, devId);
-          criados.push(`${loginId}/${devId}`);
+          await _ativarNotificacaoManutencao(clienteLoginIdCanonical, devId);
+          criados.push(`${clienteLoginIdCanonical}/${devId}`);
         }
       } catch (e) {
         erros.push(loginId);

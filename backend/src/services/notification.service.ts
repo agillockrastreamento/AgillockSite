@@ -293,14 +293,15 @@ class NotificationService {
         if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, vinculo.cliente);
       }
 
-      for (const cliente of clientesMap.values()) {
+      const clientes = Array.from(clientesMap.values());
+      for (const cliente of clientes) {
         const clienteLogin = cliente.login;
         if (!clienteLogin?.ativo) continue;
         await this._verificarKmExcedida(clienteLogin.id, dispositivo, odometroMetros);
         await this._verificarKmReduzida(clienteLogin.id, dispositivo, odometroMetros);
         await this._verificarTrocaOleo(clienteLogin.id, dispositivo, odometroMetros);
-        await this._verificarManutencaoRecorrencias(clienteLogin.id, dispositivo, odometroMetros);
       }
+      await this._verificarManutencaoRecorrencias(dispositivo, odometroMetros, clientes.map(c => c.login).filter((l): l is { id: string; email: string; ativo: boolean } => !!l?.ativo));
     } catch (error) {
       console.error('Erro ao verificar km notificações:', error);
     }
@@ -443,24 +444,32 @@ class NotificationService {
   }
 
   private async _verificarManutencaoRecorrencias(
-    clienteLoginId: string,
     dispositivo: DispositivoBasico,
     odometroMetros: number,
+    clienteLogins: Array<{ id: string; email: string; ativo: boolean }>,
   ) {
-    const pref = await prisma.preferenciaNotificacao.findUnique({
-      where: {
-        clienteLoginId_dispositivoId_tipoEvento: {
-          clienteLoginId,
-          dispositivoId: dispositivo.id,
-          tipoEvento: 'manutencao',
+    const targets: Array<{ clienteLoginId: string; pref: { web: boolean; app: boolean; email: boolean } }> = [];
+    for (const login of clienteLogins) {
+      const pref = await prisma.preferenciaNotificacao.findUnique({
+        where: {
+          clienteLoginId_dispositivoId_tipoEvento: {
+            clienteLoginId: login.id,
+            dispositivoId: dispositivo.id,
+            tipoEvento: 'manutencao',
+          },
         },
-      },
-    });
-    if (!pref || (!pref.web && !pref.app && !pref.email)) return;
+      });
+      if (pref && (pref.web || pref.app || pref.email)) {
+        targets.push({ clienteLoginId: login.id, pref });
+      }
+    }
+    if (!targets.length) return;
 
-    const recorrencias = await prisma.manutencaoRecorrencia.findMany({
-      where: { dispositivoId: dispositivo.id, clienteLoginId, ativa: true },
+    const recorrenciasRaw = await prisma.manutencaoRecorrencia.findMany({
+      where: { dispositivoId: dispositivo.id, ativa: true },
+      orderBy: { createdAt: 'asc' },
     });
+    const recorrencias = this._deduplicarRecorrenciasManutencao(recorrenciasRaw);
 
     const odometroKm = odometroMetros / 1000;
     const nome = dispositivo.nome;
@@ -475,7 +484,7 @@ class NotificationService {
       if (!rec.alerta50Enviado && kmPercorrido >= intervalo - 50) {
         const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
         const mensagem = `Manutenção Próxima: "${titulo}" no veículo ${nome}${pl} — faltam ${kmRestante} km para o próximo serviço (intervalo: ${intervalo} km).`;
-        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencaoAlerta', mensagem);
+        await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem);
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta50Enviado: true } });
         rec.alerta50Enviado = true;
       }
@@ -484,7 +493,7 @@ class NotificationService {
       if (!rec.alerta25Enviado && kmPercorrido >= intervalo - 25) {
         const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
         const mensagem = `Manutenção Urgente: "${titulo}" no veículo ${nome}${pl} — faltam apenas ${kmRestante} km para o próximo serviço!`;
-        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencaoAlerta', mensagem);
+        await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem);
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta25Enviado: true } });
         rec.alerta25Enviado = true;
       }
@@ -492,7 +501,7 @@ class NotificationService {
       // At limit (orange → transitions to red on post-due)
       if (!rec.alerta0Enviado && kmPercorrido >= intervalo) {
         const mensagem = `Manutenção Devida: "${titulo}" no veículo ${nome}${pl} atingiu o intervalo de ${intervalo} km. Realize o serviço!`;
-        await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencaoAlerta', mensagem);
+        await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem);
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta0Enviado: true } });
         rec.alerta0Enviado = true;
       }
@@ -505,12 +514,33 @@ class NotificationService {
           const kmAtrasado = i * 50;
           if (ultima < kmAtrasado) {
             const mensagem = `Manutenção Atrasada: "${titulo}" no veículo ${nome}${pl} está ${kmAtrasado} km acima do intervalo recomendado (${intervalo} km). Realize o serviço urgente!`;
-            await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'manutencaoAtrasada', mensagem);
+            await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAtrasada', mensagem);
             await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { ultimaAlertaPostDueKm: kmAtrasado } });
             break;
           }
         }
       }
+    }
+  }
+
+  private _deduplicarRecorrenciasManutencao<T extends { titulo: string; intervaloKm: number; kmBase: number }>(recorrencias: T[]): T[] {
+    const vistos = new Set<string>();
+    return recorrencias.filter((rec) => {
+      const chave = `${rec.titulo.trim().toLowerCase()}|${rec.intervaloKm}|${Math.round(rec.kmBase)}`;
+      if (vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+  }
+
+  private async _notificarTargetsManutencao(
+    targets: Array<{ clienteLoginId: string; pref: { web: boolean; app: boolean; email: boolean } }>,
+    dispositivo: DispositivoBasico,
+    tipo: 'manutencaoAlerta' | 'manutencaoAtrasada',
+    mensagem: string,
+  ) {
+    for (const target of targets) {
+      await this._salvarEEnviar(target.clienteLoginId, dispositivo, target.pref, tipo, mensagem);
     }
   }
 
