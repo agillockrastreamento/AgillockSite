@@ -737,6 +737,20 @@ function _nomeDispositivo(dispositivoId) {
   return v.placa ? `${v.nome} (${v.placa})` : v.nome;
 }
 
+function _restaurarPopupVeiculoAdmin(dispositivoId) {
+  const marker = marcadores[dispositivoId];
+  const v = veiculosMap[dispositivoId];
+  if (!marker || !v) return;
+  marker._eventPopupAberto = false;
+  marker._eventOriginalPopup = null;
+  marker._eventPopupToken = null;
+  if (_mostrarPopup) {
+    marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+  } else {
+    marker.unbindPopup();
+  }
+}
+
 window.clicarEvento = function (idx) {
   const e = _eventos[idx];
   if (!e) return;
@@ -761,7 +775,7 @@ window.clicarEvento = function (idx) {
     if (!marcadores[e.dispositivoId]) renderMarcadores();
     const marker = marcadores[e.dispositivoId];
     if (marker) {
-      if (!marker._eventOriginalPopup) marker._eventOriginalPopup = marker.getPopup();
+      _restaurarPopupVeiculoAdmin(e.dispositivoId);
 
       const addrId = `evt-addr-admin-${idx}`;
       const v = veiculosMap[e.dispositivoId];
@@ -809,21 +823,19 @@ window.clicarEvento = function (idx) {
         </div>
       `;
 
+      const popupToken = Date.now() + '-' + idx;
       marker._eventPopupAberto = true;
+      marker._eventPopupToken = popupToken;
       marker.bindPopup(content, { className: 'popup-evento-moderno', offset: [0, -10], maxWidth: 280 });
       setTimeout(function() {
-        if (map.hasLayer(marker)) {
+        if (marker._eventPopupToken === popupToken && map.hasLayer(marker)) {
           marker.openPopup();
           if (!enderecoInicial && eventoTemCoords) geocodificarCoordenadas(eventoLat, eventoLng, addrId);
         }
       }, 500);
 
       marker.once('popupclose', function() {
-        marker._eventPopupAberto = false;
-        if (marker._eventOriginalPopup) {
-          marker.bindPopup(marker._eventOriginalPopup);
-          marker._eventOriginalPopup = null;
-        }
+        _restaurarPopupVeiculoAdmin(e.dispositivoId);
         _eventoPopupAtualIdx = null;
       });
     }
@@ -2995,7 +3007,7 @@ window.focar = function (dispositivoId, opts = {}) {
       const marker = marcadores[dispositivoId];
       const className = marker.getPopup()?.options?.className || '';
       if (className.includes('popup-evento-moderno')) {
-        marker.bindPopup(criarPopupSimples(veiculosMap[dispositivoId]), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+        _restaurarPopupVeiculoAdmin(dispositivoId);
       }
       marcadores[dispositivoId].openPopup();
     }
