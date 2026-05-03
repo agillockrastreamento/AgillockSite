@@ -75,6 +75,16 @@ function validarClienteParaCarne(cliente: { tipoPessoa?: string | null; socios?:
 }
 
 // ─── POST /api/carnes — Gerar carnê individual (1 dispositivo ou placa) ───────
+function montarNomeItemDispositivo(
+  dispositivo: { nome?: string | null; placa?: string | null },
+  descricaoBoleto?: string | null,
+): string {
+  const placa = dispositivo.placa?.trim();
+  const nome = dispositivo.nome?.trim();
+  const base = placa ? `Placa ${placa}` : (nome ? `${nome}` : '');
+  return (descricaoBoleto ? `${base} - ${descricaoBoleto}` : base).slice(0, 255);
+}
+
 router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const { clienteId, placaId, dispositivoId, valor, dataVencimento, numeroParcelas, vendedorId, descricaoBoleto } = req.body;
 
@@ -121,10 +131,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
       res.status(404).json({ error: 'Dispositivo não encontrado ou inativo.' });
       return;
     }
-    const base = dispositivo.placa
-      ? `Placa ${dispositivo.placa}`
-      : `Placa ${dispositivo.identificador}`;
-    itemNome = (descricaoBoleto ? `${base} - ${descricaoBoleto}` : base).slice(0, 255);
+    itemNome = montarNomeItemDispositivo(dispositivo, descricaoBoleto);
     itemVendedorId = dispositivo.vendedorId;
     boletoExtra = { dispositivoId };
 
@@ -779,13 +786,9 @@ router.post('/unificar-dispositivos', requireRoles('ADMIN', 'COLABORADOR'), asyn
   // Montar itens EFI
   const itensDisp = dispositivos.map((d: any) => {
     const db = dispositivosDb.find((x) => x.id === d.dispositivoId)!;
-    const base = db.placa
-      ? `Placa ${db.placa}`
-      : `${db.identificador}`;
-    const nomeCompleto = descricaoBoleto ? `${base} - ${descricaoBoleto}` : base;
     return {
       dispositivoId: d.dispositivoId as string,
-      nome: nomeCompleto.slice(0, 255),
+      nome: montarNomeItemDispositivo(db, descricaoBoleto),
       valor: Number(d.valor),
     };
   });
