@@ -57,7 +57,7 @@ Backend consumindo a API REST do Traccar e expondo WebSocket para o frontend.
 **O que foi implementado:**
 - `backend/src/services/traccar.service.ts` — todas as funções de acesso à API Traccar (dispositivos, posições, histórico, viagens, paradas, eventos, resumo, comandos)
 - `backend/src/services/traccar.ws.ts` — bridge WebSocket: conecta ao Traccar, transforma mensagens e repassa para todos os clientes frontend conectados em `/ws/rastreamento`
-- `backend/src/routes/rastreamento.routes.ts` — rotas REST completas (ver `API_BACKEND.md`)
+- `backend/src/routes/rastreamento.routes.ts` — rotas REST completas (ver `docs/traccar/API.md`)
 
 **Testes concluídos:** `TESTES.md` → Fase 3 e Fase 4 ✅
 
@@ -122,31 +122,35 @@ Sistema funcionando de forma contínua em produção, filtros de posição invá
 
 ---
 
-## v2 — Portal do Cliente + melhorias globais de UI
+## v2 — Portal do Cliente + recursos avançados ✅ Concluído
 
-Planejadas após a v1 estar operando de forma estável. Especificação completa em `docs/traccar/PORTAL_CLIENTE.md`.
+O portal do cliente e os recursos avançados de rastreamento foram implementados. A referência atual dos contratos está em `docs/traccar/API.md` e `docs/projeto/API.md`.
 
-### Etapa 7 — Login do cliente e portal (próxima fase)
+### Etapa 7 — Login do cliente e portal ✅ Concluído
 
-| Item | Descrição | Arquivo(s) |
+| Item | Status | Referência |
 |---|---|---|
-| **Sidebar minimizável** | Todos os perfis (admin, colaborador, vendedor, cliente) — apenas ícones quando collapsed, favicon como logo | `admin.css` + JS global |
-| **index.html** | Remover dropdown "Acessar" — botão único → `admin/login.html` | `index.html` |
-| **Backend login cliente** | Model `ClienteLogin` + rotas de CRUD + JWT separado para o portal | `schema.prisma` + novas rotas |
-| **Tab "Login" em cliente-detalhe** | Admin e colaborador gerenciam login do cliente; admin controla permissões do colaborador | `admin/cliente-detalhe.html`, `colaborador/cliente-detalhe.html` |
-| **Portal do cliente** | `cliente/login.html` + auth-guard próprio + JWT com perfil (responsável/vinculado) | `cliente/login.html`, `auth-guard-cliente.js` |
-| **Rastreamento do cliente** | Mesmo mapa ao vivo, com barra de veículos no rodapé (foto, placa, marca/modelo), overlay para histórico/relatório em vez de navegação | `cliente/rastreamento.html`, `rastreamento-cliente.js` |
-| **Bloqueio por inadimplência** | Se boleto vencido > 10 dias, modal bloqueante na entrada do rastreamento | Backend + frontend |
-| **Foto do veículo pelo cliente** | Upload separado da foto do admin; aparece apenas na tela do cliente | `POST /api/clientes/dispositivos/:id/foto` |
-| **Pagamentos do cliente** | Lista de boletos, filtros, segunda via — apenas para Cliente Responsável | `cliente/pagamentos.html` |
+| Login unificado com `ClienteLogin` e JWT `CLIENTE` | Concluído | `POST /api/auth/login` |
+| CRUD administrativo do login do cliente | Concluído | `/api/clientes/:id/login` |
+| Portal web do cliente | Concluído | `AgillockSite/cliente/` |
+| Rastreamento filtrado por cliente | Concluído | `/api/cliente/rastreamento/posicoes` |
+| Bloqueio por inadimplência > 10 dias | Concluído | `/api/cliente/rastreamento/status-acesso` |
+| Upload de foto do veículo pelo cliente | Concluído | `/api/cliente/dispositivos/:dispositivoId/foto` |
+| Pagamentos do cliente | Concluído | `/api/cliente/boletos` |
+| Preferências do portal | Concluído | `/api/cliente/rastreamento/prefs` |
 
-### Etapa 8 — Funcionalidades avançadas de rastreamento (futuro)
+### Etapa 8 — Funcionalidades avançadas de rastreamento ✅ Concluído
 
-| Funcionalidade | Descrição |
-|---|---|
-| Geocodificação reversa no backend | Endereço já resolvido na API, não no browser |
-| Geofences | Cercas virtuais por cliente/dispositivo |
-| Alertas de velocidade | Notificação quando ultrapassar limite configurado |
-| Alertas de ignição | Notificação ao ligar/desligar o veículo |
-| Comandos remotos | Solicitar posição, bloquear/desbloquear veículo (`comandos.html` já existe na sidebar) |
-| Tela de relatório | `relatorio.html` — histórico avançado por período (link já existe no card) |
+| Funcionalidade | Status | Referência |
+|---|---|---|
+| Geocodificação reversa no backend | Concluído | `/api/*/rastreamento/geocode/reverse` |
+| Geocercas admin e cliente | Concluído | `/api/rastreamento/geocercas`, `/api/cliente/rastreamento/geocercas` |
+| Alertas de velocidade, ignição, geocerca, energia e km | Concluído | `/api/cliente/notificacoes/*` |
+| Comandos remotos | Concluído | `/api/*/dispositivos/:id/comandos` |
+| Relatórios em lote e exportação XLSX | Concluído | `/api/*/rastreamento/relatorios/*` |
+| Medidores de sistema | Concluído | `/api/rastreamento/dispositivos/:id/medidores` |
+| Manutenções | Concluído | `/api/cliente/manutencoes/*` |
+
+## Próxima etapa — App mobile React Native Expo
+
+O backend, banco, site e integração Traccar estão prontos para o planejamento do app mobile. O app deve partir das rotas do cliente documentadas em `docs/projeto/API.md` e `docs/traccar/API.md`.

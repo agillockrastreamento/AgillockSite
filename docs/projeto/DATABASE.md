@@ -1,47 +1,38 @@
-# Schema do Banco de Dados
+# Banco de Dados - AgilLock Rastreamento
 
-ORM: Prisma | Banco: PostgreSQL
+Atualizado em: 2026-05-03
 
----
+ORM: Prisma
+Banco: PostgreSQL
+Schema fonte: `backend/prisma/schema.prisma`
 
-## Diagrama de Entidades
+## Visão geral
 
+```text
+User
+  -> Cliente
+      -> ClienteLogin
+      -> Placa
+      -> Dispositivo
+          -> DispositivoCliente
+          -> MotoristaDispositivo
+          -> PreferenciaNotificacao
+          -> EventoNotificacao
+          -> ManutencaoRegistro
+          -> ManutencaoRecorrencia
+          -> GeocercaDispositivo
+      -> Carne
+          -> Boleto
+              -> BoletoPlaca
+              -> BoletoDispositivo
+              -> ComissaoVendedor
+      -> Contrato
+      -> Geocerca
 ```
-User (ADMIN | COLABORADOR | VENDEDOR)
-  │
-  ├── cria → Cliente
-  │             │
-  │             ├── possui → Placa (1..N)
-  │             │              └── imagemUrl (foto do admin)
-  │             │              └── imagemUrlCliente (foto do cliente)
-  │             ├── possui → Carne (1..N)
-  │             │              └── possui → Boleto (1..N parcelas)
-  │             │                           └── gera → ComissaoVendedor
-  │             └── possui → ClienteLogin (0..1)
-  │                           └── JWT portal do cliente
-  │
-  ├── responsável vendas → Cliente (vendedor_id)
-  └── recebe → PagamentoComissao (por mês)
 
-Configuracoes (singleton — percentuais de comissão)
-```
-
----
-
-## Schema Prisma
+## Enums
 
 ```prisma
-// prisma/schema.prisma
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 enum Role {
   ADMIN
   COLABORADOR
@@ -54,8 +45,8 @@ enum StatusCliente {
 }
 
 enum TipoCarne {
-  INDIVIDUAL  // carnê vinculado a uma placa específica
-  UNIFICADO   // carnê que agrega múltiplas placas
+  INDIVIDUAL
+  UNIFICADO
 }
 
 enum StatusBoleto {
@@ -65,235 +56,290 @@ enum StatusBoleto {
   CANCELADO
   REEMBOLSADO
 }
-
-model User {
-  id         String   @id @default(uuid())
-  nome       String
-  email      String   @unique
-  senhaHash  String
-  role       Role
-  ativo      Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Permissões granulares (apenas para role COLABORADOR; ignoradas para ADMIN/VENDEDOR)
-  podeExcluirCliente    Boolean @default(true)
-  podeEditarCliente     Boolean @default(true)
-  podeInativarCliente   Boolean @default(true)
-  podeExcluirPlaca      Boolean @default(true)
-  podeInativarPlaca     Boolean @default(true)
-  podeBaixaManual       Boolean @default(true)
-  podeCancelarCarne     Boolean @default(true)
-  podeAlterarVencimento Boolean @default(true)
-  // Permissões de login do cliente (adicionadas na v2)
-  podeCriarLoginCliente    Boolean @default(true)
-  podeEditarLoginCliente   Boolean @default(true)
-  podeInativarLoginCliente Boolean @default(false)
-  podeExcluirLoginCliente  Boolean @default(false)
-
-  // Relacionamentos
-  clientesCriados  Cliente[]           @relation("ClienteCriador")
-  clientesVendidos Cliente[]           @relation("ClienteVendedor")
-  carnesGerados    Carne[]             @relation("CarneGeradoPor")
-  carnesVendidos   Carne[]             @relation("CarneVendedor")
-  placasVendidas   Placa[]             @relation("PlacaVendedor")
-  comissoes        ComissaoVendedor[]
-  pagamentos       PagamentoComissao[]
-}
-
-model Cliente {
-  id          String        @id @default(uuid())
-  nome        String
-  cpfCnpj     String?
-  // ... campos existentes ...
-  login       ClienteLogin?  // portal do cliente
-  telefone    String?
-  email       String?
-  notas       String?
-  status      StatusCliente @default(ATIVO)
-  // Endereço
-  cep         String?
-  logradouro  String?
-  numero      String?
-  complemento String?
-  bairro      String?
-  cidade      String?
-  estado      String?
-
-  // Relacionamentos
-  criadoPorId String
-  criadoPor   User   @relation("ClienteCriador", fields: [criadoPorId], references: [id])
-  vendedorId  String?
-  vendedor    User?  @relation("ClienteVendedor", fields: [vendedorId], references: [id])
-
-  placas  Placa[]
-  carnes  Carne[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Placa {
-  id          String        @id @default(uuid())
-  clienteId   String
-  cliente     Cliente       @relation(fields: [clienteId], references: [id])
-  placa       String
-  descricao   String?       // ex: "Carro preto Honda Civic"
-  ativo       Boolean       @default(true)
-  valorPadrao Decimal?      @db.Decimal(10,2)  // valor mensal padrão da placa (salvo no wizard)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  // Vendedor "dono" da placa: o primeiro que gerou cobrança para ela
-  // Uma vez definido, permanece mesmo em cobranças futuras
-  vendedorId  String?
-  vendedor    User?         @relation("PlacaVendedor", fields: [vendedorId], references: [id])
-
-  // Boletos vinculados a esta placa (carnês individuais)
-  boletos           Boleto[]
-  // Boletos unificados que incluem esta placa
-  boletosUnificados BoletoPlaca[]
-}
-
-model Carne {
-  id             String    @id @default(uuid())
-  clienteId      String
-  cliente        Cliente   @relation(fields: [clienteId], references: [id])
-  geradoPorId    String
-  geradoPor      User      @relation("CarneGeradoPor", fields: [geradoPorId], references: [id])
-  // Vendedor responsável pelo carnê (informado no wizard ou herdado do cliente)
-  vendedorId     String?
-  vendedor       User?     @relation("CarneVendedor", fields: [vendedorId], references: [id])
-  tipo           TipoCarne
-  // Referência externa no EFI
-  efiCarneId     String?   @unique
-  efiCarneLink   String?   // link para download do PDF
-  valorTotal     Decimal   @db.Decimal(10,2)
-  numeroParcelas Int       @default(1)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  boletos Boleto[]
-}
-
-model Boleto {
-  id             String      @id @default(uuid())
-  carneId        String
-  carne          Carne       @relation(fields: [carneId], references: [id])
-  // Placa associada (null para boleto unificado — usa BoletoPlaca)
-  placaId        String?
-  placa          Placa?      @relation(fields: [placaId], references: [id])
-  numeroParcela  Int
-  valor          Decimal     @db.Decimal(10,2)
-  vencimento     DateTime
-  status         StatusBoleto @default(PENDENTE)
-  dataPagamento  DateTime?
-  valorPago      Decimal?    @db.Decimal(10,2)
-  // Referência externa no EFI
-  efiChargeId    String?     @unique
-  linkBoleto     String?     // URL para visualizar/pagar o boleto
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  // Para boletos unificados
-  placasUnificadas BoletoPlaca[]
-  comissoes        ComissaoVendedor[]
-}
-
-// Relação M:N — Boleto Unificado ↔ Placas
-model BoletoPlaca {
-  boletoId   String
-  boleto     Boleto @relation(fields: [boletoId], references: [id])
-  placaId    String
-  placa      Placa  @relation(fields: [placaId], references: [id])
-  valorPlaca Decimal @db.Decimal(10,2) // valor individual desta placa dentro do boleto
-
-  @@id([boletoId, placaId])
-}
-
-model ComissaoVendedor {
-  id                 String   @id @default(uuid())
-  vendedorId         String
-  vendedor           User     @relation(fields: [vendedorId], references: [id])
-  boletoId           String
-  boleto             Boleto   @relation(fields: [boletoId], references: [id])
-  // Valor de referência para cálculo (valor da placa, não do boleto unificado)
-  valorReferencia    Decimal  @db.Decimal(10,2)
-  percentualAplicado Decimal  @db.Decimal(5,2)
-  valorComissao      Decimal  @db.Decimal(10,2)
-  pago               Boolean  @default(false)
-  createdAt          DateTime @default(now())
-}
-
-// Registro de pagamento de comissão ao vendedor (por mês)
-// Criado pelo admin na tela de carteira do vendedor
-model PagamentoComissao {
-  id              String   @id @default(uuid())
-  vendedorId      String
-  vendedor        User     @relation(fields: [vendedorId], references: [id])
-  mes             String   // formato YYYY-MM
-  valor           Decimal  @db.Decimal(10, 2)
-  pago            Boolean  @default(false)
-  comprovante     String?  // caminho relativo do arquivo (ex: "uploads/comprovantes/uuid.pdf")
-  comprovanteMime String?  // MIME type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([vendedorId, mes])
-}
-
-// Login do portal do cliente (separado de User, que é para colaboradores/admin/vendedor)
-model ClienteLogin {
-  id        String   @id @default(cuid())
-  clienteId String   @unique
-  email     String   @unique
-  senhaHash String
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  cliente   Cliente  @relation(fields: [clienteId], references: [id])
-}
-
-// Singleton de configurações (sempre ID = "1")
-model Configuracoes {
-  id                String  @id @default("1")
-  percentualMenor   Decimal @db.Decimal(5,2) @default(12.50)  // comissão para valor < valorReferencia
-  percentualMaior   Decimal @db.Decimal(5,2) @default(18.00)  // comissão para valor >= valorReferencia
-  valorReferencia   Decimal @db.Decimal(10,2) @default(50.00)
-  multaPercentual   Decimal @db.Decimal(5,2) @default(5.00)   // multa por atraso (% ao mês)
-  jurosDiarios      Decimal @db.Decimal(5,2) @default(0.33)   // juros por atraso (% ao dia)
-  updatedAt         DateTime @updatedAt
-}
 ```
 
----
+## Usuários internos
 
----
+`User` representa admin, colaborador e vendedor.
 
-## Novos campos em modelos existentes (v2)
+Campos importantes:
+
+- `role`
+- `ativo`
+- permissões granulares de cliente, placa, dispositivo, cobrança, contrato e monitoramento
+- `podeAcessarMonitoramento`
+- permissões de login do cliente
+
+Permissões de colaborador:
+
+```text
+podeExcluirCliente, podeEditarCliente, podeInativarCliente,
+podeExcluirPlaca, podeInativarPlaca,
+podeExcluirDispositivo, podeInativarDispositivo,
+podeCriarDispositivo, podeEditarDispositivo, podeDesvincularDispositivo,
+podeBaixaManual, podeCancelarCarne, podeAlterarVencimento,
+podeCriarContrato, podeEditarContrato, podeExcluirContrato,
+podeAcessarMonitoramento,
+podeCriarLoginCliente, podeEditarLoginCliente,
+podeInativarLoginCliente, podeExcluirLoginCliente
+```
+
+`AdminPreferencia` guarda preferências JSON por usuário admin/colaborador.
+
+## Cliente e login do cliente
+
+`Cliente` guarda dados cadastrais, endereço, tipo pessoa, origem, vendedor responsável, contratos, placas, dispositivos e login.
+
+`ClienteLogin` é separado de `User` e usado pelo portal/app.
+
+Campos:
+
+```text
+id, clienteId, email, senhaHash, ativo, prefs
+```
+
+O JWT de cliente usa `ClienteLogin.id` como `sub` e `Cliente.id` como `clienteId`.
+
+## Placas
+
+`Placa` mantém compatibilidade com cobranças por placa.
+
+Campos:
+
+```text
+placa, descricao, ativo, valorPadrao, clienteId, vendedorId
+```
+
+`vendedorId` é o dono comercial da placa para cálculo de comissão.
+
+## Dispositivos
+
+`Dispositivo` é o cadastro principal do rastreamento.
+
+Campos de integração:
+
+```text
+traccarId
+identificador
+```
+
+`identificador` é o IMEI e chave de vínculo com `tc_devices.uniqueid` no Traccar.
+
+Campos do rastreador:
+
+```text
+modeloRastreador, telefoneRastreador, iccid, operadora
+```
+
+Campos do veículo:
+
+```text
+placa, marca, modeloVeiculo, cor, ano, renavam, chassi,
+combustivel, localInstalacao, instalador
+```
+
+Campos de medidores do sistema:
+
+```text
+ignorarOdometro
+odometroSistemaMetros
+horimetroSistemaSegundos
+telemetriaUltimaPosicaoEm
+telemetriaUltimaLatitude
+telemetriaUltimaLongitude
+telemetriaUltimaIgnicao
+```
+
+Imagens:
+
+```text
+imagemUrl         -> imagem cadastrada pelo admin
+imagemUrlCliente  -> imagem enviada pelo cliente
+```
+
+Vínculos:
+
+- `clienteId`: cliente principal/faturamento.
+- `DispositivoCliente`: clientes vinculados que também podem visualizar.
+- `MotoristaDispositivo`: motoristas vinculados.
+
+## Motoristas
+
+`Motorista` representa condutor e pode ser sincronizado com o Traccar como driver.
+
+Campos:
+
+```text
+nome, identificador, traccarId, cnh, telefone, ativo
+```
+
+Relação N:N com dispositivos via `MotoristaDispositivo`.
+
+## Cobranças
+
+`Carne` agrupa boletos.
+
+Campos:
+
+```text
+tipo, efiCarneId, efiCarneLink, valorTotal, numeroParcelas,
+clienteId, geradoPorId, vendedorId
+```
+
+`Boleto` representa parcela/cobrança.
+
+Campos:
+
+```text
+numeroParcela, valor, vencimento, status,
+dataPagamento, valorPago, efiChargeId, linkBoleto,
+placaId, dispositivoId
+```
+
+Relações para unificados:
+
+- `BoletoPlaca`: valor individual por placa.
+- `BoletoDispositivo`: valor individual por dispositivo.
+
+## Comissões
+
+`ComissaoVendedor` é gerada quando boleto é marcado como pago.
+
+Campos:
+
+```text
+valorReferencia, percentualAplicado, valorComissao,
+pago, dataPagamento, vendedorId, boletoId
+```
+
+`PagamentoComissao` registra pagamento mensal ao vendedor:
+
+```text
+vendedorId, mes, valor, pago, comprovante, comprovanteMime
+```
+
+Constraint:
 
 ```prisma
-// model Dispositivo — adicionar:
-imagemUrlCliente String?   // foto enviada pelo cliente (separada da imagemUrl do admin)
+@@unique([vendedorId, mes])
 ```
 
----
+## Configurações
 
-## Observações Importantes
+`Configuracoes` é singleton com `id = "1"`.
 
-1. **Carnê Unificado**: quando `tipo = UNIFICADO`, a coluna `placaId` do boleto fica `null` e as placas são listadas em `BoletoPlaca` com seus valores individuais.
+Campos:
 
-2. **Cálculo de Comissão**: feito no momento em que o boleto é marcado como `PAGO`. A comissão é calculada **por placa**, usando `Placa.vendedorId` (não o vendedor do cliente). Para boletos unificados, itera sobre `BoletoPlaca` e gera um `ComissaoVendedor` por placa.
+```text
+percentualMenor, percentualMaior, valorReferencia,
+multaPercentual, jurosDiarios,
+representanteNome, representanteEmail, representanteTelefone, representanteCpf
+```
 
-3. **Dono da Placa (`Placa.vendedorId`)**: definido na **primeira cobrança** gerada para aquela placa. Uma vez definido, não muda — todas as cobranças futuras da mesma placa continuam comissionando o mesmo vendedor, mesmo que a cobrança posterior indique outro.
+## Notificações
 
-4. **Endereço do Cliente (obrigatório na criação)**: campos `cep`, `logradouro`, `numero`, `bairro`, `cidade` e `estado` são obrigatórios no `POST /api/clientes`. O backend retorna 400 se qualquer um estiver ausente. O endereço é enviado ao EFI no campo `address` do `customer` ao gerar carnês, garantindo que apareça impresso no boleto.
+`PreferenciaNotificacao`
 
-5. **PagamentoComissao**: registra o pagamento físico de comissão ao vendedor por mês. A constraint `@@unique([vendedorId, mes])` garante um único registro por vendedor/mês. O campo `comprovante` armazena o caminho relativo do arquivo no filesystem (`uploads/comprovantes/`); `comprovanteMime` guarda o tipo para servir o arquivo com o `Content-Type` correto.
+```text
+clienteLoginId, dispositivoId, tipoEvento,
+web, app, email,
+overspeedLimit, kmMaximo30Dias, diaRenovacaoMes,
+kmMinimo7Dias, diaSemanaRenovacao, kmTrocaOleo
+```
 
-6. **Recuperação de Clientes EFI**: o EFI não possui endpoint direto de clientes. Os clientes existentes serão importados consultando as cobranças (`GET /v1/charges`) e extraindo os dados do pagador (`customer`). Isso será uma migração única.
+Constraint:
 
-7. **Migrações**: rodar `npx prisma migrate dev` no desenvolvimento e `npx prisma migrate deploy` na produção via Docker entrypoint. Migrations devem ser executadas **dentro do container** (`docker exec backend-backend-1 npx prisma migrate dev`), pois o schema Prisma usa a URL interna (`postgres:5432`).
+```prisma
+@@unique([clienteLoginId, dispositivoId, tipoEvento])
+```
 
-8. **Arquivos de comprovante**: salvos em `/app/uploads/comprovantes/` dentro do container. O volume `.:/app` no `docker-compose.dev.yml` garante persistência no host em `backend/uploads/comprovantes/`.
+`EstadoKmNotificacao` controla base e repetição de alertas por km.
+
+`EventoNotificacao` guarda eventos gerados:
+
+```text
+tipoEvento, mensagem, latitude, longitude, endereco,
+velocidade, lido, createdAt
+```
+
+## Manutenções
+
+`ManutencaoRegistro` guarda histórico executado.
+
+Campos:
+
+```text
+dispositivoId, clienteLoginId, criadoPorAdminId,
+titulo, tipo, descricao, dataRealizacao, kmRealizacao,
+custo, oficina, notas, fotos, origem
+```
+
+`ManutencaoRecorrencia` guarda planos recorrentes por km.
+
+Campos:
+
+```text
+dispositivoId, clienteLoginId, criadoPorAdminId,
+titulo, descricao, intervaloKm, kmBase,
+alerta50Enviado, alerta25Enviado, alerta0Enviado,
+ultimaAlertaPostDueKm, ativa, origem
+```
+
+## Geocercas
+
+`Geocerca` espelha geocercas do Traccar e guarda metadados locais.
+
+Campos:
+
+```text
+traccarId, nome, descricao, area, tipo,
+origemTipo, clienteId, visivelCliente,
+notificarCliente, sistemasNotif, dataInicio, ativa
+```
+
+`origemTipo`:
+
+```text
+ADMIN
+CLIENTE
+```
+
+`GeocercaDispositivo` vincula geocerca a dispositivo local.
+
+## Contratos
+
+`Contrato` guarda HTML renderizado, status, Clicksign e signatários.
+
+Campos relevantes:
+
+```text
+tipo, clienteId, fiadores, testemunhas, htmlConteudo,
+metodoAutenticacao, status, clicksignEnvelopeId,
+clicksignDocumentoId, signatarios, criadoPorId, assinadoEm
+```
+
+## Migrations recentes importantes
+
+| Migration | Conteúdo |
+|---|---|
+| `20260417000000_portal_cliente` | Portal do cliente |
+| `20260421164747_add_motorista` | Motoristas |
+| `20260422012240_add_motorista_traccar_fields` | Campos Traccar de motorista |
+| `20260422014208_many_to_many_motorista_dispositivo` | Vínculo motorista/dispositivo |
+| `20260422040000_add_dispositivo_medidores_sistema` | Medidores do sistema |
+| `20260426033043_add_notification_tables` | Notificações |
+| `20260426200000_add_km_notifications` | Alertas por km |
+| `20260426210000_add_endereco_evento_notificacao` | Endereço em evento |
+| `20260426230000_add_ultima_notificacao_km` | Controle de repetição de km |
+| `20260427000000_add_admin_preferencia` | Preferências admin |
+| `20260427235432_add_prefs_field` | Preferências do login cliente |
+| `20260429034038_add_manutencoes` | Manutenções |
+| `20260430011545_add_geocerca` | Geocercas |
+| `20260502000000_add_colaborador_monitoramento_permission` | Permissão de monitoramento |
+
+## Observações operacionais
+
+- Em desenvolvimento, usar `npx prisma migrate dev`.
+- Em produção, usar `npx prisma migrate deploy`.
+- O schema atual não define `url` diretamente no datasource; a conexão vem da configuração Prisma/ambiente.
+- O banco Traccar é independente; o vínculo operacional com AgilLock é por IMEI e `traccarId`.

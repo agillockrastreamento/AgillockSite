@@ -1,77 +1,61 @@
-# Documentação Traccar — AgilLock Rastreamento
+# Documentação Traccar - AgilLock Rastreamento
 
-Este diretório contém toda a documentação técnica de integração do **Traccar** ao sistema AgilLock.
+Atualizado em: 2026-05-03
 
-## O que é o Traccar?
+Esta pasta documenta a integração do AgilLock com o Traccar, incluindo API REST, WebSocket, relatórios, geocercas, comandos, notificações e portal/app do cliente.
 
-Traccar é uma plataforma de rastreamento GPS **open-source (Apache 2.0)** — uso comercial e privado são permitidos sem restrições, bastando manter a atribuição. É um projeto maduro e ativo: v6.12.2 (fevereiro/2026), 9.500+ commits, 200+ contribuidores.
+## Papel do Traccar
 
-**Por que usar o Traccar no AgilLock?**
-- Suporta +2.000 modelos de dispositivos GPS e +200 protocolos
-- REST API + WebSocket completos para integração com qualquer backend
-- Pode ser hospedado em servidor próprio (self-hosted)
-- Não tem custo de licença
+O Traccar recebe dados dos rastreadores GPS por protocolo TCP/UDP, persiste posições no banco dele e expõe REST API + WebSocket. O backend AgilLock atua como camada intermediária:
 
----
-
-## Arquitetura geral
-
-```
-Dispositivos GPS (GT06, Teltonika, etc.)
-        |
-        | TCP/UDP (protocolo proprietário, porta 5023 para GT06)
-        ↓
- ┌─────────────────────┐
- │   Traccar Server    │  ← Java, porta 8082 (HTTP/API/WebUI)
- │   (Docker)          │    porta 5023 (GT06 protocol)
- └─────────┬───────────┘
-           │ REST API + WebSocket
-           ↓
- ┌─────────────────────┐
- │  Backend AgilLock   │  ← Node.js + Express + Prisma
- │  (Express routes)   │
- └─────────┬───────────┘
-           │ API REST interna
-           ↓
- ┌─────────────────────┐
- │ Frontend AgillockSite│  ← Bootstrap 3 + jQuery
- │ (tela rastreamento) │
- └─────────────────────┘
+```text
+Rastreador GPS
+  -> Traccar Server
+  -> Backend AgilLock
+  -> Site admin/cliente e futuro app mobile
 ```
 
-O backend Node.js atua como **intermediário**: consulta o Traccar, une os dados com informações do banco AgilLock (clientes, contratos, placas) e entrega ao frontend.
+O frontend e o app não acessam o Traccar diretamente. Eles consomem `/api/rastreamento/*`, `/api/cliente/rastreamento/*` e `/ws/rastreamento`.
 
----
-
-## Índice dos documentos
+## Documentos
 
 | Arquivo | Conteúdo |
 |---|---|
-| [ROADMAP.md](./ROADMAP.md) | **Etapas de implementação com critérios de conclusão** |
-| [TESTES.md](./TESTES.md) | Checklist de testes por fase (conectividade → API → backend → frontend → produção) |
-| [ARQUITETURA.md](./ARQUITETURA.md) | Componentes do Traccar, modelo de dados, fluxo de dados |
-| [DEPLOY.md](./DEPLOY.md) | Deploy via Docker no mesmo docker-compose do projeto (PostgreSQL) |
-| [PROTOCOLOS.md](./PROTOCOLOS.md) | Protocolos GPS suportados, portas, configuração do dispositivo GT06 |
-| [BANCO_DE_DADOS.md](./BANCO_DE_DADOS.md) | Schema do banco, tabelas principais, relação com AgilLock |
-| [API.md](./API.md) | REST API completa: endpoints, autenticação, exemplos, WebSocket |
-| [INTEGRACAO_BACKEND.md](./INTEGRACAO_BACKEND.md) | `traccar.service.ts`, `traccar.ws.ts`, rotas REST — código completo |
-| [FRONTEND_RASTREAMENTO.md](./FRONTEND_RASTREAMENTO.md) | HTML + JS completo da tela rastreamento.html com WebSocket e Leaflet |
-| [PORTAL_CLIENTE.md](./PORTAL_CLIENTE.md) | Tela de rastreamento do portal do cliente: barra de veículos, overlays, bloqueio por inadimplência |
+| [API.md](./API.md) | Contratos atuais da API de rastreamento, WebSocket e endpoints Traccar internos |
+| [INTEGRACAO_BACKEND.md](./INTEGRACAO_BACKEND.md) | Como o backend integra Prisma, Traccar REST e WebSocket |
+| [ARQUITETURA.md](./ARQUITETURA.md) | Visão de componentes e fluxo de dados |
+| [BANCO_DE_DADOS.md](./BANCO_DE_DADOS.md) | Tabelas do Traccar e vínculo com o banco AgilLock |
+| [DEPLOY.md](./DEPLOY.md) | Deploy do Traccar no Docker |
+| [PROTOCOLOS.md](./PROTOCOLOS.md) | Protocolos e portas de rastreadores |
+| [FRONTEND_RASTREAMENTO.md](./FRONTEND_RASTREAMENTO.md) | Implementação web da tela de rastreamento |
+| [PORTAL_CLIENTE.md](./PORTAL_CLIENTE.md) | Rastreamento no portal do cliente |
+| [TESTES.md](./TESTES.md) | Checklist de testes |
+| [ROADMAP.md](./ROADMAP.md) | Histórico de implementação |
+| [NOVO_PROTOCOLO.md](./NOVO_PROTOCOLO.md) | Como adicionar novo protocolo/dispositivo |
 
----
+## Estado atual
 
-## Status das etapas
-
-| Etapa | Status |
+| Área | Status |
 |---|---|
-| 1 — Deploy Traccar (Docker + PostgreSQL) | ✅ Concluído |
-| 2 — Conectar dispositivo GT06 | ✅ Concluído |
-| 3 — Backend: `traccar.service.ts` + WebSocket bridge + rotas | ✅ Concluído |
-| 4 — Frontend: `rastreamento.html` com mapa e WebSocket | ✅ Concluído |
-| 5 — Tela de detalhes do veículo (histórico + viagens) | ✅ Concluído |
-| 6 — Estabilidade em produção | ✅ Concluído |
-| 7 — Portal do cliente (login, rastreamento, pagamentos) | ⬜ Próxima fase |
-| 8 — Funcionalidades avançadas (geofences, alertas, etc.) | ⬜ Futuro |
+| Deploy Traccar com PostgreSQL | Concluído |
+| Cadastro/sincronização de dispositivos | Concluído |
+| REST API de rastreamento admin | Concluído |
+| REST API de rastreamento cliente | Concluído |
+| WebSocket bridge `/ws/rastreamento` | Concluído |
+| Histórico, viagens, paradas, eventos e resumo | Concluído |
+| Relatórios em lote e exportação XLSX | Concluído |
+| Comandos para dispositivos | Concluído |
+| Geocercas admin e cliente | Concluído |
+| Medidores de sistema | Concluído |
+| Notificações por evento/km/manutenção | Concluído |
+| Portal web do cliente | Concluído |
+| App mobile React Native Expo | Próxima etapa |
 
-Ver detalhes completos de cada etapa em [ROADMAP.md](./ROADMAP.md).
-Especificação v2 em [PORTAL_CLIENTE.md](./PORTAL_CLIENTE.md).
+## Pontos importantes para o app mobile
+
+- Login: `POST /api/auth/login`, usando apenas usuários com `role: CLIENTE`.
+- Snapshot inicial: `GET /api/cliente/rastreamento/posicoes`.
+- Tempo real: `wss://api.agillock.com.br/ws/rastreamento`.
+- O WebSocket entrega `deviceId` como `traccarId`; o app deve mapear para `dispositivoId` usando o snapshot.
+- Rotas do cliente bloqueiam rastreamento com `403 { "error": "acesso_bloqueado" }` quando há inadimplência superior a 10 dias.
+- Preferências, notificações, geocercas e manutenções já possuem API própria para uso no app.

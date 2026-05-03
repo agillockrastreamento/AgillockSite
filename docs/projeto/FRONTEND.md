@@ -316,7 +316,7 @@ AgillockSite/
 │   ├── carteira.html
 │   └── carteira-detalhes.html
 ├── cliente/                    ← nova área (portal do cliente)
-│   ├── login.html              ← login próprio do cliente
+│   ├── login.html              ← redireciona para login unificado
 │   ├── rastreamento.html       ← mapa ao vivo + barra de veículos no rodapé
 │   └── pagamentos.html         ← boletos (somente Cliente Responsável)
 └── js/
