@@ -58,4 +58,4 @@ O frontend e o app não acessam o Traccar diretamente. Eles consomem `/api/rastr
 - Tempo real: `wss://api.agillock.com.br/ws/rastreamento`.
 - O WebSocket entrega `deviceId` como `traccarId`; o app deve mapear para `dispositivoId` usando o snapshot.
 - Rotas do cliente bloqueiam rastreamento com `403 { "error": "acesso_bloqueado" }` quando há inadimplência superior a 10 dias.
-- Preferências, notificações, geocercas e manutenções já possuem API própria para uso no app.
+- Preferências, notificações Expo, geocercas e manutenções já possuem API própria para uso no app.

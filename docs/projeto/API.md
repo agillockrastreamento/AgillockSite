@@ -511,19 +511,53 @@ O cliente só pode editar/remover geocercas com `origemTipo = "CLIENTE"` e `clie
 |---|---|---|---|
 | GET | `/cliente/notificacoes/preferencias/:dispositivoId` | CLIENTE | Preferências por dispositivo |
 | POST | `/cliente/notificacoes/preferencias` | CLIENTE | Salva preferência de evento |
+| GET | `/cliente/notificacoes/app-tokens` | CLIENTE | Lista tokens Expo ativos do login |
+| POST | `/cliente/notificacoes/app-tokens` | CLIENTE | Registra/reativa token Expo do aparelho |
+| DELETE | `/cliente/notificacoes/app-tokens` | CLIENTE | Desativa token Expo por logout/desinstalação |
 | PATCH | `/cliente/notificacoes/km-troca-oleo/:dispositivoId` | CLIENTE | Configura km de troca de óleo |
 | POST | `/cliente/notificacoes/confirmar-troca-oleo/:dispositivoId` | CLIENTE | Confirma troca e redefine base |
 | GET | `/cliente/notificacoes/km-config/:dispositivoId` | CLIENTE | Configurações de km |
 | GET | `/cliente/notificacoes/eventos` | CLIENTE | Lista eventos/notificações |
 
+Registro de token Expo:
+
+```json
+{
+  "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+  "plataforma": "ios",
+  "deviceId": "device-installation-id"
+}
+```
+
+Remoção:
+
+```json
+{ "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }
+```
+
+ou:
+
+```json
+{ "deviceId": "device-installation-id" }
+```
+
 Eventos usados:
 
 ```text
 ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed,
-powerCut, kmExcedida, kmReduzida, trocaOleo, deviceLocked, deviceUnlocked
+powerCut, kmExcedida, kmReduzida, trocaOleo, deviceLocked, deviceUnlocked,
+boletoVencendoHoje, boletoAtrasado, pagamentoRecebido
 ```
 
 Canais por preferência: `web`, `app`, `email`.
+
+Notificações financeiras do app:
+
+- `boletoVencendoHoje`: enviada uma vez às 09:00 no dia do vencimento para boletos `PENDENTE`.
+- `boletoAtrasado`: enviada uma vez por dia às 09:00 para cada boleto em atraso enquanto permanecer em aberto. A mensagem lembra o cliente de se manter em dia para continuar acessando a área de monitoramento.
+- `pagamentoRecebido`: enviada quando o boleto é marcado como `PAGO`, seja por webhook EFI ou baixa manual.
+- O backend grava os eventos em `/cliente/notificacoes/eventos` com `boleto` preenchido e envia push via Expo para tokens ativos.
+- Não depende de Firebase; o app deve obter o token com `expo-notifications` e registrá-lo em `/cliente/notificacoes/app-tokens`.
 
 ## Notificações admin
 

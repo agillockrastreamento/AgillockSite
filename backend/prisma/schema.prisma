@@ -191,6 +191,8 @@ model Boleto {
   placasUnificadas       BoletoPlaca[]
   dispositivosUnificados BoletoDispositivo[]
   comissoes              ComissaoVendedor[]
+  eventosNotificacoes    EventoNotificacao[]
+  notificacoesFinanceiras NotificacaoFinanceiraEnvio[]
 }
 
 model BoletoPlaca {
@@ -375,6 +377,25 @@ model ClienteLogin {
   estadosKmNotificacao     EstadoKmNotificacao[]
   manutencoesRegistros     ManutencaoRegistro[]
   manutencoesRecorrencias  ManutencaoRecorrencia[]
+  appPushTokens            AppPushToken[]
+  notificacoesFinanceiras  NotificacaoFinanceiraEnvio[]
+}
+
+model AppPushToken {
+  id             String   @id @default(uuid())
+  clienteLoginId String
+  token          String   @unique
+  plataforma     String?
+  deviceId       String?
+  ativo          Boolean  @default(true)
+  ultimoErro     String?
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
+
+  @@index([clienteLoginId, ativo])
 }
 
 model PreferenciaNotificacao {
@@ -421,7 +442,8 @@ model EstadoKmNotificacao {
 model EventoNotificacao {
   id             String   @id @default(uuid())
   clienteLoginId String
-  dispositivoId  String
+  dispositivoId  String?
+  boletoId       String?
   tipoEvento     String
   mensagem       String
   latitude       Float?
@@ -432,7 +454,26 @@ model EventoNotificacao {
   createdAt      DateTime @default(now())
 
   clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
-  dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  dispositivo  Dispositivo? @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  boleto       Boleto?      @relation(fields: [boletoId], references: [id], onDelete: Cascade)
+
+  @@index([clienteLoginId, createdAt])
+  @@index([boletoId])
+}
+
+model NotificacaoFinanceiraEnvio {
+  id             String   @id @default(uuid())
+  clienteLoginId String
+  boletoId       String
+  tipo           String
+  dataReferencia DateTime
+  createdAt      DateTime @default(now())
+
+  clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
+  boleto       Boleto       @relation(fields: [boletoId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteLoginId, boletoId, tipo, dataReferencia])
+  @@index([tipo, dataReferencia])
 }
 
 model ManutencaoRegistro {

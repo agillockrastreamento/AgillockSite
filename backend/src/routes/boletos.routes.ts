@@ -5,6 +5,7 @@ import prisma from '../utils/prisma';
 import { param } from '../utils/params';
 import * as efiService from '../services/efi.service';
 import { registrarComissoes } from '../services/comissao.service';
+import FinanceiroNotificationService from '../services/financeiro-notification.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -252,6 +253,9 @@ router.patch('/:id/baixa', requireRoles('ADMIN', 'COLABORADOR'), async (req: Aut
 
   // Calcular comissão por placa (cada placa tem seu vendedor dono)
   await registrarComissoes(id);
+  await FinanceiroNotificationService.notificarPagamentoRecebido(id).catch(err => {
+    console.error('[Financeiro Notif] Erro ao notificar pagamento recebido:', err?.message || err);
+  });
 
   res.json(atualizado);
 });

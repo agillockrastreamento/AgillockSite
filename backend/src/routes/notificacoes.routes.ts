@@ -2,8 +2,81 @@ import { Router } from 'express';
 import prisma from '../utils/prisma';
 import { clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
 import EmailService from '../services/email.service';
+import ExpoPushService from '../services/expo-push.service';
 
 const router = Router();
+
+router.get('/app-tokens', clienteAuthMiddleware, async (req: any, res) => {
+  try {
+    const clienteLoginId = req.cliente.sub;
+    const tokens = await prisma.appPushToken.findMany({
+      where: { clienteLoginId, ativo: true },
+      orderBy: { lastSeenAt: 'desc' },
+      select: { id: true, token: true, plataforma: true, deviceId: true, lastSeenAt: true, createdAt: true },
+    });
+    res.json(tokens);
+  } catch {
+    res.status(500).json({ message: 'Erro ao listar tokens do app.' });
+  }
+});
+
+router.post('/app-tokens', clienteAuthMiddleware, async (req: any, res) => {
+  try {
+    const clienteLoginId = req.cliente.sub;
+    const { token, plataforma, deviceId } = req.body as { token?: string; plataforma?: string; deviceId?: string };
+
+    if (!token || !ExpoPushService.isValidToken(token)) {
+      return res.status(400).json({ message: 'Token Expo inválido.' });
+    }
+
+    const salvo = await prisma.appPushToken.upsert({
+      where: { token },
+      update: {
+        clienteLoginId,
+        plataforma: plataforma || null,
+        deviceId: deviceId || null,
+        ativo: true,
+        ultimoErro: null,
+        lastSeenAt: new Date(),
+      },
+      create: {
+        clienteLoginId,
+        token,
+        plataforma: plataforma || null,
+        deviceId: deviceId || null,
+      },
+      select: { id: true, token: true, plataforma: true, deviceId: true, ativo: true, lastSeenAt: true },
+    });
+
+    res.json({ message: 'Token do app registrado com sucesso.', token: salvo });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao registrar token do app.' });
+  }
+});
+
+router.delete('/app-tokens', clienteAuthMiddleware, async (req: any, res) => {
+  try {
+    const clienteLoginId = req.cliente.sub;
+    const { token, deviceId } = req.body as { token?: string; deviceId?: string };
+
+    if (!token && !deviceId) {
+      return res.status(400).json({ message: 'Informe token ou deviceId.' });
+    }
+
+    await prisma.appPushToken.updateMany({
+      where: {
+        clienteLoginId,
+        ...(token ? { token } : { deviceId }),
+      },
+      data: { ativo: false },
+    });
+
+    res.json({ message: 'Token do app removido com sucesso.' });
+  } catch {
+    res.status(500).json({ message: 'Erro ao remover token do app.' });
+  }
+});
 
 // Obter preferências de um dispositivo
 router.get('/preferencias/:dispositivoId', clienteAuthMiddleware, async (req: any, res) => {
@@ -224,7 +297,10 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
     const eventos = await prisma.eventoNotificacao.findMany({
       where: { clienteLoginId, createdAt: dateFilter },
       orderBy: { createdAt: 'desc' },
-      include: { dispositivo: { select: { nome: true, placa: true } } },
+      include: {
+        dispositivo: { select: { nome: true, placa: true } },
+        boleto: { select: { id: true, numeroParcela: true, valor: true, vencimento: true, status: true, linkBoleto: true } },
+      },
     });
 
     res.json(eventos.map(e => ({
@@ -238,8 +314,16 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
       lng: e.longitude,
       endereco: e.endereco,
       velocidade: e.velocidade,
-      dispositivoNome: e.dispositivo.nome,
-      dispositivoPlaca: e.dispositivo.placa,
+      dispositivoNome: e.dispositivo?.nome ?? null,
+      dispositivoPlaca: e.dispositivo?.placa ?? null,
+      boleto: e.boleto ? {
+        id: e.boleto.id,
+        numeroParcela: e.boleto.numeroParcela,
+        valor: Number(e.boleto.valor),
+        vencimento: e.boleto.vencimento,
+        status: e.boleto.status,
+        linkBoleto: e.boleto.linkBoleto,
+      } : null,
     })));
   } catch (error) {
     res.status(500).json({ message: 'Erro ao obter histórico de eventos.' });

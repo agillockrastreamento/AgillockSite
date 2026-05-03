@@ -249,6 +249,7 @@ router.get('/eventos', async (req, res) => {
       take: 500,
       include: {
         dispositivo:  { select: { nome: true, placa: true } },
+        boleto: { select: { id: true, numeroParcela: true, valor: true, vencimento: true, status: true, linkBoleto: true } },
         clienteLogin: { select: { cliente: { select: { nome: true } } } },
       },
     });
@@ -263,8 +264,16 @@ router.get('/eventos', async (req, res) => {
       lng:              e.longitude,
       endereco:         e.endereco,
       velocidade:       e.velocidade,
-      dispositivoNome:  e.dispositivo.nome,
-      dispositivoPlaca: e.dispositivo.placa,
+      dispositivoNome:  e.dispositivo?.nome ?? null,
+      dispositivoPlaca: e.dispositivo?.placa ?? null,
+      boleto: e.boleto ? {
+        id: e.boleto.id,
+        numeroParcela: e.boleto.numeroParcela,
+        valor: Number(e.boleto.valor),
+        vencimento: e.boleto.vencimento,
+        status: e.boleto.status,
+        linkBoleto: e.boleto.linkBoleto,
+      } : null,
       clienteNome:      e.clienteLogin.cliente.nome,
     })));
   } catch (err) {

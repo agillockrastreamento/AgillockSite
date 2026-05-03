@@ -224,11 +224,20 @@ Mensagens possíveis:
 
 O app deve descartar mensagens de `deviceId` que não pertençam ao cliente logado.
 
-## Pendência específica para mobile
+## Push notification no mobile
 
-A API já possui canal `app` em preferências de notificação, mas ainda precisa de desenho para push notification nativo:
+A API usa Expo Push Notifications, sem Firebase.
 
-- Registrar token Expo/FCM do aparelho.
-- Associar token ao `ClienteLogin`.
-- Criar endpoint de opt-in/opt-out por aparelho.
-- Enviar push quando `PreferenciaNotificacao.app = true`.
+Fluxo:
+
+```text
+POST   /api/cliente/notificacoes/app-tokens
+GET    /api/cliente/notificacoes/app-tokens
+DELETE /api/cliente/notificacoes/app-tokens
+```
+
+O backend envia push para eventos com canal `app` ativo e também para eventos financeiros:
+
+- `boletoVencendoHoje`: uma vez às 09:00 no dia do vencimento.
+- `boletoAtrasado`: uma vez por dia às 09:00 enquanto o boleto estiver atrasado.
+- `pagamentoRecebido`: quando o boleto for marcado como pago por webhook EFI ou baixa manual.

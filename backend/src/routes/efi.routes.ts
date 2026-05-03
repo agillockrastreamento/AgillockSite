@@ -4,6 +4,7 @@ import { requireRoles } from '../middleware/roles.middleware';
 import prisma from '../utils/prisma';
 import * as efiService from '../services/efi.service';
 import { registrarComissoes } from '../services/comissao.service';
+import FinanceiroNotificationService from '../services/financeiro-notification.service';
 
 const router = Router();
 
@@ -67,6 +68,9 @@ async function processarPagamento(efiChargeId: string): Promise<void> {
 
   // Calcular comissão por placa (cada placa tem seu vendedor dono)
   await registrarComissoes(boleto.id);
+  await FinanceiroNotificationService.notificarPagamentoRecebido(boleto.id).catch(err => {
+    console.error('[Financeiro Notif] Erro ao notificar pagamento recebido:', err?.message || err);
+  });
 
   console.log(`Boleto ${boleto.id} (EFI charge ${efiChargeId}) marcado como PAGO.`);
 }

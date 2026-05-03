@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma';
 import EmailService from './email.service';
 import { reverseGeocode } from '../utils/reverse-geocode';
+import ExpoPushService from './expo-push.service';
 
 type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string };
 
@@ -255,7 +256,15 @@ class NotificationService {
           }
 
           if (pref.app) {
-            console.log(`[APP NOTIF] Enviando para ${cliente.nome}: ${mensagem}`);
+            await ExpoPushService.enviarParaCliente(clienteLogin.id, {
+              title: label,
+              body: mensagem,
+              data: {
+                tipo,
+                dispositivoId: dispositivo.id,
+                traccarId: (dados as any).traccarDeviceId || dispositivo.traccarId,
+              },
+            });
           }
         } catch (clienteErr: any) {
           console.error(`[Notif] Erro ao processar notificações para o cliente ${cliente.nome}:`, clienteErr.message);
@@ -531,6 +540,13 @@ class NotificationService {
         await EmailService.enviarEmail(loginData.email, `Alerta: ${this.getLabelTipo(tipo)} — ${dispositivo.nome}`, html);
       }
     }
+    if (pref.app) {
+      await ExpoPushService.enviarParaCliente(clienteLoginId, {
+        title: this.getLabelTipo(tipo),
+        body: mensagem,
+        data: { tipo, dispositivoId: dispositivo.id },
+      });
+    }
   }
 
   private getLabelTipo(tipo: string) {
@@ -551,6 +567,9 @@ class NotificationService {
       manutencaoAlerta: 'Alerta de Manutenção',
       manutencaoAtrasada: 'Manutenção Atrasada',
       manutencaoFeita:  'Manutenção Realizada',
+      boletoVencendoHoje: 'Boleto vence hoje',
+      boletoAtrasado: 'Boleto em atraso',
+      pagamentoRecebido: 'Pagamento recebido',
     };
     return labels[tipo] || tipo;
   }

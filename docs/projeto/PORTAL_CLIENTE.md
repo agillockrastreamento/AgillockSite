@@ -262,6 +262,9 @@ O cliente só gerencia geocercas próprias (`origemTipo = "CLIENTE"`). Geocercas
 |---|---|---|
 | GET | `/api/cliente/notificacoes/preferencias/:dispositivoId` | Preferências |
 | POST | `/api/cliente/notificacoes/preferencias` | Salva preferência |
+| GET | `/api/cliente/notificacoes/app-tokens` | Lista tokens Expo ativos |
+| POST | `/api/cliente/notificacoes/app-tokens` | Registra token Expo do aparelho |
+| DELETE | `/api/cliente/notificacoes/app-tokens` | Desativa token Expo |
 | PATCH | `/api/cliente/notificacoes/km-troca-oleo/:dispositivoId` | Configura troca de óleo |
 | POST | `/api/cliente/notificacoes/confirmar-troca-oleo/:dispositivoId` | Confirma troca |
 | GET | `/api/cliente/notificacoes/km-config/:dispositivoId` | Configurações de km |
@@ -278,8 +281,21 @@ Eventos:
 ```text
 ignitionOn, ignitionOff, geofenceEnter, geofenceExit,
 overspeed, powerCut, kmExcedida, kmReduzida, trocaOleo,
-deviceLocked, deviceUnlocked
+deviceLocked, deviceUnlocked, boletoVencendoHoje, boletoAtrasado,
+pagamentoRecebido
 ```
+
+O app usa Expo Push Notifications sem Firebase. Após login, deve obter o token Expo via `expo-notifications` e chamar:
+
+```text
+POST /api/cliente/notificacoes/app-tokens
+```
+
+O backend envia:
+
+- Notificação no dia do vencimento do boleto às 09:00.
+- Notificação diária às 09:00 para boletos em atraso enquanto permanecerem em aberto, lembrando de manter o pagamento em dia para continuar com acesso ao monitoramento.
+- Notificação de pagamento recebido quando o boleto for marcado como pago.
 
 ## Manutenções
 
@@ -319,4 +335,4 @@ Mensagem de posição usa `deviceId` como `traccarId`.
 
 - O app não precisa replicar a estrutura HTML do portal; deve reaproveitar os contratos.
 - Telas naturais para o app: login, mapa ao vivo, detalhe do veículo, histórico, relatórios, comandos, notificações, geocercas, manutenções, pagamentos e perfil.
-- Push notification ainda precisa de desenho próprio: a API já separa canal `app`, mas é necessário definir token Expo/FCM e tabela/endpoint para registrar dispositivo móvel.
+- Push notification usa Expo Push API. O app deve registrar o token Expo em `/api/cliente/notificacoes/app-tokens` após login e removê-lo no logout.

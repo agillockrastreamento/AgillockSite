@@ -100,6 +100,15 @@ id, clienteId, email, senhaHash, ativo, prefs
 
 O JWT de cliente usa `ClienteLogin.id` como `sub` e `Cliente.id` como `clienteId`.
 
+`AppPushToken` guarda tokens Expo do app:
+
+```text
+clienteLoginId, token, plataforma, deviceId, ativo,
+ultimoErro, lastSeenAt
+```
+
+`token` é único. Se o mesmo aparelho fizer login de novo, o backend reativa e associa o token ao login atual.
+
 ## Placas
 
 `Placa` mantém compatibilidade com cobranças por placa.
@@ -258,8 +267,30 @@ Constraint:
 `EventoNotificacao` guarda eventos gerados:
 
 ```text
-tipoEvento, mensagem, latitude, longitude, endereco,
+dispositivoId?, boletoId?, tipoEvento, mensagem, latitude, longitude, endereco,
 velocidade, lido, createdAt
+```
+
+`dispositivoId` é opcional para permitir notificações financeiras do app. Quando o evento é de boleto, `boletoId` fica preenchido.
+
+`NotificacaoFinanceiraEnvio` controla idempotência diária:
+
+```text
+clienteLoginId, boletoId, tipo, dataReferencia
+```
+
+Constraint:
+
+```prisma
+@@unique([clienteLoginId, boletoId, tipo, dataReferencia])
+```
+
+Tipos financeiros atuais:
+
+```text
+boletoVencendoHoje
+boletoAtrasado
+pagamentoRecebido
 ```
 
 ## Manutenções
