@@ -242,6 +242,14 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
     for (const [identificador, disp] of atualizados) {
       if (disp.odometroSistemaMetros != null) {
         NotificationService.verificarKmNotificacoes(identificador, disp.odometroSistemaMetros)
+          .then(evts => {
+            if (evts && evts.length > 0) {
+              const outgoing = JSON.stringify({ events: evts });
+              frontendClients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) client.send(outgoing);
+              });
+            }
+          })
           .catch(err => console.error('[KM Notif] Erro:', err.message));
       }
     }

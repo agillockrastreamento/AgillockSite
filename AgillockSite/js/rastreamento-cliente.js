@@ -83,11 +83,11 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'kmReduzida',    label: 'Km Reduzida (Período)',       css: 'tipo-geofence' },
   { tipo: 'trocaOleo',          label: 'Troca de Óleo',            css: 'tipo-alarm' },
   { tipo: 'trocaOleoFeita',    label: 'Troca de Óleo Realizada',  css: 'tipo-ignition' },
-  { tipo: 'manutencao',        label: 'Alerta de Manutenção',     css: 'tipo-overspeed' },
   { tipo: 'manutencaoAlerta',  label: 'Alerta de Manutenção',     css: 'tipo-manutencao-alerta' },
   { tipo: 'manutencaoAtrasada',label: 'Manutenção Atrasada',      css: 'tipo-manutencao-atrasada' },
   { tipo: 'manutencaoFeita',   label: 'Manutenção Realizada',     css: 'tipo-ignition' },
 ];
+const TIPOS_EVENTO_CLIENTE_FILTRO = TIPOS_EVENTO_CLIENTE.filter(t => t.tipo !== 'manutencao');
 
 let _evtFiltros = new Set();
 let _evtNotif = true;
@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (bloqueado) return;
     inicializarMapa();
     _aplicarPreferenciasOverlay();
-    inicializarEventosPanel();
+    carregarUltimaLeituraCliente().finally(function () { inicializarEventosPanel(); });
     inicializarBarraVeiculos();
     carregarPosicoes();
     _instalarMobileOutsideClick();
@@ -325,12 +325,20 @@ async function verificarAcesso() {
 let _panelAbertoCliente = false;
 
 let _ultimaLeituraCliente = 0;
+let _eventosLimposAteCliente = 0;
 
 async function carregarUltimaLeituraCliente() {
+  try {
+    _ultimaLeituraCliente = parseInt(localStorage.getItem('al_last_notif_client') || '0', 10) || 0;
+    _eventosLimposAteCliente = parseInt(localStorage.getItem('al_clear_notif_client') || '0', 10) || 0;
+  } catch (e) {}
   try {
     const data = await AL_CLIENTE.apiGet('/api/cliente/rastreamento/prefs');
     if (data && data.prefs && data.prefs.al_last_notif_client) {
       _ultimaLeituraCliente = parseInt(data.prefs.al_last_notif_client, 10) || 0;
+    }
+    if (data && data.prefs && data.prefs.al_clear_notif_client) {
+      _eventosLimposAteCliente = parseInt(data.prefs.al_clear_notif_client, 10) || 0;
     }
   } catch (e) {}
   _atualizarBadgeNotificacoesCliente();
@@ -340,10 +348,15 @@ function _getUltimaLeituraCliente() {
   return _ultimaLeituraCliente;
 }
 
-function _setUltimaLeituraCliente() {
-  const now = Date.now();
+function _maxEventoTsCliente() {
+  return Math.max(Date.now(), ..._eventos.map(e => new Date(e.serverTime || Date.now()).getTime()).filter(Number.isFinite));
+}
+
+function _setUltimaLeituraCliente(ts) {
+  const now = Number.isFinite(ts) ? ts : _maxEventoTsCliente();
   _ultimaLeituraCliente = now;
   try {
+    localStorage.setItem('al_last_notif_client', String(now));
     AL_CLIENTE.apiPost('/api/cliente/rastreamento/prefs/merge', { prefs: { al_last_notif_client: now } });
   } catch (e) {}
 }
@@ -381,7 +394,7 @@ function inicializarEventosPanel() {
   if (panel) panel.classList.add('minimizado');
 
   const dropdown = document.getElementById('evt-tipo-dropdown');
-  dropdown.innerHTML = TIPOS_EVENTO_CLIENTE.map(t =>
+  dropdown.innerHTML = TIPOS_EVENTO_CLIENTE_FILTRO.map(t =>
     `<label class="evt-tipo-item">
       <input type="checkbox" data-tipo="${t.tipo}" checked>
       ${t.label}
@@ -406,7 +419,17 @@ function inicializarEventosPanel() {
   });
 
   document.getElementById('evt-btn-limpar').addEventListener('click', function () {
+    const cutoff = _maxEventoTsCliente();
+    _eventosLimposAteCliente = cutoff;
+    try {
+      localStorage.setItem('al_clear_notif_client', String(cutoff));
+      localStorage.setItem('al_last_notif_client', String(cutoff));
+      AL_CLIENTE.apiPost('/api/cliente/rastreamento/prefs/merge', {
+        prefs: { al_clear_notif_client: cutoff, al_last_notif_client: cutoff },
+      });
+    } catch (e) {}
     _eventos.length = 0;
+    _setUltimaLeituraCliente(cutoff);
     _atualizarBadgeNotificacoesCliente();
     renderEventosLista();
   });
@@ -458,7 +481,13 @@ async function carregarHistoricoEventos(periodo, de, ate) {
     const data = await AL_CLIENTE.apiGet(url);
     _eventos.length = 0;
     if (data && data.length) {
-      data.forEach(e => _eventos.push(e));
+      data.forEach(e => {
+        if (e.tipo === 'deviceOverspeed') e = { ...e, tipo: 'overspeed' };
+        const time = new Date(e.serverTime || Date.now()).getTime();
+        const tiposPermitidos = TIPOS_EVENTO_CLIENTE_FILTRO.map(t => t.tipo);
+        if (time <= _eventosLimposAteCliente || !tiposPermitidos.includes(e.tipo)) return;
+        _eventos.push(e);
+      });
     }
     renderEventosLista();
   } catch (err) {
@@ -520,15 +549,16 @@ function _atualizarFiltrosTipo() {
   if (todas) {
     label.textContent = 'Tipo';
   } else {
-    const ativas = TIPOS_EVENTO_CLIENTE.length - _evtFiltros.size;
-    label.textContent = `Tipo (${ativas}/${TIPOS_EVENTO_CLIENTE.length})`;
+    const ativas = TIPOS_EVENTO_CLIENTE_FILTRO.length - _evtFiltros.size;
+    label.textContent = `Tipo (${ativas}/${TIPOS_EVENTO_CLIENTE_FILTRO.length})`;
   }
 }
 
 function adicionarEvento(evt) {
   if (evt.tipo === 'deviceOverspeed') evt = { ...evt, tipo: 'overspeed' };
-  const tiposPermitidos = TIPOS_EVENTO_CLIENTE.map(t => t.tipo);
-  if (!tiposPermitidos.includes(evt.tipo)) return;
+  const time = new Date(evt.serverTime || Date.now()).getTime();
+  const tiposPermitidos = TIPOS_EVENTO_CLIENTE_FILTRO.map(t => t.tipo);
+  if (time <= _eventosLimposAteCliente || !tiposPermitidos.includes(evt.tipo)) return;
   _eventos.unshift(evt);
   if (_eventos.length > MAX_EVENTOS) _eventos.length = MAX_EVENTOS;
   renderEventosLista();
@@ -638,7 +668,9 @@ window.clicarEvento = function (idx) {
     switch (e.tipo) {
       case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60' };
       case 'ignitionOff': return { color: '#e67e22' };
-      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c' };
+      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': case 'manutencaoAtrasada': return { color: '#e74c3c' };
+      case 'manutencaoAlerta': return { color: '#e67e22' };
+      case 'manutencaoFeita': return { color: '#27ae60' };
       default: return { color: '#2980b9' };
     }
   })();
@@ -700,6 +732,7 @@ window.clicarEvento = function (idx) {
         </div>
       `;
 
+      marker._eventPopupAberto = true;
       marker.bindPopup(content, {
         className: `popup-evento-moderno${barraExpandida ? ' popup-evento-rodape-aberto' : ''}`,
         offset: [0, -10],
@@ -713,11 +746,12 @@ window.clicarEvento = function (idx) {
       }, 500);
 
       marker.once('popupclose', function() {
+        marker._eventPopupAberto = false;
         if (marker._eventOriginalPopup) {
           marker.bindPopup(marker._eventOriginalPopup);
           marker._eventOriginalPopup = null;
-          _eventoPopupAtualIdx = null;
         }
+        _eventoPopupAtualIdx = null;
       });
     }
   } else if (e.lat != null && e.lng != null) {
@@ -797,6 +831,8 @@ function inicializarMapa() {
   _adicionarBotoesCamadas();
 
   map.on('popupclose', function (e) {
+    const className = e.popup?.options?.className || '';
+    if (className.includes('popup-evento-moderno')) return;
     if (_togglingPopup || _modoDesenho) return;
     if (ativoId && marcadores[ativoId] && e.popup === marcadores[ativoId].getPopup()) {
       if (_isMobileTracking()) _fecharTrackingDrawer();
@@ -1401,7 +1437,7 @@ function atualizarMarcador(did) {
   if (marcadoresIconeKey[did] !== ik) { marcadores[did].setIcon(criarIcone(v)); marcadoresIconeKey[did] = ik; }
   
   const isOpen = marcadores[did].getPopup()?.isOpen();
-  const isEventPopup = marcadores[did].getPopup()?.options?.className === 'popup-evento-moderno';
+  const isEventPopup = (marcadores[did].getPopup()?.options?.className || '').includes('popup-evento-moderno');
   if (_mostrarPopup && isOpen && !isEventPopup) {
     marcadores[did].getPopup().setContent(criarPopupSimples(v));
   }

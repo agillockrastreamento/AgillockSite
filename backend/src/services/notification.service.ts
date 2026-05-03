@@ -3,7 +3,7 @@ import EmailService from './email.service';
 import { reverseGeocode } from '../utils/reverse-geocode';
 import ExpoPushService from './expo-push.service';
 
-type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string };
+type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null };
 
 class NotificationService {
   private _lastOverspeedAt = new Map<string, number>(); // Cache para cooldown de velocidade
@@ -276,7 +276,8 @@ class NotificationService {
     return wsEvent;
   }
 
-  async verificarKmNotificacoes(identificador: string, odometroMetros: number) {
+  async verificarKmNotificacoes(identificador: string, odometroMetros: number): Promise<any[]> {
+    const eventosDetectados: any[] = [];
     try {
       const dispositivo = await prisma.dispositivo.findFirst({
         where: { identificador },
@@ -285,7 +286,7 @@ class NotificationService {
           clientesVinculados: { include: { cliente: { include: { login: true } } } },
         },
       });
-      if (!dispositivo) return;
+      if (!dispositivo) return eventosDetectados;
 
       const clientesMap = new Map<string, { nome: string; login: { id: string; email: string; ativo: boolean } | null }>();
       if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, dispositivo.cliente);
@@ -301,10 +302,11 @@ class NotificationService {
         await this._verificarKmReduzida(clienteLogin.id, dispositivo, odometroMetros);
         await this._verificarTrocaOleo(clienteLogin.id, dispositivo, odometroMetros);
       }
-      await this._verificarManutencaoRecorrencias(dispositivo, odometroMetros, clientes.map(c => c.login).filter((l): l is { id: string; email: string; ativo: boolean } => !!l?.ativo));
+      eventosDetectados.push(...await this._verificarManutencaoRecorrencias(dispositivo, odometroMetros, clientes.map(c => c.login).filter((l): l is { id: string; email: string; ativo: boolean } => !!l?.ativo)));
     } catch (error) {
       console.error('Erro ao verificar km notificações:', error);
     }
+    return eventosDetectados;
   }
 
   private async _verificarKmExcedida(
@@ -448,6 +450,7 @@ class NotificationService {
     odometroMetros: number,
     clienteLogins: Array<{ id: string; email: string; ativo: boolean }>,
   ) {
+    const eventosDetectados: any[] = [];
     const targets: Array<{ clienteLoginId: string; pref: { web: boolean; app: boolean; email: boolean } }> = [];
     for (const login of clienteLogins) {
       const pref = await prisma.preferenciaNotificacao.findUnique({
@@ -463,7 +466,7 @@ class NotificationService {
         targets.push({ clienteLoginId: login.id, pref });
       }
     }
-    if (!targets.length) return;
+    if (!targets.length) return eventosDetectados;
 
     const recorrenciasRaw = await prisma.manutencaoRecorrencia.findMany({
       where: { dispositivoId: dispositivo.id, ativa: true },
@@ -484,7 +487,7 @@ class NotificationService {
       if (!rec.alerta50Enviado && kmPercorrido >= intervalo - 50) {
         const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
         const mensagem = `Manutenção Próxima: "${titulo}" no veículo ${nome}${pl} — faltam ${kmRestante} km para o próximo serviço (intervalo: ${intervalo} km).`;
-        await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem);
+        eventosDetectados.push(...await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem));
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta50Enviado: true } });
         rec.alerta50Enviado = true;
       }
@@ -493,7 +496,7 @@ class NotificationService {
       if (!rec.alerta25Enviado && kmPercorrido >= intervalo - 25) {
         const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
         const mensagem = `Manutenção Urgente: "${titulo}" no veículo ${nome}${pl} — faltam apenas ${kmRestante} km para o próximo serviço!`;
-        await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem);
+        eventosDetectados.push(...await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem));
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta25Enviado: true } });
         rec.alerta25Enviado = true;
       }
@@ -501,7 +504,7 @@ class NotificationService {
       // At limit (orange → transitions to red on post-due)
       if (!rec.alerta0Enviado && kmPercorrido >= intervalo) {
         const mensagem = `Manutenção Devida: "${titulo}" no veículo ${nome}${pl} atingiu o intervalo de ${intervalo} km. Realize o serviço!`;
-        await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem);
+        eventosDetectados.push(...await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem));
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta0Enviado: true } });
         rec.alerta0Enviado = true;
       }
@@ -514,13 +517,14 @@ class NotificationService {
           const kmAtrasado = i * 50;
           if (ultima < kmAtrasado) {
             const mensagem = `Manutenção Atrasada: "${titulo}" no veículo ${nome}${pl} está ${kmAtrasado} km acima do intervalo recomendado (${intervalo} km). Realize o serviço urgente!`;
-            await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAtrasada', mensagem);
+            eventosDetectados.push(...await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAtrasada', mensagem));
             await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { ultimaAlertaPostDueKm: kmAtrasado } });
             break;
           }
         }
       }
     }
+    return eventosDetectados;
   }
 
   private _deduplicarRecorrenciasManutencao<T extends { titulo: string; intervaloKm: number; kmBase: number }>(recorrencias: T[]): T[] {
@@ -539,9 +543,12 @@ class NotificationService {
     tipo: 'manutencaoAlerta' | 'manutencaoAtrasada',
     mensagem: string,
   ) {
+    const eventos: any[] = [];
     for (const target of targets) {
-      await this._salvarEEnviar(target.clienteLoginId, dispositivo, target.pref, tipo, mensagem);
+      const evento = await this._salvarEEnviar(target.clienteLoginId, dispositivo, target.pref, tipo, mensagem);
+      if (evento && !eventos.length) eventos.push(evento);
     }
+    return eventos;
   }
 
   private async _salvarEEnviar(
@@ -551,10 +558,22 @@ class NotificationService {
     tipo: string,
     mensagem: string,
   ) {
+    let wsEvent: any = null;
     if (pref.web || pref.app) {
       await prisma.eventoNotificacao.create({
         data: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: tipo, mensagem, latitude: null, longitude: null, velocidade: null },
       });
+      wsEvent = {
+        deviceId: dispositivo.traccarId,
+        dispositivoId: dispositivo.id,
+        type: tipo,
+        tipoLabel: this.getLabelTipo(tipo),
+        serverTime: new Date().toISOString(),
+        mensagem,
+        lat: null,
+        lng: null,
+        endereco: null,
+      };
     }
     if (pref.email) {
       const loginData = await prisma.clienteLogin.findUnique({ where: { id: clienteLoginId }, include: { cliente: { select: { nome: true } } } });
@@ -577,6 +596,7 @@ class NotificationService {
         data: { tipo, dispositivoId: dispositivo.id },
       });
     }
+    return wsEvent;
   }
 
   private getLabelTipo(tipo: string) {
