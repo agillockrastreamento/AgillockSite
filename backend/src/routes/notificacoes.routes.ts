@@ -295,7 +295,7 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
     }
 
     const eventos = await prisma.eventoNotificacao.findMany({
-      where: { clienteLoginId, createdAt: dateFilter },
+      where: { clienteLoginId, adminEvento: false, createdAt: dateFilter },
       orderBy: { createdAt: 'desc' },
       include: {
         dispositivo: { select: { nome: true, placa: true } },

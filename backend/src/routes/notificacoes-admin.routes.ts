@@ -3,6 +3,11 @@ import prisma from '../utils/prisma';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
 
+function tipoPreferenciaAdmin(tipoEvento: string) {
+  if (tipoEvento === 'manutencaoAlerta' || tipoEvento === 'manutencaoAtrasada' || tipoEvento === 'manutencaoFeita') return 'manutencao';
+  return tipoEvento;
+}
+
 const router = Router();
 router.use(authMiddleware);
 router.use(requireMonitoramentoAccess);
@@ -222,6 +227,7 @@ router.get('/clientes/:clienteLoginId/km-config/:dispositivoId', async (req, res
 
 router.get('/eventos', async (req, res) => {
   try {
+    const userId = (req as any).user.userId;
     const { periodo, de, ate } = req.query as Record<string, string>;
     let dateFilter: any = {};
 
@@ -243,19 +249,27 @@ router.get('/eventos', async (req, res) => {
       if (!isNaN(inicio.getTime()) && !isNaN(fim.getTime())) dateFilter = { gte: inicio, lte: fim };
     }
 
-    const eventos = await prisma.eventoNotificacao.findMany({
-      where: { createdAt: dateFilter },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-      include: {
-        dispositivo:  { select: { nome: true, placa: true } },
-        boleto: { select: { id: true, numeroParcela: true, valor: true, vencimento: true, status: true, linkBoleto: true } },
-        clienteLogin: { select: { cliente: { select: { nome: true } } } },
-      },
+    const [adminPrefsRow, eventos] = await Promise.all([
+      prisma.adminPreferencia.findUnique({ where: { userId } }),
+      prisma.eventoNotificacao.findMany({
+        where: { createdAt: dateFilter, OR: [{ adminEvento: true }, { origemTipo: null }] },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+        include: {
+          dispositivo:  { select: { nome: true, placa: true } },
+          boleto: { select: { id: true, numeroParcela: true, valor: true, vencimento: true, status: true, linkBoleto: true } },
+          clienteLogin: { select: { cliente: { select: { nome: true } } } },
+        },
+      }),
+    ]);
+    const adminPrefs = (adminPrefsRow?.prefs as Record<string, any>) ?? {};
+    const eventosPermitidos = eventos.filter(e => {
+      if (e.origemTipo !== 'CLIENTE') return true;
+      return !!adminPrefs[tipoPreferenciaAdmin(e.tipoEvento)];
     });
 
     const vistos = new Set<string>();
-    const eventosUnicos = eventos.filter((e) => {
+    const eventosUnicos = eventosPermitidos.filter((e) => {
       const minuto = new Date(e.createdAt);
       minuto.setSeconds(0, 0);
       const chave = `${e.tipoEvento}|${e.dispositivoId || ''}|${e.mensagem}|${minuto.toISOString()}`;
@@ -268,6 +282,9 @@ router.get('/eventos', async (req, res) => {
       id:               e.id,
       dispositivoId:    e.dispositivoId,
       tipo:             e.tipoEvento,
+      origemTipo:       e.origemTipo,
+      origemId:         e.origemId,
+      adminEvento:      e.adminEvento,
       mensagem:         e.mensagem,
       serverTime:       e.createdAt,
       lat:              e.latitude,

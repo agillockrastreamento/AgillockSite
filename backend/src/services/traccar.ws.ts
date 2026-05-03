@@ -27,6 +27,16 @@ let reconnectTimer: NodeJS.Timeout | null = null;
 const traccarIdToUniqueId = new Map<number, string>();
 const lastGeofenceState = new Map<number, string[]>();
 const geofenceCache = new Map<number, { at: number; items: Array<{ id: number; area: string }> }>();
+const geofenceMetaCache = new Map<number, {
+  at: number;
+  meta: {
+    origemId: string;
+    origemTipo: string;
+    clienteId: string | null;
+    notificarCliente: boolean;
+    visivelCliente: boolean;
+  } | null;
+}>();
 const GEOFENCE_CACHE_TTL_MS = 30_000;
 const eventAddressCache = new Map<string, string>();
 
@@ -36,6 +46,31 @@ export function broadcastTrackingEvents(events: any[]) {
   frontendClients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) client.send(outgoing);
   });
+}
+
+async function getGeofenceMeta(traccarId?: number | null) {
+  if (traccarId == null) return null;
+  const cached = geofenceMetaCache.get(traccarId);
+  if (cached && Date.now() - cached.at < GEOFENCE_CACHE_TTL_MS) return cached.meta;
+  const geocerca = await prisma.geocerca.findUnique({
+    where: { traccarId },
+    select: {
+      id: true,
+      origemTipo: true,
+      clienteId: true,
+      notificarCliente: true,
+      visivelCliente: true,
+    },
+  }).catch(() => null);
+  const meta = geocerca ? {
+    origemId: geocerca.id,
+    origemTipo: geocerca.origemTipo,
+    clienteId: geocerca.clienteId,
+    notificarCliente: geocerca.notificarCliente,
+    visivelCliente: geocerca.visivelCliente,
+  } : null;
+  geofenceMetaCache.set(traccarId, { at: Date.now(), meta });
+  return meta;
 }
 
 // ── Iniciar o servidor WebSocket para o frontend ──────────────────────────────
@@ -359,7 +394,13 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       positionId: e.positionId,
       geofenceId: e.geofenceId,
     }));
-    const eventosComLocal = realtimeEvents.concat(syntheticEvents);
+    const eventosComLocal = await Promise.all(realtimeEvents.concat(syntheticEvents).map(async (evt) => {
+      if ((evt.type === 'geofenceEnter' || evt.type === 'geofenceExit') && evt.geofenceId) {
+        const meta = await getGeofenceMeta(evt.geofenceId);
+        if (meta) return { ...evt, ...meta };
+      }
+      return evt;
+    }));
 
     // Disparar notificações para cada evento (fire-and-forget)
     type TraccarPos = NonNullable<TraccarWsMessage['positions']>[number];
@@ -389,6 +430,11 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         velocidade: pos != null ? Math.round(pos.speed * 1.852) : null,
         endereco: enderecoEvento,
         alarme: (norm as any).alarme ?? null,
+        geofenceId: evt.geofenceId ?? null,
+        origemTipo: (evt as any).origemTipo ?? null,
+        origemId: (evt as any).origemId ?? null,
+        clienteId: (evt as any).clienteId ?? null,
+        notificarCliente: (evt as any).notificarCliente,
       };
       NotificationService.processarEvento(identificador, evt.type, dados).catch(err => {
         console.error('[Notificações] Erro ao processar evento:', err.message);

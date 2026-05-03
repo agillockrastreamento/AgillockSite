@@ -402,6 +402,7 @@ let _ultimaLeituraAdmin = 0;
 let _eventosLimposAteAdmin = 0;
 let _eventosLimposRangesAdmin = [];
 let _periodoEventosAdmin = { periodo: 'hoje', de: null, ate: null };
+let _adminNotifPrefs = {};
 
 async function carregarUltimaLeituraAdmin() {
   try {
@@ -411,6 +412,9 @@ async function carregarUltimaLeituraAdmin() {
   } catch (e) {}
   try {
     const data = await window.AL.apiGet('/api/notificacoes-admin/admin-prefs');
+    if (data && data.prefs) {
+      _adminNotifPrefs = data.prefs || {};
+    }
     if (data && data.prefs && data.prefs.al_last_notif_admin) {
       _ultimaLeituraAdmin = parseInt(data.prefs.al_last_notif_admin, 10) || 0;
     }
@@ -444,6 +448,17 @@ function _normalizarEventoAdmin(evt) {
     evt = { ...evt, tipoLabel: _rotuloTipoEventoAdmin(evt.tipo) };
   }
   return evt;
+}
+
+function _tipoPreferenciaAdmin(tipo) {
+  if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
+  return tipo;
+}
+
+function _eventoPermitidoParaAdmin(evt) {
+  if (!evt || evt.origemTipo !== 'CLIENTE') return true;
+  if (evt.adminEvento === false) return false;
+  return !!_adminNotifPrefs[_tipoPreferenciaAdmin(evt.tipo)];
 }
 
 function _intervaloPeriodoEventosAdmin(cutoff) {
@@ -639,7 +654,7 @@ function adicionarEvento(evt) {
   evt = _normalizarEventoAdmin(evt);
   const time = new Date(evt.serverTime || Date.now()).getTime();
   const tiposPermitidos = TIPOS_EVENTO_ADMIN_FILTRO.map(t => t.tipo);
-  if (_eventoLimpoAdmin(evt) || !tiposPermitidos.includes(evt.tipo)) return;
+  if (_eventoLimpoAdmin(evt) || !_eventoPermitidoParaAdmin(evt) || !tiposPermitidos.includes(evt.tipo)) return;
   _eventos.unshift(evt);
   if (_eventos.length > MAX_EVENTOS) _eventos.length = MAX_EVENTOS;
   renderEventosLista();
@@ -1955,6 +1970,12 @@ function processarMensagemWs(msg) {
         lng: e.lng ?? pos?.longitude ?? null,
         endereco: e.endereco ?? null,
         geofenceId: e.geofenceId,
+        origemTipo: e.origemTipo,
+        origemId: e.origemId,
+        clienteId: e.clienteId,
+        clienteLoginId: e.clienteLoginId,
+        notificarCliente: e.notificarCliente,
+        adminEvento: e.adminEvento,
       });
     });
   }

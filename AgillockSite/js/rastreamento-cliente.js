@@ -601,6 +601,13 @@ function adicionarEvento(evt) {
   evt = _normalizarEventoCliente(evt);
   const time = new Date(evt.serverTime || Date.now()).getTime();
   const tiposPermitidos = TIPOS_EVENTO_CLIENTE_FILTRO.map(t => t.tipo);
+  if (evt.adminEvento === true) return;
+  if (evt.origemTipo === 'ADMIN' && evt.notificarCliente === false) return;
+  if (evt.origemTipo === 'CLIENTE' && window.AL_CLIENTE && AL_CLIENTE.getUser) {
+    const user = AL_CLIENTE.getUser() || {};
+    if (evt.clienteId && user.clienteId && evt.clienteId !== user.clienteId) return;
+    if (evt.clienteLoginId && user.sub && evt.clienteLoginId !== user.sub) return;
+  }
   if (_eventoLimpoCliente(evt) || !tiposPermitidos.includes(evt.tipo)) return;
   _eventos.unshift(evt);
   if (_eventos.length > MAX_EVENTOS) _eventos.length = MAX_EVENTOS;
@@ -1373,6 +1380,13 @@ function processarMensagemWs(msg) {
         lat: e.lat ?? pos?.latitude ?? null,
         lng: e.lng ?? pos?.longitude ?? null,
         endereco: e.endereco ?? null,
+        geofenceId: e.geofenceId,
+        origemTipo: e.origemTipo,
+        origemId: e.origemId,
+        clienteId: e.clienteId,
+        clienteLoginId: e.clienteLoginId,
+        notificarCliente: e.notificarCliente,
+        adminEvento: e.adminEvento,
       });
     });
   }

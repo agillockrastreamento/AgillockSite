@@ -312,12 +312,44 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
     });
     const mensagemFeita = `Manutenção "${recorrencia.titulo}" realizada! Contador reiniciado a partir de ${Math.round(kmAtual).toLocaleString('pt-BR')} km.`;
+    await prisma.eventoNotificacao.create({
+      data: {
+        clienteLoginId,
+        dispositivoId: recorrencia.dispositivoId,
+        tipoEvento: 'manutencaoFeita',
+        origemTipo: recorrencia.origem,
+        origemId: recorrencia.id,
+        adminEvento: true,
+        mensagem: mensagemFeita,
+        latitude: null,
+        longitude: null,
+        velocidade: null,
+      },
+    });
+    broadcastTrackingEvents([{
+      deviceId: recorrencia.dispositivo.traccarId,
+      dispositivoId: recorrencia.dispositivoId,
+      type: 'manutencaoFeita',
+      tipoLabel: 'Manutenção Realizada',
+      origemTipo: recorrencia.origem,
+      origemId: recorrencia.id,
+      clienteLoginId,
+      clienteId: req.cliente.clienteId,
+      adminEvento: true,
+      serverTime: new Date().toISOString(),
+      mensagem: mensagemFeita,
+      lat: null,
+      lng: null,
+      endereco: null,
+    }]);
     if (prefFeita && (prefFeita.web || prefFeita.app)) {
       await prisma.eventoNotificacao.create({
         data: {
           clienteLoginId,
           dispositivoId: recorrencia.dispositivoId,
           tipoEvento: 'manutencaoFeita',
+          origemTipo: recorrencia.origem,
+          origemId: recorrencia.id,
           mensagem: `Manutenção "${recorrencia.titulo}" realizada! Contador reiniciado a partir de ${Math.round(kmAtual).toLocaleString('pt-BR')} km.`,
           latitude: null,
           longitude: null,
@@ -329,6 +361,11 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
         dispositivoId: recorrencia.dispositivoId,
         type: 'manutencaoFeita',
         tipoLabel: 'Manutenção Realizada',
+        origemTipo: recorrencia.origem,
+        origemId: recorrencia.id,
+        clienteLoginId,
+        clienteId: req.cliente.clienteId,
+        adminEvento: false,
         serverTime: new Date().toISOString(),
         mensagem: mensagemFeita,
         lat: null,

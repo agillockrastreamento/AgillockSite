@@ -161,12 +161,51 @@ class NotificationService {
         console.log(`[Notif] Evento "${tipo}" (original: ${tipoOriginal}) para ${identificador} — ${clientesParaProcessar.length} cliente(s)`);
       }
 
+      if ((tipo === 'geofenceEnter' || tipo === 'geofenceExit') && (dados.origemTipo === 'ADMIN' || dados.origemTipo === 'CLIENTE')) {
+        const clienteAdminRef = (dados.origemTipo === 'CLIENTE' && dados.clienteId)
+          ? clientesParaProcessar.find(c => c.id === dados.clienteId)
+          : clientesParaProcessar[0];
+        const loginAdminRef = clienteAdminRef?.login;
+        if (loginAdminRef?.id) {
+          const mensagemAdmin = this.gerarMensagem(tipo, dispositivo.nome, dispositivo.placa, dados);
+          const enderecoAdmin = await this.resolverEnderecoEvento(dados);
+          await prisma.eventoNotificacao.create({
+            data: {
+              clienteLoginId: loginAdminRef.id,
+              dispositivoId: dispositivo.id,
+              tipoEvento: tipo,
+              origemTipo: dados.origemTipo,
+              origemId: dados.origemId ?? (dados.geofenceId != null ? String(dados.geofenceId) : null),
+              adminEvento: true,
+              mensagem: mensagemAdmin,
+              latitude: dados.latitude ?? null,
+              longitude: dados.longitude ?? null,
+              endereco: enderecoAdmin,
+              velocidade: dados.velocidade ?? null,
+            },
+          }).catch(err => console.error('[Notif] Erro ao salvar evento admin:', err.message));
+        }
+      }
+
       for (const cliente of clientesParaProcessar) {
         try {
           const clienteLogin = cliente.login;
           if (!clienteLogin || !clienteLogin.ativo) {
             console.log(`[Notif] Cliente ${cliente.nome} sem login ativo.`);
             continue;
+          }
+
+          if ((tipo === 'geofenceEnter' || tipo === 'geofenceExit') && dados.geofenceId) {
+            const origemTipo = dados.origemTipo ?? null;
+            const origemClienteId = dados.clienteId ?? null;
+            if (origemTipo === 'CLIENTE' && origemClienteId && origemClienteId !== cliente.id) {
+              console.log(`[Notif] Cerca de outro cliente ignorada para ${cliente.nome}.`);
+              continue;
+            }
+            if (origemTipo === 'ADMIN' && dados.notificarCliente === false) {
+              console.log(`[Notif] Cerca admin sem notificacao ao cliente ignorada para ${cliente.nome}.`);
+              continue;
+            }
           }
 
           const pref = await prisma.preferenciaNotificacao.findUnique({
@@ -207,6 +246,8 @@ class NotificationService {
                   clienteLoginId: clienteLogin.id,
                   dispositivoId: dispositivo.id,
                   tipoEvento: tipo,
+                  origemTipo: dados.origemTipo ?? null,
+                  origemId: dados.origemId ?? (dados.geofenceId != null ? String(dados.geofenceId) : null),
                   mensagem,
                   latitude: dados.latitude ?? null,
                   longitude: dados.longitude ?? null,
@@ -225,6 +266,11 @@ class NotificationService {
                 lat: dados.latitude ?? null,
                 lng: dados.longitude ?? null,
                 endereco: enderecoEvento,
+                origemTipo: dados.origemTipo ?? null,
+                origemId: dados.origemId ?? (dados.geofenceId != null ? String(dados.geofenceId) : null),
+                clienteId: dados.clienteId ?? null,
+                notificarCliente: dados.notificarCliente,
+                geofenceId: dados.geofenceId ?? null,
               };
 
               console.log(`[Notif] Evento "${tipo}" salvo no banco para ${cliente.nome}`);
@@ -479,6 +525,10 @@ class NotificationService {
     const pl = dispositivo.placa ? ` (${dispositivo.placa})` : '';
 
     for (const rec of recorrencias) {
+      const targetsRecorrencia = rec.origem === 'CLIENTE' && rec.clienteLoginId
+        ? targets.filter(t => t.clienteLoginId === rec.clienteLoginId)
+        : targets;
+      if (!targetsRecorrencia.length) continue;
       const kmPercorrido = odometroKm - rec.kmBase;
       const intervalo = rec.intervaloKm;
       const titulo = rec.titulo;
@@ -487,7 +537,7 @@ class NotificationService {
       if (!rec.alerta50Enviado && kmPercorrido >= intervalo - 50) {
         const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
         const mensagem = `Manutenção Próxima: "${titulo}" no veículo ${nome}${pl} — faltam ${kmRestante} km para o próximo serviço (intervalo: ${intervalo} km).`;
-        eventosDetectados.push(...await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem));
+        eventosDetectados.push(...await this._notificarTargetsManutencao(targetsRecorrencia, dispositivo, 'manutencaoAlerta', mensagem, rec.origem, rec.id));
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta50Enviado: true } });
         rec.alerta50Enviado = true;
       }
@@ -496,7 +546,7 @@ class NotificationService {
       if (!rec.alerta25Enviado && kmPercorrido >= intervalo - 25) {
         const kmRestante = Math.max(0, Math.round(intervalo - kmPercorrido));
         const mensagem = `Manutenção Urgente: "${titulo}" no veículo ${nome}${pl} — faltam apenas ${kmRestante} km para o próximo serviço!`;
-        eventosDetectados.push(...await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem));
+        eventosDetectados.push(...await this._notificarTargetsManutencao(targetsRecorrencia, dispositivo, 'manutencaoAlerta', mensagem, rec.origem, rec.id));
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta25Enviado: true } });
         rec.alerta25Enviado = true;
       }
@@ -504,7 +554,7 @@ class NotificationService {
       // At limit (orange → transitions to red on post-due)
       if (!rec.alerta0Enviado && kmPercorrido >= intervalo) {
         const mensagem = `Manutenção Devida: "${titulo}" no veículo ${nome}${pl} atingiu o intervalo de ${intervalo} km. Realize o serviço!`;
-        eventosDetectados.push(...await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAlerta', mensagem));
+        eventosDetectados.push(...await this._notificarTargetsManutencao(targetsRecorrencia, dispositivo, 'manutencaoAlerta', mensagem, rec.origem, rec.id));
         await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { alerta0Enviado: true } });
         rec.alerta0Enviado = true;
       }
@@ -517,7 +567,7 @@ class NotificationService {
           const kmAtrasado = i * 50;
           if (ultima < kmAtrasado) {
             const mensagem = `Manutenção Atrasada: "${titulo}" no veículo ${nome}${pl} está ${kmAtrasado} km acima do intervalo recomendado (${intervalo} km). Realize o serviço urgente!`;
-            eventosDetectados.push(...await this._notificarTargetsManutencao(targets, dispositivo, 'manutencaoAtrasada', mensagem));
+            eventosDetectados.push(...await this._notificarTargetsManutencao(targetsRecorrencia, dispositivo, 'manutencaoAtrasada', mensagem, rec.origem, rec.id));
             await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { ultimaAlertaPostDueKm: kmAtrasado } });
             break;
           }
@@ -527,7 +577,7 @@ class NotificationService {
     return eventosDetectados;
   }
 
-  private _deduplicarRecorrenciasManutencao<T extends { titulo: string; intervaloKm: number; kmBase: number }>(recorrencias: T[]): T[] {
+  private _deduplicarRecorrenciasManutencao<T extends { titulo: string; intervaloKm: number; kmBase: number; origem?: string | null; clienteLoginId?: string | null; id?: string }>(recorrencias: T[]): T[] {
     const vistos = new Set<string>();
     return recorrencias.filter((rec) => {
       const chave = `${rec.titulo.trim().toLowerCase()}|${rec.intervaloKm}|${Math.round(rec.kmBase)}`;
@@ -542,10 +592,12 @@ class NotificationService {
     dispositivo: DispositivoBasico,
     tipo: 'manutencaoAlerta' | 'manutencaoAtrasada',
     mensagem: string,
+    origemTipo?: string | null,
+    origemId?: string | null,
   ) {
     const eventos: any[] = [];
     for (const target of targets) {
-      const evento = await this._salvarEEnviar(target.clienteLoginId, dispositivo, target.pref, tipo, mensagem);
+      const evento = await this._salvarEEnviar(target.clienteLoginId, dispositivo, target.pref, tipo, mensagem, origemTipo, origemId);
       if (evento && !eventos.length) eventos.push(evento);
     }
     return eventos;
@@ -557,11 +609,13 @@ class NotificationService {
     pref: { web: boolean; app: boolean; email: boolean },
     tipo: string,
     mensagem: string,
+    origemTipo?: string | null,
+    origemId?: string | null,
   ) {
     let wsEvent: any = null;
     if (pref.web || pref.app) {
       await prisma.eventoNotificacao.create({
-        data: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: tipo, mensagem, latitude: null, longitude: null, velocidade: null },
+        data: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: tipo, origemTipo: origemTipo ?? null, origemId: origemId ?? null, mensagem, latitude: null, longitude: null, velocidade: null },
       });
       wsEvent = {
         deviceId: dispositivo.traccarId,
@@ -573,6 +627,10 @@ class NotificationService {
         lat: null,
         lng: null,
         endereco: null,
+        origemTipo: origemTipo ?? null,
+        origemId: origemId ?? null,
+        clienteLoginId,
+        adminEvento: false,
       };
     }
     if (pref.email) {
