@@ -100,7 +100,7 @@ Entregas:
 - Drawer com símbolo `AgillockSite/img/agillock_new_symbol.png`.
 - Links: Mapa, Relatório, Notificações, Geocercas e Pagamentos.
 - Avatar no drawer.
-- Modal de perfil ao tocar no avatar.
+- Bottom sheet de perfil ao tocar no avatar, ocupando 80% da tela, com animação, toque fora e arraste para fechar.
 - Upload de avatar.
 - Dados do perfil e listas de veículos de faturamento/responsável e vinculados.
 - Botão Sair abaixo do avatar.
@@ -114,7 +114,8 @@ Critério de saída:
 Implementação atual:
 
 - `app/src/navigation/AppNavigator.tsx`: drawer autenticado, topbar centralizada e ações de Mapa/Relatório.
-- `app/src/profile/ProfileModal.tsx`: modal de perfil com avatar, dados e listas de veículos.
+- `app/src/components/BottomSheet.tsx`: componente reutilizável para bottom sheets do app.
+- `app/src/profile/ProfileModal.tsx`: bottom sheet de perfil com avatar, dados, CPF/CNPJ mascarado e listas de veículos.
 - `app/src/profile/profileService.ts`: chamadas `GET /cliente/perfil` e `POST /cliente/perfil/avatar`.
 - `app/src/profile/profileTypes.ts`: contratos do perfil no app.
 - `backend/src/routes/cliente-perfil.routes.ts`: usa `clienteAuthMiddleware`, compatível com JWT do app cliente.

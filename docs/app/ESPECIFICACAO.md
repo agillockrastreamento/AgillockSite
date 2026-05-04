@@ -153,15 +153,19 @@ Ao abrir o drawer:
 - Exibir a marca reduzida `AgillockSite/img/agillock_new_symbol.png` no topo.
 - Exibir links das telas do cliente.
 - Na área onde hoje fica o nome do usuário, exibir um avatar circular com a foto do cliente.
-- Ao tocar no avatar, abrir modal de perfil.
+- Ao tocar no avatar, abrir bottom sheet de perfil com 80% da altura da tela.
 - Abaixo do avatar, exibir botão `Sair`.
 
-Modal de perfil:
+Bottom sheet de perfil:
 
 - Mostra avatar atual e ação de upload de foto.
+- Abre e fecha com animação.
+- Fecha ao tocar fora, ao tocar no botão de fechar ou ao arrastar a gaveta para baixo.
+- Usa o componente reutilizável `app/src/components/BottomSheet.tsx`.
 - Seleciona imagem com `expo-image-picker`.
 - Faz upload com `POST /api/cliente/perfil/avatar`, campo `avatar`.
 - Mostra dados do usuário: nome, email, telefone, CPF/CNPJ quando disponíveis.
+- Exibe CPF/CNPJ com máscara visual, sem alterar o valor recebido da API.
 - Lista veículos associados, separados entre faturamento/responsável e vinculados.
 - Ao concluir upload, atualiza o avatar exibido no drawer.
 
@@ -577,7 +581,7 @@ Configuração esperada:
 ## Critérios de aceite
 
 - Login aceita somente cliente e abre Mapa como primeira tela.
-- Drawer mostra símbolo AgilLock, telas, avatar, modal de perfil e botão Sair.
+- Drawer mostra símbolo AgilLock, telas, avatar, bottom sheet de perfil e botão Sair.
 - App inteiro permanece em tema claro.
 - Mapa carrega snapshot, atualiza por WebSocket e filtra eventos por `traccarId`.
 - Pesquisa do mapa abre Bottom Sheet de 80% e foca dispositivo selecionado.

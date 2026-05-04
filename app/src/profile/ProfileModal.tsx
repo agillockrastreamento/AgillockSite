@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,8 +8,9 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { ActivityIndicator, Avatar, Button, IconButton } from 'react-native-paper';
+import { ActivityIndicator, Avatar, Button } from 'react-native-paper';
 
+import { BottomSheet } from '../components/BottomSheet';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
@@ -23,9 +23,27 @@ import type { ClientePerfil, ClientePerfilVeiculo } from './profileTypes';
 
 type Props = {
   visible: boolean;
+  initialProfile?: ClientePerfil | null;
   onClose(): void;
   onProfileUpdated?(profile: ClientePerfil): void;
 };
+
+function formatCpfCnpj(value: string | null | undefined) {
+  const digits = (value ?? '').replace(/\D/g, '');
+
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+
+  if (digits.length === 14) {
+    return digits.replace(
+      /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+      '$1.$2.$3/$4-$5',
+    );
+  }
+
+  return value || '-';
+}
 
 function VeiculoList({
   title,
@@ -55,15 +73,31 @@ function VeiculoList({
   );
 }
 
-export function ProfileModal({ visible, onClose, onProfileUpdated }: Props) {
+export function ProfileModal({
+  visible,
+  initialProfile,
+  onClose,
+  onProfileUpdated,
+}: Props) {
   const toast = useToast();
-  const [profile, setProfile] = useState<ClientePerfil | null>(null);
+  const [profile, setProfile] = useState<ClientePerfil | null>(
+    initialProfile ?? null,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
+    if (initialProfile) setProfile(initialProfile);
+  }, [initialProfile]);
+
+  useEffect(() => {
     let mounted = true;
     if (!visible) return undefined;
+
+    if (initialProfile) {
+      setProfile(initialProfile);
+      return undefined;
+    }
 
     setIsLoading(true);
     getClientePerfil()
@@ -86,7 +120,7 @@ export function ProfileModal({ visible, onClose, onProfileUpdated }: Props) {
     return () => {
       mounted = false;
     };
-  }, [onProfileUpdated, toast, visible]);
+  }, [initialProfile, onProfileUpdated, toast, visible]);
 
   async function handlePickAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -128,122 +162,81 @@ export function ProfileModal({ visible, onClose, onProfileUpdated }: Props) {
   const avatarUri = resolveUploadUrl(profile?.avatarUrl);
 
   return (
-    <Modal
-      animationType="fade"
-      transparent
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Perfil</Text>
-            <IconButton icon="close" size={22} onPress={onClose} />
+    <BottomSheet visible={visible} title="Perfil" heightPercent={0.7} onClose={onClose}>
+      {isLoading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator />
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <Pressable
+            accessibilityRole="button"
+            style={styles.avatarButton}
+            disabled={isUploading}
+            onPress={handlePickAvatar}
+          >
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <Avatar.Text
+                size={92}
+                label={(profile?.nome ?? 'CL').slice(0, 2).toUpperCase()}
+                color={colors.primaryText}
+                style={styles.avatarFallback}
+              />
+            )}
+            <View style={styles.cameraBadge}>
+              <Avatar.Icon
+                size={30}
+                icon="camera"
+                color={colors.primaryText}
+                style={styles.cameraIcon}
+              />
+            </View>
+          </Pressable>
+
+          <Button
+            mode="outlined"
+            icon="camera"
+            loading={isUploading}
+            disabled={isUploading}
+            onPress={handlePickAvatar}
+          >
+            Alterar foto
+          </Button>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Dados</Text>
+            <Text style={styles.fieldLabel}>Nome</Text>
+            <Text style={styles.fieldValue}>{profile?.nome ?? '-'}</Text>
+            <Text style={styles.fieldLabel}>Email</Text>
+            <Text style={styles.fieldValue}>{profile?.email ?? '-'}</Text>
+            <Text style={styles.fieldLabel}>Telefone</Text>
+            <Text style={styles.fieldValue}>{profile?.telefone ?? '-'}</Text>
+            <Text style={styles.fieldLabel}>CPF/CNPJ</Text>
+            <Text style={styles.fieldValue}>
+              {formatCpfCnpj(profile?.cpfCnpj)}
+            </Text>
           </View>
 
-          {isLoading ? (
-            <View style={styles.loading}>
-              <ActivityIndicator />
-            </View>
-          ) : (
-            <ScrollView
-              contentContainerStyle={styles.content}
-              showsVerticalScrollIndicator={false}
-            >
-              <Pressable
-                accessibilityRole="button"
-                style={styles.avatarButton}
-                disabled={isUploading}
-                onPress={handlePickAvatar}
-              >
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-                ) : (
-                  <Avatar.Text
-                    size={92}
-                    label={(profile?.nome ?? 'CL').slice(0, 2).toUpperCase()}
-                    color={colors.primaryText}
-                    style={styles.avatarFallback}
-                  />
-                )}
-                <View style={styles.cameraBadge}>
-                  <IconButton
-                    icon="camera"
-                    size={18}
-                    iconColor={colors.primaryText}
-                    style={styles.cameraIcon}
-                  />
-                </View>
-              </Pressable>
-
-              <Button
-                mode="outlined"
-                icon="camera"
-                loading={isUploading}
-                disabled={isUploading}
-                onPress={handlePickAvatar}
-              >
-                Alterar foto
-              </Button>
-
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Dados</Text>
-                <Text style={styles.fieldLabel}>Nome</Text>
-                <Text style={styles.fieldValue}>{profile?.nome ?? '-'}</Text>
-                <Text style={styles.fieldLabel}>Email</Text>
-                <Text style={styles.fieldValue}>{profile?.email ?? '-'}</Text>
-                <Text style={styles.fieldLabel}>Telefone</Text>
-                <Text style={styles.fieldValue}>{profile?.telefone ?? '-'}</Text>
-                <Text style={styles.fieldLabel}>CPF/CNPJ</Text>
-                <Text style={styles.fieldValue}>{profile?.cpfCnpj ?? '-'}</Text>
-              </View>
-
-              <VeiculoList
-                title="Veículos sob responsabilidade"
-                veiculos={profile?.veiculosFaturamento ?? []}
-              />
-              <VeiculoList
-                title="Veículos vinculados"
-                veiculos={profile?.veiculosVinculados ?? []}
-              />
-            </ScrollView>
-          )}
-        </View>
-      </View>
-    </Modal>
+          <VeiculoList
+            title="Veículos sob responsabilidade"
+            veiculos={profile?.veiculosFaturamento ?? []}
+          />
+          <VeiculoList
+            title="Veículos vinculados"
+            veiculos={profile?.veiculosVinculados ?? []}
+          />
+        </ScrollView>
+      )}
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
-    backgroundColor: 'rgba(23, 32, 42, 0.38)',
-  },
-  sheet: {
-    width: '100%',
-    maxWidth: 430,
-    maxHeight: '88%',
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-    overflow: 'hidden',
-  },
-  header: {
-    minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingLeft: spacing.xl,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 19,
-    fontWeight: '800',
-  },
   loading: {
     minHeight: 260,
     alignItems: 'center',
@@ -252,6 +245,7 @@ const styles = StyleSheet.create({
   content: {
     gap: spacing.lg,
     padding: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   avatarButton: {
     alignSelf: 'center',
@@ -279,9 +273,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   cameraIcon: {
-    width: 30,
-    height: 30,
-    margin: 0,
+    backgroundColor: colors.primary,
   },
   section: {
     gap: spacing.xs,
