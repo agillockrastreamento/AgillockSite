@@ -62,6 +62,7 @@ Entregas:
 - Validação obrigatória de `user.role === "CLIENTE"`.
 - Persistência do JWT em `expo-secure-store`.
 - Persistência do usuário cliente em storage local para restauração da sessão.
+- Autenticação Biométrica (Face ID / Touch ID) após o primeiro login, disparada automaticamente após o splash.
 - Registro do Expo Push Token no backend após login quando o token já estiver disponível.
 - Logout com limpeza de token e usuário local, incluindo tentativa de remoção do token Expo no backend.
 
@@ -70,6 +71,8 @@ Critério de saída:
 - Cliente válido entra no app.
 - Usuários admin, colaborador e vendedor são recusados.
 - Sessão é restaurada ao reabrir o app.
+- Autenticação Biométrica é exibida automaticamente após carregar caso o cliente tenha salvo as credenciais em um acesso prévio com senha, aguardando o fim da animação da tela de splash.
+- Botão "Acessar com Biometria / Face ID" sempre disponível na tela de login, caso o hardware suporte.
 - Logout limpa sessão local e retorna para a tela de login.
 - Após login, o app tenta registrar o Expo Push Token salvo em `/api/cliente/notificacoes/app-tokens`.
 - No Android, o canal de notificação `default` é configurado antes do pedido de permissão.

@@ -20,7 +20,7 @@ import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
 
-const logo = require('../../assets/logo_agillock_white_new.png');
+const logo = require('../../assets/logo_agillock_new.png');
 
 let hasAutoPrompted = false;
 
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xl,
     borderRadius: radius.md,
-    backgroundColor: colors.loginLogoBackground,
+    backgroundColor: colors.surface,
   },
   formArea: {
     gap: spacing.lg,

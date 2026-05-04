@@ -183,7 +183,8 @@ Visual:
 - Fundo da tela igual ao login do site: base escura `#1e2530`.
 - Logo dentro do painel claro, em uma área interna com a mesma cor escura do login web, mantendo margem branca visível do painel ao redor dessa área.
 - Painel/formulário com superfície clara do app.
-- Abaixo do botão Entrar, exibir `© 2026 AgilLock — Gestão de Rastreamento`.
+- Abaixo do botão Entrar, exibir botão para login biométrico "Acessar com Biometria / Face ID" caso as credenciais já estejam salvas e o hardware suporte. Este botão deve aparecer automaticamente após 800ms ao carregar a tela, invocando a leitura nativa sem ação do usuário.
+- Abaixo de todas as opções de botão, exibir `© 2026 AgilLock — Gestão de Rastreamento`.
 - Campo de senha com botão para alternar visualização.
 
 Contrato:
@@ -207,7 +208,7 @@ Implementação atual:
 - `app/src/auth/AuthProvider.tsx`: controla sessão, restauração, login e logout.
 - `app/src/auth/sessionStorage.ts`: persiste JWT em SecureStore e dados mínimos do usuário em AsyncStorage.
 - `app/src/navigation/AppNavigator.tsx`: mostra Login quando não autenticado e Drawer do cliente quando autenticado.
-- `app/src/screens/LoginScreen.tsx`: usa logo `logo_agillock_new.png`, `AppTextInput`, toast centralizado e bloqueio de envio enquanto autentica.
+- `app/src/screens/LoginScreen.tsx`: usa logo `logo_agillock_new.png`, `AppTextInput`, toast centralizado, suporte à autenticação biométrica via `expo-local-authentication` (com delay automático de 800ms) e bloqueio de envio enquanto autentica.
 
 Referência: `docs/projeto/PORTAL_CLIENTE.md`, seção `Login do cliente`.
 
