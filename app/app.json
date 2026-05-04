@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "AgilLock Cliente",
+    "slug": "agillock-cliente",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "br.com.agillock.cliente"
+    },
+    "android": {
+      "package": "br.com.agillock.cliente",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "apiUrl": "https://api.agillock.com.br/api",
+      "wsUrl": "wss://api.agillock.com.br/ws/rastreamento",
+      "environment": "production"
+    }
+  }
+}
