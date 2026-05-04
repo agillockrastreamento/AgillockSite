@@ -87,6 +87,17 @@ podeInativarLoginCliente
 podeExcluirLoginCliente
 ```
 
+## Perfil e Avatar (App Mobile)
+
+Estes endpoints foram criados especificamente para suportar o aplicativo mobile, permitindo o gerenciamento da conta e o upload de foto do usuário.
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/cliente/perfil` | Retorna dados do cliente, `avatarUrl` e lista os veículos divididos entre faturamento e vinculados |
+| POST | `/api/cliente/perfil/avatar` | Upload de foto de perfil (multipart/form-data). Retorna a nova `avatarUrl`. |
+
+O upload salva a imagem em `/uploads/cliente-avatar` e apaga automaticamente a foto antiga do servidor.
+
 ## Rastreamento
 
 Rotas principais:

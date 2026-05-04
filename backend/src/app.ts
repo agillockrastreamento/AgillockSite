@@ -23,6 +23,7 @@ import notificacoesAdminRoutes from './routes/notificacoes-admin.routes';
 import manutencoesRoutes from './routes/manutencoes.routes';
 import manutencoesAdminRoutes from './routes/manutencoes-admin.routes';
 import compartilhamentoRoutes from './routes/compartilhamento.routes';
+import clientePerfilRoutes from './routes/cliente-perfil.routes';
 import { UPLOADS_DIR } from './utils/upload-paths';
 
 const app = express();
@@ -108,6 +109,7 @@ app.use('/api/cliente/notificacoes', notificacoesRoutes);    // Notificações d
 app.use('/api/notificacoes-admin', notificacoesAdminRoutes); // Notificações admin
 app.use('/api/cliente/manutencoes', manutencoesRoutes);      // Manutenções do cliente
 app.use('/api/manutencoes-admin', manutencoesAdminRoutes);   // Manutenções admin
+app.use('/api/cliente/perfil', clientePerfilRoutes); // Perfil do cliente
 app.use('/api/cliente', clientePortalRoutes);   // portal do cliente (JWT role=CLIENTE)
 
 // Rota não encontrada

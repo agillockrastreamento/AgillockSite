@@ -368,6 +368,7 @@ model ClienteLogin {
   senhaHash String
   ativo     Boolean  @default(true)
   prefs     Json     @default("{}")
+  avatarUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
