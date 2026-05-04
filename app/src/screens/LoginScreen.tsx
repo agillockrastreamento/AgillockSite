@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
 
 import { useAuth } from '../auth/AuthProvider';
 import { ApiError } from '../services/api/apiClient';
@@ -19,6 +21,8 @@ import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
 
 const logo = require('../../assets/logo_agillock_white_new.png');
+
+let hasAutoPrompted = false;
 
 export function LoginScreen() {
   const { signIn } = useAuth();
@@ -30,6 +34,84 @@ export function LoginScreen() {
   const [senhaError, setSenhaError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+  const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
+
+  useEffect(() => {
+    async function checkBiometricsAndCredentials() {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      const isSupported = compatible && enrolled;
+      setIsBiometricSupported(isSupported);
+
+      const savedEmail = await SecureStore.getItemAsync('saved_email');
+      const savedPassword = await SecureStore.getItemAsync('saved_password');
+      
+      if (savedEmail) {
+        setEmail(savedEmail);
+      }
+      if (savedEmail && savedPassword) {
+        setHasSavedCredentials(true);
+        
+        if (isSupported && !hasAutoPrompted) {
+          hasAutoPrompted = true;
+          setTimeout(async () => {
+            const auth = await LocalAuthentication.authenticateAsync({
+              promptMessage: 'Autentique-se para entrar',
+              fallbackLabel: 'Usar senha',
+            });
+
+            if (auth.success) {
+              try {
+                setIsSubmitting(true);
+                await signIn({ email: savedEmail, senha: savedPassword });
+              } catch (error) {
+                const message =
+                  error instanceof ApiError || error instanceof Error
+                    ? error.message
+                    : 'Não foi possível entrar com biometria.';
+                toast.show({ message, type: 'error' });
+              } finally {
+                setIsSubmitting(false);
+              }
+            }
+          }, 900);
+        }
+      }
+    }
+    checkBiometricsAndCredentials();
+  }, [signIn, toast]);
+
+  async function handleBiometricLogin() {
+    const savedEmail = await SecureStore.getItemAsync('saved_email');
+    const savedPassword = await SecureStore.getItemAsync('saved_password');
+
+    if (!savedEmail || !savedPassword) {
+      toast.show({ message: 'Você precisa fazer login com senha ao menos uma vez.', type: 'error' });
+      return;
+    }
+
+    const auth = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Autentique-se para entrar',
+      fallbackLabel: 'Usar senha',
+    });
+
+    if (auth.success) {
+      try {
+        setIsSubmitting(true);
+        await signIn({ email: savedEmail, senha: savedPassword });
+      } catch (error) {
+        const message =
+          error instanceof ApiError || error instanceof Error
+            ? error.message
+            : 'Não foi possível entrar com biometria.';
+        toast.show({ message, type: 'error' });
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  }
 
   async function handleSubmit() {
     const normalizedEmail = email.trim().toLowerCase();
@@ -58,6 +140,11 @@ export function LoginScreen() {
     try {
       setIsSubmitting(true);
       await signIn({ email: normalizedEmail, senha });
+      
+      // Salvar credenciais para login biométrico futuro
+      await SecureStore.setItemAsync('saved_email', normalizedEmail);
+      await SecureStore.setItemAsync('saved_password', senha);
+      setHasSavedCredentials(true);
     } catch (error) {
       const message =
         error instanceof ApiError || error instanceof Error
@@ -86,10 +173,10 @@ export function LoginScreen() {
             <AppTextInput
               label="Email"
               value={email}
-              errorMessage={emailError} // <-- Passando o erro
+              errorMessage={emailError}
               onChangeText={(text) => {
                 setEmail(text);
-                if (emailError) setEmailError(''); // Limpa o erro ao digitar
+                if (emailError) setEmailError('');
               }}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -102,10 +189,10 @@ export function LoginScreen() {
             <AppTextInput
               label="Senha"
               value={senha}
-              errorMessage={senhaError} // <-- Passando o erro
+              errorMessage={senhaError}
               onChangeText={(text) => {
                 setSenha(text);
-                if (senhaError) setSenhaError(''); // Limpa o erro ao digitar
+                if (senhaError) setSenhaError('');
               }}
               secureTextEntry={!showPassword}
               textContentType="password"
@@ -131,6 +218,18 @@ export function LoginScreen() {
                 {isSubmitting ? 'Entrando...' : 'Entrar'}
               </Text>
             </Pressable>
+            {isBiometricSupported && (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSubmitting}
+                style={[styles.buttonBiometric, isSubmitting && styles.buttonDisabled]}
+                onPress={handleBiometricLogin}
+              >
+                <Text style={styles.buttonBiometricText}>
+                  Acessar com Biometria / Face ID
+                </Text>
+              </Pressable>
+            )}
             <Text style={styles.copyright}>
               © 2026 AgilLock — Gestão de Rastreamento
             </Text>
@@ -205,6 +304,21 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: colors.primaryText,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  buttonBiometric: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    marginTop: spacing.sm,
+  },
+  buttonBiometricText: {
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '700',
   },

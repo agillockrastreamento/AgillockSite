@@ -24,7 +24,7 @@ export function AppTextInput({
 }: Props) {
 
   // Estado para controlar a posição do cursor
-  const [inputSelection, setInputSelection] = useState<{ start: number; end: number } | undefined>(undefined);
+  const [inputSelection, setInputSelection] = useState<{ start: number; end: number } | undefined>({ start: 0, end: 0 });
 
   // Estado para controlar quando há erro
   const hasError = error || !!errorMessage;

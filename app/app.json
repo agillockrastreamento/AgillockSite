@@ -19,7 +19,8 @@
         "NSCameraUsageDescription": "A AgilLock usa a câmera para permitir o envio de fotos de perfil e fotos dos veículos vinculados à sua conta.",
         "NSPhotoLibraryUsageDescription": "A AgilLock acessa suas fotos apenas quando você escolhe uma imagem para perfil, veículo ou comprovantes dentro do app.",
         "NSPhotoLibraryAddUsageDescription": "A AgilLock pode salvar arquivos exportados por você, como relatórios e comprovantes, quando essa ação for solicitada no app.",
-        "NSLocationWhenInUseUsageDescription": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos."
+        "NSLocationWhenInUseUsageDescription": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos.",
+        "NSFaceIDUsageDescription": "A AgilLock usa o Face ID / Touch ID para permitir um login mais rápido e seguro."
       }
     },
     "android": {
@@ -28,7 +29,9 @@
         "CAMERA",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "READ_MEDIA_IMAGES"
+        "READ_MEDIA_IMAGES",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -42,7 +45,13 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "A AgilLock usa o Face ID / Touch ID para permitir um login mais rápido e seguro."
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://api.agillock.com.br/api",
