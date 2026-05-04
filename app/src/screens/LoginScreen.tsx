@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   buttonBiometric: {
-    minHeight: 48,
+    minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,
