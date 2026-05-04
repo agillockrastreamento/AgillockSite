@@ -130,7 +130,7 @@ Referências:
 | Limites de upload | `Uploads` | `docs/projeto/API.md` |
 | Navegação esperada | `Observações para o plano mobile` | `docs/projeto/PORTAL_CLIENTE.md` |
 
-## Fase 3 - Mapa base e snapshot 
+## Fase 3 - Mapa base e snapshot (Implementada)
 
 Objetivo: entregar a primeira tela logada com dispositivos do cliente.
 
@@ -151,6 +151,14 @@ Critério de saída:
 - Mapa renderiza em Android/iOS.
 - Snapshot aparece com dispositivos corretos do cliente.
 - Cliente bloqueado vê estado de bloqueio e não acessa rastreamento.
+
+Implementação atual:
+
+- `app/src/screens/MapScreen.tsx`: tela de mapa com `react-native-maps`, `PROVIDER_GOOGLE`, marcadores, foco e painel rápido inicial.
+- `app/src/tracking/trackingService.ts`: chamadas `GET /cliente/rastreamento/status-acesso` e `GET /cliente/rastreamento/posicoes`.
+- `app/src/tracking/trackingTypes.ts`: contratos do snapshot e índice `traccarId -> dispositivoId`.
+- `expo-location`: centraliza a posição atual do aparelho pelo botão de localização.
+- Marcadores usam renderização simples nesta fase; ícones SVG 3D e cards completos ficam para a Fase 4.
 
 Referências:
 

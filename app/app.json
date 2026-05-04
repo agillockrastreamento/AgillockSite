@@ -59,6 +59,12 @@
         {
           "faceIDPermission": "A AgilLock usa o Face ID / Touch ID para permitir um login mais rápido e seguro."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos."
+        }
       ]
     ],
     "extra": {

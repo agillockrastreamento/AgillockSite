@@ -257,6 +257,15 @@ traccarId -> dispositivoId
 
 Esse índice é obrigatório para filtrar mensagens do WebSocket.
 
+Implementação atual da Fase 3:
+
+- `app/src/screens/MapScreen.tsx` renderiza o mapa com `react-native-maps` e `PROVIDER_GOOGLE`.
+- `app/src/tracking/trackingService.ts` carrega status de acesso e snapshot.
+- `app/src/tracking/trackingTypes.ts` define os contratos do snapshot no app.
+- `expo-location` é usado pelo botão de localização para centralizar a posição atual do aparelho.
+- Marcadores usam ponto simples com status online/offline/unknown; os ícones SVG 3D do site entram na Fase 4.
+- O painel rápido inferior desta fase mostra uma lista compacta inicial para focar dispositivos; o Bottom Sheet com cards completos entra na Fase 4.
+
 Referências:
 
 - `docs/traccar/PORTAL_CLIENTE.md`, seção `Fluxo recomendado`.

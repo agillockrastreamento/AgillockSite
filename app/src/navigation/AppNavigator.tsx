@@ -16,6 +16,7 @@ import { getClientePerfil, resolveUploadUrl } from '../profile/profileService';
 import type { ClientePerfil } from '../profile/profileTypes';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { MapScreen } from '../screens/MapScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
@@ -225,9 +226,7 @@ function ClienteDrawer() {
         ),
       })}
     >
-      <Drawer.Screen name="Mapa">
-        {() => <PlaceholderScreen title="Mapa" />}
-      </Drawer.Screen>
+      <Drawer.Screen name="Mapa" component={MapScreen} />
       <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }}>
         {() => <PlaceholderScreen title="Relatório" />}
       </Drawer.Screen>
