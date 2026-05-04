@@ -24,6 +24,13 @@ O app é exclusivo para usuários com JWT `role: "CLIENTE"` e deve expor as mesm
 - Pagamentos.
 - Perfil no drawer, com avatar e lista de veículos associados.
 
+## Status Atual
+
+| Fase | Estado |
+|---|---|
+| Fase 0 - Preparação | Concluída |
+| Fase 1 - Autenticação e sessão | Implementada |
+
 ## Decisão de mapa
 
 Para o app Expo, a recomendação é usar `react-native-maps` com `provider={PROVIDER_GOOGLE}` em Android e iOS. Assim o app usa o SDK nativo do Google Maps, com melhor integração em React Native do que tentar embutir o Google Maps JavaScript API em WebView.
@@ -84,8 +91,15 @@ Observações da Fase 0:
 - O app usa `react-native-paper` para inputs e componentes Material.
 - `PaperProvider` deve envolver a navegação com o tema `app/src/theme/paperTheme.ts`.
 - Campos comuns devem usar o wrapper `app/src/components/AppTextInput.tsx`, não `TextInput` direto na tela.
+- Inputs devem manter o início do valor visível; textos longos ocultam o final.
+- Campo de senha deve ter ação de visualizar/ocultar dentro do input.
 - O app usa `react-native-reanimated` por causa do drawer.
 - `app/babel.config.js` deve manter `react-native-reanimated/plugin`.
 - `react-native-worklets` deve ficar fixado na versão esperada pelo Expo SDK 54 (`0.5.1`) para casar com o Expo Go.
 - `newArchEnabled` fica `true` no SDK 54, compatível com Expo Go e Reanimated 4.
 - `react-native-gesture-handler` deve ser importado no entrypoint `index.ts`.
+- `expo-notifications` é usado para pedir permissão após a splash e registrar o Expo Push Token após login.
+- Projeto EAS vinculado: `@pedro_castro/agillock-cliente`.
+- EAS Project ID: `63e4131c-1fd9-4366-9bf7-d2bbbfafabd2`.
+- O `projectId` fica em `app.json` em `expo.extra.eas.projectId`; `EXPO_PUBLIC_EAS_PROJECT_ID` pode sobrescrever esse valor quando configurado.
+- Textos de permissão para câmera, fotos e localização ficam em `app.json`; fluxos Android que não aceitam texto nativo customizado devem explicar o motivo na própria tela antes de pedir acesso.

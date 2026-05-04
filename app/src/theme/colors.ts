@@ -5,9 +5,13 @@ export const colors = {
   border: '#d9e1ea',
   text: '#17202a',
   textMuted: '#657485',
+  textSubtle: '#a0a7b0',
   primary: '#fab32c',
   primaryText: '#1f2328',
   accent: '#2980b9',
   danger: '#e74c3c',
   success: '#27ae60',
+  loginBackgroundStart: '#1e2530',
+  loginBackgroundEnd: '#2d3748',
+  loginLogoBackground: '#1e2530',
 };

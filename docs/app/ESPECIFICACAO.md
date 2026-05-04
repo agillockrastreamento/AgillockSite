@@ -53,6 +53,57 @@ Confirmações bloqueantes devem usar o modal universal do app:
 
 O modal universal deve ficar em `app/src/components` e ser acessado por provider/hook global, assim como o toast.
 
+## Notificações Expo no boot
+
+Após a splash animada terminar, o app deve solicitar permissão de notificações usando `expo-notifications`.
+
+Fluxo:
+
+- Splash termina.
+- `NotificationBootstrap` solicita permissão do sistema.
+- No Android, `pushTokenService` configura o canal `default` antes de solicitar permissão.
+- Se a permissão for concedida e houver `EAS projectId`, o app obtém o Expo Push Token.
+- O token é salvo localmente.
+- Após login ou restauração de sessão, o app registra o token em `POST /api/cliente/notificacoes/app-tokens`.
+- No logout, o app tenta desativar o token no backend antes de limpar a sessão local.
+
+Arquivos:
+
+- `app/src/notifications/NotificationBootstrap.tsx`
+- `app/src/notifications/pushTokenService.ts`
+- `app/src/notifications/pushTokenStorage.ts`
+
+Configuração:
+
+- `expo-notifications` deve estar no `app.json`.
+- Projeto EAS vinculado: `@pedro_castro/agillock-cliente`.
+- EAS Project ID atual: `63e4131c-1fd9-4366-9bf7-d2bbbfafabd2`.
+- `expo.extra.eas.projectId` deve ficar configurado no `app.json` para gerar Expo Push Token em builds.
+- `EXPO_PUBLIC_EAS_PROJECT_ID` pode sobrescrever esse valor em ambiente local, mas valores vazios devem ser ignorados pelo app.
+
+## Permissões e textos de aprovação
+
+Toda permissão solicitada pelo app deve ter uma justificativa clara para revisão das lojas e para o usuário.
+
+Regras:
+
+- iOS: descrições obrigatórias devem ficar em `app.json`, em `expo.ios.infoPlist`.
+- Android: permissões declaradas ficam em `app.json`, em `expo.android.permissions`; quando o sistema não exibir texto customizado, a tela que dispara a permissão deve explicar o motivo antes da solicitação.
+- Notificações: o prompt nativo não usa descrição customizada via `app.json`; o app deve pedir permissão somente quando o fluxo de notificação estiver pronto.
+- Câmera: usada para foto de perfil e fotos dos veículos.
+- Fotos/galeria: usada para selecionar imagens de perfil, veículos e comprovantes.
+- Localização: usada para centralizar o mapa na posição do usuário e facilitar visualização dos veículos próximos.
+- Storage/arquivos: usado apenas em ações explícitas do usuário, como exportar relatórios ou salvar comprovantes.
+- Nenhuma tela deve solicitar permissão sem contexto visual da ação que motivou o pedido.
+
+Configuração atual no `app.json`:
+
+- `NSCameraUsageDescription`
+- `NSPhotoLibraryUsageDescription`
+- `NSPhotoLibraryAddUsageDescription`
+- `NSLocationWhenInUseUsageDescription`
+- Android: `CAMERA`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `READ_MEDIA_IMAGES`
+
 ## Inputs e formulários
 
 O app usa `react-native-paper` como base para inputs e formulários.
@@ -64,6 +115,8 @@ Regras:
 - Inputs devem usar o modo `outlined` por padrão.
 - Labels animadas/floating labels devem vir do `TextInput` do `react-native-paper`.
 - Cores de borda, foco, cursor, texto, erro e superfície devem vir do tema AgilLock.
+- Conteúdo dos inputs deve ser LTR, alinhado à esquerda e com o início do valor fixo; quando o texto for maior que o campo, o final deve ficar oculto.
+- Campos de senha devem ter botão de visualizar/ocultar senha no próprio input.
 - `TextInput` nativo do React Native só deve ser usado se houver uma necessidade técnica específica e documentada.
 
 ## Navegação
@@ -125,6 +178,14 @@ Tela igual ao login atual do site cliente, usando a imagem:
 AgillockSite/img/logo_agillock_new.png
 ```
 
+Visual:
+
+- Fundo da tela igual ao login do site: base escura `#1e2530`.
+- Logo dentro do painel claro, em uma área interna com a mesma cor escura do login web, mantendo margem branca visível do painel ao redor dessa área.
+- Painel/formulário com superfície clara do app.
+- Abaixo do botão Entrar, exibir `© 2026 AgilLock — Gestão de Rastreamento`.
+- Campo de senha com botão para alternar visualização.
+
 Contrato:
 
 ```text
@@ -136,8 +197,17 @@ O app deve rejeitar respostas cujo `user.role` não seja `CLIENTE`, limpar sess�
 Armazenamento recomendado:
 
 - JWT em `expo-secure-store`.
+- Dados mínimos do usuário cliente em storage local para restaurar sessão e montar a navegação inicial.
 - Preferências visuais e estado de UI em AsyncStorage ou MMKV.
 - Dados sensíveis nunca em storage simples.
+
+Implementação atual:
+
+- `app/src/auth/authService.ts`: chama `POST /auth/login` e aceita apenas `role: "CLIENTE"`.
+- `app/src/auth/AuthProvider.tsx`: controla sessão, restauração, login e logout.
+- `app/src/auth/sessionStorage.ts`: persiste JWT em SecureStore e dados mínimos do usuário em AsyncStorage.
+- `app/src/navigation/AppNavigator.tsx`: mostra Login quando não autenticado e Drawer do cliente quando autenticado.
+- `app/src/screens/LoginScreen.tsx`: usa logo `logo_agillock_new.png`, `AppTextInput`, toast centralizado e bloqueio de envio enquanto autentica.
 
 Referência: `docs/projeto/PORTAL_CLIENTE.md`, seção `Login do cliente`.
 

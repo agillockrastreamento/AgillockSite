@@ -98,6 +98,8 @@ Este documento lista as partes da documentação existente que devem ser usadas 
 | Provider e tema Material | `PaperProvider` e tema MD3 | Documentação oficial do `react-native-paper` |
 | Wrapper local de inputs | `AppTextInput` | `app/src/components/AppTextInput.tsx` |
 | Tema local do Paper | `paperTheme` | `app/src/theme/paperTheme.ts` |
+| Sessão do app | `AuthProvider`, `authService`, `sessionStorage` | `app/src/auth/` |
+| Notificações Expo | `NotificationBootstrap`, `pushTokenService`, `pushTokenStorage` | `app/src/notifications/` |
 
 ## Observações de implementação
 

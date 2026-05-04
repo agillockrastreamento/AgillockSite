@@ -14,10 +14,22 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "br.com.agillock.cliente"
+      "bundleIdentifier": "br.com.agillock.cliente",
+      "infoPlist": {
+        "NSCameraUsageDescription": "A AgilLock usa a câmera para permitir o envio de fotos de perfil e fotos dos veículos vinculados à sua conta.",
+        "NSPhotoLibraryUsageDescription": "A AgilLock acessa suas fotos apenas quando você escolhe uma imagem para perfil, veículo ou comprovantes dentro do app.",
+        "NSPhotoLibraryAddUsageDescription": "A AgilLock pode salvar arquivos exportados por você, como relatórios e comprovantes, quando essa ação for solicitada no app.",
+        "NSLocationWhenInUseUsageDescription": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos."
+      }
     },
     "android": {
       "package": "br.com.agillock.cliente",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_MEDIA_IMAGES"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -29,12 +41,17 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "extra": {
       "apiUrl": "https://api.agillock.com.br/api",
       "wsUrl": "wss://api.agillock.com.br/ws/rastreamento",
-      "environment": "production"
-    }
+      "environment": "production",
+      "eas": {
+        "projectId": "63e4131c-1fd9-4366-9bf7-d2bbbfafabd2"
+      }
+    },
+    "owner": "pedro_castro"
   }
 }

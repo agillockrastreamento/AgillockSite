@@ -123,8 +123,9 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 900,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     padding: spacing.xl,
+    marginBottom: 24,
   },
   toast: {
     maxWidth: 340,

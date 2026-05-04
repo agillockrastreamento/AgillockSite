@@ -5,7 +5,11 @@ import { colors } from '../theme/colors';
 
 const splashImage = require('../../assets/agillock_new_symbol.png');
 
-export function AnimatedSplash() {
+type Props = {
+  onFinish?: () => void;
+};
+
+export function AnimatedSplash({ onFinish }: Props) {
   const [visible, setVisible] = useState(true);
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.35)).current;
@@ -71,8 +75,11 @@ export function AnimatedSplash() {
           useNativeDriver: true,
         }),
       ]),
-    ]).start(() => setVisible(false));
-  }, [opacity, scale, translateX]);
+    ]).start(() => {
+      setVisible(false);
+      onFinish?.();
+    });
+  }, [onFinish, opacity, scale, translateX]);
 
   if (!visible) return null;
 
@@ -98,7 +105,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.loginBackgroundStart,
   },
   logoWrap: {
     width: 132,

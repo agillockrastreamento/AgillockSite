@@ -4,7 +4,7 @@ Atualizado em: 2026-05-04
 
 Roadmap de implementação do app React Native Expo Android/iOS exclusivo para cliente. Cada etapa aponta para a documentação existente que deve ser usada como fonte de contrato e comportamento.
 
-## Fase 0 - Preparação
+## Fase 0 - Preparação (Implementada)
 
 Objetivo: iniciar o app com base técnica estável.
 
@@ -47,7 +47,7 @@ Referências:
 | Símbolo da splash/drawer | Asset `agillock_new_symbol.png` | `AgillockSite/img/agillock_new_symbol.png` |
 | Inputs do app | `TextInput` com label animada | Documentação oficial do `react-native-paper` |
 
-## Fase 1 - Autenticação e sessão
+## Fase 1 - Autenticação e sessão (Implementada)
 
 Objetivo: permitir login apenas de cliente e manter sessão segura.
 
@@ -55,16 +55,24 @@ Entregas:
 
 - Tela de login baseada no site cliente.
 - Logo `AgillockSite/img/logo_agillock_new.png`.
+- Fundo e área da logo alinhados ao login web.
+- Campo de senha com ação de visualizar/ocultar.
+- Rodapé `© 2026 AgilLock — Gestão de Rastreamento`.
 - Chamada `POST /api/auth/login`.
 - Validação obrigatória de `user.role === "CLIENTE"`.
 - Persistência do JWT em `expo-secure-store`.
-- Logout com limpeza de token, cache e token Expo quando existir.
+- Persistência do usuário cliente em storage local para restauração da sessão.
+- Registro do Expo Push Token no backend após login quando o token já estiver disponível.
+- Logout com limpeza de token e usuário local, incluindo tentativa de remoção do token Expo no backend.
 
 Critério de saída:
 
 - Cliente válido entra no app.
 - Usuários admin, colaborador e vendedor são recusados.
 - Sessão é restaurada ao reabrir o app.
+- Logout limpa sessão local e retorna para a tela de login.
+- Após login, o app tenta registrar o Expo Push Token salvo em `/api/cliente/notificacoes/app-tokens`.
+- No Android, o canal de notificação `default` é configurado antes do pedido de permissão.
 
 Referências:
 
@@ -74,6 +82,10 @@ Referências:
 | Payload JWT do cliente | `Visão geral` | `docs/projeto/PORTAL_CLIENTE.md` |
 | Rotas de autenticação | `Autenticação` | `docs/projeto/API.md` |
 | Tela visual base | Página de login do cliente | `AgillockSite/cliente/login.html` |
+| Serviço de login do app | `loginCliente` | `app/src/auth/authService.ts` |
+| Provider de sessão | `AuthProvider` | `app/src/auth/AuthProvider.tsx` |
+| Storage da sessão | `sessionStorage` | `app/src/auth/sessionStorage.ts` |
+| Registro de push token após login | `ensureExpoPushTokenRegistered` | `app/src/notifications/pushTokenService.ts` |
 
 ## Fase 2 - Shell do app, drawer e perfil
 
@@ -206,10 +218,10 @@ Objetivo: ativar notificações push mobile.
 
 Entregas:
 
-- Solicitar permissão de notificação.
-- Obter token com `expo-notifications`.
-- Registrar token em `POST /api/cliente/notificacoes/app-tokens`.
-- Remover token em logout/desinstalação quando possível.
+- Solicitação de permissão após splash. Implementado parcialmente na Fase 1.
+- Obtenção de token com `expo-notifications`. Implementado parcialmente na Fase 1, depende de `EAS projectId`.
+- Registro do token em `POST /api/cliente/notificacoes/app-tokens`. Implementado após login na Fase 1.
+- Remover token em logout. Implementado na Fase 1.
 - Tratar abertura do app por push.
 - Encaminhar eventos com dispositivo para Mapa focado.
 - Encaminhar eventos financeiros para Pagamentos ou Notificações.
@@ -348,7 +360,8 @@ Entregas:
 
 - Testes manuais em Android e iOS.
 - Testes de login, mapa, WebSocket, upload, push, relatório e pagamentos.
-- Permissões de localização, câmera/galeria e notificações.
+- Permissões de localização, câmera/galeria, storage/arquivos e notificações.
+- Revisar descrições de permissões no `app.json` e mensagens contextuais antes dos prompts.
 - Configuração EAS Build.
 - Chaves Google Maps por plataforma.
 - Ícones e splash screen.
