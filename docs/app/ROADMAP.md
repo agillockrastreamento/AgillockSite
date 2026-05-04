@@ -90,7 +90,7 @@ Referências:
 | Storage da sessão | `sessionStorage` | `app/src/auth/sessionStorage.ts` |
 | Registro de push token após login | `ensureExpoPushTokenRegistered` | `app/src/notifications/pushTokenService.ts` |
 
-## Fase 2 - Shell do app, drawer e perfil
+## Fase 2 - Shell do app, drawer e perfil (Implementada)
 
 Objetivo: implementar a estrutura autenticada comum.
 
@@ -111,6 +111,15 @@ Critério de saída:
 - Perfil carrega dados reais da API.
 - Upload troca avatar e atualiza drawer.
 
+Implementação atual:
+
+- `app/src/navigation/AppNavigator.tsx`: drawer autenticado, topbar centralizada e ações de Mapa/Relatório.
+- `app/src/profile/ProfileModal.tsx`: modal de perfil com avatar, dados e listas de veículos.
+- `app/src/profile/profileService.ts`: chamadas `GET /cliente/perfil` e `POST /cliente/perfil/avatar`.
+- `app/src/profile/profileTypes.ts`: contratos do perfil no app.
+- `backend/src/routes/cliente-perfil.routes.ts`: usa `clienteAuthMiddleware`, compatível com JWT do app cliente.
+- `expo-image-picker`: seleção de imagem para upload do avatar.
+
 Referências:
 
 | Uso | Parágrafo/seção | Onde encontra |
@@ -120,7 +129,7 @@ Referências:
 | Limites de upload | `Uploads` | `docs/projeto/API.md` |
 | Navegação esperada | `Observações para o plano mobile` | `docs/projeto/PORTAL_CLIENTE.md` |
 
-## Fase 3 - Mapa base e snapshot
+## Fase 3 - Mapa base e snapshot 
 
 Objetivo: entregar a primeira tela logada com dispositivos do cliente.
 

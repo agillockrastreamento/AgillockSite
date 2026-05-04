@@ -102,7 +102,7 @@ Configuração atual no `app.json`:
 - `NSPhotoLibraryUsageDescription`
 - `NSPhotoLibraryAddUsageDescription`
 - `NSLocationWhenInUseUsageDescription`
-- Android: `CAMERA`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `READ_MEDIA_IMAGES`
+- Android: `CAMERA`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `READ_MEDIA_IMAGES`, `READ_EXTERNAL_STORAGE`
 
 ## Inputs e formulários
 
@@ -159,9 +159,11 @@ Ao abrir o drawer:
 Modal de perfil:
 
 - Mostra avatar atual e ação de upload de foto.
+- Seleciona imagem com `expo-image-picker`.
 - Faz upload com `POST /api/cliente/perfil/avatar`, campo `avatar`.
 - Mostra dados do usuário: nome, email, telefone, CPF/CNPJ quando disponíveis.
 - Lista veículos associados, separados entre faturamento/responsável e vinculados.
+- Ao concluir upload, atualiza o avatar exibido no drawer.
 
 Contrato base:
 
@@ -169,6 +171,14 @@ Contrato base:
 - `POST /api/cliente/perfil/avatar`
 
 Referência: `docs/projeto/PORTAL_CLIENTE.md`, seção `Perfil e Avatar (App Mobile)`.
+
+Implementação atual:
+
+- `app/src/navigation/AppNavigator.tsx`
+- `app/src/profile/ProfileModal.tsx`
+- `app/src/profile/profileService.ts`
+- `app/src/profile/profileTypes.ts`
+- `backend/src/routes/cliente-perfil.routes.ts`
 
 ## Login
 

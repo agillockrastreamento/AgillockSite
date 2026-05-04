@@ -4,13 +4,11 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import prisma from '../utils/prisma';
-import { AuthRequest, authMiddleware } from '../middleware/auth.middleware';
-import { requireRoles } from '../middleware/roles.middleware';
+import { ClienteRequest, clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
 import { CLIENTE_AVATAR_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
 const router = Router();
-router.use(authMiddleware);
-router.use(requireRoles('CLIENTE'));
+router.use(clienteAuthMiddleware);
 
 const uploadDir = CLIENTE_AVATAR_UPLOADS_DIR;
 if (!fs.existsSync(uploadDir)) {
@@ -38,9 +36,9 @@ const uploadAvatar = multer({
 
 // GET /api/cliente/perfil
 // Retorna os dados do perfil do cliente autenticado
-router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/', async (req: ClienteRequest, res: Response): Promise<void> => {
   try {
-    const clienteLoginId = req.user!.userId;
+    const clienteLoginId = req.cliente!.sub;
     const clienteLogin = await prisma.clienteLogin.findUnique({
       where: { id: clienteLoginId },
       include: {
@@ -100,9 +98,9 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
 // POST /api/cliente/perfil/avatar
 // Faz upload de uma nova foto de avatar e atualiza o banco de dados
-router.post('/avatar', uploadAvatar.single('avatar'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/avatar', uploadAvatar.single('avatar'), async (req: ClienteRequest, res: Response): Promise<void> => {
   try {
-    const clienteLoginId = req.user!.userId;
+    const clienteLoginId = req.cliente!.sub;
 
     if (!req.file) {
       res.status(400).json({ error: 'Nenhum arquivo enviado' });

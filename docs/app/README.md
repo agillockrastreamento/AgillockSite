@@ -30,6 +30,7 @@ O app é exclusivo para usuários com JWT `role: "CLIENTE"` e deve expor as mesm
 |---|---|
 | Fase 0 - Preparação | Concluída |
 | Fase 1 - Autenticação e sessão | Implementada |
+| Fase 2 - Shell do app, drawer e perfil | Implementada |
 
 ## Decisão de mapa
 
@@ -103,3 +104,4 @@ Observações da Fase 0:
 - EAS Project ID: `63e4131c-1fd9-4366-9bf7-d2bbbfafabd2`.
 - O `projectId` fica em `app.json` em `expo.extra.eas.projectId`; `EXPO_PUBLIC_EAS_PROJECT_ID` pode sobrescrever esse valor quando configurado.
 - Textos de permissão para câmera, fotos e localização ficam em `app.json`; fluxos Android que não aceitam texto nativo customizado devem explicar o motivo na própria tela antes de pedir acesso.
+- `expo-image-picker` é usado no modal de perfil para selecionar e enviar avatar.
