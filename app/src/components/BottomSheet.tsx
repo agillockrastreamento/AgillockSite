@@ -29,6 +29,9 @@ type Props = {
   title: string;
   children: ReactNode;
   heightPercent?: number;
+  dimBackdrop?: boolean;
+  closeOnBackdropPress?: boolean;
+  statusBarOverlay?: boolean;
   onClose(): void;
 };
 
@@ -37,6 +40,9 @@ export function BottomSheet({
   title,
   children,
   heightPercent = 0.8,
+  dimBackdrop = true,
+  closeOnBackdropPress = true,
+  statusBarOverlay = true,
   onClose,
 }: Props) {
   const sheetHeight = Math.round(Dimensions.get('window').height * heightPercent);
@@ -137,15 +143,19 @@ export function BottomSheet({
     >
       <StatusBar
         translucent
-        backgroundColor="rgba(23, 32, 42, 0.38)"
-        barStyle="light-content"
+        backgroundColor={statusBarOverlay ? 'rgba(23, 32, 42, 0.38)' : 'transparent'}
+        barStyle={statusBarOverlay ? 'light-content' : 'dark-content'}
       />
       <View style={styles.backdrop}>
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.backdropTint, { opacity: backdropOpacity }]}
-        />
-        <Pressable style={styles.backdropPressable} onPress={close} />
+        {dimBackdrop ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.backdropTint, { opacity: backdropOpacity }]}
+          />
+        ) : null}
+        {closeOnBackdropPress ? (
+          <Pressable style={styles.backdropPressable} onPress={close} />
+        ) : null}
         <Animated.View
           style={[
             styles.sheet,

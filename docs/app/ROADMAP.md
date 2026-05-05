@@ -170,7 +170,7 @@ Referências:
 | Bloqueio financeiro | `Bloqueio por inadimplência` | `docs/traccar/PORTAL_CLIENTE.md` |
 | Preferências do mapa | `Rastreamento` | `docs/projeto/PORTAL_CLIENTE.md` |
 
-## Fase 4 - Ícones SVG 3D e cards do mapa
+## Fase 4 - Ícones SVG 3D e cards do mapa (Implementada)
 
 Objetivo: portar a experiência visual dos veículos para mobile.
 
@@ -179,17 +179,24 @@ Entregas:
 - Portar `window.AL_ICONS_3D` para TypeScript.
 - Renderizar ícones com `react-native-svg`.
 - Usar categoria, cor e curso/heading nos marcadores.
-- Bottom Sheet inferior com cards rápidos.
-- Estado fechado/aberto do Bottom Sheet.
+- Bottom Sheet inferior com cards rápidos em estados fechado, 30% e 50%.
+- Animação de abrir/fechar por toque no puxador e arraste vertical.
 - Ícone de câmera visível nos cards rápidos.
 - Upload/remover foto do veículo.
-- Bottom Sheet principal do veículo ao focar dispositivo.
+- Bottom Sheet principal do veículo ao focar dispositivo, sem backdrop escuro para manter o mapa visível.
 
 Critério de saída:
 
 - Marcadores usam os mesmos desenhos/categorias do site.
 - Cards rápidos e card principal mostram dados equivalentes ao portal cliente.
 - Foto enviada pelo cliente aparece no card rápido e no card principal.
+
+Implementação atual:
+
+- `app/src/tracking/VehicleIcon.tsx`: componente nativo com `react-native-svg`, baseado nas categorias e formas de `window.AL_ICONS_3D`.
+- `app/src/tracking/VehicleCards.tsx`: card rápido em grade mobile e card principal do veículo com foto, status, métricas, endereço e ações já suportadas no app.
+- `app/src/tracking/vehiclePhotoService.ts`: upload/remover foto do veículo em `POST/DELETE /cliente/dispositivos/:dispositivoId/foto`.
+- `app/src/screens/MapScreen.tsx`: marcadores com SVG, Bottom Sheet inferior recolhível/30%/50%, card principal em Bottom Sheet sem backdrop e atualização da foto no snapshot local.
 
 Referências:
 

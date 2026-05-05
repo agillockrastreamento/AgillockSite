@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Dimensions,
+  PanResponder,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView, {
   Marker,
@@ -15,6 +20,7 @@ import MapView, {
 } from 'react-native-maps';
 import { Icon, IconButton } from 'react-native-paper';
 
+import { BottomSheet } from '../components/BottomSheet';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
@@ -24,6 +30,17 @@ import {
   getTrackingSnapshot,
 } from '../tracking/trackingService';
 import type { TrackingAccessStatus, TrackingDevice } from '../tracking/trackingTypes';
+import { VehicleIcon } from '../tracking/VehicleIcon';
+import {
+  formatSpeed,
+  getStatusColor,
+  MainVehicleCard,
+  QuickVehicleCard,
+} from '../tracking/VehicleCards';
+import {
+  deleteVehiclePhoto,
+  uploadVehiclePhoto,
+} from '../tracking/vehiclePhotoService';
 
 const DEFAULT_REGION = {
   latitude: -14.235,
@@ -33,6 +50,14 @@ const DEFAULT_REGION = {
 };
 
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'terrain', 'hybrid'];
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const QUICK_SHEET_HEIGHTS = {
+  closed: 46,
+  peek: Math.round(SCREEN_HEIGHT * 0.3),
+  expanded: Math.round(SCREEN_HEIGHT * 0.5),
+};
+
+type QuickSheetMode = keyof typeof QUICK_SHEET_HEIGHTS;
 
 function getDeviceCoordinate(device: TrackingDevice): LatLng | null {
   const latitude = device.posicao?.latitude;
@@ -41,18 +66,6 @@ function getDeviceCoordinate(device: TrackingDevice): LatLng | null {
   if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return { latitude, longitude };
-}
-
-function getStatusColor(status: string) {
-  if (status === 'online') return colors.success;
-  if (status === 'offline') return colors.danger;
-  return colors.textMuted;
-}
-
-function formatSpeed(device: TrackingDevice) {
-  const speed = device.posicao?.velocidade;
-  if (typeof speed !== 'number' || !Number.isFinite(speed)) return 'Sem velocidade';
-  return `${Math.round(speed)} km/h`;
 }
 
 function MapFloatingButton({
@@ -85,10 +98,14 @@ export function MapScreen() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const [mapTypeIndex, setMapTypeIndex] = useState(0);
   const [showLabels, setShowLabels] = useState(true);
   const [showFences, setShowFences] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
+  const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
+  const quickSheetHeight = useRef(new Animated.Value(QUICK_SHEET_HEIGHTS.peek)).current;
+  const [mainSheetVisible, setMainSheetVisible] = useState(false);
 
   const locatedDevices = useMemo(
     () => devices.filter((device) => !!getDeviceCoordinate(device)),
@@ -103,7 +120,97 @@ export function MapScreen() {
     [devices],
   );
 
-  const focusDevice = useCallback((device: TrackingDevice) => {
+  const animateMapForPanel = useCallback((device: TrackingDevice | null, panelHeight: number) => {
+    if (!device) return;
+    const coordinate = getDeviceCoordinate(device);
+    if (!coordinate) return;
+
+    const latitudeOffset = (panelHeight / SCREEN_HEIGHT) * 0.011;
+    mapRef.current?.animateCamera(
+      {
+        center: {
+          latitude: coordinate.latitude - latitudeOffset,
+          longitude: coordinate.longitude,
+        },
+        zoom: 16,
+      },
+      { duration: 420 },
+    );
+  }, []);
+
+  const updateDevice = useCallback((dispositivoId: string, patch: Partial<TrackingDevice>) => {
+    setDevices((current) =>
+      current.map((device) =>
+        device.dispositivoId === dispositivoId ? { ...device, ...patch } : device,
+      ),
+    );
+  }, []);
+
+  const moveQuickSheet = useCallback(
+    (mode: QuickSheetMode) => {
+      setQuickSheetMode(mode);
+      Animated.spring(quickSheetHeight, {
+        toValue: QUICK_SHEET_HEIGHTS[mode],
+        useNativeDriver: false,
+        friction: 8,
+        tension: 82,
+      }).start();
+      if (!mainSheetVisible) {
+        animateMapForPanel(selectedDevice, mode === 'closed' ? 0 : QUICK_SHEET_HEIGHTS[mode]);
+      }
+    },
+    [animateMapForPanel, mainSheetVisible, quickSheetHeight, selectedDevice],
+  );
+
+  const toggleQuickSheet = useCallback(() => {
+    if (quickSheetMode === 'closed') {
+      moveQuickSheet('peek');
+      return;
+    }
+
+    if (quickSheetMode === 'peek') {
+      moveQuickSheet('expanded');
+      return;
+    }
+
+    moveQuickSheet('peek');
+  }, [moveQuickSheet, quickSheetMode]);
+
+  const quickSheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponder: (_event, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onMoveShouldSetPanResponderCapture: (_event, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderMove: (_event, gestureState) => {
+          const baseHeight = QUICK_SHEET_HEIGHTS[quickSheetMode];
+          const nextHeight = Math.min(
+            QUICK_SHEET_HEIGHTS.expanded,
+            Math.max(QUICK_SHEET_HEIGHTS.closed, baseHeight - gestureState.dy),
+          );
+          quickSheetHeight.setValue(nextHeight);
+        },
+        onPanResponderRelease: (_event, gestureState) => {
+          if (gestureState.dy < -42 || gestureState.vy < -0.7) {
+            moveQuickSheet(quickSheetMode === 'closed' ? 'peek' : 'expanded');
+            return;
+          }
+
+          if (gestureState.dy > 42 || gestureState.vy > 0.7) {
+            moveQuickSheet(quickSheetMode === 'expanded' ? 'peek' : 'closed');
+            return;
+          }
+
+          moveQuickSheet(quickSheetMode);
+        },
+      }),
+    [moveQuickSheet, quickSheetHeight, quickSheetMode],
+  );
+
+  const focusDevice = useCallback((device: TrackingDevice, openMain = false) => {
     const coordinate = getDeviceCoordinate(device);
     if (!coordinate) {
       toast.show({
@@ -114,14 +221,25 @@ export function MapScreen() {
     }
 
     setSelectedDeviceId(device.dispositivoId);
+    if (openMain) {
+      setMainSheetVisible(true);
+      moveQuickSheet('closed');
+    }
+    const panelHeight = openMain ? Math.round(SCREEN_HEIGHT * 0.55) : 0;
+    const center = openMain
+      ? {
+          latitude: coordinate.latitude - (panelHeight / SCREEN_HEIGHT) * 0.011,
+          longitude: coordinate.longitude,
+        }
+      : coordinate;
     mapRef.current?.animateCamera(
       {
-        center: coordinate,
+        center,
         zoom: 16,
       },
       { duration: 520 },
     );
-  }, [toast]);
+  }, [moveQuickSheet, toast]);
 
   const fitAllDevices = useCallback((nextDevices: TrackingDevice[]) => {
     const coordinates = nextDevices
@@ -140,7 +258,7 @@ export function MapScreen() {
       }
 
       mapRef.current?.fitToCoordinates(coordinates, {
-        edgePadding: { top: 96, right: 56, bottom: 176, left: 56 },
+        edgePadding: { top: 96, right: 56, bottom: 220, left: 56 },
         animated: true,
       });
     });
@@ -222,6 +340,62 @@ export function MapScreen() {
     }
   }, [toast]);
 
+  const handleUploadPhoto = useCallback(async () => {
+    if (!selectedDevice) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      toast.show({
+        message: 'Permita acesso às fotos para escolher a imagem do veículo.',
+        type: 'error',
+      });
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.84,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    try {
+      setIsPhotoUploading(true);
+      const response = await uploadVehiclePhoto(
+        selectedDevice.dispositivoId,
+        result.assets[0],
+      );
+      updateDevice(selectedDevice.dispositivoId, {
+        imagemUrlCliente: response.imagemUrlCliente,
+      });
+      toast.show({ message: 'Foto do veículo atualizada.', type: 'success' });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Erro ao enviar foto do veículo.';
+      toast.show({ message, type: 'error' });
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  }, [selectedDevice, toast, updateDevice]);
+
+  const handleRemovePhoto = useCallback(async () => {
+    if (!selectedDevice) return;
+
+    try {
+      setIsPhotoUploading(true);
+      await deleteVehiclePhoto(selectedDevice.dispositivoId);
+      updateDevice(selectedDevice.dispositivoId, { imagemUrlCliente: null });
+      toast.show({ message: 'Foto do veículo removida.', type: 'success' });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Erro ao remover foto do veículo.';
+      toast.show({ message, type: 'error' });
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  }, [selectedDevice, toast, updateDevice]);
+
   const currentMapType = MAP_TYPES[mapTypeIndex];
 
   return (
@@ -245,27 +419,26 @@ export function MapScreen() {
               key={device.dispositivoId}
               coordinate={coordinate}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
-              onPress={() => focusDevice(device)}
+              tracksViewChanges
+              onPress={() => focusDevice(device, true)}
             >
-              <View
-                style={[
-                  styles.marker,
-                  {
-                    borderColor: isSelected ? colors.primary : colors.surface,
-                    backgroundColor: getStatusColor(device.status),
-                  },
-                ]}
-              >
-                <Icon source="car" size={18} color="#ffffff" />
-              </View>
-              {showLabels ? (
-                <View style={styles.markerLabel}>
-                  <Text style={styles.markerLabelText} numberOfLines={1}>
-                    {device.placa ?? device.nome}
-                  </Text>
+              <View collapsable={false} style={styles.markerContainer}>
+                <View collapsable={false} style={styles.markerWrap}>
+                  <VehicleIcon
+                    categoria={device.categoria}
+                    color={device.cor}
+                    course={device.posicao?.curso}
+                    size={52}
+                  />
                 </View>
-              ) : null}
+                {showLabels ? (
+                  <View collapsable={false} style={styles.markerLabel}>
+                    <Text style={styles.markerLabelText} numberOfLines={1}>
+                      {device.placa ?? device.nome}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             </Marker>
           );
         })}
@@ -295,12 +468,6 @@ export function MapScreen() {
             setShowFences((current) => !current);
           }}
         />
-      </View>
-
-      <View style={styles.indexBadge}>
-        <Text style={styles.indexBadgeText}>
-          {Object.keys(traccarDeviceIndex).length} online no índice
-        </Text>
       </View>
 
       {isLoading ? (
@@ -336,68 +503,84 @@ export function MapScreen() {
       ) : null}
 
       {!accessStatus?.bloqueado && devices.length ? (
-        <View style={styles.quickSheet}>
-          <View style={styles.quickHeader}>
-            <View>
-              <Text style={styles.quickTitle}>Veículos</Text>
-              <Text style={styles.quickMeta}>
-                {locatedDevices.length} com posição de {devices.length}
-              </Text>
-            </View>
+        <Animated.View
+          style={[
+            styles.quickSheet,
+            { height: quickSheetHeight },
+          ]}
+        >
+          <View style={styles.quickHandleArea} {...quickSheetPanResponder.panHandlers}>
             <Pressable
               accessibilityRole="button"
-              style={styles.refreshButton}
-              disabled={isRefreshing}
-              onPress={() => loadSnapshot(true)}
+              hitSlop={12}
+              style={styles.quickHandleButton}
+              onPress={toggleQuickSheet}
             >
-              {isRefreshing ? (
-                <ActivityIndicator size="small" color={colors.primaryText} />
-              ) : (
-                <Icon source="refresh" size={18} color={colors.primaryText} />
-              )}
+              <View style={styles.quickHandle} />
             </Pressable>
           </View>
-
-          {selectedDevice ? (
-            <View style={styles.selectedCard}>
-              <Text style={styles.selectedName} numberOfLines={1}>
-                {selectedDevice.nome}
-              </Text>
-              <Text style={styles.selectedMeta} numberOfLines={1}>
-                {selectedDevice.placa ?? 'Sem placa'} - {formatSpeed(selectedDevice)}
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={styles.quickList}>
-            {devices.slice(0, 4).map((device) => (
-              <Pressable
-                key={device.dispositivoId}
-                accessibilityRole="button"
-                style={[
-                  styles.devicePill,
-                  selectedDeviceId === device.dispositivoId && styles.devicePillActive,
-                ]}
-                onPress={() => focusDevice(device)}
-              >
-                <View
-                  style={[
-                    styles.deviceDot,
-                    { backgroundColor: getStatusColor(device.status) },
-                  ]}
-                />
-                <View style={styles.devicePillText}>
-                  <Text style={styles.deviceName} numberOfLines={1}>
-                    {device.placa ?? device.nome}
-                  </Text>
-                  <Text style={styles.deviceStatus} numberOfLines={1}>
-                    {device.status}
+          {quickSheetMode !== 'closed' ? (
+            <>
+              <View style={styles.quickHeader}>
+                <View>
+                  <Text style={styles.quickTitle}>Veículos</Text>
+                  <Text style={styles.quickMeta}>
+                    {locatedDevices.length} com posição de {devices.length}
                   </Text>
                 </View>
-              </Pressable>
-            ))}
-          </View>
-        </View>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.refreshButton}
+                  disabled={isRefreshing}
+                  onPress={() => loadSnapshot(true)}
+                >
+                  {isRefreshing ? (
+                    <ActivityIndicator size="small" color={colors.primaryText} />
+                  ) : (
+                    <Icon source="refresh" size={18} color={colors.primaryText} />
+                  )}
+                </Pressable>
+              </View>
+              <ScrollView
+                showsVerticalScrollIndicator={quickSheetMode === 'expanded'}
+                contentContainerStyle={styles.quickList}
+              >
+                {devices.map((device) => (
+                  <QuickVehicleCard
+                    key={device.dispositivoId}
+                    device={device}
+                    selected={selectedDeviceId === device.dispositivoId}
+                    onPress={() => focusDevice(device, true)}
+                  />
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
+        </Animated.View>
+      ) : null}
+
+      {selectedDevice ? (
+        <BottomSheet
+          visible={mainSheetVisible}
+          title={selectedDevice.nome}
+          heightPercent={0.55}
+          dimBackdrop={false}
+          closeOnBackdropPress={false}
+          statusBarOverlay={false}
+          onClose={() => {
+            setMainSheetVisible(false);
+            animateMapForPanel(selectedDevice, 0);
+          }}
+        >
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <MainVehicleCard
+              device={selectedDevice}
+              onUploadPhoto={handleUploadPhoto}
+              onRemovePhoto={handleRemovePhoto}
+              isUploading={isPhotoUploading}
+            />
+          </ScrollView>
+        </BottomSheet>
       ) : null}
     </View>
   );
@@ -418,14 +601,17 @@ const styles = StyleSheet.create({
     margin: 0,
     elevation: 3,
   },
-  marker: {
-    width: 36,
-    height: 36,
+  markerContainer: {
+    width: 76,
+    height: 92,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
-    borderWidth: 3,
-    elevation: 4,
+  },
+  markerWrap: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   markerLabel: {
     maxWidth: 96,
@@ -527,16 +713,39 @@ const styles = StyleSheet.create({
   },
   quickSheet: {
     position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    bottom: spacing.md,
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.lg,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    borderTopLeftRadius: radius.bottomSheet,
+    borderTopRightRadius: radius.bottomSheet,
     backgroundColor: colors.surface,
     elevation: 5,
   },
+  quickSheetClosed: {
+    height: 34,
+    paddingBottom: 0,
+  },
+  quickHandleArea: {
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickHandleButton: {
+    width: 88,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+  },
   quickHeader: {
+    display: 'none',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -560,61 +769,10 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     backgroundColor: colors.primary,
   },
-  selectedCard: {
-    gap: 2,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceMuted,
-  },
-  selectedName: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  selectedMeta: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
   quickList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  devicePill: {
-    width: '48%',
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  devicePillActive: {
-    borderColor: colors.primary,
-    backgroundColor: '#fff7e3',
-  },
-  deviceDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  devicePillText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  deviceName: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  deviceStatus: {
-    marginTop: 1,
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
+    paddingBottom: spacing.lg,
   },
 });

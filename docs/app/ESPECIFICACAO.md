@@ -263,8 +263,8 @@ Implementação atual da Fase 3:
 - `app/src/tracking/trackingService.ts` carrega status de acesso e snapshot.
 - `app/src/tracking/trackingTypes.ts` define os contratos do snapshot no app.
 - `expo-location` é usado pelo botão de localização para centralizar a posição atual do aparelho.
-- Marcadores usam ponto simples com status online/offline/unknown; os ícones SVG 3D do site entram na Fase 4.
-- O painel rápido inferior desta fase mostra uma lista compacta inicial para focar dispositivos; o Bottom Sheet com cards completos entra na Fase 4.
+- Marcadores usam `VehicleIcon` com SVG nativo a partir da Fase 4.
+- O painel rápido inferior foi substituído na Fase 4 por Bottom Sheet recolhível, com estados fechado, 30% e 50%, cards verticais e sem cabeçalho auxiliar.
 
 Referências:
 
@@ -415,6 +415,14 @@ No React Native, há duas opções aceitáveis:
 - Gerar SVG string e renderizar via componente compatível com SVG string, mantendo cache por `categoria`, `cor` e `course`.
 
 Para marcadores do `react-native-maps`, usar `Marker` com child customizado baseado em `SvgXml`/`react-native-svg`. Evitar WebView por marcador.
+
+Implementação atual da Fase 4:
+
+- `app/src/tracking/VehicleIcon.tsx` contém a versão nativa em SVG para carros, motos, caminhões, vans/ônibus e máquinas, com mapeamento por categoria compatível com `window.AL_ICONS_3D`.
+- `app/src/tracking/VehicleCards.tsx` renderiza cards rápidos em grade mobile e card principal com foto, status, métricas, endereço e ações já suportadas no app.
+- O card principal usa Bottom Sheet sem backdrop escuro para manter o mapa visível; ao focar o dispositivo, o mapa desloca o centro para preservar marcador e painel na tela.
+- `app/src/tracking/vehiclePhotoService.ts` envia e remove `imagemUrlCliente`.
+- A foto do cliente aparece nos cards; quando não há foto, aparece o ícone SVG do veículo.
 
 ## Relatório
 

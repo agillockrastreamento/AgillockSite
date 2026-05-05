@@ -14,4 +14,5 @@ export const colors = {
   loginBackgroundStart: '#1e2530',
   loginBackgroundEnd: '#2d3748',
   loginLogoBackground: '#1e2530',
+  colorHeader: '#403e3e',
 };

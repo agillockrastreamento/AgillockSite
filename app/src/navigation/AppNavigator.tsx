@@ -167,12 +167,14 @@ function HeaderActions({ routeName }: { routeName: keyof ClienteDrawerParamList 
       <View style={styles.headerActions}>
         <IconButton
           icon="magnify"
+          iconColor={colors.colorHeader}
           size={22}
           accessibilityLabel="Pesquisar dispositivo"
           onPress={() => pending('Pesquisa do mapa')}
         />
         <IconButton
           icon="bell-outline"
+          iconColor={colors.colorHeader}
           size={22}
           accessibilityLabel="Notificações do mapa"
           onPress={() => pending('Notificações do mapa')}
@@ -186,6 +188,7 @@ function HeaderActions({ routeName }: { routeName: keyof ClienteDrawerParamList 
       <View style={styles.headerActions}>
         <IconButton
           icon="export-variant"
+          iconColor={colors.colorHeader}
           size={22}
           accessibilityLabel="Exportar relatório"
           onPress={() => pending('Exportação de relatório')}
@@ -204,8 +207,8 @@ function ClienteDrawer() {
       drawerContent={(props) => <ClienteDrawerContent {...props} />}
       screenOptions={({ route }) => ({
         headerTitleAlign: 'center',
-        headerTintColor: colors.text,
-        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.colorHeader,
+        headerStyle: { backgroundColor: colors.primary },
         headerShadowVisible: false,
         headerLeftContainerStyle: styles.headerSide,
         headerRightContainerStyle: styles.headerSide,
@@ -391,5 +394,8 @@ const styles = StyleSheet.create({
   },
   headerSide: {
     width: 96,
+  },
+  headerBottom: {
+    color: colors.colorHeader,
   },
 });

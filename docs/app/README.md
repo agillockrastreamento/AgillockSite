@@ -32,6 +32,7 @@ O app é exclusivo para usuários com JWT `role: "CLIENTE"` e deve expor as mesm
 | Fase 1 - Autenticação e sessão | Implementada |
 | Fase 2 - Shell do app, drawer e perfil | Implementada |
 | Fase 3 - Mapa base e snapshot | Implementada |
+| Fase 4 - Ícones SVG 3D e cards do mapa | Implementada |
 
 ## Decisão de mapa
 
@@ -109,3 +110,5 @@ Observações da Fase 0:
 - `app/src/components/BottomSheet.tsx` é o componente reutilizável para gavetas inferiores, com animação, toque fora e arraste para fechar.
 - `react-native-maps` renderiza a tela Mapa com `PROVIDER_GOOGLE`, snapshot inicial, marcadores e foco por dispositivo.
 - `expo-location` atende o botão de localização da tela Mapa.
+- `react-native-svg` renderiza os ícones nativos dos veículos no mapa, baseados em `AgillockSite/js/config.js`.
+- Cards rápidos e card principal do veículo ficam em `app/src/tracking/VehicleCards.tsx`.
