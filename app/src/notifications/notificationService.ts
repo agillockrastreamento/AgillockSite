@@ -4,14 +4,19 @@ export type NotificationEvent = {
   id: string;
   dispositivoId: string | null;
   tipo: string;
+  tipoLabel?: string;
   titulo: string;
   mensagem: string;
   data: string;
   serverTime?: string;
   lido: boolean;
   prioridade?: string;
-  latitude?: number;
-  longitude?: number;
+  lat?: number | null;
+  lng?: number | null;
+  endereco?: string | null;
+  velocidade?: number | null;
+  dispositivoNome?: string | null;
+  dispositivoPlaca?: string | null;
 };
 
 export type NotificationEventsResponse = NotificationEvent[];

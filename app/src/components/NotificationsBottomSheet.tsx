@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, Icon, Portal } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -15,17 +15,24 @@ const EVENTO_TYPES = [
   { tipo: 'geofenceEnter', label: 'Entrada na Cerca', color: '#27ae60', icon: 'map-marker-check' },
   { tipo: 'geofenceExit', label: 'Saída da Cerca', color: '#e67e22', icon: 'map-marker-minus' },
   { tipo: 'overspeed', label: 'Excesso de Velocidade', color: '#e74c3c', icon: 'speedometer' },
-  { tipo: 'alarm', label: 'Alarme', color: '#e74c3c', icon: 'bell-ring' },
   { tipo: 'powerCut', label: 'Alimentação Cortada', color: '#e74c3c', icon: 'car-battery' },
+  { tipo: 'alarm', label: 'Alarme', color: '#e74c3c', icon: 'bell-ring' },
   { tipo: 'deviceLocked', label: 'Veículo Bloqueado', color: '#e74c3c', icon: 'lock' },
   { tipo: 'deviceUnlocked', label: 'Veículo Desbloqueado', color: '#27ae60', icon: 'lock-open' },
+  { tipo: 'kmExcedida', label: 'Km Excedida', color: '#e74c3c', icon: 'speedometer' },
+  { tipo: 'kmReduzida', label: 'Km Reduzida', color: '#e67e22', icon: 'speedometer' },
+  { tipo: 'trocaOleo', label: 'Troca de Óleo', color: '#e74c3c', icon: 'oil' },
+  { tipo: 'trocaOleoFeita', label: 'Troca de Óleo Realizada', color: '#27ae60', icon: 'oil' },
+  { tipo: 'manutencaoAlerta', label: 'Alerta de Manutenção', color: '#e74c3c', icon: 'wrench' },
+  { tipo: 'manutencaoAtrasada', label: 'Manutenção Atrasada', color: '#e74c3c', icon: 'wrench' },
+  { tipo: 'manutencaoFeita', label: 'Manutenção Realizada', color: '#27ae60', icon: 'wrench' },
 ];
 
 type PeriodFilter = 'hoje' | 'ontem' | '7dias' | 'custom';
 
 type NotificationsBottomSheetProps = {
   visible: boolean;
-  devices: { dispositivoId: string; nome: string; placa: string | null }[];
+  devices: { dispositivoId: string; nome: string; placa: string | null; posicao?: { latitude?: number | null; longitude?: number; endereco?: string | null } | null; endereco?: string | null }[];
   onClose(): void;
   onSelectEvent(event: NotificationEvent): void;
 };
@@ -57,6 +64,25 @@ function fmtTempoDecorrido(dateStr: string | undefined): string {
   return diffDays === 1 ? 'há 1 dia' : `há ${diffDays} dias`;
 }
 
+const _geocodeCache: Record<string, string> = {};
+
+async function geocodeAddress(lat: number, lng: number): Promise<string> {
+  const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+  if (_geocodeCache[cacheKey]) return _geocodeCache[cacheKey];
+  try {
+    const { apiRequest } = await import('../services/api/apiClient');
+    const result = await apiRequest<{ endereco?: string }>(
+      `/cliente/rastreamento/geocode/reverse?lat=${lat}&lon=${lng}`
+    );
+    const address = result?.endereco || '';
+    _geocodeCache[cacheKey] = address;
+    return address;
+  } catch {
+    _geocodeCache[cacheKey] = '';
+    return '';
+  }
+}
+
 export function NotificationsBottomSheet({
   visible,
   devices,
@@ -71,6 +97,7 @@ export function NotificationsBottomSheet({
   const [period, setPeriod] = useState<PeriodFilter>('hoje');
   const [typePickerVisible, setTypePickerVisible] = useState(false);
   const [typeFilterLabel, setTypeFilterLabel] = useState(`Todos (${EVENTO_TYPES.length})`);
+  const [geocodedAddresses, setGeocodedAddresses] = useState<Record<string, string>>({});
 
   const [showDatePicker, setShowDatePicker] = useState<'from' | 'to' | null>(null);
   const [customDateFrom, setCustomDateFrom] = useState(new Date());
@@ -99,10 +126,48 @@ export function NotificationsBottomSheet({
   useEffect(() => {
     if (visible) {
       loadEvents();
-      // Marcar todas como lidas ao abrir
       markAllAsRead().catch(() => {});
     }
   }, [visible, loadEvents]);
+
+  // Geocode addresses for events
+  useEffect(() => {
+    if (!events.length) return;
+    
+    const toGeocode: { event: NotificationEvent; lat: number; lng: number }[] = [];
+    
+    events.forEach((event) => {
+      if (geocodedAddresses[event.id]) return; // Already geocoded
+      
+      const lat = event.lat ?? null;
+      const lng = event.lng ?? null;
+      
+      if (lat != null && lng != null) {
+        toGeocode.push({ event, lat, lng });
+      }
+    });
+    
+    if (toGeocode.length === 0) return;
+    
+    // Queue geocoding
+    toGeocode.forEach(async ({ event, lat, lng }) => {
+      const cachedKey = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+      let address = '';
+      
+      if (_geocodeCache[cachedKey]) {
+        address = _geocodeCache[cachedKey];
+      } else {
+        const cachedKeyFull = `${lat},${lng}`;
+        if (_geocodeCache[cachedKeyFull]) {
+          address = _geocodeCache[cachedKeyFull];
+        } else {
+          address = await geocodeAddress(lat, lng);
+        }
+      }
+      
+      setGeocodedAddresses(prev => ({ ...prev, [event.id]: address }));
+    });
+  }, [events, devices, geocodedAddresses]);
 
   const handleTypeToggle = useCallback((tipo: string) => {
     setSelectedTypes((prev) => {
@@ -303,20 +368,90 @@ export function NotificationsBottomSheet({
                         <Text style={styles.expandedDate}>
                           {formatFullDate(item.data)}
                         </Text>
-                        {item.latitude && item.longitude && (
-                          <Text style={styles.expandedCoords}>
-                            Lat: {item.latitude}, Lng: {item.longitude}
-                          </Text>
-                        )}
-                        <Pressable
-                          style={styles.viewOnMapBtn}
-                          onPress={() => handleSelect(item)}
-                        >
-                          <Icon source="map-marker" size={14} color={colors.primary} />
-                          <Text style={styles.viewOnMapText}>
-                            Ver no mapa
-                          </Text>
-                        </Pressable>
+                        {(() => {
+                          const eventLat = item.lat ?? null;
+                          const eventLng = item.lng ?? null;
+                          
+                          let address = '';
+                          let deviceLatLng: { lat: number; lng: number } | null = null;
+                          
+                          // Try to get device current position for fallback
+                          const device = devices.find(d => d.dispositivoId === item.dispositivoId);
+                          const devicePos = device?.posicao;
+                          const deviceLat = devicePos?.latitude ?? null;
+                          const deviceLng = devicePos?.longitude ?? null;
+                          const deviceAddress = devicePos?.endereco ?? device?.endereco ?? null;
+                          
+                          if (item.endereco) {
+                            address = item.endereco;
+                          } else if (eventLat != null && eventLng != null) {
+                            // Check if event coords match current position roughly
+                            const mesmaPosicao = deviceLat != null && deviceLng != null
+                              && Math.abs(eventLat - deviceLat) < 0.00001
+                              && Math.abs(eventLng - deviceLng) < 0.00001;
+                            
+                            if (mesmaPosicao && deviceAddress) {
+                              address = deviceAddress;
+                            } else {
+                              address = geocodedAddresses[item.id] || '';
+                              if (!address) {
+                                const cachedKey = `${eventLat.toFixed(3)},${eventLng.toFixed(3)}`;
+                                address = _geocodeCache[cachedKey] || '';
+                              }
+                              if (!address) {
+                                const fullKey = `${eventLat},${eventLng}`;
+                                address = _geocodeCache[fullKey] || '';
+                              }
+                              if (!address && item.titulo) {
+                                address = item.titulo;
+                              }
+                            }
+                          } else if (deviceLat != null && deviceLng != null) {
+                            // No event coords - use device current position
+                            deviceLatLng = { lat: deviceLat, lng: deviceLng };
+                            if (deviceAddress) {
+                              address = deviceAddress;
+                            }
+                          }
+                          
+                          if (!address) {
+                            return <Text style={styles.noCoords}>Localização indisponível</Text>;
+                          }
+                          
+                          const finalLat = eventLat ?? deviceLatLng?.lat ?? null;
+                          const finalLng = eventLng ?? deviceLatLng?.lng ?? null;
+                          
+                          return (
+                            <>
+                              <Text style={styles.expandedAddress} numberOfLines={2}>
+                                {address}
+                              </Text>
+                              {finalLat != null && finalLng != null && (
+                                <View style={styles.mapsButtonsRow}>
+                                  <Pressable
+                                    style={styles.mapsButton}
+                                    onPress={() => {
+                                      const url = address.startsWith('Lat:')
+                                        ? `https://www.google.com/maps/dir/?api=1&destination=${finalLat},${finalLng}`
+                                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+                                      Linking.openURL(url);
+                                    }}
+                                  >
+                                    <Text style={styles.mapsButtonText}>Maps</Text>
+                                  </Pressable>
+                                  <Pressable
+                                    style={styles.streetViewButton}
+                                    onPress={() => {
+                                      Linking.openURL(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${finalLat},${finalLng}`);
+                                    }}
+                                  >
+                                    <Text style={styles.streetViewButtonText}>StreetView</Text>
+                                  </Pressable>
+                                </View>
+                              )}
+                            </>
+                          );
+                        })()}
                       </View>
                     )}
                   </View>
@@ -361,7 +496,7 @@ export function NotificationsBottomSheet({
                 <Pressable style={styles.applyBtn} onPress={applyTypeFilter}>
                   <Text style={styles.applyBtnText}>Aplicar</Text>
                 </Pressable>
-                <View style={styles.typeList}>
+                <ScrollView style={styles.typeList} showsVerticalScrollIndicator={false}>
                   {EVENTO_TYPES.map((t) => (
                     <Pressable
                       key={t.tipo}
@@ -386,7 +521,7 @@ export function NotificationsBottomSheet({
                       </Text>
                     </Pressable>
                   ))}
-                </View>
+                </ScrollView>
               </View>
             </Pressable>
           </Modal>
@@ -537,6 +672,53 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     marginTop: 2,
+  },
+  expandedAddress: {
+    color: colors.text,
+    fontSize: 12,
+    marginTop: spacing.xs,
+    lineHeight: 16,
+  },
+  noCoords: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: spacing.xs,
+    fontStyle: 'italic',
+  },
+  mapsButtonsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  mapsButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  mapsButtonText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  streetViewButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+  },
+  streetViewButtonText: {
+    color: colors.primaryText,
+    fontSize: 11,
+    fontWeight: '600',
   },
   viewOnMapBtn: {
     flexDirection: 'row',

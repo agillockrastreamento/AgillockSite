@@ -693,10 +693,11 @@ export function MapScreen() {
 
       <NotificationsBottomSheet
         visible={notificationsSheetVisible}
-        devices={devices.map((d) => ({
+        devices={devices.map((d): any => ({
           dispositivoId: d.dispositivoId,
           nome: d.nome,
           placa: d.placa,
+          posicao: d.posicao,
         }))}
         onClose={() => setNotificationsSheetVisible(false)}
         onSelectEvent={(event) => {
