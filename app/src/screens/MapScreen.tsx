@@ -11,8 +11,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView, {
@@ -49,6 +49,7 @@ import {
   deleteVehiclePhoto,
   uploadVehiclePhoto,
 } from '../tracking/vehiclePhotoService';
+import type { RootStackParamList } from '../navigation/routes';
 
 const DEFAULT_REGION = {
   latitude: -14.235,
@@ -110,7 +111,8 @@ function MapFloatingButton({
 }
 
 export function MapScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<NativeStackScreenProps<RootStackParamList, 'Map'>['route']>();
   const toast = useToast();
   const mapRef = useRef<MapView | null>(null);
   const [accessStatus, setAccessStatus] = useState<TrackingAccessStatus | null>(null);
@@ -130,6 +132,25 @@ export function MapScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, showLabels);
+
+  // Handle push notification navigation
+  useEffect(() => {
+    const targetDeviceId = route.params?.dispositivoId;
+    if (targetDeviceId && devices.length > 0) {
+      setSelectedDeviceId(targetDeviceId);
+      setMainSheetVisible(true);
+      if (route.params?.highlight) {
+        toast.show({ message: 'Notificação do veículo', type: 'info' });
+      }
+    }
+  }, [route.params, devices, toast]);
+
+  // Clean navigation params after handling
+  useEffect(() => {
+    if (route.params?.dispositivoId) {
+      navigation.setParams({ dispositivoId: undefined, highlight: undefined });
+    }
+  }, [route.params, navigation]);
 
   // Carregar contagem de não lidas
   useEffect(() => {

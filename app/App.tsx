@@ -9,6 +9,7 @@ import { ConfirmDialogProvider } from './src/components/ConfirmDialogProvider';
 import { AuthProvider } from './src/auth/AuthProvider';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { NotificationBootstrap } from './src/notifications/NotificationBootstrap';
+import { configureAndroidChannel } from './src/notifications/NotificationHandlers';
 import { colors } from './src/theme/colors';
 import { paperTheme } from './src/theme/paperTheme';
 import { ToastProvider } from './src/toast/ToastProvider';
@@ -26,7 +27,7 @@ export default function App() {
                 <StatusBar style="dark" backgroundColor={colors.surface} />
                 <AppNavigator />
                 <NotificationBootstrap enabled={splashFinished} />
-                <AnimatedSplash onFinish={() => setSplashFinished(true)} />
+                <AnimatedSplash onFinish={() => { setSplashFinished(true); configureAndroidChannel(); }} />
               </AuthProvider>
             </ConfirmDialogProvider>
           </ToastProvider>

@@ -24,6 +24,7 @@ export function NotificationBootstrap({ enabled }: Props) {
       .then((token) => {
         if (!token) return;
         if (isAuthenticated) return ensureExpoPushTokenRegistered();
+        console.log(token);
       })
       .catch((error) => {
         const message =

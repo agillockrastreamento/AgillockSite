@@ -1,4 +1,4 @@
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import {
   DrawerContentScrollView,
@@ -6,7 +6,7 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, Avatar, Icon, IconButton } from 'react-native-paper';
 
@@ -18,6 +18,8 @@ import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
+import { NotificationBootstrap } from '../notifications/NotificationBootstrap';
+import { NotificationHandlers } from '../notifications/NotificationHandlers';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
@@ -227,19 +229,28 @@ function ClienteDrawer() {
 
 export function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) setNotificationsEnabled(true);
+  }, [isAuthenticated]);
 
   if (isLoading) return <SessionLoadingScreen />;
 
   return (
-    <NavigationContainer theme={navigationTheme}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
-          <Stack.Screen name="Cliente" component={ClienteDrawer} />
-        ) : (
-          <Stack.Screen name="Login" component={LoginScreen} />
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <>
+      <NotificationHandlers navigation={navigationRef} />
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {isAuthenticated ? (
+            <Stack.Screen name="Cliente" component={ClienteDrawer} />
+          ) : (
+            <Stack.Screen name="Login" component={LoginScreen} />
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </>
   );
 }
 

@@ -307,25 +307,48 @@ Referências:
 | Cards de notificação | `getTipoConfig` | `app/src/components/NotificationsBottomSheet.tsx` |
 | API eventos | `/cliente/notificacoes/eventos` | `backend/src/routes/notificacoes.routes.ts` |
 
-## Fase 6 - Push notification Expo
+## Fase 6 - Push notification Expo (Implementada)
 
 Objetivo: ativar notificações push mobile.
 
 Entregas:
 
-- Solicitação de permissão após splash. Implementado parcialmente na Fase 1.
-- Obtenção de token com `expo-notifications`. Implementado parcialmente na Fase 1, depende de `EAS projectId`.
+- Solicitação de permissão após splash. Implementado na Fase 1.
+- Obtenção de token com `expo-notifications`. Implementado na Fase 1, depende de `EAS projectId`.
 - Registro do token em `POST /api/cliente/notificacoes/app-tokens`. Implementado após login na Fase 1.
 - Remover token em logout. Implementado na Fase 1.
-- Tratar abertura do app por push.
-- Encaminhar eventos com dispositivo para Mapa focado.
-- Encaminhar eventos financeiros para Pagamentos ou Notificações.
+- Tratar abertura do app por push. Implementado nesta atualização.
+- Encaminhar eventos com dispositivo para Mapa focado. Implementado nesta atualização.
+- Encaminhar eventos financeiros para Pagamentos ou Notificações. Implementado nesta atualização.
 
 Critério de saída:
 
 - Token Expo aparece no backend.
 - Push recebido abre o destino correto.
 - Logout desativa o token do aparelho.
+
+Implementação atual:
+
+- `app/src/notifications/NotificationHandlers.tsx`: handler de notificação com `addNotificationResponseReceivedListener` que direciona para:
+  - `dispositivoId` → Mapa com highlight
+  - `action: 'pagamentos'` ou `tipo: 'boleto'/'cobranca'` → Pagamentos
+  - `action: 'notificacoes'` ou `tipo` starts with 'manutencao' → Notificações
+  - 默认 → Mapa
+- `app/src/notifications/pushTokenService.ts`: `requestExpoPushToken()`, `ensureExpoPushTokenRegistered()`, `unregisterStoredExpoPushToken()`
+- `app/src/notifications/pushTokenStorage.ts`: persistência de token e deviceId
+- `app/App.tsx`: configura canal Android na splash
+- `app/src/navigation/AppNavigator.tsx`: passa `navigationRef` para `NotificationHandlers`
+- `app/src/screens/MapScreen.tsx`: recebe params `dispositivoId` e abre card ao navegar de notificação
+
+### Dados esperados da notificação push
+
+| Campo | Tipo | Ação |
+|---|---|---|
+| `dispositivoId` | string | Abre Mapa com dispositivo focado |
+| `tipo` | 'boleto' \| 'cobranca' | Abre Pagamentos |
+| `action` | 'pagamentos' | Abre Pagamentos |
+| `action` | 'notificacoes' | Abre Notificações |
+| `tipo` starts 'manutencao' | - | Abre Notificações |
 
 Referências:
 
@@ -335,6 +358,8 @@ Referências:
 | Rotas de token Expo | `Notificações do cliente` | `docs/projeto/API.md` |
 | Eventos financeiros | `Notificações` | `docs/projeto/PORTAL_CLIENTE.md` |
 | Tokens Expo no backend | Rotas `/api/cliente/notificacoes/*` | `backend/src/routes/notificacoes.routes.ts` |
+| Handler push app | `NotificationHandlers` | `app/src/notifications/NotificationHandlers.tsx` |
+| MapScreen params | `dispositivoId` params | `app/src/screens/MapScreen.tsx` |
 
 ## Fase 7 - Relatórios
 
