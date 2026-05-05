@@ -176,7 +176,7 @@ export function VehicleIcon({
   categoria,
   color,
   course,
-  size = 52,
+  size = 62,
 }: Props) {
   const normalizedColor = normalizeColor(color);
   const type = mapCategoria(categoria);
@@ -189,7 +189,7 @@ export function VehicleIcon({
   };
 
   return (
-    <Svg width={size} height={size} viewBox="-50 -50 100 100" style={{ overflow: 'visible' }}>
+    <Svg width={size} height={size} viewBox="-60 -60 120 120">
       <Defs>
         <LinearGradient id={ids.body} x1="0%" y1="0%" x2="100%" y2="0%">
           <Stop offset="0%" stopColor={normalizedColor} stopOpacity="1" />

@@ -416,6 +416,21 @@ No React Native, há duas opções aceitáveis:
 
 Para marcadores do `react-native-maps`, usar `Marker` com child customizado baseado em `SvgXml`/`react-native-svg`. Evitar WebView por marcador.
 
+#### Problema de renderização de children no Android
+
+O `react-native-maps` no Android com nova arquitetura tem problemas conhecidos ao renderizar children customizados (`<View><Svg ... /></View>`) dentro de `Marker`. O bitmap é capturado incorretamente ou aparece cortado no mapa.
+
+Solução implementada: usar `react-native-view-shot` para capturar o SVG offscreen como PNG e passar a imagem via prop `Marker.image`.
+
+Implementação atual da Fase 5:
+
+- `app/src/tracking/useMarkerBitmaps.tsx` renderiza cada ícone offscreen em container oculto (`position: absolute; left: -9999`), captura via `captureRef` com formato PNG, e expõe hook `useMarkerBitmaps`.
+- `app/src/screens/MapScreen.tsx` usa o hook para obter o URI da imagem capturada e passa para `Marker.image={ { uri: bitmapUri } }`.
+- Fallback para renderização direta de `VehicleIcon` permanece enquanto o bitmap não está disponível.
+- Cache em memória persiste entre re-renders para evitar recapturas desnecessárias.
+
+Referência: issue [react-native-maps#5906](https://github.com/react-native-maps/react-native-maps/issues/5906).
+
 Implementação atual da Fase 4:
 
 - `app/src/tracking/VehicleIcon.tsx` contém a versão nativa em SVG para carros, motos, caminhões, vans/ônibus e máquinas, com mapeamento por categoria compatível com `window.AL_ICONS_3D`.

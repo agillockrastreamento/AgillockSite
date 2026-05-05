@@ -198,6 +198,22 @@ Implementação atual:
 - `app/src/tracking/vehiclePhotoService.ts`: upload/remover foto do veículo em `POST/DELETE /cliente/dispositivos/:dispositivoId/foto`.
 - `app/src/screens/MapScreen.tsx`: marcadores com SVG, Bottom Sheet inferior recolhível/30%/50%, card principal em Bottom Sheet sem backdrop e atualização da foto no snapshot local.
 
+#### Correção técnica:-Marcadores no Android
+
+Problema: `react-native-maps` no Android com nova arquitetura tem problemas conhecidos ao renderizar children customizados dentro de `Marker`. O bitmap é capturado incorretamente ou aparece cortado no mapa.
+
+Solução implementada:
+
+- `app/src/tracking/useMarkerBitmaps.tsx`: usa `react-native-view-shot` para capturar cada ícone offscreen como PNG.
+- Container oculto em `position: absolute; left: -9999; opacity: 0` para renderização sem interação.
+- `captureRef` com formato PNG e qualidade 1.
+- Cache em memória para persistir URIs entre re-renders.
+- `app/src/screens/MapScreen.tsx` passa a imagem via `Marker.image={ { uri: bitmapUri } }` quando disponível.
+- Fallback para renderização direta de `VehicleIcon` permanece enquanto bitmap não carrega.
+- Requerido `react-native-view-shot` versão 4.0.3 no `package.json`.
+
+Referência: issue [react-native-maps#5906](https://github.com/react-native-maps/react-native-maps/issues/5906).
+
 Referências:
 
 | Uso | Parágrafo/seção | Onde encontra |

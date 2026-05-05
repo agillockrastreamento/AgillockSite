@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Image,
   PanResponder,
   Pressable,
   ScrollView,
@@ -31,6 +32,7 @@ import {
 } from '../tracking/trackingService';
 import type { TrackingAccessStatus, TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
+import { useMarkerBitmaps, OffscreenCapturePool } from '../tracking/useMarkerBitmaps';
 import {
   formatSpeed,
   getStatusColor,
@@ -117,6 +119,8 @@ export function MapScreen() {
   const [showFences, setShowFences] = useState(false);
   const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
   const [mainSheetVisible, setMainSheetVisible] = useState(false);
+
+  const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, showLabels);
 
   const quickSheetHeights = useMemo(() => getQuickSheetHeights(devices.length), [devices.length]);
   const quickSheetHeight = useRef(new Animated.Value(Math.round(SCREEN_HEIGHT * 0.3))).current;
@@ -442,35 +446,41 @@ export function MapScreen() {
           if (!coordinate) return null;
 
           const isSelected = selectedDeviceId === device.dispositivoId;
+          const bitmapUri = getBitmap(device);
           return (
             <Marker
               key={device.dispositivoId}
               coordinate={coordinate}
+              image={bitmapUri ? { uri: bitmapUri } : undefined}
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges
               onPress={() => focusDevice(device, true)}
             >
-              <View collapsable={false} style={styles.markerContainer}>
-                <View collapsable={false} style={styles.markerWrap}>
-                  <VehicleIcon
-                    categoria={device.categoria}
-                    color={getMarkerColor(device)}
-                    course={device.posicao?.curso}
-                    size={48}
-                  />
-                </View>
-                {showLabels ? (
-                  <View collapsable={false} style={styles.markerLabel}>
-                    <Text style={styles.markerLabelText} numberOfLines={1}>
-                      {device.placa ?? device.nome}
-                    </Text>
+              {!bitmapUri ? (
+                <View style={styles.markerContainer}>
+                  <View style={styles.markerWrap}>
+                    <VehicleIcon
+                      categoria={device.categoria}
+                      color={getMarkerColor(device)}
+                      course={device.posicao?.curso}
+                      size={58}
+                    />
                   </View>
-                ) : null}
-              </View>
+                  {showLabels ? (
+                    <View style={styles.markerLabel}>
+                      <Text style={styles.markerLabelText} numberOfLines={1}>
+                        {device.placa ?? device.nome}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
             </Marker>
           );
         })}
       </MapView>
+
+      <OffscreenCapturePool pending={pending} onReady={onReady} />
 
       <View style={styles.mapControls}>
         <MapFloatingButton
@@ -633,16 +643,20 @@ const styles = StyleSheet.create({
     margin: 0,
     elevation: 3,
   },
+  markerImage: {
+    width: 70,
+    height: 70,
+  },
   markerContainer: {
-    width: 76,
-    height: 92,
+    width: 84,
+    height: 104,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',
   },
   markerWrap: {
-    width: 64,
-    height: 64,
+    width: 70,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',

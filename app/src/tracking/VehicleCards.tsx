@@ -166,7 +166,7 @@ export function QuickVehicleCard({
       style={[styles.quickCard, selected && styles.quickCardSelected]}
       onPress={onPress}
     >
-      <VehiclePhoto device={device} size={50} />
+      <VehiclePhoto device={device} size={60} />
       <View style={styles.quickBody}>
         <Text style={styles.quickName} numberOfLines={1}>
           {device.nome}
@@ -358,7 +358,7 @@ export function MainVehicleCard({
               categoria={device.categoria}
               color={device.cor}
               course={0}
-              size={80}
+              size={96}
             />
           </View>
         )}
