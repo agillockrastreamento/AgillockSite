@@ -100,8 +100,12 @@ function fmtHora(iso?: string | null): string {
   );
 }
 
-function fmtDataSimples(d: Date): string {
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+function fmtDataHora(d: Date): string {
+  return (
+    d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
+    ' ' +
+    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  );
 }
 
 function fmtDuracao(mins?: number): string {
@@ -421,6 +425,8 @@ function RouteTab({
                 key="player-pos"
                 coordinate={{ latitude: playerPos.latitude, longitude: playerPos.longitude }}
                 zIndex={10}
+                rotation={playerPos.curso ?? 0}
+                anchor={{ x: 0.5, y: 0.5 }}
                 image={{ uri: vehicleBitmap }}
               />
             ) : (
@@ -428,6 +434,8 @@ function RouteTab({
                 key="player-pos"
                 coordinate={{ latitude: playerPos.latitude, longitude: playerPos.longitude }}
                 zIndex={10}
+                rotation={playerPos.curso ?? 0}
+                anchor={{ x: 0.5, y: 0.5 }}
                 pinColor={markerColor}
               />
             )
@@ -850,7 +858,7 @@ export function ReportScreen() {
     d.setHours(23, 59, 59, 0);
     return d;
   });
-  const [showDatePicker, setShowDatePicker] = useState<'from' | 'to' | null>(null);
+  const [datePickerState, setDatePickerState] = useState<{ field: 'from' | 'to'; mode: 'date' | 'time' | 'datetime' } | null>(null);
 
   const [activeTab, setActiveTab] = useState<ReportTab>('rota');
   const [historico, setHistorico] = useState<HistoricoResponse | null>(null);
@@ -1016,12 +1024,12 @@ export function ReportScreen() {
         </View>
         {periodo === 'custom' && (
           <View style={styles.customDateRow}>
-            <Pressable style={styles.customDateBtn} onPress={() => setShowDatePicker('from')}>
-              <Text style={styles.customDateText}>{fmtDataSimples(customFrom)}</Text>
+            <Pressable style={styles.customDateBtn} onPress={() => setDatePickerState({ field: 'from', mode: Platform.OS === 'ios' ? 'datetime' : 'date' })}>
+              <Text style={styles.customDateText}>{fmtDataHora(customFrom)}</Text>
             </Pressable>
             <Text style={styles.customDateSep}>até</Text>
-            <Pressable style={styles.customDateBtn} onPress={() => setShowDatePicker('to')}>
-              <Text style={styles.customDateText}>{fmtDataSimples(customTo)}</Text>
+            <Pressable style={styles.customDateBtn} onPress={() => setDatePickerState({ field: 'to', mode: Platform.OS === 'ios' ? 'datetime' : 'date' })}>
+              <Text style={styles.customDateText}>{fmtDataHora(customTo)}</Text>
             </Pressable>
             <Pressable style={styles.customLoadBtn} onPress={handleCustomLoad} disabled={isLoading}>
               <Icon source="magnify" size={18} color={colors.surface} />
@@ -1085,23 +1093,45 @@ export function ReportScreen() {
         onConfirm={handleExport}
         onClose={() => setShowExportModal(false)}
       />
-      {showDatePicker && (
+      {datePickerState && (
         <DateTimePicker
-          value={showDatePicker === 'from' ? customFrom : customTo}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          value={datePickerState.field === 'from' ? customFrom : customTo}
+          mode={datePickerState.mode as any}
+          display={Platform.OS === 'ios' ? (datePickerState.mode === 'date' ? 'inline' : 'spinner') : 'default'}
           maximumDate={new Date()}
           onChange={(_, date) => {
-            setShowDatePicker(null);
-            if (!date) return;
-            if (showDatePicker === 'from') {
-              const d = new Date(date);
-              d.setHours(0, 0, 0, 0);
-              setCustomFrom(d);
-            } else {
-              const d = new Date(date);
-              d.setHours(23, 59, 59, 0);
-              setCustomTo(d);
+            if (!date) {
+              setDatePickerState(null);
+              return;
+            }
+            const { field, mode } = datePickerState;
+
+            if (mode === 'datetime') {
+              if (field === 'from') setCustomFrom(date);
+              else setCustomTo(date);
+              setDatePickerState(null);
+            } else if (mode === 'date') {
+              if (field === 'from') {
+                const newDate = new Date(customFrom);
+                newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                setCustomFrom(newDate);
+              } else {
+                const newDate = new Date(customTo);
+                newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                setCustomTo(newDate);
+              }
+              setDatePickerState({ field, mode: 'time' });
+            } else if (mode === 'time') {
+              if (field === 'from') {
+                const newDate = new Date(customFrom);
+                newDate.setHours(date.getHours(), date.getMinutes(), 0, 0);
+                setCustomFrom(newDate);
+              } else {
+                const newDate = new Date(customTo);
+                newDate.setHours(date.getHours(), date.getMinutes(), 59, 0);
+                setCustomTo(newDate);
+              }
+              setDatePickerState(null);
             }
           }}
         />
