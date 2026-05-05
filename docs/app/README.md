@@ -1,6 +1,6 @@
 # App Mobile Cliente - React Native Expo
 
-Atualizado em: 2026-05-04
+Atualizado em: 2026-05-05
 
 Esta pasta documenta o app React Native Expo Android/iOS exclusivo para clientes AgilLock. O app deve reutilizar os contratos do portal do cliente web e da integração Traccar, mantendo uma experiência mobile própria, em tema claro único.
 
@@ -112,3 +112,51 @@ Observações da Fase 0:
 - `expo-location` atende o botão de localização da tela Mapa.
 - `react-native-svg` renderiza os ícones nativos dos veículos no mapa, baseados em `AgillockSite/js/config.js`.
 - Cards rápidos e card principal do veículo ficam em `app/src/tracking/VehicleCards.tsx`.
+
+## Notificações (Bottom Sheet)
+
+O componente `NotificationsBottomSheet` exibe eventos/notificações do cliente em um bottom sheet com filtro de tipo e período.
+
+### Tipos de Notificação Suportados
+
+O app suporta os mesmos 15 tipos de notificação da web:
+
+| Tipo | Label |
+|---|---|
+| ignitionOn | Ignição Ligada |
+| ignitionOff | Ignição Desligada |
+| geofenceEnter | Entrada na Cerca |
+| geofenceExit | Saída da Cerca |
+| overspeed | Excesso de Velocidade |
+| powerCut | Alimentação Cortada |
+| alarm | Alarme |
+| deviceLocked | Veículo Bloqueado |
+| deviceUnlocked | Veículo Desbloqueado |
+| kmExcedida | Km Excedida |
+| kmReduzida | Km Reduzida |
+| trocaOleo | Troca de Óleo |
+| trocaOleoFeita | Troca de Óleo Realizada |
+| manutencaoAlerta | Alerta de Manutenção |
+| manutencaoAtrasada | Manutenção Atrasada |
+| manutencaoFeita | Manutenção Realizada |
+
+### Lógica de Localização
+
+A localização exibida segue esta ordem de prioridade:
+
+1. **Endereço do evento** (`item.endereco`) - quando o evento tem coordenada salva
+2. **Coordenadas do evento + geocode** - tenta geocode se coords diferentes da posição atual
+3. **Posição atual do dispositivo** - fallback quando evento não tem coords (ex: manutenção)
+4. **"Localização indisponível"** - quando nada está disponível
+
+Para eventos de manutenção que não tienen coordenadas, usa a posição atual do dispositivo como fallback (mesmo comportamento que a web em `rastreamento-cliente.js:761`).
+
+### API
+
+- Endpoint: `/cliente/notificacoes/eventos?periodo=hoje|ontem|7dias|custom`
+- Retorna: `NotificationEvent[]` com campos `lat`, `lng`, `endereco`, `tipo`, `mensagem`, etc.
+
+### Filtros
+
+- **Período**: hoje, ontem, 7 dias, custom (data range)
+- **Tipo**: Checkbox multi-select via modal com ScrollView

@@ -1,6 +1,6 @@
 # Roadmap do App Cliente
 
-Atualizado em: 2026-05-04
+Atualizado em: 2026-05-05
 
 Roadmap de implementação do app React Native Expo Android/iOS exclusivo para cliente. Cada etapa aponta para a documentação existente que deve ser usada como fonte de contrato e comportamento.
 
@@ -252,21 +252,41 @@ Implementação atual:
 - `app/src/tracking/useTrackingWebSocket.ts`: hook React que gerencia conexão, desconecta ao desmontar e retorna status.
 - `app/src/screens/MapScreen.tsx`: usa `useTrackingWebSocket` para atualizar dispositivos em tempo real.
 - `app/src/components/SearchBottomSheet.tsx`: bottom sheet de pesquisa com 2 colunas em grid, input de busca por nome/placa, cards com foto/nome/placa usando `QuickVehicleCard`.
-- `app/src/components/NotificationsBottomSheet.tsx`: bottom sheet de notificações com filtros de período (Hoje, Ontem, 7 dias, Personalizado), picker de tipo em modal centralizado, cards com cores e ícones por tipo, tempo relativo "há X min/h/dias", expansão ao tocar para ver detalhes/data/coordenadas e botão "Ver no mapa".
-- Backend endpoints:
-  - `GET /cliente/notificacoes/nao-lidas/count`: retorna contagem de não lidas.
-  - `POST /cliente/notificacoes/marcar-lidas`: marca notificações como lidas.
-- `app/src/notifications/notificationService.ts`: funções `getUnreadCount()` e `markAllAsRead()`.
-- Badge de notificação não lida no botão de sino do header.
-- Ao abrirNotificationsBottomSheet, todas as notificações são marcadas como lidas automaticamente.
+- `app/src/components/NotificationsBottomSheet.tsx`: bottom sheet de notificações com filtros de período (Hoje, Ontem, 7 dias, Personalizado), modal de tipo com ScrollView, cards com cores e ícones por tipo, tempo relativo "há X min/h/dias", expansão ao tocar para ver detalhes/data/coordenadas, botões Maps/StreetView e fallback para posição atual do dispositivo em eventos sem coordenadas.
 
-Correções técnicas implementadas:
+### Tipos de Notificação Suportados (15 tipos)
 
-- Ícones de notification use Material Community Icons válidos (`key`, `power-off`, `map-marker-check`, `map-marker-minus`, `speedometer`, `bell-ring`, `car-battery`, `lock`, `lock-open`).
-- Campo `serverTime` usado para calcular tempo relativo (como na web).
-- ScrollView substituído por FlatList para melhor performance.
-- DateTimePicker nativo para seleção de datas no modo personalizado.
-- Modal centralizado para picker de tipo de notificação.
+O app suporta os mesmos 15 tipos de notificação da web:
+
+| Tipo | Label |
+|---|---|
+| ignitionOn | Ignição Ligada |
+| ignitionOff | Ignição Desligada |
+| geofenceEnter | Entrada na Cerca |
+| geofenceExit | Saída da Cerca |
+| overspeed | Excesso de Velocidade |
+| powerCut | Alimentação Cortada |
+| alarm | Alarme |
+| deviceLocked | Veículo Bloqueado |
+| deviceUnlocked | Veículo Desbloqueado |
+| kmExcedida | Km Excedida |
+| kmReduzida | Km Reduzida |
+| trocaOleo | Troca de Óleo |
+| trocaOleoFeita | Troca de Óleo Realizada |
+| manutencaoAlerta | Alerta de Manutenção |
+| manutencaoAtrasada | Manutenção Atrasada |
+| manutencaoFeita | Manutenção Realizada |
+
+### Lógica de Localização das Notificações
+
+A localização exibida no bottom sheet de notificações segue esta ordem de prioridade:
+
+1. **Endereço do evento** (`item.endereco`) - quando o evento tem coordenada salva
+2. **Coordenadas do evento + geocode** - tenta geocode se coords diferentes da posição atual
+3. **Posição atual do dispositivo** - fallback quando evento não tem coords (ex: manutenção)
+4. **"Localização indisponível"** - quando nada está disponível
+
+Para eventos de manutenção que não têm coordenadas, usa a posição atual do dispositivo como fallback (mesmo comportamento que a web em `rastreamento-cliente.js:761`).
 
 Referências:
 
@@ -281,9 +301,11 @@ Referências:
 | Backend - marcar lidas | `POST /cliente/notificacoes/marcar-lidas` | `backend/src/routes/notificacoes.routes.ts` |
 | App - contagem não lidas | `getUnreadCount` | `app/src/notifications/notificationService.ts` |
 | App - marcar todas lidas | `markAllAsRead` | `app/src/notifications/notificationService.ts` |
+| App - listar eventos | `getNotificationEvents` | `app/src/notifications/notificationService.ts` |
 | WebSocket hook | `useTrackingWebSocket` | `app/src/tracking/useTrackingWebSocket.ts` |
 | Cards de pesquisa | `SearchVehicleCard` | `app/src/components/SearchBottomSheet.tsx` |
 | Cards de notificação | `getTipoConfig` | `app/src/components/NotificationsBottomSheet.tsx` |
+| API eventos | `/cliente/notificacoes/eventos` | `backend/src/routes/notificacoes.routes.ts` |
 
 ## Fase 6 - Push notification Expo
 
