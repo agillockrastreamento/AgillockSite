@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -11,6 +11,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView, {
@@ -19,12 +21,15 @@ import MapView, {
   type LatLng,
   type MapType,
 } from 'react-native-maps';
-import { Icon, IconButton } from 'react-native-paper';
+import { Badge, Icon, IconButton } from 'react-native-paper';
 
 import { BottomSheet } from '../components/BottomSheet';
+import { SearchBottomSheet } from '../components/SearchBottomSheet';
+import { NotificationsBottomSheet } from '../components/NotificationsBottomSheet';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
+import { useTrackingWebSocket, updateDeviceFromMessage } from '../tracking/useTrackingWebSocket';
 import {
   buildTraccarDeviceIndex,
   getTrackingAccessStatus,
@@ -105,6 +110,7 @@ function MapFloatingButton({
 }
 
 export function MapScreen() {
+  const navigation = useNavigation();
   const toast = useToast();
   const mapRef = useRef<MapView | null>(null);
   const [accessStatus, setAccessStatus] = useState<TrackingAccessStatus | null>(null);
@@ -119,8 +125,21 @@ export function MapScreen() {
   const [showFences, setShowFences] = useState(false);
   const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
   const [mainSheetVisible, setMainSheetVisible] = useState(false);
+  const [searchSheetVisible, setSearchSheetVisible] = useState(false);
+  const [notificationsSheetVisible, setNotificationsSheetVisible] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, showLabels);
+
+  // Carregar contagem de não lidas
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      const { getUnreadCount } = await import('../notifications/notificationService');
+      const count = await getUnreadCount();
+      setUnreadCount(count);
+    };
+    loadUnreadCount();
+  }, []);
 
   const quickSheetHeights = useMemo(() => getQuickSheetHeights(devices.length), [devices.length]);
   const quickSheetHeight = useRef(new Animated.Value(Math.round(SCREEN_HEIGHT * 0.3))).current;
@@ -330,9 +349,46 @@ export function MapScreen() {
     }
   }, [fitAllDevices, toast]);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtons}>
+          <IconButton
+            icon="magnify"
+            iconColor={colors.surface}
+            size={22}
+            onPress={() => setSearchSheetVisible(true)}
+          />
+          <IconButton
+            icon="bell-outline"
+            iconColor={colors.surface}
+            size={22}
+            onPress={() => setNotificationsSheetVisible(true)}
+          />
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+          )}
+        </View>
+      ),
+    });
+  }, [navigation, unreadCount]);
+
   useEffect(() => {
     loadSnapshot();
   }, [loadSnapshot]);
+
+  const handleWebSocketMessage = useCallback(
+    (message: import('../tracking/trackingWebSocket').TrackingMessage, dispositivoId: string) => {
+      setDevices((current) => updateDeviceFromMessage(current, dispositivoId, message));
+    },
+    [],
+  );
+
+  useTrackingWebSocket(devices, traccarDeviceIndex, handleWebSocketMessage);
 
   const focusUserLocation = useCallback(async () => {
     try {
@@ -624,6 +680,35 @@ export function MapScreen() {
           </ScrollView>
         </BottomSheet>
       ) : null}
+
+      <SearchBottomSheet
+        visible={searchSheetVisible}
+        devices={devices}
+        onClose={() => setSearchSheetVisible(false)}
+        onSelectDevice={(device) => {
+          focusDevice(device, true);
+          setSearchSheetVisible(false);
+        }}
+      />
+
+      <NotificationsBottomSheet
+        visible={notificationsSheetVisible}
+        devices={devices.map((d) => ({
+          dispositivoId: d.dispositivoId,
+          nome: d.nome,
+          placa: d.placa,
+        }))}
+        onClose={() => setNotificationsSheetVisible(false)}
+        onSelectEvent={(event) => {
+          if (event.dispositivoId) {
+            const device = devices.find((d) => d.dispositivoId === event.dispositivoId);
+            if (device) {
+              focusDevice(device, true);
+            }
+          }
+          setNotificationsSheetVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -632,6 +717,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    marginRight: spacing.xs,
   },
   mapControls: {
     position: 'absolute',
@@ -826,5 +915,21 @@ const styles = StyleSheet.create({
   quickListCenter: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: colors.primaryText,
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

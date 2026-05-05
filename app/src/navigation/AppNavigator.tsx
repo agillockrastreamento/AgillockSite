@@ -162,27 +162,6 @@ function HeaderActions({ routeName }: { routeName: keyof ClienteDrawerParamList 
     [toast],
   );
 
-  if (routeName === 'Mapa') {
-    return (
-      <View style={styles.headerActions}>
-        <IconButton
-          icon="magnify"
-          iconColor={colors.surface}
-          size={22}
-          accessibilityLabel="Pesquisar dispositivo"
-          onPress={() => pending('Pesquisa do mapa')}
-        />
-        <IconButton
-          icon="bell-outline"
-          iconColor={colors.surface}
-          size={22}
-          accessibilityLabel="Notificações do mapa"
-          onPress={() => pending('Notificações do mapa')}
-        />
-      </View>
-    );
-  }
-
   if (routeName === 'Relatorio') {
     return (
       <View style={styles.headerActions}>

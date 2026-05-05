@@ -224,7 +224,7 @@ Referências:
 | Foto do veículo | `Foto do veículo` | `docs/traccar/PORTAL_CLIENTE.md` |
 | Uploads | `Uploads` | `docs/projeto/API.md` |
 
-## Fase 5 - WebSocket, notificações do mapa e pesquisa
+## Fase 5 - WebSocket, notificações do mapa e pesquisa (Implementada)
 
 Objetivo: tornar o mapa vivo e concluir as ações da topbar.
 
@@ -236,7 +236,7 @@ Entregas:
 - Recarregar snapshot após reconexão.
 - Botão Pesquisar na topbar do mapa.
 - Bottom Sheet de pesquisa com 80% da tela, input, filtros e dispositivos.
-- Botão Notificações na topbar do mapa.
+- Botão Notificações na topbar do mapa com badge de contagem.
 - Bottom Sheet de notificações com 80% da tela.
 - Ao tocar notificação com dispositivo, focar dispositivo e abrir card com contexto.
 
@@ -245,6 +245,28 @@ Critério de saída:
 - Posição muda em tempo real sem mostrar dispositivos de outro cliente.
 - Pesquisa foca o dispositivo selecionado.
 - Notificação de dispositivo leva ao mapa e abre card contextual.
+
+Implementação atual:
+
+- `app/src/tracking/trackingWebSocket.ts`: conexão WebSocket com `trackingWebsocket URL`, reconnect automático, filtro por `traccarId` e estados CONNECTING/CONNECTED/DISCONNECTED.
+- `app/src/tracking/useTrackingWebSocket.ts`: hook React que gerencia conexão, desconecta ao desmontar e retorna status.
+- `app/src/screens/MapScreen.tsx`: usa `useTrackingWebSocket` para atualizar dispositivos em tempo real.
+- `app/src/components/SearchBottomSheet.tsx`: bottom sheet de pesquisa com 2 colunas em grid, input de busca por nome/placa, cards com foto/nome/placa usando `QuickVehicleCard`.
+- `app/src/components/NotificationsBottomSheet.tsx`: bottom sheet de notificações com filtros de período (Hoje, Ontem, 7 dias, Personalizado), picker de tipo em modal centralizado, cards com cores e ícones por tipo, tempo relativo "há X min/h/dias", expansão ao tocar para ver detalhes/data/coordenadas e botão "Ver no mapa".
+- Backend endpoints:
+  - `GET /cliente/notificacoes/nao-lidas/count`: retorna contagem de não lidas.
+  - `POST /cliente/notificacoes/marcar-lidas`: marca notificações como lidas.
+- `app/src/notifications/notificationService.ts`: funções `getUnreadCount()` e `markAllAsRead()`.
+- Badge de notificação não lida no botão de sino do header.
+- Ao abrirNotificationsBottomSheet, todas as notificações são marcadas como lidas automaticamente.
+
+Correções técnicas implementadas:
+
+- Ícones de notification use Material Community Icons válidos (`key`, `power-off`, `map-marker-check`, `map-marker-minus`, `speedometer`, `bell-ring`, `car-battery`, `lock`, `lock-open`).
+- Campo `serverTime` usado para calcular tempo relativo (como na web).
+- ScrollView substituído por FlatList para melhor performance.
+- DateTimePicker nativo para seleção de datas no modo personalizado.
+- Modal centralizado para picker de tipo de notificação.
 
 Referências:
 
@@ -255,6 +277,13 @@ Referências:
 | Eventos persistidos | `Eventos e notificações` | `docs/traccar/INTEGRACAO_BACKEND.md` |
 | Eventos da API | `Notificações do cliente` | `docs/projeto/API.md` |
 | Notificações do portal | `Notificações` | `docs/projeto/PORTAL_CLIENTE.md` |
+| Backend - contagem não lidas | `GET /cliente/notificacoes/nao-lidas/count` | `backend/src/routes/notificacoes.routes.ts` |
+| Backend - marcar lidas | `POST /cliente/notificacoes/marcar-lidas` | `backend/src/routes/notificacoes.routes.ts` |
+| App - contagem não lidas | `getUnreadCount` | `app/src/notifications/notificationService.ts` |
+| App - marcar todas lidas | `markAllAsRead` | `app/src/notifications/notificationService.ts` |
+| WebSocket hook | `useTrackingWebSocket` | `app/src/tracking/useTrackingWebSocket.ts` |
+| Cards de pesquisa | `SearchVehicleCard` | `app/src/components/SearchBottomSheet.tsx` |
+| Cards de notificação | `getTipoConfig` | `app/src/components/NotificationsBottomSheet.tsx` |
 
 ## Fase 6 - Push notification Expo
 
@@ -429,12 +458,12 @@ Referências:
 ## Ordem recomendada
 
 ```text
-0. Preparação
-1. Autenticação e sessão
-2. Shell, drawer e perfil
-3. Mapa base e snapshot
-4. Ícones/cards do mapa
-5. WebSocket, pesquisa e notificações no mapa
+0. Preparação (Implementada)
+1. Autenticação e sessão (Implementada)
+2. Shell, drawer e perfil (Implementada)
+3. Mapa base e snapshot (Implementada)
+4. Ícones/cards do mapa (Implementada)
+5. WebSocket, pesquisa e notificações no mapa (Implementada)
 6. Push notification Expo
 7. Relatórios
 8. Notificações

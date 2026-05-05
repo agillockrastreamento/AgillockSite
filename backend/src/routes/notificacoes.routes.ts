@@ -330,4 +330,40 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
   }
 });
 
+// Contar notificações não lidas
+router.get('/nao-lidas/count', clienteAuthMiddleware, async (req: any, res) => {
+  try {
+    const clienteLoginId = req.cliente.sub;
+    const count = await prisma.eventoNotificacao.count({
+      where: { clienteLoginId, lido: false, adminEvento: false },
+    });
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao contar notificações.' });
+  }
+});
+
+// Marcar notificações como lidas
+router.post('/marcar-lidas', clienteAuthMiddleware, async (req: any, res) => {
+  try {
+    const clienteLoginId = req.cliente.sub;
+    const { ate } = req.body as { ate?: string };
+
+    // Se não informar "ate", marca todas como lidas
+    const where: any = { clienteLoginId, lido: false, adminEvento: false };
+    if (ate) {
+      where.createdAt = { lte: new Date(ate) };
+    }
+
+    await prisma.eventoNotificacao.updateMany({
+      where,
+      data: { lido: true },
+    });
+
+    res.json({ message: 'Notificações marcadas como lidas.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao marcar notificações.' });
+  }
+});
+
 export default router;
