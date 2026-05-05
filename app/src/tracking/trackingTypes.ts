@@ -15,6 +15,13 @@ export type TrackingPosition = {
   ignicao?: boolean | null;
   emMovimento?: boolean | null;
   endereco?: string | null;
+  bateria_nivel?: number | null;
+  tensao?: number | null;
+  odometro?: number | null;
+  horas_motor?: number | null;
+  bloqueado?: boolean | null;
+  alarme?: string | null;
+  sinal?: number | null;
 };
 
 export type TrackingDevice = {
@@ -36,6 +43,12 @@ export type TrackingDevice = {
   status: string;
   lastUpdate: string | null;
   posicao: TrackingPosition | null;
+  _recorrencias?: Array<{
+    id: string;
+    titulo: string;
+    intervaloKm: number;
+    kmBase: number;
+  }>;
 };
 
 export type TrackingSnapshot = TrackingDevice[];

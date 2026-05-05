@@ -51,13 +51,24 @@ const DEFAULT_REGION = {
 
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'terrain', 'hybrid'];
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-const QUICK_SHEET_HEIGHTS = {
-  closed: 46,
-  peek: Math.round(SCREEN_HEIGHT * 0.3),
-  expanded: Math.round(SCREEN_HEIGHT * 0.5),
-};
 
-type QuickSheetMode = keyof typeof QUICK_SHEET_HEIGHTS;
+type QuickSheetMode = 'closed' | 'peek' | 'expanded';
+
+function getQuickSheetHeights(deviceCount: number) {
+  if (deviceCount === 0) {
+    return { closed: 46, peek: 46, expanded: 46 };
+  }
+  const rows = Math.ceil(deviceCount / 2);
+  const neededHeight = 122 + (rows * 104); // 122 for paddings/headers + 104 per row
+  const maxExpanded = Math.round(SCREEN_HEIGHT * 0.65);
+  const maxPeek = Math.round(SCREEN_HEIGHT * 0.35);
+
+  return {
+    closed: 46,
+    peek: rows <= 2 ? neededHeight : Math.min(neededHeight, maxPeek),
+    expanded: Math.min(neededHeight, maxExpanded),
+  };
+}
 
 function getDeviceCoordinate(device: TrackingDevice): LatLng | null {
   const latitude = device.posicao?.latitude;
@@ -104,8 +115,22 @@ export function MapScreen() {
   const [showLabels, setShowLabels] = useState(true);
   const [showFences, setShowFences] = useState(false);
   const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
-  const quickSheetHeight = useRef(new Animated.Value(QUICK_SHEET_HEIGHTS.peek)).current;
   const [mainSheetVisible, setMainSheetVisible] = useState(false);
+
+  const quickSheetHeights = useMemo(() => getQuickSheetHeights(devices.length), [devices.length]);
+  const quickSheetHeight = useRef(new Animated.Value(Math.round(SCREEN_HEIGHT * 0.3))).current;
+
+  // Adjust height when device count changes
+  useEffect(() => {
+    if (devices.length > 0) {
+      Animated.spring(quickSheetHeight, {
+        toValue: quickSheetHeights[quickSheetMode],
+        useNativeDriver: false,
+        friction: 8,
+        tension: 82,
+      }).start();
+    }
+  }, [devices.length, quickSheetHeights, quickSheetHeight, quickSheetMode]);
 
   const locatedDevices = useMemo(
     () => devices.filter((device) => !!getDeviceCoordinate(device)),
@@ -150,16 +175,16 @@ export function MapScreen() {
     (mode: QuickSheetMode) => {
       setQuickSheetMode(mode);
       Animated.spring(quickSheetHeight, {
-        toValue: QUICK_SHEET_HEIGHTS[mode],
+        toValue: quickSheetHeights[mode],
         useNativeDriver: false,
         friction: 8,
         tension: 82,
       }).start();
       if (!mainSheetVisible) {
-        animateMapForPanel(selectedDevice, mode === 'closed' ? 0 : QUICK_SHEET_HEIGHTS[mode]);
+        animateMapForPanel(selectedDevice, mode === 'closed' ? 0 : quickSheetHeights[mode]);
       }
     },
-    [animateMapForPanel, mainSheetVisible, quickSheetHeight, selectedDevice],
+    [animateMapForPanel, mainSheetVisible, quickSheetHeight, selectedDevice, quickSheetHeights],
   );
 
   const toggleQuickSheet = useCallback(() => {
@@ -186,10 +211,10 @@ export function MapScreen() {
         onMoveShouldSetPanResponderCapture: (_event, gestureState) =>
           Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderMove: (_event, gestureState) => {
-          const baseHeight = QUICK_SHEET_HEIGHTS[quickSheetMode];
+          const baseHeight = quickSheetHeights[quickSheetMode];
           const nextHeight = Math.min(
-            QUICK_SHEET_HEIGHTS.expanded,
-            Math.max(QUICK_SHEET_HEIGHTS.closed, baseHeight - gestureState.dy),
+            quickSheetHeights.expanded,
+            Math.max(quickSheetHeights.closed, baseHeight - gestureState.dy),
           );
           quickSheetHeight.setValue(nextHeight);
         },
@@ -207,7 +232,7 @@ export function MapScreen() {
           moveQuickSheet(quickSheetMode);
         },
       }),
-    [moveQuickSheet, quickSheetHeight, quickSheetMode],
+    [moveQuickSheet, quickSheetHeight, quickSheetMode, quickSheetHeights],
   );
 
   const focusDevice = useCallback((device: TrackingDevice, openMain = false) => {
@@ -257,8 +282,10 @@ export function MapScreen() {
         return;
       }
 
+      const currentHeights = getQuickSheetHeights(nextDevices.length);
+
       mapRef.current?.fitToCoordinates(coordinates, {
-        edgePadding: { top: 96, right: 56, bottom: 220, left: 56 },
+        edgePadding: { top: 120, right: 60, bottom: currentHeights.peek + 40, left: 60 },
         animated: true,
       });
     });
@@ -543,7 +570,10 @@ export function MapScreen() {
               </View>
               <ScrollView
                 showsVerticalScrollIndicator={quickSheetMode === 'expanded'}
-                contentContainerStyle={styles.quickList}
+                contentContainerStyle={[
+                  styles.quickList,
+                  devices.length === 1 && styles.quickListCenter,
+                ]}
               >
                 {devices.map((device) => (
                   <QuickVehicleCard
@@ -562,14 +592,15 @@ export function MapScreen() {
       {selectedDevice ? (
         <BottomSheet
           visible={mainSheetVisible}
-          title={selectedDevice.nome}
-          heightPercent={0.55}
+          titleMainVehicleCard={selectedDevice.nome +  (selectedDevice.placa ? ' - ' + selectedDevice.placa : '')}
+          heightPercent={0.60}
           dimBackdrop={false}
           closeOnBackdropPress={false}
           statusBarOverlay={false}
           onClose={() => {
             setMainSheetVisible(false);
-            animateMapForPanel(selectedDevice, 0);
+            setSelectedDeviceId(null);
+            animateMapForPanel(null, 0);
           }}
         >
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -774,5 +805,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     paddingBottom: spacing.lg,
+  },
+  quickListCenter: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

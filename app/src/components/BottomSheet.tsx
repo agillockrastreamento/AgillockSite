@@ -26,7 +26,8 @@ const DISMISS_DRAG_DISTANCE = 90;
 
 type Props = {
   visible: boolean;
-  title: string;
+  title?: string;
+  titleMainVehicleCard?: string;
   children: ReactNode;
   heightPercent?: number;
   dimBackdrop?: boolean;
@@ -38,6 +39,7 @@ type Props = {
 export function BottomSheet({
   visible,
   title,
+  titleMainVehicleCard,
   children,
   heightPercent = 0.8,
   dimBackdrop = true,
@@ -170,7 +172,11 @@ export function BottomSheet({
           </View>
           <View style={styles.header}>
             <View style={styles.headerDragZone} {...panResponder.panHandlers}>
-              <Text style={styles.title}>{title}</Text>
+              {title ? (
+                <Text style={styles.title}>{title}</Text>
+              ) : (
+                <Text style={styles.titleMainVehicleCard}>{titleMainVehicleCard}</Text>
+              )}
             </View>
             <IconButton icon="close" size={22} onPress={close} />
           </View>
@@ -230,5 +236,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 19,
     fontWeight: '800',
+  },
+  titleMainVehicleCard: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: -10,
   },
 });
