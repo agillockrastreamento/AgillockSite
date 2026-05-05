@@ -361,7 +361,7 @@ Referências:
 | Handler push app | `NotificationHandlers` | `app/src/notifications/NotificationHandlers.tsx` |
 | MapScreen params | `dispositivoId` params | `app/src/screens/MapScreen.tsx` |
 
-## Fase 7 - Relatórios
+## Fase 7 - Relatórios (Implementada)
 
 Objetivo: implementar a tela Relatório com exportação.
 
@@ -380,6 +380,16 @@ Critério de saída:
 - Exportação baixa e compartilha o arquivo.
 - Estados vazios e erros ficam claros no mobile.
 
+Implementação atual:
+
+- `app/src/reporting/reportTypes.ts`: contratos TypeScript de `HistoricoResponse`, `Viagem`, `Parada`, `Evento`, `Resumo`, `ReportPeriodo`, `ReportTab`, `ExportType`.
+- `app/src/reporting/reportService.ts`: chamadas `GET /cliente/rastreamento/dispositivos/:id/historico|viagens|paradas|eventos|resumo` e `GET /cliente/rastreamento/dispositivos/:id/exportar`.
+- `app/src/screens/ReportScreen.tsx`: tela completa com seletor de veículo, filtros de período (Hoje/Ontem/7 dias/Personalizado) com `DateTimePicker`, abas Rota/Eventos/Viagens/Paradas/Resumo/Gráfico, mapa de trajeto com `react-native-maps` + `Polyline`, gráfico de velocidade SVG com `react-native-svg`, e exportação XLSX via `expo-file-system` + `expo-sharing`.
+- Botão Exportar no cabeçalho do drawer configurado via `navigation.setOptions` dentro da própria tela.
+- `expo-file-system` e `expo-sharing` adicionados ao `package.json`.
+
+Normalização de campos: helpers que suportam tanto o formato normalizado do backend (`inicio`, `fim`, `distancia`, `duracao`) quanto o formato bruto do Traccar (`startTime`, `endTime`, `distance`, `duration`) para compatibilidade.
+
 Referências:
 
 | Uso | Parágrafo/seção | Onde encontra |
@@ -388,6 +398,9 @@ Referências:
 | Histórico e relatórios | `Histórico e relatórios` | `docs/projeto/PORTAL_CLIENTE.md` |
 | Contratos detalhados | `Histórico`, `Viagens`, `Paradas`, `Eventos`, `Resumo` | `docs/traccar/API.md` |
 | Tela web base | Tela de relatórios | `AgillockSite/cliente/relatorio.html` e `AgillockSite/js/relatorio-cliente.js` |
+| Tipos do app | `reportTypes` | `app/src/reporting/reportTypes.ts` |
+| Serviço do app | `reportService` | `app/src/reporting/reportService.ts` |
+| Tela do app | `ReportScreen` | `app/src/screens/ReportScreen.tsx` |
 
 ## Fase 8 - Notificações
 
@@ -512,7 +525,7 @@ Referências:
 4. Ícones/cards do mapa (Implementada)
 5. WebSocket, pesquisa e notificações no mapa (Implementada)
 6. Push notification Expo
-7. Relatórios
+7. Relatórios (Implementada)
 8. Notificações
 9. Geocercas
 10. Pagamentos

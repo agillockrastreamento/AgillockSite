@@ -6,7 +6,7 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, Avatar, Icon, IconButton } from 'react-native-paper';
 
@@ -17,6 +17,7 @@ import type { ClientePerfil } from '../profile/profileTypes';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { MapScreen } from '../screens/MapScreen';
+import { ReportScreen } from '../screens/ReportScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
 import { NotificationBootstrap } from '../notifications/NotificationBootstrap';
 import { NotificationHandlers } from '../notifications/NotificationHandlers';
@@ -152,32 +153,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
   );
 }
 
-function HeaderActions({ routeName }: { routeName: keyof ClienteDrawerParamList }) {
-  const toast = useToast();
-  const pending = useCallback(
-    (feature: string) => {
-      toast.show({
-        message: `${feature} será implementado nas próximas fases.`,
-        type: 'info',
-      });
-    },
-    [toast],
-  );
-
-  if (routeName === 'Relatorio') {
-    return (
-      <View style={styles.headerActions}>
-        <IconButton
-          icon="export-variant"
-          iconColor={colors.surface}
-          size={22}
-          accessibilityLabel="Exportar relatório"
-          onPress={() => pending('Exportação de relatório')}
-        />
-      </View>
-    );
-  }
-
+function HeaderActions() {
   return <View style={styles.headerActions} />;
 }
 
@@ -187,15 +163,14 @@ function ClienteDrawer() {
       initialRouteName="Mapa"
       drawerContent={(props) => <ClienteDrawerContent {...props} />}
       screenOptions={({ route }) => ({
+        swipeEnabled: false,
         headerTitleAlign: 'center',
         headerTintColor: colors.surface,
         headerStyle: { backgroundColor: colors.loginBackgroundStart },
         headerShadowVisible: false,
         headerLeftContainerStyle: styles.headerSide,
         headerRightContainerStyle: styles.headerSide,
-        headerRight: () => (
-          <HeaderActions routeName={route.name as keyof ClienteDrawerParamList} />
-        ),
+        headerRight: () => <HeaderActions />,
         drawerActiveTintColor: colors.primaryText,
         drawerActiveBackgroundColor: colors.primary,
         drawerInactiveTintColor: colors.text,
@@ -211,9 +186,7 @@ function ClienteDrawer() {
       })}
     >
       <Drawer.Screen name="Mapa" component={MapScreen} />
-      <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }}>
-        {() => <PlaceholderScreen title="Relatório" />}
-      </Drawer.Screen>
+      <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }} component={ReportScreen} />
       <Drawer.Screen name="Notificacoes" options={{ title: 'Notificações' }}>
         {() => <PlaceholderScreen title="Notificações" />}
       </Drawer.Screen>
