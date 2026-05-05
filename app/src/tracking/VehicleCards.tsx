@@ -20,6 +20,13 @@ export function getStatusColor(status: string, position?: TrackingPosition | nul
   return '#e67e22';
 }
 
+export function getMarkerColor(device: TrackingDevice) {
+  if (!device.posicao || device.status !== 'online') return '#95a5a6'; // cinza: offline ou sem dados
+  if (device.limiteVelocidade && (device.posicao.velocidade || 0) > device.limiteVelocidade) return '#e74c3c'; // vermelho: excesso
+  if (device.posicao.emMovimento || device.posicao.ignicao === true) return '#2980b9'; // azul: em movimento ou ignição ligada
+  return '#27ae60'; // verde: parado / ignição desligada
+}
+
 export function getStatusText(status: string, position?: TrackingPosition | null) {
   const isOnline = status === 'online';
   const isMoving = isOnline && position?.emMovimento;

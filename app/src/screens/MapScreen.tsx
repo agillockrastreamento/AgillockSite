@@ -34,6 +34,7 @@ import { VehicleIcon } from '../tracking/VehicleIcon';
 import {
   formatSpeed,
   getStatusColor,
+  getMarkerColor,
   MainVehicleCard,
   QuickVehicleCard,
 } from '../tracking/VehicleCards';
@@ -453,9 +454,9 @@ export function MapScreen() {
                 <View collapsable={false} style={styles.markerWrap}>
                   <VehicleIcon
                     categoria={device.categoria}
-                    color={device.cor}
+                    color={getMarkerColor(device)}
                     course={device.posicao?.curso}
-                    size={52}
+                    size={48}
                   />
                 </View>
                 {showLabels ? (
@@ -637,12 +638,14 @@ const styles = StyleSheet.create({
     height: 92,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
   markerWrap: {
-    width: 58,
-    height: 58,
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
   markerLabel: {
     maxWidth: 96,
