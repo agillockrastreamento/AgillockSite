@@ -402,7 +402,7 @@ Referências:
 | Serviço do app | `reportService` | `app/src/reporting/reportService.ts` |
 | Tela do app | `ReportScreen` | `app/src/screens/ReportScreen.tsx` |
 
-## Fase 8 - Notificações
+## Fase 8 - Notificações (Implementada)
 
 Objetivo: adaptar a tela de notificações do cliente ao app.
 
@@ -428,6 +428,11 @@ Referências:
 | Preferências e eventos | `Notificações` | `docs/projeto/PORTAL_CLIENTE.md` |
 | Rotas de notificações | `Notificações do cliente` | `docs/projeto/API.md` |
 | Tela web base | Tela de notificações | `AgillockSite/cliente/notificacoes.html` e `AgillockSite/js/notificacoes-cliente.js` |
+
+Implementação atual:
+
+- `app/src/screens/NotificationsScreen.tsx`: tela de notificações com seletor de veículos via BottomSheet, preferências de canais por tipo de evento, configuração de velocidade e quilometragem por período.
+- `app/src/notifications/notificationService.ts`: serviço com funções para preferências, configuração de km e confirmação de troca de óleo.
 
 ## Fase 9 - Geocercas
 
@@ -526,7 +531,7 @@ Referências:
 5. WebSocket, pesquisa e notificações no mapa (Implementada)
 6. Push notification Expo
 7. Relatórios (Implementada)
-8. Notificações
+8. Notificações (Implementada)
 9. Geocercas
 10. Pagamentos
 11. Qualidade e publicação

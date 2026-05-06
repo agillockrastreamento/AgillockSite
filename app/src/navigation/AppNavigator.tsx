@@ -17,6 +17,7 @@ import type { ClientePerfil } from '../profile/profileTypes';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { MapScreen } from '../screens/MapScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ReportScreen } from '../screens/ReportScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
 import { NotificationBootstrap } from '../notifications/NotificationBootstrap';
@@ -187,9 +188,7 @@ function ClienteDrawer() {
     >
       <Drawer.Screen name="Mapa" component={MapScreen} />
       <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }} component={ReportScreen} />
-      <Drawer.Screen name="Notificacoes" options={{ title: 'Notificações' }}>
-        {() => <PlaceholderScreen title="Notificações" />}
-      </Drawer.Screen>
+      <Drawer.Screen name="Notificacoes" component={NotificationsScreen} options={{ title: 'Notificações' }} />
       <Drawer.Screen name="Geocercas">
         {() => <PlaceholderScreen title="Geocercas" />}
       </Drawer.Screen>
