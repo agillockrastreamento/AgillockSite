@@ -434,7 +434,20 @@ Implementação atual:
 - `app/src/screens/NotificationsScreen.tsx`: tela de notificações com seletor de veículos via BottomSheet, preferências de canais por tipo de evento, configuração de velocidade e quilometragem por período.
 - `app/src/notifications/notificationService.ts`: serviço com funções para preferências, configuração de km e confirmação de troca de óleo.
 
-## Fase 9 - Geocercas
+## Fase 9 - Geocercas (Implementada)
+
+Implementação atual:
+
+- `app/src/tracking/geofenceService.ts`: serviço com funções para listar, criar e excluir geocercas, além de parser para área de círculo.
+- `app/src/tracking/VehicleCards.tsx`: botão de cerca na seção de ações do MainVehicleCard. Ao clicar, cria uma cerca de 150m ao redor do veículo (sem dialog). Botão fica destacado (laranja) quando há cerca ativa. Ao clicar com cerca ativa, exclui todas as cercas do dispositivo.
+- `app/src/screens/MapScreen.tsx`: 
+  - Barra de camadas com botões de alternância: Labels (rótulos), Cercas e Rastro.
+  - Labels: mostra/oculta rótulos (placa/nome) sobre os ícones dos veículos.
+  - Cercas: mostra/oculta círculos das geocercas no mapa via `MapView.Circle`.
+  - Rastro: mostra/oculta rotas (polilinhas) dos veículos via `MapView.Polyline`.
+  - Ao criar uma cerca via MainVehicleCard, a visualização no mapa é ativada automaticamente.
+
+## Fase 10 - Pagamentos
 
 Objetivo: adaptar geocercas do cliente ao app.
 

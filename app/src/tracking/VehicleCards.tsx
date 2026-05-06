@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Icon, IconButton } from 'react-native-paper';
+import { ActivityIndicator, Icon, IconButton } from 'react-native-paper';
 import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { resolveUploadUrl } from '../profile/profileService';
 import { apiRequest } from '../services/api/apiClient';
+import { getDeviceGeofences, createGeofence, deleteGeofence, type DeviceGeofence } from './geofenceService';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
@@ -190,11 +191,13 @@ export function MainVehicleCard({
   onUploadPhoto,
   onRemovePhoto,
   isUploading,
+  onGeofenceCreated,
 }: {
   device: TrackingDevice;
   onUploadPhoto(): void;
   onRemovePhoto(): void;
   isUploading?: boolean;
+  onGeofenceCreated?: () => void;
 }) {
   const toast = useToast();
   const [summary, setSummary] = useState<{
@@ -206,6 +209,8 @@ export function MainVehicleCard({
   const [address, setAddress] = useState<string | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [recurrences, setRecurrences] = useState<any[]>(device._recorrencias || []);
+  const [deviceGeofences, setDeviceGeofences] = useState<DeviceGeofence[]>([]);
+  const [isCreatingGeofence, setIsCreatingGeofence] = useState(false);
 
   const p = device.posicao;
   const statusColor = getStatusColor(device.status, p);
@@ -259,6 +264,15 @@ export function MainVehicleCard({
     fetchSummary();
     fetchRecurrences();
   }, [fetchSummary, fetchRecurrences]);
+
+  useEffect(() => {
+    if (!device.dispositivoId) return;
+    const loadGeofences = async () => {
+      const geofences = await getDeviceGeofences(device.dispositivoId);
+      setDeviceGeofences(geofences);
+    };
+    loadGeofences();
+  }, [device.dispositivoId]);
 
   useEffect(() => {
     if (p?.endereco) {
@@ -493,11 +507,68 @@ export function MainVehicleCard({
               </View>
               <Text style={styles.actionText}>Compartilhar</Text>
             </Pressable>
-            <Pressable style={styles.actionBtn} onPress={() => showNotImplemented('Cerca')}>
+            <Pressable
+              style={[
+                styles.actionBtn,
+                deviceGeofences.length > 0 && { backgroundColor: '#fff3e0', borderColor: '#f39c12' },
+              ]}
+              onPress={async () => {
+                if (deviceGeofences.length > 0) {
+                  // Delete all geofences for this device
+                  try {
+                    setIsCreatingGeofence(true);
+                    await Promise.all(deviceGeofences.map(g => deleteGeofence(g.id)));
+                    setDeviceGeofences([]);
+                    toast.show({ message: 'Cerca(s) removida(s)!', type: 'success' });
+                  } catch {
+                    toast.show({ message: 'Erro ao remover cerca.', type: 'error' });
+                  } finally {
+                    setIsCreatingGeofence(false);
+                  }
+                } else {
+                  // Create 150m circle around vehicle
+                  if (!device.posicao?.latitude || !device.posicao?.longitude) {
+                    toast.show({ message: 'Veículo sem posição válida.', type: 'error' });
+                    return;
+                  }
+                  try {
+                    setIsCreatingGeofence(true);
+                    const nome = `Cerca - ${device.nome}`;
+                    const area = `CIRCLE(${device.posicao.latitude}, ${device.posicao.longitude}, 150)`;
+                    await createGeofence({
+                      nome,
+                      area,
+                      tipo: 'circulo',
+                      dispositivos: [device.dispositivoId],
+                      visivelCliente: true,
+                    });
+                    const geofences = await getDeviceGeofences(device.dispositivoId);
+                    setDeviceGeofences(geofences);
+                    toast.show({ message: 'Cerca de 150m criada!', type: 'success' });
+                    onGeofenceCreated?.();
+                  } catch {
+                    toast.show({ message: 'Erro ao criar cerca.', type: 'error' });
+                  } finally {
+                    setIsCreatingGeofence(false);
+                  }
+                }
+              }}
+            >
               <View style={styles.actionIconWrap}>
-                <Icon source="circle-outline" size={18} color="#555" />
+                <Icon
+                  source="circle-outline"
+                  size={18}
+                  color={deviceGeofences.length > 0 ? '#f39c12' : '#555'}
+                />
+                {isCreatingGeofence && (
+                  <View style={styles.actionLoading}>
+                    <ActivityIndicator size="small" color="#f39c12" />
+                  </View>
+                )}
               </View>
-              <Text style={styles.actionText}>Cerca</Text>
+              <Text style={[styles.actionText, deviceGeofences.length > 0 && { color: '#f39c12', fontWeight: '700' }]}>
+                {deviceGeofences.length > 0 ? 'Cerca Ativa' : 'Cerca'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -848,6 +919,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#555',
+  },
+  actionLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 20,
   },
   summarySection: {
     marginTop: spacing.md,

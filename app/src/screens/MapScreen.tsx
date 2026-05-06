@@ -16,7 +16,9 @@ import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-n
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView, {
+  Circle,
   Marker,
+  Polyline,
   PROVIDER_GOOGLE,
   type LatLng,
   type MapType,
@@ -35,6 +37,8 @@ import {
   getTrackingAccessStatus,
   getTrackingSnapshot,
 } from '../tracking/trackingService';
+import { apiRequest } from '../services/api/apiClient';
+import { getGeofences, parseCircleArea, type Geofence } from '../tracking/geofenceService';
 import type { TrackingAccessStatus, TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
 import { useMarkerBitmaps, OffscreenCapturePool } from '../tracking/useMarkerBitmaps';
@@ -125,6 +129,10 @@ export function MapScreen() {
   const [mapTypeIndex, setMapTypeIndex] = useState(0);
   const [showLabels, setShowLabels] = useState(true);
   const [showFences, setShowFences] = useState(false);
+  const [showTracks, setShowTracks] = useState(false);
+  const [geofences, setGeofences] = useState<Geofence[]>([]);
+  const [tracks, setTracks] = useState<{ deviceId: string; coords: { latitude: number; longitude: number }[] }[]>([]);
+  const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
   const [mainSheetVisible, setMainSheetVisible] = useState(false);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
@@ -402,6 +410,59 @@ export function MapScreen() {
     loadSnapshot();
   }, [loadSnapshot]);
 
+  useEffect(() => {
+    if (!showFences) {
+      setGeofences([]);
+      return;
+    }
+    const loadGeofences = async () => {
+      const data = await getGeofences();
+      setGeofences(data);
+    };
+    loadGeofences();
+  }, [showFences]);
+
+  useEffect(() => {
+    if (!showTracks) {
+      setTracks([]);
+      return;
+    }
+    const loadAllTracks = async () => {
+      setIsLoadingTracks(true);
+      try {
+        const now = new Date();
+        const from = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString();
+        const to = now.toISOString();
+        const trackPromises = locatedDevices.map(async (device) => {
+          try {
+            const trips = await apiRequest<any[]>(
+              `/cliente/rastreamento/dispositivos/${device.dispositivoId}/historico?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+            );
+            if (!trips || trips.length < 2) return null;
+            const coords: { latitude: number; longitude: number }[] = [];
+            for (const p of trips) {
+              if (typeof p.latitude === 'number' && typeof p.longitude === 'number') {
+                coords.push({ latitude: p.latitude, longitude: p.longitude });
+              }
+            }
+            return coords.length >= 2 ? { deviceId: device.dispositivoId, coords } : null;
+          } catch {
+            return null;
+          }
+        });
+        const results = await Promise.all(trackPromises);
+        setTracks(results.filter((r): r is { deviceId: string; coords: { latitude: number; longitude: number }[] } => r !== null));
+      } finally {
+        setIsLoadingTracks(false);
+      }
+    };
+    loadAllTracks();
+  }, [showTracks, locatedDevices]);
+
+  const handleGeofenceCreated = useCallback(() => {
+    setShowFences(true);
+  }, []);
+
   const handleWebSocketMessage = useCallback(
     (message: import('../tracking/trackingWebSocket').TrackingMessage, dispositivoId: string) => {
       setDevices((current) => updateDeviceFromMessage(current, dispositivoId, message));
@@ -555,6 +616,35 @@ export function MapScreen() {
             </Marker>
           );
         })}
+
+        {/* Geofences as circles */}
+        {showFences && geofences.map((geofence) => {
+          const parsed = parseCircleArea(geofence.area);
+          if (!parsed) return null;
+          return (
+            <Circle
+              key={geofence.id}
+              center={{ latitude: parsed.latitude, longitude: parsed.longitude }}
+              radius={parsed.radius}
+              strokeWidth={2}
+              strokeColor="rgba(41,128,185,0.8)"
+              fillColor="rgba(41,128,185,0.15)"
+            />
+          );
+        })}
+
+        {/* Tracks as polylines */}
+        {showTracks && tracks.map((track) => {
+          if (!track.coords || track.coords.length < 2) return null;
+          return (
+            <Polyline
+              key={track.deviceId}
+              coordinates={track.coords}
+              strokeWidth={3}
+              strokeColor="rgba(41,128,185,0.6)"
+            />
+          );
+        })}
       </MapView>
 
       <OffscreenCapturePool pending={pending} onReady={onReady} />
@@ -576,12 +666,19 @@ export function MapScreen() {
           onPress={focusUserLocation}
         />
         <MapFloatingButton
-          icon="tune-variant"
-          active={showLabels || showFences}
-          onPress={() => {
-            setShowLabels((current) => !current);
-            setShowFences((current) => !current);
-          }}
+          icon="comment-outline"
+          active={showLabels}
+          onPress={() => setShowLabels((current) => !current)}
+        />
+        <MapFloatingButton
+          icon="circle-outline"
+          active={showFences}
+          onPress={() => setShowFences((current) => !current)}
+        />
+        <MapFloatingButton
+          icon="timeline-outline"
+          active={showTracks}
+          onPress={() => setShowTracks((current) => !current)}
         />
       </View>
 
@@ -697,6 +794,7 @@ export function MapScreen() {
               onUploadPhoto={handleUploadPhoto}
               onRemovePhoto={handleRemovePhoto}
               isUploading={isPhotoUploading}
+              onGeofenceCreated={handleGeofenceCreated}
             />
           </ScrollView>
         </BottomSheet>
