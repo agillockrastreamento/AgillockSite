@@ -124,4 +124,79 @@ router.post('/clicksign',
   }
 );
 
+/**
+ * Webhook para dispositivos ZHENCB (A01, A02, A03)
+ * Formato esperado (do documento):
+ * {
+ *   "code": 200,
+ *   "data": [
+ *     {
+ *       "deviceId": "D8:23:F9:58:D6:99",
+ *       "latitude": "22.6846869",
+ *       "longitude": "113.9786924",
+ *       "timestamp": "2025-12-05T09:41:53",
+ *       "accuracy": "103",
+ *       ...
+ *     }
+ *   ],
+ *   "message": "success"
+ * }
+ */
+router.post('/zhencb', async (req: Request, res: Response): Promise<void> => {
+  const payload = req.body;
+  const devices = payload?.data;
+
+  if (!Array.isArray(devices)) {
+    console.warn('[Webhook ZHENCB] Payload inválido: "data" não é um array');
+    res.status(400).json({ error: 'Payload inválido' });
+    return;
+  }
+
+  console.log(`[Webhook ZHENCB] Recebidos dados de ${devices.length} dispositivos`);
+
+  const TRACCAR_OSMAND_URL = process.env.TRACCAR_OSMAND_URL || 'http://traccar:5055';
+
+  // Processa cada dispositivo em paralelo (best-effort)
+  const results = await Promise.allSettled(devices.map(async (device: any) => {
+    const { deviceId, latitude, longitude, timestamp, accuracy } = device;
+
+    if (!deviceId || !latitude || !longitude) {
+      throw new Error(`Dados incompletos para dispositivo ${deviceId || 'unknown'}`);
+    }
+
+    // O Traccar aceita o protocolo OsmAnd via HTTP GET ou POST.
+    // Usaremos parâmetros na query string conforme padrão OsmAnd.
+    const params = new URLSearchParams({
+      id: deviceId,
+      lat: latitude,
+      lon: longitude,
+      timestamp: String(Math.floor(new Date(timestamp).getTime() / 1000)), // Traccar OsmAnd espera segundos ou ISO
+      hdop: accuracy || '0',
+    });
+
+    const traccarUrl = `${TRACCAR_OSMAND_URL}/?${params.toString()}`;
+
+    const traccarRes = await fetch(traccarUrl);
+    if (!traccarRes.ok) {
+      throw new Error(`Falha ao enviar para Traccar: ${traccarRes.status} ${await traccarRes.text()}`);
+    }
+
+    return deviceId;
+  }));
+
+  const successCount = results.filter(r => r.status === 'fulfilled').length;
+  const failCount = results.filter(r => r.status === 'rejected').length;
+
+  console.log(`[Webhook ZHENCB] Processamento concluído: ${successCount} sucessos, ${failCount} falhas`);
+
+  // Loga erros se houver
+  results.forEach((r, idx) => {
+    if (r.status === 'rejected') {
+      console.error(`[Webhook ZHENCB] Erro no dispositivo ${devices[idx]?.deviceId}:`, r.reason);
+    }
+  });
+
+  res.status(200).json({ ok: true, processed: devices.length, success: successCount });
+});
+
 export default router;
