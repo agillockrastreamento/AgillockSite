@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Icon, IconButton } from 'react-native-paper';
 
+import { BottomSheet } from '../components/BottomSheet';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { apiRequest } from '../services/api/apiClient';
 import { colors } from '../theme/colors';
@@ -22,6 +22,7 @@ type Dispositivo = {
   id: string;
   nome: string;
   placa: string | null;
+  podeGerenciarManutencao: boolean;
 };
 
 type Recorrencia = {
@@ -53,6 +54,12 @@ type AddRegistroPayload = {
   oficina: string;
 };
 
+type AddRecorrenciaPayload = {
+  titulo: string;
+  descricao: string;
+  intervaloKm: string;
+};
+
 const TIPOS_MANUTENCAO = [
   'Troca de óleo',
   'Revisão geral',
@@ -72,6 +79,12 @@ const EMPTY_FORM: AddRegistroPayload = {
   kmRealizacao: '',
   custo: '',
   oficina: '',
+};
+
+const EMPTY_RECORRENCIA: AddRecorrenciaPayload = {
+  titulo: '',
+  descricao: '',
+  intervaloKm: '',
 };
 
 function fmtDate(iso: string) {
@@ -101,14 +114,18 @@ export function ManutencaoScreen() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [form, setForm] = useState<AddRegistroPayload>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
+  const [addRecModalVisible, setAddRecModalVisible] = useState(false);
+  const [formRec, setFormRec] = useState<AddRecorrenciaPayload>(EMPTY_RECORRENCIA);
+  const [isSavingRec, setIsSavingRec] = useState(false);
 
   const loadDispositivos = useCallback(async () => {
     try {
-      const snapshot = await apiRequest<{ dispositivos?: Dispositivo[] } | any>('/cliente/rastreamento/snapshot');
-      const devs: Dispositivo[] = (snapshot?.dispositivos ?? snapshot ?? []).map((d: any) => ({
+      const data = await apiRequest<any[]>('/cliente/rastreamento/posicoes');
+      const devs: Dispositivo[] = (data ?? []).map((d: any) => ({
         id: d.dispositivoId ?? d.id,
         nome: d.nome,
         placa: d.placa ?? null,
+        podeGerenciarManutencao: d.podeGerenciarManutencao ?? false,
       }));
       setDispositivos(devs);
       if (devs.length > 0 && !selectedId) setSelectedId(devs[0].id);
@@ -211,6 +228,43 @@ export function ManutencaoScreen() {
     }
   };
 
+  const saveRecorrencia = async () => {
+    if (!formRec.titulo.trim()) {
+      toast.show({ message: 'Informe o título da manutenção programada.', type: 'error' });
+      return;
+    }
+    const intervaloKmNum = parseInt(formRec.intervaloKm);
+    if (!formRec.intervaloKm || isNaN(intervaloKmNum) || intervaloKmNum <= 0) {
+      toast.show({ message: 'Informe um intervalo de KM válido.', type: 'error' });
+      return;
+    }
+    if (!selectedId) return;
+    setIsSavingRec(true);
+    try {
+      await apiRequest('/cliente/manutencoes/recorrencias', {
+        method: 'POST',
+        body: {
+          dispositivoId: selectedId,
+          titulo: formRec.titulo.trim(),
+          descricao: formRec.descricao.trim() || null,
+          intervaloKm: intervaloKmNum,
+        },
+      });
+      toast.show({ message: 'Manutenção programada criada!', type: 'success' });
+      setAddRecModalVisible(false);
+      setFormRec(EMPTY_RECORRENCIA);
+      setActiveTab('recorrencias');
+      loadData(true);
+    } catch (err) {
+      toast.show({
+        message: err instanceof Error ? err.message : 'Erro ao criar manutenção programada.',
+        type: 'error',
+      });
+    } finally {
+      setIsSavingRec(false);
+    }
+  };
+
   const selectedDevice = dispositivos.find(d => d.id === selectedId);
 
   return (
@@ -219,6 +273,7 @@ export function ManutencaoScreen() {
       {dispositivos.length > 1 && (
         <ScrollView
           horizontal
+          style={styles.deviceBarScroll}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.deviceBar}
         >
@@ -284,7 +339,9 @@ export function ManutencaoScreen() {
                 <Icon source="wrench-clock" size={40} color={colors.textMuted} />
                 <Text style={styles.emptyText}>Nenhuma manutenção programada</Text>
                 <Text style={styles.emptySubText}>
-                  Configure manutenções recorrentes pelo portal web.
+                  {selectedDevice?.podeGerenciarManutencao
+                    ? 'Toque + para programar uma manutenção recorrente.'
+                    : 'Apenas o responsável pelo faturamento pode configurar manutenções.'}
                 </Text>
               </View>
             ) : (
@@ -303,14 +360,16 @@ export function ManutencaoScreen() {
                         A cada {r.intervaloKm.toLocaleString('pt-BR')} km
                       </Text>
                     </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      style={styles.doneBtn}
-                      onPress={() => markDone(r)}
-                    >
-                      <Icon source="check-circle-outline" size={18} color={colors.success} />
-                      <Text style={styles.doneBtnText}>Feito</Text>
-                    </Pressable>
+                    {selectedDevice?.podeGerenciarManutencao && (
+                      <Pressable
+                        accessibilityRole="button"
+                        style={styles.doneBtn}
+                        onPress={() => markDone(r)}
+                      >
+                        <Icon source="check-circle-outline" size={18} color={colors.success} />
+                        <Text style={styles.doneBtnText}>Feito</Text>
+                      </Pressable>
+                    )}
                   </View>
                 </View>
               ))
@@ -373,108 +432,162 @@ export function ManutencaoScreen() {
         </ScrollView>
       )}
 
-      {/* FAB */}
-      <Pressable
-        accessibilityRole="button"
-        style={styles.fab}
-        onPress={() => { setForm(EMPTY_FORM); setAddModalVisible(true); }}
-      >
-        <Icon source="plus" size={24} color={colors.primaryText} />
-      </Pressable>
+      {/* FAB — only show if user can manage this device */}
+      {selectedDevice?.podeGerenciarManutencao && (
+        <Pressable
+          accessibilityRole="button"
+          style={styles.fab}
+          onPress={() => {
+            if (activeTab === 'recorrencias') {
+              setFormRec(EMPTY_RECORRENCIA);
+              setAddRecModalVisible(true);
+            } else {
+              setForm(EMPTY_FORM);
+              setAddModalVisible(true);
+            }
+          }}
+        >
+          <Icon source="plus" size={24} color={colors.primaryText} />
+        </Pressable>
+      )}
 
-      {/* Add registro modal */}
-      <Modal
-        animationType="slide"
-        transparent
+      {/* Add recorrência — Bottom Sheet */}
+      <BottomSheet
+        visible={addRecModalVisible}
+        onClose={() => setAddRecModalVisible(false)}
+        title="Nova Manutenção Programada"
+        heightPercent={0.6}
+      >
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+          <Text style={styles.formLabel}>Título *</Text>
+          <TextInput
+            style={styles.formInput}
+            value={formRec.titulo}
+            onChangeText={v => setFormRec(f => ({ ...f, titulo: v }))}
+            placeholder="Ex: Troca de óleo"
+            placeholderTextColor={colors.textMuted}
+          />
+
+          <Text style={styles.formLabel}>Intervalo (km) *</Text>
+          <TextInput
+            style={styles.formInput}
+            value={formRec.intervaloKm}
+            onChangeText={v => setFormRec(f => ({ ...f, intervaloKm: v.replace(/\D/g, '') }))}
+            placeholder="Ex: 10000"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="numeric"
+          />
+
+          <Text style={styles.formLabel}>Observações</Text>
+          <TextInput
+            style={[styles.formInput, styles.formInputMulti]}
+            value={formRec.descricao}
+            onChangeText={v => setFormRec(f => ({ ...f, descricao: v }))}
+            placeholder="Detalhes da manutenção programada..."
+            placeholderTextColor={colors.textMuted}
+            multiline
+            numberOfLines={3}
+          />
+
+          <Pressable
+            style={[styles.saveBtn, isSavingRec && styles.saveBtnDisabled]}
+            onPress={saveRecorrencia}
+            disabled={isSavingRec}
+          >
+            {isSavingRec ? (
+              <ActivityIndicator size="small" color={colors.primaryText} />
+            ) : (
+              <Icon source="content-save" size={18} color={colors.primaryText} />
+            )}
+            <Text style={styles.saveBtnText}>Salvar</Text>
+          </Pressable>
+        </ScrollView>
+      </BottomSheet>
+
+      {/* Add registro — Bottom Sheet */}
+      <BottomSheet
         visible={addModalVisible}
-        statusBarTranslucent
-        onRequestClose={() => setAddModalVisible(false)}
+        onClose={() => setAddModalVisible(false)}
+        title="Novo Registro de Manutenção"
+        heightPercent={0.88}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Novo Registro de Manutenção</Text>
-              <IconButton icon="close" size={22} onPress={() => setAddModalVisible(false)} />
-            </View>
-            <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
-              <Text style={styles.formLabel}>Título *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={form.titulo}
-                onChangeText={v => setForm(f => ({ ...f, titulo: v }))}
-                placeholder="Ex: Troca de óleo"
-                placeholderTextColor={colors.textMuted}
-              />
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+          <Text style={styles.formLabel}>Título *</Text>
+          <TextInput
+            style={styles.formInput}
+            value={form.titulo}
+            onChangeText={v => setForm(f => ({ ...f, titulo: v }))}
+            placeholder="Ex: Troca de óleo"
+            placeholderTextColor={colors.textMuted}
+          />
 
-              <Text style={styles.formLabel}>Tipo</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
-                {TIPOS_MANUTENCAO.map(t => (
-                  <Pressable
-                    key={t}
-                    style={[styles.tipoChip, form.tipo === t && styles.tipoChipActive]}
-                    onPress={() => setForm(f => ({ ...f, tipo: t }))}
-                  >
-                    <Text style={[styles.tipoChipText, form.tipo === t && styles.tipoChipTextActive]}>{t}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              <Text style={styles.formLabel}>KM na realização</Text>
-              <TextInput
-                style={styles.formInput}
-                value={form.kmRealizacao}
-                onChangeText={v => setForm(f => ({ ...f, kmRealizacao: v.replace(/\D/g, '') }))}
-                placeholder="Ex: 45000"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="numeric"
-              />
-
-              <Text style={styles.formLabel}>Custo (R$)</Text>
-              <TextInput
-                style={styles.formInput}
-                value={form.custo}
-                onChangeText={v => setForm(f => ({ ...f, custo: v }))}
-                placeholder="Ex: 150,00"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="decimal-pad"
-              />
-
-              <Text style={styles.formLabel}>Oficina</Text>
-              <TextInput
-                style={styles.formInput}
-                value={form.oficina}
-                onChangeText={v => setForm(f => ({ ...f, oficina: v }))}
-                placeholder="Nome da oficina"
-                placeholderTextColor={colors.textMuted}
-              />
-
-              <Text style={styles.formLabel}>Observações</Text>
-              <TextInput
-                style={[styles.formInput, styles.formInputMulti]}
-                value={form.descricao}
-                onChangeText={v => setForm(f => ({ ...f, descricao: v }))}
-                placeholder="Detalhes da manutenção..."
-                placeholderTextColor={colors.textMuted}
-                multiline
-                numberOfLines={3}
-              />
-
+          <Text style={styles.formLabel}>Tipo</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
+            {TIPOS_MANUTENCAO.map(t => (
               <Pressable
-                style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
-                onPress={saveRegistro}
-                disabled={isSaving}
+                key={t}
+                style={[styles.tipoChip, form.tipo === t && styles.tipoChipActive]}
+                onPress={() => setForm(f => ({ ...f, tipo: t }))}
               >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color={colors.primaryText} />
-                ) : (
-                  <Icon source="content-save" size={18} color={colors.primaryText} />
-                )}
-                <Text style={styles.saveBtnText}>Salvar Registro</Text>
+                <Text style={[styles.tipoChipText, form.tipo === t && styles.tipoChipTextActive]}>{t}</Text>
               </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.formLabel}>KM na realização</Text>
+          <TextInput
+            style={styles.formInput}
+            value={form.kmRealizacao}
+            onChangeText={v => setForm(f => ({ ...f, kmRealizacao: v.replace(/\D/g, '') }))}
+            placeholder="Ex: 45000"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="numeric"
+          />
+
+          <Text style={styles.formLabel}>Custo (R$)</Text>
+          <TextInput
+            style={styles.formInput}
+            value={form.custo}
+            onChangeText={v => setForm(f => ({ ...f, custo: v }))}
+            placeholder="Ex: 150,00"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="decimal-pad"
+          />
+
+          <Text style={styles.formLabel}>Oficina</Text>
+          <TextInput
+            style={styles.formInput}
+            value={form.oficina}
+            onChangeText={v => setForm(f => ({ ...f, oficina: v }))}
+            placeholder="Nome da oficina"
+            placeholderTextColor={colors.textMuted}
+          />
+
+          <Text style={styles.formLabel}>Observações</Text>
+          <TextInput
+            style={[styles.formInput, styles.formInputMulti]}
+            value={form.descricao}
+            onChangeText={v => setForm(f => ({ ...f, descricao: v }))}
+            placeholder="Detalhes da manutenção..."
+            placeholderTextColor={colors.textMuted}
+            multiline
+            numberOfLines={3}
+          />
+
+          <Pressable
+            style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
+            onPress={saveRegistro}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color={colors.primaryText} />
+            ) : (
+              <Icon source="content-save" size={18} color={colors.primaryText} />
+            )}
+            <Text style={styles.saveBtnText}>Salvar Registro</Text>
+          </Pressable>
+        </ScrollView>
+      </BottomSheet>
     </View>
   );
 }
@@ -483,6 +596,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  deviceBarScroll: {
+    flexGrow: 0,
   },
   deviceBar: {
     flexDirection: 'row',
@@ -672,31 +788,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(23,32,42,0.4)',
-  },
-  modalSheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.bottomSheet,
-    borderTopRightRadius: radius.bottomSheet,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingLeft: spacing.xl,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text,
   },
   modalBody: {
     padding: spacing.xl,

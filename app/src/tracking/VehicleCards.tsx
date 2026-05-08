@@ -157,6 +157,7 @@ export function MainVehicleCard({
   onRemovePhoto,
   isUploading,
   onGeofenceCreated,
+  onGeofenceDeleted,
   onVerMais,
   onShowRoute,
   onCompartilhar,
@@ -166,6 +167,7 @@ export function MainVehicleCard({
   onRemovePhoto(): void;
   isUploading?: boolean;
   onGeofenceCreated?: () => void;
+  onGeofenceDeleted?: () => void;
   onVerMais?: () => void;
   onShowRoute?: () => void;
   onCompartilhar?: () => void;
@@ -345,6 +347,7 @@ export function MainVehicleCard({
       try {
         await Promise.all(deviceGeofences.map(g => deleteGeofence(g.id)));
         setDeviceGeofences([]);
+        onGeofenceDeleted?.();
         toast.show({ message: 'Cerca(s) removida(s)!', type: 'success' });
       } catch {
         toast.show({ message: 'Erro ao remover cerca.', type: 'error' });
@@ -573,17 +576,17 @@ export function MainVehicleCard({
               <Text style={styles.actionText}>Compartilhar</Text>
             </Pressable>
             <Pressable
-              style={[
-                styles.actionBtn,
-                deviceGeofences.length > 0 && { backgroundColor: '#fff3e0', borderColor: '#f39c12' },
-              ]}
+              style={styles.actionBtn}
               onPress={handleCercaPress}
             >
-              <View style={styles.actionIconWrap}>
+              <View style={[
+                styles.actionIconWrap,
+                deviceGeofences.length > 0 && styles.actionIconWrapCercaAtiva,
+              ]}>
                 <Icon
-                  source="circle-outline"
+                  source={deviceGeofences.length > 0 ? 'circle-slice-8' : 'circle-outline'}
                   size={18}
-                  color={deviceGeofences.length > 0 ? '#f39c12' : '#555'}
+                  color={deviceGeofences.length > 0 ? '#fff' : '#555'}
                 />
                 {isCreatingGeofence && (
                   <View style={styles.actionLoading}>
@@ -591,7 +594,7 @@ export function MainVehicleCard({
                   </View>
                 )}
               </View>
-              <Text style={[styles.actionText, deviceGeofences.length > 0 && { color: '#f39c12', fontWeight: '700' }]}>
+              <Text style={[styles.actionText, deviceGeofences.length > 0 && styles.actionTextCercaAtiva]}>
                 {deviceGeofences.length > 0 ? 'Cerca Ativa' : 'Cerca'}
               </Text>
             </Pressable>
@@ -903,10 +906,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
+  actionIconWrapCercaAtiva: {
+    backgroundColor: '#f39c12',
+    borderColor: '#e67e22',
+  },
   actionText: {
     fontSize: 10,
     fontWeight: '600',
     color: '#555',
+  },
+  actionTextCercaAtiva: {
+    color: '#f39c12',
+    fontWeight: '800',
   },
   actionLoading: {
     position: 'absolute',

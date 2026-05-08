@@ -111,6 +111,19 @@ function MapFloatingButton({ icon, active, onPress }: { icon: string; active?: b
   );
 }
 
+function LayerOption({ icon, label, active, onPress }: { icon: string; label: string; active: boolean; onPress(): void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={[styles.layerOption, active && styles.layerOptionActive]}
+      onPress={onPress}
+    >
+      <Icon source={icon} size={18} color={active ? colors.primaryText : '#fff'} />
+      <Text style={[styles.layerOptionText, active && styles.layerOptionTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export function MapScreen() {
   const navigation = useNavigation<DrawerNavigationProp<ClienteDrawerParamList>>();
   const route = useRoute<NativeStackScreenProps<RootStackParamList, 'Map'>['route']>();
@@ -136,6 +149,7 @@ export function MapScreen() {
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [notificationsSheetVisible, setNotificationsSheetVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [layersDrawerVisible, setLayersDrawerVisible] = useState(false);
 
   // Main card animation
   const mainCardAnim = useRef(new Animated.Value(MAIN_CARD_HEIGHT)).current;
@@ -171,6 +185,10 @@ export function MapScreen() {
     };
     loadUnreadCount();
   }, []);
+
+  useEffect(() => {
+    if (notificationsSheetVisible) setUnreadCount(0);
+  }, [notificationsSheetVisible]);
 
   const quickSheetHeights = useMemo(() => getQuickSheetHeights(devices.length), [devices.length]);
   const quickSheetHeight = useRef(new Animated.Value(Math.round(SCREEN_HEIGHT * 0.3))).current;
@@ -653,32 +671,44 @@ export function MapScreen() {
 
       <View style={styles.mapControls}>
         <MapFloatingButton
-          icon="map"
-          active={currentMapType !== 'standard'}
-          onPress={() => setMapTypeIndex((current) => (current + 1) % MAP_TYPES.length)}
-        />
-        <MapFloatingButton
           icon={isLocating ? 'crosshairs-question' : 'crosshairs-gps'}
           active={isLocating}
           onPress={focusUserLocation}
         />
         <MapFloatingButton
-          icon="comment-outline"
-          active={showLabels}
-          onPress={() => setShowLabels((current) => !current)}
+          icon={mapTypeIndex === 0 ? 'satellite-variant' : 'map'}
+          active={mapTypeIndex > 0}
+          onPress={() => setMapTypeIndex(prev => (prev === 0 ? 1 : 0))}
         />
-        <MapFloatingButton
-          icon="circle-outline"
-          active={showFences}
-          onPress={() => setShowFences((current) => !current)}
-        />
-        <MapFloatingButton
-          icon="timeline-outline"
-          active={showTracks}
-          onPress={() => {
-            setShowTracks((current) => !current);
-          }}
-        />
+        <View style={styles.layersBtnWrap}>
+          <MapFloatingButton
+            icon="layers-outline"
+            active={layersDrawerVisible || showLabels || showFences || showTracks}
+            onPress={() => setLayersDrawerVisible(v => !v)}
+          />
+          {layersDrawerVisible && (
+            <View style={styles.layersDrawer}>
+              <LayerOption
+                icon="label-outline"
+                label="Labels"
+                active={showLabels}
+                onPress={() => setShowLabels(v => !v)}
+              />
+              <LayerOption
+                icon="circle-outline"
+                label="Cercas"
+                active={showFences}
+                onPress={() => setShowFences(v => !v)}
+              />
+              <LayerOption
+                icon="timeline-outline"
+                label="Rastro"
+                active={showTracks}
+                onPress={() => setShowTracks(v => !v)}
+              />
+            </View>
+          )}
+        </View>
       </View>
 
       {isLoadingTracks && (
@@ -793,9 +823,18 @@ export function MapScreen() {
               onRemovePhoto={handleRemovePhoto}
               isUploading={isPhotoUploading}
               onGeofenceCreated={handleGeofenceCreated}
+              onGeofenceDeleted={() => {
+                if (showFences) getGeofences().then(setGeofences).catch(() => {});
+              }}
               onVerMais={() => {
-                closeMainCard();
-                navigation.navigate('Relatorio');
+                if (selectedDevice) {
+                  closeMainCard();
+                  (navigation as any).navigate('Historico', {
+                    dispositivoId: selectedDevice.dispositivoId,
+                    nome: selectedDevice.nome,
+                    placa: selectedDevice.placa ?? null,
+                  });
+                }
               }}
               onShowRoute={() => {
                 setShowTracks(true);
@@ -858,6 +897,44 @@ const styles = StyleSheet.create({
   mapButton: {
     margin: 0,
     elevation: 3,
+  },
+  layersBtnWrap: {
+    position: 'relative',
+  },
+  layersDrawer: {
+    position: 'absolute',
+    right: 50,
+    top: 0,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(20,20,30,0.92)',
+    borderRadius: 14,
+    padding: 8,
+    gap: 6,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+  },
+  layerOption: {
+    width: 62,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+  },
+  layerOptionActive: {
+    backgroundColor: colors.primary,
+  },
+  layerOptionText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  layerOptionTextActive: {
+    color: colors.primaryText,
   },
   markerContainer: {
     width: 84,

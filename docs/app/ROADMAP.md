@@ -449,34 +449,6 @@ Implementação atual:
 
 ## Fase 10 - Pagamentos
 
-Objetivo: adaptar geocercas do cliente ao app.
-
-Entregas:
-
-- Lista de geocercas próprias e visíveis.
-- Criação de geocerca própria.
-- Edição/remoção apenas de geocercas `origemTipo = "CLIENTE"`.
-- Desenho de círculos/polígonos no mapa.
-- Associação com dispositivos permitidos.
-- Opção de notificar cliente por canais.
-
-Critério de saída:
-
-- Cliente não edita geocerca administrativa.
-- Geocercas aparecem no mapa conforme preferência.
-- Criar/editar/remove sincroniza com backend.
-
-Referências:
-
-| Uso | Parágrafo/seção | Onde encontra |
-|---|---|---|
-| Geocercas cliente | `Geocercas` | `docs/traccar/PORTAL_CLIENTE.md` |
-| Rotas de geocercas | `Geocercas do cliente` | `docs/projeto/API.md` |
-| Integração backend-Traccar | `Geocercas` | `docs/traccar/INTEGRACAO_BACKEND.md` |
-| Tela web base | Tela de geocercas | `AgillockSite/cliente/geocercas.html` e `AgillockSite/js/geocercas-cliente.js` |
-
-## Fase 10 - Pagamentos
-
 Objetivo: adaptar boletos do cliente ao app.
 
 Entregas:

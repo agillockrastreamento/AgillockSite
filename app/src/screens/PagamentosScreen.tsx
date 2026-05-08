@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,8 +23,12 @@ type Boleto = {
   dataVencimento: string;
   dataPagamento?: string | null;
   descricao?: string | null;
+  linkBoleto?: string | null;
+  numeroParcela?: number | null;
   placas?: string[];
   dispositivos?: string[];
+  dispositivo?: { placa?: string | null; nome?: string | null } | null;
+  placa?: { placa?: string | null } | null;
 };
 
 type StatusFilter = 'TODOS' | 'PENDENTE' | 'ATRASADO' | 'PAGO' | 'CANCELADO';
@@ -93,11 +98,6 @@ export function PagamentosScreen() {
     ? boletos
     : boletos.filter(b => b.status === activeStatus);
 
-  const totais = {
-    pendente: boletos.filter(b => b.status === 'PENDENTE').reduce((s, b) => s + b.valor, 0),
-    atrasado: boletos.filter(b => b.status === 'ATRASADO').reduce((s, b) => s + b.valor, 0),
-    pago: boletos.filter(b => b.status === 'PAGO').reduce((s, b) => s + b.valor, 0),
-  };
   const contagens = {
     pendente: boletos.filter(b => b.status === 'PENDENTE').length,
     atrasado: boletos.filter(b => b.status === 'ATRASADO').length,
@@ -110,21 +110,18 @@ export function PagamentosScreen() {
       <View style={styles.summaryRow}>
         <SummaryCard
           label="Pendente"
-          valor={totais.pendente}
           count={contagens.pendente}
           color="#e67e22"
           icon="clock-outline"
         />
         <SummaryCard
           label="Atrasado"
-          valor={totais.atrasado}
           count={contagens.atrasado}
           color="#e74c3c"
           icon="alert-circle-outline"
         />
         <SummaryCard
           label="Pago"
-          valor={totais.pago}
           count={contagens.pago}
           color="#27ae60"
           icon="check-circle-outline"
@@ -134,6 +131,7 @@ export function PagamentosScreen() {
       {/* Status filter tabs */}
       <ScrollView
         horizontal
+        style={styles.tabsScroll}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabsRow}
       >
@@ -193,13 +191,11 @@ export function PagamentosScreen() {
 
 function SummaryCard({
   label,
-  valor,
   count,
   color,
   icon,
 }: {
   label: string;
-  valor: number;
   count: number;
   color: string;
   icon: string;
@@ -210,8 +206,8 @@ function SummaryCard({
         <Icon source={icon} size={16} color={color} />
         <Text style={[styles.summaryCardLabel, { color }]}>{label}</Text>
       </View>
-      <Text style={styles.summaryCardValue}>{fmtMoney(valor)}</Text>
-      <Text style={styles.summaryCardCount}>{count} {count === 1 ? 'boleto' : 'boletos'}</Text>
+      <Text style={[styles.summaryCardValue, { color }]}>{count}</Text>
+      <Text style={styles.summaryCardCount}>{count === 1 ? 'boleto' : 'boletos'}</Text>
     </View>
   );
 }
@@ -222,26 +218,51 @@ function BoletoCard({ boleto }: { boleto: Boleto }) {
   const overdue = boleto.status === 'PENDENTE' && isOverdue(boleto.dataVencimento);
   const displayColor = overdue ? '#e74c3c' : statusColor;
 
-  const tags = [
-    ...(boleto.placas ?? []),
-    ...(boleto.dispositivos ?? []),
+  const placaDisplay =
+    (boleto.dispositivo?.placa || boleto.dispositivo?.nome) ??
+    boleto.placa?.placa ??
+    (boleto.placas?.[0] || boleto.dispositivos?.[0] || null);
+
+  const extraTags = [
+    ...(boleto.placas?.slice(1) ?? []),
+    ...(boleto.dispositivos?.slice(1) ?? []),
   ];
 
   return (
-    <View style={[styles.boletoCard, { borderLeftColor: displayColor }]}>
-      <View style={styles.boletoRow}>
-        <View style={styles.boletoLeft}>
+    <View style={styles.boletoCard}>
+      {/* Top row: placa badge + status badge */}
+      <View style={styles.boletoTopRow}>
+        <View style={styles.boletoTopLeft}>
+          {placaDisplay ? (
+            <View style={styles.placaBadge}>
+              <Text style={styles.placaBadgeText}>{placaDisplay}</Text>
+            </View>
+          ) : null}
+          <View style={[styles.statusBadge, { backgroundColor: displayColor }]}>
+            <Text style={styles.statusBadgeText}>{overdue ? 'Atrasado' : statusLabel}</Text>
+          </View>
+        </View>
+        <View style={styles.boletoRight}>
           <Text style={styles.boletoValor}>{fmtMoney(boleto.valor)}</Text>
+        </View>
+      </View>
+
+      {/* Bottom row: venc info + PDF button */}
+      <View style={styles.boletoBottomRow}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.boletoVenc}>
             Venc.: {fmtDate(boleto.dataVencimento)}
-            {overdue ? ' (vencido)' : ''}
+            {boleto.numeroParcela != null ? `  ·  Parc. ${boleto.numeroParcela}` : ''}
           </Text>
+          {boleto.dataPagamento ? (
+            <Text style={styles.paidDate}>Pago em {fmtDate(boleto.dataPagamento)}</Text>
+          ) : null}
           {boleto.descricao ? (
             <Text style={styles.boletoDesc} numberOfLines={1}>{boleto.descricao}</Text>
           ) : null}
-          {tags.length > 0 && (
+          {extraTags.length > 0 && (
             <View style={styles.tagsRow}>
-              {tags.map((t, i) => (
+              {extraTags.map((t, i) => (
                 <View key={i} style={styles.plateTag}>
                   <Text style={styles.plateTagText}>{t}</Text>
                 </View>
@@ -249,15 +270,20 @@ function BoletoCard({ boleto }: { boleto: Boleto }) {
             </View>
           )}
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: `${displayColor}22` }]}>
-          <Text style={[styles.statusBadgeText, { color: displayColor }]}>{statusLabel}</Text>
+        <View style={styles.pdfArea}>
+          {boleto.linkBoleto ? (
+            <Pressable
+              style={styles.pdfBtn}
+              onPress={() => Linking.openURL(boleto.linkBoleto!)}
+            >
+              <Icon source="file-pdf-box" size={14} color="#fff" />
+              <Text style={styles.pdfBtnText}>2ª Via</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.semLink}>Sem link</Text>
+          )}
         </View>
       </View>
-      {boleto.dataPagamento && (
-        <Text style={styles.paidDate}>
-          Pago em {fmtDate(boleto.dataPagamento)}
-        </Text>
-      )}
     </View>
   );
 }
@@ -298,7 +324,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   summaryCardValue: {
-    fontSize: 13,
+    fontSize: 22,
     fontWeight: '900',
     color: colors.text,
   },
@@ -306,6 +332,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.textMuted,
     marginTop: 1,
+  },
+  tabsScroll: {
+    flexGrow: 0,
   },
   tabsRow: {
     flexDirection: 'row',
@@ -384,7 +413,6 @@ const styles = StyleSheet.create({
   },
   boletoCard: {
     borderRadius: radius.md,
-    borderLeftWidth: 4,
     backgroundColor: colors.surface,
     padding: spacing.md,
     elevation: 2,
@@ -392,30 +420,67 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
+    gap: 8,
   },
-  boletoRow: {
+  boletoTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  boletoLeft: {
+  boletoTopLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     flex: 1,
-    gap: 3,
+    flexWrap: 'wrap',
+  },
+  boletoRight: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+  },
+  placaBadge: {
+    backgroundColor: '#333',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  placaBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 2,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#fff',
   },
   boletoValor: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '900',
     color: colors.text,
   },
+  boletoBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
   boletoVenc: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textMuted,
   },
   boletoDesc: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.text,
     fontStyle: 'italic',
+    marginTop: 2,
   },
   tagsRow: {
     flexDirection: 'row',
@@ -424,31 +489,44 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   plateTag: {
-    backgroundColor: '#333',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    backgroundColor: '#555',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     borderRadius: 3,
   },
   plateTagText: {
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radius.sm,
-    alignSelf: 'flex-start',
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   paidDate: {
-    marginTop: spacing.sm,
     fontSize: 11,
     color: colors.success,
     fontWeight: '700',
+    marginTop: 2,
+  },
+  pdfArea: {
+    flexShrink: 0,
+    alignItems: 'flex-end',
+  },
+  pdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#2980b9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.sm,
+  },
+  pdfBtnText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  semLink: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontStyle: 'italic',
   },
 });

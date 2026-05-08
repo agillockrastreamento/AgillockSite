@@ -21,6 +21,7 @@ import { MapScreen } from '../screens/MapScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { PagamentosScreen } from '../screens/PagamentosScreen';
 import { ReportScreen } from '../screens/ReportScreen';
+import { HistoricoScreen } from '../screens/HistoricoScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
 import { NotificationBootstrap } from '../notifications/NotificationBootstrap';
 import { NotificationHandlers } from '../notifications/NotificationHandlers';
@@ -230,6 +231,18 @@ export function AppNavigator() {
           ) : (
             <Stack.Screen name="Login" component={LoginScreen} />
           )}
+          <Stack.Screen
+            name="Historico"
+            component={HistoricoScreen}
+            options={({ route }) => ({
+              headerShown: true,
+              headerTitle: `${route.params.nome}${route.params.placa ? ` — ${route.params.placa}` : ''}`,
+              headerTitleAlign: 'center',
+              headerStyle: { backgroundColor: colors.loginBackgroundStart },
+              headerTintColor: colors.surface,
+              headerShadowVisible: false,
+            })}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </>

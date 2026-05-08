@@ -52,6 +52,9 @@ export function BottomSheet({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(visible);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   const animateClose = useCallback(
     (notify: boolean) => {
       Animated.parallel([
@@ -67,10 +70,10 @@ export function BottomSheet({
         }),
       ]).start(() => {
         setMounted(false);
-        if (notify) onClose();
+        if (notify) onCloseRef.current();
       });
     },
-    [backdropOpacity, onClose, sheetHeight, translateY],
+    [backdropOpacity, sheetHeight, translateY],
   );
 
   const close = useCallback(() => {
