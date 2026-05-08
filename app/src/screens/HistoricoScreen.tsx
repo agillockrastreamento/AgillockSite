@@ -69,6 +69,15 @@ function fmtDur(min: number) {
   return h ? `${h}h ${m}min` : `${m}min`;
 }
 
+function isValidCoordinate(p: { latitude: number; longitude: number }) {
+  return (
+    typeof p.latitude === 'number' &&
+    typeof p.longitude === 'number' &&
+    Number.isFinite(p.latitude) &&
+    Number.isFinite(p.longitude)
+  );
+}
+
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.statCard}>
@@ -114,9 +123,7 @@ export function HistoricoScreen() {
         ).catch(() => ({ posicoes: [] })),
       ]);
       setViagens(tripsData ?? []);
-      const pos = (histData?.posicoes ?? []).filter(
-        (p) => typeof p.latitude === 'number' && typeof p.longitude === 'number',
-      );
+      const pos = (histData?.posicoes ?? []).filter(isValidCoordinate);
       setPositions(pos);
       if (pos.length > 1) {
         setTimeout(() => {
@@ -178,13 +185,13 @@ export function HistoricoScreen() {
             </Marker>
           </>
         )}
-        {positions.length === 0 && !isLoading && (
-          <View style={styles.mapEmpty}>
-            <Icon source="map-off" size={32} color={colors.textMuted} />
-            <Text style={styles.mapEmptyText}>Sem posições</Text>
-          </View>
-        )}
       </MapView>
+      {positions.length === 0 && !isLoading && (
+        <View style={styles.mapEmpty} pointerEvents="none">
+          <Icon source="map-marker-off-outline" size={32} color={colors.textMuted} />
+          <Text style={styles.mapEmptyText}>Sem posicoes</Text>
+        </View>
+      )}
 
       {/* Period selector */}
       <View style={styles.periodRow}>
@@ -250,9 +257,7 @@ export function HistoricoScreen() {
                     const data = await apiRequest<{ posicoes: { latitude: number; longitude: number }[] }>(
                       `/cliente/rastreamento/dispositivos/${dispositivoId}/historico?from=${encodeURIComponent(v.inicio)}&to=${encodeURIComponent(v.fim)}`
                     );
-                    const pos = (data?.posicoes ?? []).filter(
-                      (p) => typeof p.latitude === 'number' && typeof p.longitude === 'number',
-                    );
+                    const pos = (data?.posicoes ?? []).filter(isValidCoordinate);
                     setTripPositions(pos);
                     if (pos.length > 1) {
                       setTimeout(() => {
