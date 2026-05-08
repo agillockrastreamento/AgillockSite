@@ -66,7 +66,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         select: {
           id: true, nome: true,
           status: true,
-          carnes: { select: { id: true }, take: 1 },
+          dispositivos: { where: { ativo: true }, select: { id: true }, take: 1 },
         },
       },
     },
@@ -88,7 +88,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     const tipo: 'responsavel' | 'vinculado' =
-      clienteLogin.cliente.carnes.length > 0 ? 'responsavel' : 'vinculado';
+      clienteLogin.cliente.dispositivos.length > 0 ? 'responsavel' : 'vinculado';
 
     const token = signClienteToken({
       sub: clienteLogin.id,
@@ -162,10 +162,7 @@ router.post('/cliente', async (req: Request, res: Response): Promise<void> => {
           id: true,
           nome: true,
           status: true,
-          carnes: {
-            select: { id: true },
-            take: 1,
-          },
+          dispositivos: { where: { ativo: true }, select: { id: true }, take: 1 },
         },
       },
     },
@@ -182,9 +179,9 @@ router.post('/cliente', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // Determina o tipo: responsavel se o cliente tem carnês (é faturante)
+  // Determina o tipo: responsavel se o cliente tem veiculos sob faturamento.
   const tipo: 'responsavel' | 'vinculado' =
-    login.cliente.carnes.length > 0 ? 'responsavel' : 'vinculado';
+    login.cliente.dispositivos.length > 0 ? 'responsavel' : 'vinculado';
 
   const token = signClienteToken({
     sub: login.id,

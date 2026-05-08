@@ -162,8 +162,21 @@ function HeaderActions() {
 }
 
 function ClienteDrawer() {
-  const { user } = useAuth();
-  const canAccessPayments = user?.tipo === 'responsavel';
+  const [canAccessPayments, setCanAccessPayments] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    getClientePerfil()
+      .then((profile) => {
+        if (mounted) setCanAccessPayments(profile.veiculosFaturamento.length > 0);
+      })
+      .catch(() => {
+        if (mounted) setCanAccessPayments(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <Drawer.Navigator
