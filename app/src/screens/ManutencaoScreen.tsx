@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -652,7 +650,6 @@ export function ManutencaoScreen() {
         title={editingRecorrenciaId ? 'Editar Manutenção Programada' : 'Nova Manutenção Programada'}
         heightPercent={0.72}
       >
-        <KeyboardAvoidingView behavior={'padding'} style={styles.modalKeyboard}>
         <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
@@ -697,7 +694,6 @@ export function ManutencaoScreen() {
             <Text style={styles.saveBtnText}>{editingRecorrenciaId ? 'Atualizar' : 'Salvar'}</Text>
           </Pressable>
         </ScrollView>
-        </KeyboardAvoidingView>
       </BottomSheet>
 
       {/* Add registro — Bottom Sheet */}
@@ -710,7 +706,6 @@ export function ManutencaoScreen() {
         title={editingRegistroId ? 'Editar Registro de Manutenção' : 'Novo Registro de Manutenção'}
         heightPercent={0.88}
       >
-        <KeyboardAvoidingView behavior={'padding'} style={styles.modalKeyboard}>
         <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
@@ -827,7 +822,6 @@ export function ManutencaoScreen() {
             <Text style={styles.saveBtnText}>{editingRegistroId ? 'Atualizar Registro' : 'Salvar Registro'}</Text>
           </Pressable>
         </ScrollView>
-        </KeyboardAvoidingView>
       </BottomSheet>
     </View>
   );
@@ -1092,9 +1086,6 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: 6,
     paddingBottom: spacing.xxl,
-  },
-  modalKeyboard: {
-    flex: 1,
   },
   formLabel: {
     fontSize: 12,

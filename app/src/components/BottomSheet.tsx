@@ -9,9 +9,11 @@ import {
 import {
   Animated,
   Dimensions,
+  Keyboard,
   Modal,
   PanResponder,
   Pressable,
+  Platform,
   StyleSheet,
   StatusBar,
   Text,
@@ -23,6 +25,7 @@ import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 
 const DISMISS_DRAG_DISTANCE = 90;
+const KEYBOARD_GAP = 8;
 
 type Props = {
   visible: boolean;
@@ -50,6 +53,8 @@ export function BottomSheet({
   const sheetHeight = Math.round(Dimensions.get('window').height * heightPercent);
   const translateY = useRef(new Animated.Value(sheetHeight)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [mounted, setMounted] = useState(visible);
 
   const onCloseRef = useRef(onClose);
@@ -68,12 +73,18 @@ export function BottomSheet({
           duration: 170,
           useNativeDriver: true,
         }),
+        Animated.timing(keyboardOffset, {
+          toValue: 0,
+          duration: 170,
+          useNativeDriver: true,
+        }),
       ]).start(() => {
+        setKeyboardHeight(0);
         setMounted(false);
         if (notify) onCloseRef.current();
       });
     },
-    [backdropOpacity, sheetHeight, translateY],
+    [backdropOpacity, keyboardOffset, sheetHeight, translateY],
   );
 
   const close = useCallback(() => {
@@ -137,6 +148,40 @@ export function BottomSheet({
     if (mounted) animateClose(false);
   }, [animateClose, backdropOpacity, mounted, sheetHeight, translateY, visible]);
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      const nextHeight = Math.max(event.endCoordinates.height - KEYBOARD_GAP, 0);
+      setKeyboardHeight(nextHeight);
+      Animated.timing(keyboardOffset, {
+        toValue: -nextHeight,
+        duration: event.duration || 220,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, (event) => {
+      setKeyboardHeight(0);
+      Animated.timing(keyboardOffset, {
+        toValue: 0,
+        duration: event.duration || 180,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [keyboardOffset]);
+
+  const visibleSheetHeight = Math.max(
+    Math.min(sheetHeight, Dimensions.get('window').height - keyboardHeight - KEYBOARD_GAP),
+    260,
+  );
+
   return (
     <Modal
       animationType="none"
@@ -165,8 +210,8 @@ export function BottomSheet({
           style={[
             styles.sheet,
             {
-              height: sheetHeight,
-              transform: [{ translateY }],
+              height: visibleSheetHeight,
+              transform: [{ translateY }, { translateY: keyboardOffset }],
             },
           ]}
         >
