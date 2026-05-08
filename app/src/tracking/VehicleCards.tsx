@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, Icon, IconButton } from 'react-native-paper';
 import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
+import { GeofenceCreateModal } from '../components/GeofenceCreateModal';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { resolveUploadUrl } from '../profile/profileService';
 import { apiRequest } from '../services/api/apiClient';
-import { getDeviceGeofences, createGeofence, deleteGeofence, type DeviceGeofence } from './geofenceService';
+import {
+  buildCircleArea,
+  getDeviceGeofences,
+  createGeofence,
+  deleteGeofence,
+  type DeviceGeofence,
+} from './geofenceService';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
@@ -22,10 +29,10 @@ export function getStatusColor(status: string, position?: TrackingPosition | nul
 }
 
 export function getMarkerColor(device: TrackingDevice) {
-  if (!device.posicao || device.status !== 'online') return '#95a5a6'; // cinza: offline ou sem dados
-  if (device.limiteVelocidade && (device.posicao.velocidade || 0) > device.limiteVelocidade) return '#e74c3c'; // vermelho: excesso
-  if (device.posicao.emMovimento || device.posicao.ignicao === true) return '#2980b9'; // azul: em movimento ou ignição ligada
-  return '#27ae60'; // verde: parado / ignição desligada
+  if (!device.posicao || device.status !== 'online') return '#95a5a6';
+  if (device.limiteVelocidade && (device.posicao.velocidade || 0) > device.limiteVelocidade) return '#e74c3c';
+  if (device.posicao.emMovimento || device.posicao.ignicao === true) return '#2980b9';
+  return '#27ae60';
 }
 
 export function getStatusText(status: string, position?: TrackingPosition | null) {
@@ -88,62 +95,27 @@ function Speedometer({ speed, limit }: { speed: number; limit: number }) {
       strokeLinecap="round"
     />
   ) : null;
-  
+
   return (
     <View style={styles.speedometerWrap}>
       <Svg width="90" height="54" viewBox="0 0 90 54">
-        <Path
-          d="M 10 45 A 30 30 0 0 1 70 45"
-          fill="none"
-          stroke={tr}
-          strokeWidth="7"
-          strokeLinecap="round"
-        />
+        <Path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke={tr} strokeWidth="7" strokeLinecap="round" />
         {arc}
-        <SvgText
-          x="40"
-          y="40"
-          textAnchor="middle"
-          fontSize="17"
-          fontWeight="700"
-          fill="#333"
-        >
-          {Math.round(v)}
-        </SvgText>
-        <SvgText
-          x="40"
-          y="50"
-          textAnchor="middle"
-          fontSize="9"
-          fill="#555"
-        >
-          km/h
-        </SvgText>
+        <SvgText x="40" y="40" textAnchor="middle" fontSize="17" fontWeight="700" fill="#333">{Math.round(v)}</SvgText>
+        <SvgText x="40" y="50" textAnchor="middle" fontSize="9" fill="#555">km/h</SvgText>
       </Svg>
     </View>
   );
 }
 
-function VehiclePhoto({
-  device,
-  size = 62,
-}: {
-  device: TrackingDevice;
-  size?: number;
-}) {
+function VehiclePhoto({ device, size = 62 }: { device: TrackingDevice; size?: number }) {
   const imageUrl = resolveUploadUrl(device.imagemUrlCliente);
-
   return (
     <View style={[styles.photoBox, { width: size, height: size }]}>
       {imageUrl ? (
         <Image source={{ uri: imageUrl }} style={styles.photo} />
       ) : (
-        <VehicleIcon
-          categoria={device.categoria}
-          color={device.cor}
-          course={device.posicao?.curso}
-          size={size - 6}
-        />
+        <VehicleIcon categoria={device.categoria} color={device.cor} course={device.posicao?.curso} size={size - 6} />
       )}
       <View style={styles.cameraBadge}>
         <Icon source="camera" size={13} color={colors.primaryText} />
@@ -169,21 +141,14 @@ export function QuickVehicleCard({
     >
       <VehiclePhoto device={device} size={60} />
       <View style={styles.quickBody}>
-        <Text style={styles.quickName} numberOfLines={1}>
-          {device.nome}
-        </Text>
-        <Text style={styles.quickMeta} numberOfLines={1}>
-          {device.placa ?? 'Sem placa'}
-        </Text>
-        <Text style={styles.quickMeta} numberOfLines={1}>
-          {formatSpeed(device)}
-        </Text>
+        <Text style={styles.quickName} numberOfLines={1}>{device.nome}</Text>
+        <Text style={styles.quickMeta} numberOfLines={1}>{device.placa ?? 'Sem placa'}</Text>
+        <Text style={styles.quickMeta} numberOfLines={1}>{formatSpeed(device)}</Text>
       </View>
     </Pressable>
   );
 }
 
-// Simple geocode cache
 const _geocodeCache: Record<string, string> = {};
 
 export function MainVehicleCard({
@@ -192,14 +157,21 @@ export function MainVehicleCard({
   onRemovePhoto,
   isUploading,
   onGeofenceCreated,
+  onVerMais,
+  onShowRoute,
+  onCompartilhar,
 }: {
   device: TrackingDevice;
   onUploadPhoto(): void;
   onRemovePhoto(): void;
   isUploading?: boolean;
   onGeofenceCreated?: () => void;
+  onVerMais?: () => void;
+  onShowRoute?: () => void;
+  onCompartilhar?: () => void;
 }) {
   const toast = useToast();
+  const confirm = useConfirmDialog();
   const [summary, setSummary] = useState<{
     km: string;
     velMax: string;
@@ -211,10 +183,11 @@ export function MainVehicleCard({
   const [recurrences, setRecurrences] = useState<any[]>(device._recorrencias || []);
   const [deviceGeofences, setDeviceGeofences] = useState<DeviceGeofence[]>([]);
   const [isCreatingGeofence, setIsCreatingGeofence] = useState(false);
+  const [isSendingCommand, setIsSendingCommand] = useState(false);
+  const [geofenceModalVisible, setGeofenceModalVisible] = useState(false);
 
   const p = device.posicao;
   const statusColor = getStatusColor(device.status, p);
-  const statusText = getStatusText(device.status, p);
   const imageUrl = resolveUploadUrl(device.imagemUrlCliente);
 
   const fetchSummary = useCallback(async () => {
@@ -222,29 +195,25 @@ export function MainVehicleCard({
       const agora = new Date();
       const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString();
       const fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59).toISOString();
-      
       const trips = await apiRequest<any[]>(
         `/cliente/rastreamento/dispositivos/${device.dispositivoId}/viagens?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`
       );
-      
       const km = trips.reduce((s, v) => s + (v.distancia || 0), 0);
       const velMax = trips.reduce((m, v) => Math.max(m, v.velocidadeMaxima || 0), 0);
       const min = trips.reduce((s, v) => s + (v.duracao || 0), 0);
-      
       const formatDur = (m: number) => {
         if (!m) return '—';
         const h = Math.floor(m / 60);
         const rem = m % 60;
         return h ? `${h}h ${rem}min` : `${rem}min`;
       };
-
       setSummary({
         km: km ? `${km.toFixed(1)} km` : '—',
         velMax: velMax ? `${velMax} km/h` : '—',
         tempo: min ? formatDur(min) : '—',
         viagens: String(trips.length || 0),
       });
-    } catch (error) {
+    } catch {
       setSummary({ km: '—', velMax: '—', tempo: '—', viagens: '0' });
     }
   }, [device.dispositivoId]);
@@ -252,12 +221,13 @@ export function MainVehicleCard({
   const fetchRecurrences = useCallback(async () => {
     try {
       const data = await apiRequest<any[]>(`/cliente/manutencoes/recorrencias?dispositivoId=${device.dispositivoId}`);
-      if (data) {
-        setRecurrences(data.filter(r => r.ativa !== false));
-      }
-    } catch (error) {
-      console.error('Error fetching recurrences', error);
-    }
+      if (data) setRecurrences(data.filter(r => r.ativa !== false));
+    } catch {}
+  }, [device.dispositivoId]);
+
+  const loadGeofences = useCallback(async () => {
+    const geofences = await getDeviceGeofences(device.dispositivoId);
+    setDeviceGeofences(geofences);
   }, [device.dispositivoId]);
 
   useEffect(() => {
@@ -267,12 +237,8 @@ export function MainVehicleCard({
 
   useEffect(() => {
     if (!device.dispositivoId) return;
-    const loadGeofences = async () => {
-      const geofences = await getDeviceGeofences(device.dispositivoId);
-      setDeviceGeofences(geofences);
-    };
     loadGeofences();
-  }, [device.dispositivoId]);
+  }, [device.dispositivoId, loadGeofences]);
 
   useEffect(() => {
     if (p?.endereco) {
@@ -285,7 +251,6 @@ export function MainVehicleCard({
         setAddress(_geocodeCache[cacheKey] || `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})`);
         return;
       }
-      
       const geocode = async () => {
         setIsGeocoding(true);
         try {
@@ -295,7 +260,7 @@ export function MainVehicleCard({
           const end = result?.endereco || '';
           _geocodeCache[cacheKey] = end;
           setAddress(end || `(${p.latitude!.toFixed(5)}, ${p.longitude!.toFixed(5)})`);
-        } catch (err) {
+        } catch {
           setAddress(`(${p.latitude!.toFixed(5)}, ${p.longitude!.toFixed(5)})`);
         } finally {
           setIsGeocoding(false);
@@ -310,31 +275,110 @@ export function MainVehicleCard({
   const openInMaps = () => {
     if (!p?.latitude || !p?.longitude) return;
     const query = address && !address.startsWith('(') ? address : `${p.latitude},${p.longitude}`;
-    const url = `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
-    Linking.openURL(url);
+    Linking.openURL(`https://www.google.com/maps?q=${encodeURIComponent(query)}`);
   };
 
   const openInStreetView = () => {
     if (!p?.latitude || !p?.longitude) return;
-    const url = `https://www.google.com/maps?q=&layer=c&cbll=${p.latitude},${p.longitude}`;
-    Linking.openURL(url);
+    Linking.openURL(`https://www.google.com/maps?q=&layer=c&cbll=${p.latitude},${p.longitude}`);
   };
 
-  const sendCommand = (type: string) => {
-    toast.show({
-      message: `Enviando comando de ${type === 'engineStop' ? 'bloqueio' : 'desbloqueio'}...`,
-      type: 'info',
+  const sendCommand = async (tipo: 'engineStop' | 'engineResume') => {
+    const isStop = tipo === 'engineStop';
+    const confirmed = await confirm.show({
+      title: isStop ? 'Bloquear veículo' : 'Desbloquear veículo',
+      message: isStop
+        ? `Deseja bloquear o motor de "${device.nome}"? O veículo perderá tração assim que parar.`
+        : `Deseja desbloquear o motor de "${device.nome}"?`,
+      confirmLabel: isStop ? 'Bloquear' : 'Desbloquear',
+      destructive: isStop,
     });
+    if (!confirmed) return;
+    setIsSendingCommand(true);
+    try {
+      await apiRequest(`/cliente/dispositivos/${device.dispositivoId}/comandos`, {
+        method: 'POST',
+        body: { tipo, atributos: {} },
+      });
+      toast.show({
+        message: isStop ? 'Comando de bloqueio enviado!' : 'Comando de desbloqueio enviado!',
+        type: 'success',
+      });
+    } catch (err) {
+      toast.show({
+        message: err instanceof Error ? err.message : `Erro ao ${isStop ? 'bloquear' : 'desbloquear'}.`,
+        type: 'error',
+      });
+    } finally {
+      setIsSendingCommand(false);
+    }
   };
 
-  const showNotImplemented = (feature: string) => {
-    toast.show({
-      message: `${feature} ainda não está implementado no aplicativo.`,
-      type: 'info',
-    });
+  const compartilhar = async () => {
+    if (!p?.latitude || !p?.longitude) {
+      toast.show({ message: 'Veículo sem posição para compartilhar.', type: 'error' });
+      return;
+    }
+    const url = `https://www.google.com/maps?q=${p.latitude},${p.longitude}&label=${encodeURIComponent(device.nome)}`;
+    try {
+      await Share.share({
+        message: `📍 Posição de ${device.nome}${device.placa ? ` (${device.placa})` : ''}: ${url}`,
+        title: `Localização — ${device.nome}`,
+      });
+    } catch (err: any) {
+      if (err?.code !== 'ERR_SHARING_CANCELLED') {
+        toast.show({ message: 'Não foi possível compartilhar.', type: 'error' });
+      }
+    }
   };
 
-  const confirm = useConfirmDialog();
+  const handleCercaPress = async () => {
+    if (deviceGeofences.length > 0) {
+      const confirmed = await confirm.show({
+        title: 'Remover Cerca',
+        message: `Deseja remover a(s) cerca(s) associada(s) a ${device.nome}?`,
+        confirmLabel: 'Remover',
+        destructive: true,
+      });
+      if (!confirmed) return;
+      setIsCreatingGeofence(true);
+      try {
+        await Promise.all(deviceGeofences.map(g => deleteGeofence(g.id)));
+        setDeviceGeofences([]);
+        toast.show({ message: 'Cerca(s) removida(s)!', type: 'success' });
+      } catch {
+        toast.show({ message: 'Erro ao remover cerca.', type: 'error' });
+      } finally {
+        setIsCreatingGeofence(false);
+      }
+    } else {
+      if (!p?.latitude || !p?.longitude) {
+        toast.show({ message: 'Veículo sem posição válida.', type: 'error' });
+        return;
+      }
+      setGeofenceModalVisible(true);
+    }
+  };
+
+  const handleGeofenceConfirm = async (nome: string, raio: number) => {
+    setGeofenceModalVisible(false);
+    if (!p?.latitude || !p?.longitude) return;
+    setIsCreatingGeofence(true);
+    try {
+      const area = buildCircleArea(p.latitude, p.longitude, raio);
+      await createGeofence({ nome, area, dispositivoId: device.dispositivoId });
+      await loadGeofences();
+      toast.show({ message: `Cerca de ${raio >= 1000 ? `${raio / 1000} km` : `${raio} m`} criada!`, type: 'success' });
+      onGeofenceCreated?.();
+    } catch (err) {
+      toast.show({
+        message: err instanceof Error ? err.message : 'Erro ao criar cerca.',
+        type: 'error',
+      });
+    } finally {
+      setIsCreatingGeofence(false);
+    }
+  };
 
   const markMaintenanceDone = async (id: string, title: string) => {
     const confirmed = await confirm.show({
@@ -342,13 +386,12 @@ export function MainVehicleCard({
       message: `Confirmar que a manutenção "${title}" foi realizada?\n\nO contador será reiniciado a partir do odômetro atual.`,
       confirmLabel: 'Confirmar',
     });
-
     if (confirmed) {
       try {
         await apiRequest(`/cliente/manutencoes/recorrencias/${id}/feito`, { method: 'POST' });
         toast.show({ message: 'Manutenção confirmada!', type: 'success' });
         fetchRecurrences();
-      } catch (err) {
+      } catch {
         toast.show({ message: 'Erro ao confirmar manutenção.', type: 'error' });
       }
     }
@@ -363,17 +406,19 @@ export function MainVehicleCard({
 
   return (
     <View style={styles.mainContainer}>
+      <GeofenceCreateModal
+        visible={geofenceModalVisible}
+        deviceName={device.nome}
+        onClose={() => setGeofenceModalVisible(false)}
+        onConfirm={handleGeofenceConfirm}
+      />
+
       <Pressable onPress={onUploadPhoto} disabled={isUploading} style={styles.mainCoverWrap}>
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={styles.mainCoverImage} />
         ) : (
           <View style={styles.mainCoverFallback}>
-            <VehicleIcon
-              categoria={device.categoria}
-              color={device.cor}
-              course={0}
-              size={96}
-            />
+            <VehicleIcon categoria={device.categoria} color={device.cor} course={0} size={96} />
           </View>
         )}
         <View style={styles.coverCameraBadge}>
@@ -383,7 +428,7 @@ export function MainVehicleCard({
 
       <View style={styles.mainBody}>
         <Text style={styles.sectionTitle}>Informações do Dispositivo</Text>
-        
+
         <View style={styles.infoAndSpeedRow}>
           <View style={styles.statusInfoColumn}>
             {p?.ignicao !== null && (
@@ -409,7 +454,9 @@ export function MainVehicleCard({
             {p?.odometro != null && (
               <View style={styles.statusItem}>
                 <Icon source="speedometer" size={14} color={colors.textMuted} />
-                <Text style={styles.statusItemText}>Odômetro: {Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km</Text>
+                <Text style={styles.statusItemText}>
+                  Odômetro: {Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km
+                </Text>
               </View>
             )}
             {p?.horas_motor != null && (
@@ -420,7 +467,7 @@ export function MainVehicleCard({
             )}
             {p?.bloqueado != null && (
               <View style={styles.statusItem}>
-                <Icon source={p.bloqueado ? "lock" : "lock-open"} size={14} color={p.bloqueado ? colors.danger : colors.success} />
+                <Icon source={p.bloqueado ? 'lock' : 'lock-open'} size={14} color={p.bloqueado ? colors.danger : colors.success} />
                 <Text style={[styles.statusItemText, { color: p.bloqueado ? colors.danger : colors.success }]}>
                   {p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}
                 </Text>
@@ -436,9 +483,11 @@ export function MainVehicleCard({
           return (
             <View key={r.id} style={styles.alertRow}>
               <View style={styles.alertTextWrap}>
-                <Icon source="wrench" size={14} color={pastDue ? colors.danger : "#f39c12"} />
-                <Text style={[styles.alertText, { color: pastDue ? colors.danger : "#f39c12" }]}>
-                  {pastDue ? `Ultrapassou ${Math.abs(kmRestante).toLocaleString('pt-BR')} km da ${r.titulo}` : `Faltam ${kmRestante.toLocaleString('pt-BR')} km para ${r.titulo}`}
+                <Icon source="wrench" size={14} color={pastDue ? colors.danger : '#f39c12'} />
+                <Text style={[styles.alertText, { color: pastDue ? colors.danger : '#f39c12' }]}>
+                  {pastDue
+                    ? `Ultrapassou ${Math.abs(kmRestante).toLocaleString('pt-BR')} km da ${r.titulo}`
+                    : `Faltam ${kmRestante.toLocaleString('pt-BR')} km para ${r.titulo}`}
                 </Text>
               </View>
               {device.podeGerenciarManutencao ? (
@@ -474,7 +523,7 @@ export function MainVehicleCard({
                 <IconButton icon="google-street-view" size={20} containerColor="#eef6fc" iconColor="#2980b9" style={styles.miniBtn} onPress={openInStreetView} />
               </View>
             </View>
-            <View style={{flexDirection: 'row', alignItems: 'flex-start', gap: 6}}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
               <Icon source="map-marker" size={14} color={colors.textMuted} />
               <Text style={styles.addressText}>{address || (isGeocoding ? 'Buscando...' : '—')}</Text>
             </View>
@@ -482,12 +531,28 @@ export function MainVehicleCard({
         ) : null}
 
         <View style={styles.commandsGrid}>
-          <Pressable style={[styles.cmdBtn, styles.cmdBtnDanger]} onPress={() => sendCommand('engineStop')}>
-            <Icon source="lock" size={14} color="#fff" />
+          <Pressable
+            style={[styles.cmdBtn, styles.cmdBtnDanger, isSendingCommand && styles.cmdBtnDisabled]}
+            onPress={() => sendCommand('engineStop')}
+            disabled={isSendingCommand}
+          >
+            {isSendingCommand ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Icon source="lock" size={14} color="#fff" />
+            )}
             <Text style={styles.cmdBtnText}>Bloquear</Text>
           </Pressable>
-          <Pressable style={[styles.cmdBtn, styles.cmdBtnSuccess]} onPress={() => sendCommand('engineResume')}>
-            <Icon source="lock-open" size={14} color="#fff" />
+          <Pressable
+            style={[styles.cmdBtn, styles.cmdBtnSuccess, isSendingCommand && styles.cmdBtnDisabled]}
+            onPress={() => sendCommand('engineResume')}
+            disabled={isSendingCommand}
+          >
+            {isSendingCommand ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Icon source="lock-open" size={14} color="#fff" />
+            )}
             <Text style={styles.cmdBtnText}>Desbloquear</Text>
           </Pressable>
         </View>
@@ -495,13 +560,13 @@ export function MainVehicleCard({
         <View style={styles.actionsSection}>
           <Text style={styles.actionsTitle}>AÇÕES</Text>
           <View style={styles.actionsGrid}>
-            <Pressable style={styles.actionBtn} onPress={() => showNotImplemented('Rota')}>
+            <Pressable style={styles.actionBtn} onPress={onShowRoute}>
               <View style={styles.actionIconWrap}>
                 <Icon source="road-variant" size={18} color="#555" />
               </View>
               <Text style={styles.actionText}>Rota</Text>
             </Pressable>
-            <Pressable style={styles.actionBtn} onPress={() => showNotImplemented('Compartilhar')}>
+            <Pressable style={styles.actionBtn} onPress={compartilhar}>
               <View style={styles.actionIconWrap}>
                 <Icon source="share-variant" size={18} color="#555" />
               </View>
@@ -512,47 +577,7 @@ export function MainVehicleCard({
                 styles.actionBtn,
                 deviceGeofences.length > 0 && { backgroundColor: '#fff3e0', borderColor: '#f39c12' },
               ]}
-              onPress={async () => {
-                if (deviceGeofences.length > 0) {
-                  // Delete all geofences for this device
-                  try {
-                    setIsCreatingGeofence(true);
-                    await Promise.all(deviceGeofences.map(g => deleteGeofence(g.id)));
-                    setDeviceGeofences([]);
-                    toast.show({ message: 'Cerca(s) removida(s)!', type: 'success' });
-                  } catch {
-                    toast.show({ message: 'Erro ao remover cerca.', type: 'error' });
-                  } finally {
-                    setIsCreatingGeofence(false);
-                  }
-                } else {
-                  // Create 150m circle around vehicle
-                  if (!device.posicao?.latitude || !device.posicao?.longitude) {
-                    toast.show({ message: 'Veículo sem posição válida.', type: 'error' });
-                    return;
-                  }
-                  try {
-                    setIsCreatingGeofence(true);
-                    const nome = `Cerca - ${device.nome}`;
-                    const area = `CIRCLE(${device.posicao.latitude}, ${device.posicao.longitude}, 150)`;
-                    await createGeofence({
-                      nome,
-                      area,
-                      tipo: 'circulo',
-                      dispositivos: [device.dispositivoId],
-                      visivelCliente: true,
-                    });
-                    const geofences = await getDeviceGeofences(device.dispositivoId);
-                    setDeviceGeofences(geofences);
-                    toast.show({ message: 'Cerca de 150m criada!', type: 'success' });
-                    onGeofenceCreated?.();
-                  } catch {
-                    toast.show({ message: 'Erro ao criar cerca.', type: 'error' });
-                  } finally {
-                    setIsCreatingGeofence(false);
-                  }
-                }
-              }}
+              onPress={handleCercaPress}
             >
               <View style={styles.actionIconWrap}>
                 <Icon
@@ -585,9 +610,9 @@ export function MainVehicleCard({
               <SummaryItem label="Viagens" value={summary.viagens} />
             </View>
           )}
-          <Pressable style={styles.verMaisBtn} onPress={() => showNotImplemented('Histórico')}>
+          <Pressable style={styles.verMaisBtn} onPress={onVerMais}>
             <Icon source="history" size={14} color="#fff" />
-            <Text style={styles.verMaisText}>Ver Mais</Text>
+            <Text style={styles.verMaisText}>Ver Histórico</Text>
           </Pressable>
         </View>
       </View>
@@ -693,34 +718,6 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
     backgroundColor: colors.primary,
   },
-  mainHeader: {
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  mainTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  mainName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  plateBadge: {
-    backgroundColor: '#333',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  plateText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
   mainBody: {
     padding: spacing.md,
   },
@@ -762,11 +759,13 @@ const styles = StyleSheet.create({
   alertTextWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
     gap: 6,
   },
   alertText: {
     fontSize: 12,
     fontWeight: '700',
+    flex: 1,
   },
   alertBtn: {
     paddingVertical: 4,
@@ -788,21 +787,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: 4,
     textTransform: 'uppercase',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  statusDotSmall: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '700',
   },
   gpsTimeRow: {
     flexDirection: 'row',
@@ -847,6 +831,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.text,
     lineHeight: 16,
+    flex: 1,
   },
   commandsGrid: {
     flexDirection: 'row',
@@ -871,6 +856,9 @@ const styles = StyleSheet.create({
   },
   cmdBtnSuccess: {
     backgroundColor: '#5cb85c',
+  },
+  cmdBtnDisabled: {
+    opacity: 0.6,
   },
   cmdBtnText: {
     color: '#fff',

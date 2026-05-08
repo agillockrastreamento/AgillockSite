@@ -16,8 +16,10 @@ import { getClientePerfil, resolveUploadUrl } from '../profile/profileService';
 import type { ClientePerfil } from '../profile/profileTypes';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { ManutencaoScreen } from '../screens/ManutencaoScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { PagamentosScreen } from '../screens/PagamentosScreen';
 import { ReportScreen } from '../screens/ReportScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
 import { NotificationBootstrap } from '../notifications/NotificationBootstrap';
@@ -37,6 +39,7 @@ const routeIcons: Record<keyof ClienteDrawerParamList, string> = {
   Relatorio: 'file-chart-outline',
   Notificacoes: 'bell-outline',
   Geocercas: 'vector-polygon',
+  Manutencao: 'wrench-outline',
   Pagamentos: 'credit-card-outline',
 };
 
@@ -189,12 +192,19 @@ function ClienteDrawer() {
       <Drawer.Screen name="Mapa" component={MapScreen} />
       <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }} component={ReportScreen} />
       <Drawer.Screen name="Notificacoes" component={NotificationsScreen} options={{ title: 'Notificações' }} />
-      <Drawer.Screen name="Geocercas">
+      <Drawer.Screen name="Geocercas" options={{ title: 'Geocercas' }}>
         {() => <PlaceholderScreen title="Geocercas" />}
       </Drawer.Screen>
-      <Drawer.Screen name="Pagamentos">
-        {() => <PlaceholderScreen title="Pagamentos" />}
-      </Drawer.Screen>
+      <Drawer.Screen
+        name="Manutencao"
+        component={ManutencaoScreen}
+        options={{ title: 'Manutenção' }}
+      />
+      <Drawer.Screen
+        name="Pagamentos"
+        component={PagamentosScreen}
+        options={{ title: 'Pagamentos' }}
+      />
     </Drawer.Navigator>
   );
 }

@@ -12,7 +12,8 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { DrawerNavigationProp } from '@react-navigation/drawer';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView, {
@@ -23,11 +24,11 @@ import MapView, {
   type LatLng,
   type MapType,
 } from 'react-native-maps';
-import { Badge, Icon, IconButton } from 'react-native-paper';
+import { Icon, IconButton } from 'react-native-paper';
 
-import { BottomSheet } from '../components/BottomSheet';
 import { SearchBottomSheet } from '../components/SearchBottomSheet';
 import { NotificationsBottomSheet } from '../components/NotificationsBottomSheet';
+import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
@@ -38,7 +39,12 @@ import {
   getTrackingSnapshot,
 } from '../tracking/trackingService';
 import { apiRequest } from '../services/api/apiClient';
-import { getGeofences, parseCircleArea, type Geofence } from '../tracking/geofenceService';
+import {
+  getGeofences,
+  deleteGeofence,
+  parseCircleArea,
+  type Geofence,
+} from '../tracking/geofenceService';
 import type { TrackingAccessStatus, TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
 import { useMarkerBitmaps, OffscreenCapturePool } from '../tracking/useMarkerBitmaps';
@@ -53,7 +59,7 @@ import {
   deleteVehiclePhoto,
   uploadVehiclePhoto,
 } from '../tracking/vehiclePhotoService';
-import type { RootStackParamList } from '../navigation/routes';
+import type { ClienteDrawerParamList, RootStackParamList } from '../navigation/routes';
 
 const DEFAULT_REGION = {
   latitude: -14.235,
@@ -64,6 +70,7 @@ const DEFAULT_REGION = {
 
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'terrain', 'hybrid'];
 const SCREEN_HEIGHT = Dimensions.get('window').height;
+const MAIN_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.60);
 
 type QuickSheetMode = 'closed' | 'peek' | 'expanded';
 
@@ -72,10 +79,9 @@ function getQuickSheetHeights(deviceCount: number) {
     return { closed: 46, peek: 46, expanded: 46 };
   }
   const rows = Math.ceil(deviceCount / 2);
-  const neededHeight = 122 + (rows * 104); // 122 for paddings/headers + 104 per row
+  const neededHeight = 122 + rows * 104;
   const maxExpanded = Math.round(SCREEN_HEIGHT * 0.65);
   const maxPeek = Math.round(SCREEN_HEIGHT * 0.35);
-
   return {
     closed: 46,
     peek: rows <= 2 ? neededHeight : Math.min(neededHeight, maxPeek),
@@ -86,21 +92,12 @@ function getQuickSheetHeights(deviceCount: number) {
 function getDeviceCoordinate(device: TrackingDevice): LatLng | null {
   const latitude = device.posicao?.latitude;
   const longitude = device.posicao?.longitude;
-
   if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return { latitude, longitude };
 }
 
-function MapFloatingButton({
-  icon,
-  active,
-  onPress,
-}: {
-  icon: string;
-  active?: boolean;
-  onPress(): void;
-}) {
+function MapFloatingButton({ icon, active, onPress }: { icon: string; active?: boolean; onPress(): void }) {
   return (
     <IconButton
       icon={icon}
@@ -115,9 +112,10 @@ function MapFloatingButton({
 }
 
 export function MapScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<DrawerNavigationProp<ClienteDrawerParamList>>();
   const route = useRoute<NativeStackScreenProps<RootStackParamList, 'Map'>['route']>();
   const toast = useToast();
+  const confirm = useConfirmDialog();
   const mapRef = useRef<MapView | null>(null);
   const [accessStatus, setAccessStatus] = useState<TrackingAccessStatus | null>(null);
   const [devices, setDevices] = useState<TrackingDevice[]>([]);
@@ -134,33 +132,37 @@ export function MapScreen() {
   const [tracks, setTracks] = useState<{ deviceId: string; coords: { latitude: number; longitude: number }[] }[]>([]);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
-  const [mainSheetVisible, setMainSheetVisible] = useState(false);
+  const [mainCardVisible, setMainCardVisible] = useState(false);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [notificationsSheetVisible, setNotificationsSheetVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Main card animation
+  const mainCardAnim = useRef(new Animated.Value(MAIN_CARD_HEIGHT)).current;
+  // Track last centered position to avoid redundant map moves
+  const lastCenteredKey = useRef('');
+
   const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, showLabels);
 
-  // Handle push notification navigation
+  // Push notification navigation
   useEffect(() => {
     const targetDeviceId = route.params?.dispositivoId;
     if (targetDeviceId && devices.length > 0) {
-      setSelectedDeviceId(targetDeviceId);
-      setMainSheetVisible(true);
+      const device = devices.find(d => d.dispositivoId === targetDeviceId);
+      if (device) focusDevice(device, true);
       if (route.params?.highlight) {
         toast.show({ message: 'Notificação do veículo', type: 'info' });
       }
     }
-  }, [route.params, devices, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params, devices]);
 
-  // Clean navigation params after handling
   useEffect(() => {
     if (route.params?.dispositivoId) {
-      navigation.setParams({ dispositivoId: undefined, highlight: undefined });
+      navigation.setParams({ dispositivoId: undefined, highlight: undefined } as any);
     }
   }, [route.params, navigation]);
 
-  // Carregar contagem de não lidas
   useEffect(() => {
     const loadUnreadCount = async () => {
       const { getUnreadCount } = await import('../notifications/notificationService');
@@ -173,7 +175,6 @@ export function MapScreen() {
   const quickSheetHeights = useMemo(() => getQuickSheetHeights(devices.length), [devices.length]);
   const quickSheetHeight = useRef(new Animated.Value(Math.round(SCREEN_HEIGHT * 0.3))).current;
 
-  // Adjust height when device count changes
   useEffect(() => {
     if (devices.length > 0) {
       Animated.spring(quickSheetHeight, {
@@ -198,12 +199,10 @@ export function MapScreen() {
     [devices],
   );
 
-  const animateMapForPanel = useCallback((device: TrackingDevice | null, panelHeight: number) => {
-    if (!device) return;
+  const animateToDevice = useCallback((device: TrackingDevice, cardHeight: number) => {
     const coordinate = getDeviceCoordinate(device);
     if (!coordinate) return;
-
-    const latitudeOffset = (panelHeight / SCREEN_HEIGHT) * 0.011;
+    const latitudeOffset = (cardHeight / SCREEN_HEIGHT) * 0.011;
     mapRef.current?.animateCamera(
       {
         center: {
@@ -215,6 +214,76 @@ export function MapScreen() {
       { duration: 420 },
     );
   }, []);
+
+  // Follow selected vehicle when main card is open
+  useEffect(() => {
+    if (!mainCardVisible || !selectedDevice?.posicao) return;
+    const { latitude, longitude } = selectedDevice.posicao;
+    if (!latitude || !longitude) return;
+    const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+    if (lastCenteredKey.current === key) return;
+    lastCenteredKey.current = key;
+    mapRef.current?.animateCamera(
+      {
+        center: {
+          latitude: latitude - (MAIN_CARD_HEIGHT / SCREEN_HEIGHT) * 0.011,
+          longitude,
+        },
+        zoom: 16,
+      },
+      { duration: 300 },
+    );
+  }, [selectedDevice?.posicao?.latitude, selectedDevice?.posicao?.longitude, mainCardVisible, selectedDevice]);
+
+  const openMainCard = useCallback(() => {
+    setMainCardVisible(true);
+    Animated.spring(mainCardAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 90,
+    }).start();
+  }, [mainCardAnim]);
+
+  const closeMainCard = useCallback(() => {
+    Animated.timing(mainCardAnim, {
+      toValue: MAIN_CARD_HEIGHT,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setMainCardVisible(false);
+      setSelectedDeviceId(null);
+      lastCenteredKey.current = '';
+    });
+  }, [mainCardAnim]);
+
+  const mainCardPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponder: (_, gs) =>
+          gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+        onMoveShouldSetPanResponderCapture: (_, gs) =>
+          gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+        onPanResponderMove: (_, gs) => {
+          if (gs.dy > 0) mainCardAnim.setValue(gs.dy);
+        },
+        onPanResponderRelease: (_, gs) => {
+          if (gs.dy > 80 || gs.vy > 0.7) {
+            closeMainCard();
+          } else {
+            Animated.spring(mainCardAnim, {
+              toValue: 0,
+              useNativeDriver: true,
+              friction: 8,
+              tension: 90,
+            }).start();
+          }
+        },
+      }),
+    [mainCardAnim, closeMainCard],
+  );
 
   const updateDevice = useCallback((dispositivoId: string, patch: Partial<TrackingDevice>) => {
     setDevices((current) =>
@@ -233,24 +302,13 @@ export function MapScreen() {
         friction: 8,
         tension: 82,
       }).start();
-      if (!mainSheetVisible) {
-        animateMapForPanel(selectedDevice, mode === 'closed' ? 0 : quickSheetHeights[mode]);
-      }
     },
-    [animateMapForPanel, mainSheetVisible, quickSheetHeight, selectedDevice, quickSheetHeights],
+    [quickSheetHeight, quickSheetHeights],
   );
 
   const toggleQuickSheet = useCallback(() => {
-    if (quickSheetMode === 'closed') {
-      moveQuickSheet('peek');
-      return;
-    }
-
-    if (quickSheetMode === 'peek') {
-      moveQuickSheet('expanded');
-      return;
-    }
-
+    if (quickSheetMode === 'closed') { moveQuickSheet('peek'); return; }
+    if (quickSheetMode === 'peek') { moveQuickSheet('expanded'); return; }
     moveQuickSheet('peek');
   }, [moveQuickSheet, quickSheetMode]);
 
@@ -276,67 +334,44 @@ export function MapScreen() {
             moveQuickSheet(quickSheetMode === 'closed' ? 'peek' : 'expanded');
             return;
           }
-
           if (gestureState.dy > 42 || gestureState.vy > 0.7) {
             moveQuickSheet(quickSheetMode === 'expanded' ? 'peek' : 'closed');
             return;
           }
-
           moveQuickSheet(quickSheetMode);
         },
       }),
     [moveQuickSheet, quickSheetHeight, quickSheetMode, quickSheetHeights],
   );
 
-  const focusDevice = useCallback((device: TrackingDevice, openMain = false) => {
+  const focusDevice = useCallback((device: TrackingDevice, openCard = false) => {
     const coordinate = getDeviceCoordinate(device);
     if (!coordinate) {
-      toast.show({
-        message: 'Este dispositivo ainda não possui posição válida.',
-        type: 'info',
-      });
+      toast.show({ message: 'Este dispositivo ainda não possui posição válida.', type: 'info' });
       return;
     }
-
     setSelectedDeviceId(device.dispositivoId);
-    if (openMain) {
-      setMainSheetVisible(true);
+    if (openCard) {
       moveQuickSheet('closed');
+      lastCenteredKey.current = `${coordinate.latitude.toFixed(5)},${coordinate.longitude.toFixed(5)}`;
+      animateToDevice(device, MAIN_CARD_HEIGHT);
+      openMainCard();
+    } else {
+      animateToDevice(device, 0);
     }
-    const panelHeight = openMain ? Math.round(SCREEN_HEIGHT * 0.55) : 0;
-    const center = openMain
-      ? {
-          latitude: coordinate.latitude - (panelHeight / SCREEN_HEIGHT) * 0.011,
-          longitude: coordinate.longitude,
-        }
-      : coordinate;
-    mapRef.current?.animateCamera(
-      {
-        center,
-        zoom: 16,
-      },
-      { duration: 520 },
-    );
-  }, [moveQuickSheet, toast]);
+  }, [moveQuickSheet, animateToDevice, openMainCard, toast]);
 
   const fitAllDevices = useCallback((nextDevices: TrackingDevice[]) => {
     const coordinates = nextDevices
       .map(getDeviceCoordinate)
-      .filter((coordinate): coordinate is LatLng => !!coordinate);
-
+      .filter((c): c is LatLng => !!c);
     if (!coordinates.length) return;
-
     requestAnimationFrame(() => {
       if (coordinates.length === 1) {
-        mapRef.current?.animateCamera(
-          { center: coordinates[0], zoom: 15 },
-          { duration: 450 },
-        );
+        mapRef.current?.animateCamera({ center: coordinates[0], zoom: 15 }, { duration: 450 });
         return;
       }
-
       const currentHeights = getQuickSheetHeights(nextDevices.length);
-
       mapRef.current?.fitToCoordinates(coordinates, {
         edgePadding: { top: 120, right: 60, bottom: currentHeights.peek + 40, left: 60 },
         animated: true,
@@ -347,31 +382,23 @@ export function MapScreen() {
   const loadSnapshot = useCallback(async (silent = false) => {
     if (silent) setIsRefreshing(true);
     else setIsLoading(true);
-
     try {
       const status = await getTrackingAccessStatus();
       setAccessStatus(status);
-
-      if (status.bloqueado) {
-        setDevices([]);
-        return;
-      }
-
+      if (status.bloqueado) { setDevices([]); return; }
       const snapshot = await getTrackingSnapshot();
       if (snapshot === 'blocked') {
         setAccessStatus({ bloqueado: true });
         setDevices([]);
         return;
       }
-
       setDevices(snapshot);
       fitAllDevices(snapshot);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível carregar o rastreamento.';
-      toast.show({ message, type: 'error' });
+      toast.show({
+        message: error instanceof Error ? error.message : 'Não foi possível carregar o rastreamento.',
+        type: 'error',
+      });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -382,23 +409,11 @@ export function MapScreen() {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerButtons}>
-          <IconButton
-            icon="magnify"
-            iconColor={colors.surface}
-            size={22}
-            onPress={() => setSearchSheetVisible(true)}
-          />
-          <IconButton
-            icon="bell-outline"
-            iconColor={colors.surface}
-            size={22}
-            onPress={() => setNotificationsSheetVisible(true)}
-          />
+          <IconButton icon="magnify" iconColor={colors.surface} size={22} onPress={() => setSearchSheetVisible(true)} />
+          <IconButton icon="bell-outline" iconColor={colors.surface} size={22} onPress={() => setNotificationsSheetVisible(true)} />
           {unreadCount > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Text>
+              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
             </View>
           )}
         </View>
@@ -406,27 +421,15 @@ export function MapScreen() {
     });
   }, [navigation, unreadCount]);
 
-  useEffect(() => {
-    loadSnapshot();
-  }, [loadSnapshot]);
+  useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
 
   useEffect(() => {
-    if (!showFences) {
-      setGeofences([]);
-      return;
-    }
-    const loadGeofences = async () => {
-      const data = await getGeofences();
-      setGeofences(data);
-    };
-    loadGeofences();
+    if (!showFences) { setGeofences([]); return; }
+    getGeofences().then(setGeofences).catch(() => {});
   }, [showFences]);
 
   useEffect(() => {
-    if (!showTracks) {
-      setTracks([]);
-      return;
-    }
+    if (!showTracks) { setTracks([]); return; }
     const loadAllTracks = async () => {
       setIsLoadingTracks(true);
       try {
@@ -435,16 +438,14 @@ export function MapScreen() {
         const to = now.toISOString();
         const trackPromises = locatedDevices.map(async (device) => {
           try {
-            const trips = await apiRequest<any[]>(
+            const data = await apiRequest<{ posicoes: { latitude: number; longitude: number }[] }>(
               `/cliente/rastreamento/dispositivos/${device.dispositivoId}/historico?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
             );
-            if (!trips || trips.length < 2) return null;
-            const coords: { latitude: number; longitude: number }[] = [];
-            for (const p of trips) {
-              if (typeof p.latitude === 'number' && typeof p.longitude === 'number') {
-                coords.push({ latitude: p.latitude, longitude: p.longitude });
-              }
-            }
+            const positions = data?.posicoes ?? [];
+            if (positions.length < 2) return null;
+            const coords = positions.filter(
+              p => typeof p.latitude === 'number' && typeof p.longitude === 'number',
+            );
             return coords.length >= 2 ? { deviceId: device.dispositivoId, coords } : null;
           } catch {
             return null;
@@ -461,7 +462,25 @@ export function MapScreen() {
 
   const handleGeofenceCreated = useCallback(() => {
     setShowFences(true);
+    getGeofences().then(setGeofences).catch(() => {});
   }, []);
+
+  const handleGeofencePress = useCallback(async (geofence: Geofence) => {
+    const confirmed = await confirm.show({
+      title: 'Remover Cerca',
+      message: `Deseja remover a cerca "${geofence.name}"?`,
+      confirmLabel: 'Remover',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await deleteGeofence(geofence.id);
+      setGeofences(current => current.filter(g => g.id !== geofence.id));
+      toast.show({ message: 'Cerca removida!', type: 'success' });
+    } catch {
+      toast.show({ message: 'Não foi possível remover esta cerca.', type: 'error' });
+    }
+  }, [confirm, toast]);
 
   const handleWebSocketMessage = useCallback(
     (message: import('../tracking/trackingWebSocket').TrackingMessage, dispositivoId: string) => {
@@ -476,35 +495,20 @@ export function MapScreen() {
     try {
       setIsLocating(true);
       const permission = await Location.requestForegroundPermissionsAsync();
-
       if (!permission.granted) {
-        toast.show({
-          message: 'Permita acesso à localização para centralizar sua posição.',
-          type: 'error',
-        });
+        toast.show({ message: 'Permita acesso à localização para centralizar sua posição.', type: 'error' });
         return;
       }
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       mapRef.current?.animateCamera(
-        {
-          center: {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          },
-          zoom: 15,
-        },
+        { center: { latitude: location.coords.latitude, longitude: location.coords.longitude }, zoom: 15 },
         { duration: 520 },
       );
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível obter sua localização.';
-      toast.show({ message, type: 'error' });
+      toast.show({
+        message: error instanceof Error ? error.message : 'Não foi possível obter sua localização.',
+        type: 'error',
+      });
     } finally {
       setIsLocating(false);
     }
@@ -512,38 +516,24 @@ export function MapScreen() {
 
   const handleUploadPhoto = useCallback(async () => {
     if (!selectedDevice) return;
-
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      toast.show({
-        message: 'Permita acesso às fotos para escolher a imagem do veículo.',
-        type: 'error',
-      });
+      toast.show({ message: 'Permita acesso às fotos para escolher a imagem do veículo.', type: 'error' });
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.84,
     });
-
     if (result.canceled || !result.assets[0]) return;
-
     try {
       setIsPhotoUploading(true);
-      const response = await uploadVehiclePhoto(
-        selectedDevice.dispositivoId,
-        result.assets[0],
-      );
-      updateDevice(selectedDevice.dispositivoId, {
-        imagemUrlCliente: response.imagemUrlCliente,
-      });
+      const response = await uploadVehiclePhoto(selectedDevice.dispositivoId, result.assets[0]);
+      updateDevice(selectedDevice.dispositivoId, { imagemUrlCliente: response.imagemUrlCliente });
       toast.show({ message: 'Foto do veículo atualizada.', type: 'success' });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Erro ao enviar foto do veículo.';
-      toast.show({ message, type: 'error' });
+      toast.show({ message: error instanceof Error ? error.message : 'Erro ao enviar foto.', type: 'error' });
     } finally {
       setIsPhotoUploading(false);
     }
@@ -551,16 +541,13 @@ export function MapScreen() {
 
   const handleRemovePhoto = useCallback(async () => {
     if (!selectedDevice) return;
-
     try {
       setIsPhotoUploading(true);
       await deleteVehiclePhoto(selectedDevice.dispositivoId);
       updateDevice(selectedDevice.dispositivoId, { imagemUrlCliente: null });
-      toast.show({ message: 'Foto do veículo removida.', type: 'success' });
+      toast.show({ message: 'Foto removida.', type: 'success' });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Erro ao remover foto do veículo.';
-      toast.show({ message, type: 'error' });
+      toast.show({ message: error instanceof Error ? error.message : 'Erro ao remover foto.', type: 'error' });
     } finally {
       setIsPhotoUploading(false);
     }
@@ -582,8 +569,6 @@ export function MapScreen() {
         {locatedDevices.map((device) => {
           const coordinate = getDeviceCoordinate(device);
           if (!coordinate) return null;
-
-          const isSelected = selectedDeviceId === device.dispositivoId;
           const bitmapUri = getBitmap(device);
           return (
             <Marker
@@ -591,7 +576,7 @@ export function MapScreen() {
               coordinate={coordinate}
               image={bitmapUri ? { uri: bitmapUri } : undefined}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges
+              tracksViewChanges={!bitmapUri}
               onPress={() => focusDevice(device, true)}
             >
               {!bitmapUri ? (
@@ -617,13 +602,31 @@ export function MapScreen() {
           );
         })}
 
-        {/* Geofences as circles */}
+        {showFences && geofences.map((geofence) => {
+          const parsed = parseCircleArea(geofence.area);
+          if (!parsed) return null;
+          const center = { latitude: parsed.latitude, longitude: parsed.longitude };
+          return (
+            <Marker
+              key={`fence-tap-${geofence.id}`}
+              coordinate={center}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              onPress={() => handleGeofencePress(geofence)}
+            >
+              <View style={styles.geofenceTapTarget}>
+                <Icon source="circle-outline" size={14} color="#2980b9" />
+              </View>
+            </Marker>
+          );
+        })}
+
         {showFences && geofences.map((geofence) => {
           const parsed = parseCircleArea(geofence.area);
           if (!parsed) return null;
           return (
             <Circle
-              key={geofence.id}
+              key={`fence-circle-${geofence.id}`}
               center={{ latitude: parsed.latitude, longitude: parsed.longitude }}
               radius={parsed.radius}
               strokeWidth={2}
@@ -633,7 +636,6 @@ export function MapScreen() {
           );
         })}
 
-        {/* Tracks as polylines */}
         {showTracks && tracks.map((track) => {
           if (!track.coords || track.coords.length < 2) return null;
           return (
@@ -641,7 +643,7 @@ export function MapScreen() {
               key={track.deviceId}
               coordinates={track.coords}
               strokeWidth={3}
-              strokeColor="rgba(41,128,185,0.6)"
+              strokeColor="rgba(41,128,185,0.7)"
             />
           );
         })}
@@ -653,11 +655,6 @@ export function MapScreen() {
         <MapFloatingButton
           icon="map"
           active={currentMapType !== 'standard'}
-          onPress={() => setMapTypeIndex((current) => (current + 1) % MAP_TYPES.length)}
-        />
-        <MapFloatingButton
-          icon="layers-outline"
-          active={currentMapType === 'satellite' || currentMapType === 'hybrid'}
           onPress={() => setMapTypeIndex((current) => (current + 1) % MAP_TYPES.length)}
         />
         <MapFloatingButton
@@ -678,9 +675,18 @@ export function MapScreen() {
         <MapFloatingButton
           icon="timeline-outline"
           active={showTracks}
-          onPress={() => setShowTracks((current) => !current)}
+          onPress={() => {
+            setShowTracks((current) => !current);
+          }}
         />
       </View>
+
+      {isLoadingTracks && (
+        <View style={styles.trackLoadingBadge}>
+          <ActivityIndicator size="small" color={colors.primaryText} />
+          <Text style={styles.trackLoadingText}>Carregando rota...</Text>
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.loadingOverlay}>
@@ -694,13 +700,10 @@ export function MapScreen() {
           <Icon source="lock-alert-outline" size={28} color={colors.danger} />
           <Text style={styles.blockedTitle}>Rastreamento bloqueado</Text>
           <Text style={styles.blockedText}>
-            Existe pendência financeira com mais de 10 dias. Regularize os
-            pagamentos para voltar a acompanhar os veículos.
+            Existe pendência financeira com mais de 10 dias. Regularize os pagamentos para voltar a acompanhar os veículos.
           </Text>
           {typeof accessStatus.diasAtraso === 'number' ? (
-            <Text style={styles.blockedMeta}>
-              Dias em atraso: {accessStatus.diasAtraso}
-            </Text>
+            <Text style={styles.blockedMeta}>Dias em atraso: {accessStatus.diasAtraso}</Text>
           ) : null}
         </View>
       ) : null}
@@ -715,12 +718,7 @@ export function MapScreen() {
       ) : null}
 
       {!accessStatus?.bloqueado && devices.length ? (
-        <Animated.View
-          style={[
-            styles.quickSheet,
-            { height: quickSheetHeight },
-          ]}
-        >
+        <Animated.View style={[styles.quickSheet, { height: quickSheetHeight }]}>
           <View style={styles.quickHandleArea} {...quickSheetPanResponder.panHandlers}>
             <Pressable
               accessibilityRole="button"
@@ -774,31 +772,42 @@ export function MapScreen() {
         </Animated.View>
       ) : null}
 
-      {selectedDevice ? (
-        <BottomSheet
-          visible={mainSheetVisible}
-          titleMainVehicleCard={selectedDevice.nome +  (selectedDevice.placa ? ' - ' + selectedDevice.placa : '')}
-          heightPercent={0.60}
-          dimBackdrop={false}
-          closeOnBackdropPress={false}
-          statusBarOverlay={false}
-          onClose={() => {
-            setMainSheetVisible(false);
-            setSelectedDeviceId(null);
-            animateMapForPanel(null, 0);
-          }}
+      {/* Main vehicle card — inline, does NOT use Modal so map stays interactive above it */}
+      {selectedDevice && mainCardVisible && (
+        <Animated.View
+          style={[styles.mainCard, { transform: [{ translateY: mainCardAnim }] }]}
         >
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.mainCardDragArea} {...mainCardPanResponder.panHandlers}>
+            <View style={styles.mainCardHandle} />
+          </View>
+          <View style={styles.mainCardHeader}>
+            <Text style={styles.mainCardTitle} numberOfLines={1}>
+              {selectedDevice.nome}{selectedDevice.placa ? ` — ${selectedDevice.placa}` : ''}
+            </Text>
+            <IconButton icon="close" size={22} onPress={closeMainCard} />
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <MainVehicleCard
               device={selectedDevice}
               onUploadPhoto={handleUploadPhoto}
               onRemovePhoto={handleRemovePhoto}
               isUploading={isPhotoUploading}
               onGeofenceCreated={handleGeofenceCreated}
+              onVerMais={() => {
+                closeMainCard();
+                navigation.navigate('Relatorio');
+              }}
+              onShowRoute={() => {
+                setShowTracks(true);
+                closeMainCard();
+              }}
+              onCompartilhar={() => {
+                // Compartilhar is handled inside VehicleCards
+              }}
             />
           </ScrollView>
-        </BottomSheet>
-      ) : null}
+        </Animated.View>
+      )}
 
       <SearchBottomSheet
         visible={searchSheetVisible}
@@ -822,9 +831,7 @@ export function MapScreen() {
         onSelectEvent={(event) => {
           if (event.dispositivoId) {
             const device = devices.find((d) => d.dispositivoId === event.dispositivoId);
-            if (device) {
-              focusDevice(device, true);
-            }
+            if (device) focusDevice(device, true);
           }
           setNotificationsSheetVisible(false);
         }}
@@ -851,10 +858,6 @@ const styles = StyleSheet.create({
   mapButton: {
     margin: 0,
     elevation: 3,
-  },
-  markerImage: {
-    width: 70,
-    height: 70,
   },
   markerContainer: {
     width: 84,
@@ -884,20 +887,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-  indexBadge: {
+  geofenceTapTarget: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(41,128,185,0.6)',
+    elevation: 2,
+  },
+  trackLoadingBadge: {
     position: 'absolute',
-    left: spacing.md,
     top: spacing.lg,
+    left: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
-    elevation: 2,
+    elevation: 3,
   },
-  indexBadgeText: {
-    color: colors.textMuted,
+  trackLoadingText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
+    color: colors.text,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -980,10 +997,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     elevation: 5,
   },
-  quickSheetClosed: {
-    height: 34,
-    paddingBottom: 0,
-  },
   quickHandleArea: {
     height: 42,
     alignItems: 'center',
@@ -1002,10 +1015,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   quickHeader: {
-    display: 'none',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
   quickTitle: {
     color: colors.text,
@@ -1051,5 +1064,48 @@ const styles = StyleSheet.create({
     color: colors.primaryText,
     fontSize: 10,
     fontWeight: '700',
+  },
+  // Inline main card (not a Modal)
+  mainCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: MAIN_CARD_HEIGHT,
+    borderTopLeftRadius: radius.bottomSheet,
+    borderTopRightRadius: radius.bottomSheet,
+    backgroundColor: colors.surface,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    overflow: 'hidden',
+  },
+  mainCardDragArea: {
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainCardHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+  },
+  mainCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: spacing.xl,
+    minHeight: 52,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  mainCardTitle: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
   },
 });

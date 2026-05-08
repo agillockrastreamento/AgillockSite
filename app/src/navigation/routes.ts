@@ -7,6 +7,8 @@ export type RootStackParamList = {
   Relatorio: undefined;
   Geocercas: undefined;
   Notificacoes: undefined;
+  Manutencao: undefined;
+  Pagamentos: undefined;
 };
 
 export type ClienteDrawerParamList = {
@@ -14,5 +16,6 @@ export type ClienteDrawerParamList = {
   Relatorio: undefined;
   Notificacoes: undefined;
   Geocercas: undefined;
+  Manutencao: undefined;
   Pagamentos: undefined;
 };
