@@ -14,6 +14,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { DrawerNavigationProp } from '@react-navigation/drawer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView, {
@@ -71,6 +72,7 @@ const DEFAULT_REGION = {
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'terrain', 'hybrid'];
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const MAIN_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.60);
+const MAP_PREFERENCES_KEY = 'agillock_map_preferences_v1';
 
 type QuickSheetMode = 'closed' | 'peek' | 'expanded';
 
@@ -82,10 +84,15 @@ function getQuickSheetHeights(deviceCount: number) {
   const neededHeight = 122 + rows * 104;
   const maxExpanded = Math.round(SCREEN_HEIGHT * 0.65);
   const maxPeek = Math.round(SCREEN_HEIGHT * 0.35);
+  const expanded = Math.min(neededHeight, maxExpanded);
+  const peek = rows <= 1
+    ? expanded
+    : Math.min(Math.max(neededHeight - 72, 220), maxPeek, expanded - 48);
+
   return {
     closed: 46,
-    peek: rows <= 2 ? neededHeight : Math.min(neededHeight, maxPeek),
-    expanded: Math.min(neededHeight, maxExpanded),
+    peek,
+    expanded,
   };
 }
 
@@ -150,6 +157,7 @@ export function MapScreen() {
   const [notificationsSheetVisible, setNotificationsSheetVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [layersDrawerVisible, setLayersDrawerVisible] = useState(false);
+  const mapPreferencesHydrated = useRef(false);
 
   // Main card animation
   const mainCardAnim = useRef(new Animated.Value(MAIN_CARD_HEIGHT)).current;
@@ -157,6 +165,40 @@ export function MapScreen() {
   const lastCenteredKey = useRef('');
 
   const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, showLabels);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadMapPreferences = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(MAP_PREFERENCES_KEY);
+        if (!raw || cancelled) return;
+        const prefs = JSON.parse(raw) as Partial<{
+          showLabels: boolean;
+          showFences: boolean;
+          showTracks: boolean;
+        }>;
+        if (typeof prefs.showLabels === 'boolean') setShowLabels(prefs.showLabels);
+        if (typeof prefs.showFences === 'boolean') setShowFences(prefs.showFences);
+        if (typeof prefs.showTracks === 'boolean') setShowTracks(prefs.showTracks);
+      } catch {
+        await AsyncStorage.removeItem(MAP_PREFERENCES_KEY);
+      } finally {
+        if (!cancelled) mapPreferencesHydrated.current = true;
+      }
+    };
+    loadMapPreferences();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapPreferencesHydrated.current) return;
+    AsyncStorage.setItem(
+      MAP_PREFERENCES_KEY,
+      JSON.stringify({ showLabels, showFences, showTracks }),
+    ).catch(() => {});
+  }, [showLabels, showFences, showTracks]);
 
   // Push notification navigation
   useEffect(() => {
@@ -350,6 +392,10 @@ export function MapScreen() {
         onPanResponderRelease: (_event, gestureState) => {
           if (gestureState.dy < -42 || gestureState.vy < -0.7) {
             moveQuickSheet(quickSheetMode === 'closed' ? 'peek' : 'expanded');
+            return;
+          }
+          if (gestureState.dy > 120 || gestureState.vy > 1.1) {
+            moveQuickSheet('closed');
             return;
           }
           if (gestureState.dy > 42 || gestureState.vy > 0.7) {
@@ -608,10 +654,13 @@ export function MapScreen() {
                     />
                   </View>
                   {showLabels ? (
-                    <View style={styles.markerLabel}>
-                      <Text style={styles.markerLabelText} numberOfLines={1}>
-                        {device.placa ?? device.nome}
-                      </Text>
+                    <View style={styles.markerLabelWrap}>
+                      <View style={styles.markerLabelPointer} />
+                      <View style={styles.markerLabel}>
+                        <Text style={styles.markerLabelText} numberOfLines={1}>
+                          {device.placa ?? device.nome}
+                        </Text>
+                      </View>
                     </View>
                   ) : null}
                 </View>
@@ -952,12 +1001,26 @@ const styles = StyleSheet.create({
   },
   markerLabel: {
     maxWidth: 96,
-    marginTop: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.sm,
     backgroundColor: colors.surface,
     elevation: 2,
+  },
+  markerLabelWrap: {
+    marginTop: -6,
+    alignItems: 'center',
+  },
+  markerLabelPointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: colors.surface,
+    marginBottom: -1,
   },
   markerLabelText: {
     color: colors.text,

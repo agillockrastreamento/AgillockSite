@@ -31,10 +31,10 @@ export async function clienteAuthMiddleware(
   // Verifica se o login ainda está ativo no banco (força logout imediato ao inativar)
   const login = await prisma.clienteLogin.findUnique({
     where: { id: decoded.sub },
-    select: { ativo: true },
+    select: { ativo: true, cliente: { select: { status: true } } },
   });
 
-  if (!login || !login.ativo) {
+  if (!login || !login.ativo || login.cliente.status !== 'ATIVO') {
     res.status(401).json({ error: 'Acesso inativo. Contate o administrador.' });
     return;
   }

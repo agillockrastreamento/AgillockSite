@@ -10,6 +10,7 @@ import { getMarkerColor } from './VehicleCards';
 
 export const MARKER_ICON_SIZE = 58;
 const COURSE_STEP = 10;
+const MARKER_BITMAP_VERSION = 2.5;
 
 function roundCourse(course: number): number {
   return ((Math.round(course / COURSE_STEP) * COURSE_STEP) % 360 + 360) % 360;
@@ -24,7 +25,7 @@ export function makeCaptureKey(
 ): string {
   const rc = roundCourse(course);
   const lbl = showLabel && label ? label : '';
-  return `${categoria ?? ''}|${color}|${rc}|${lbl}`;
+  return `${MARKER_BITMAP_VERSION}|${categoria ?? ''}|${color}|${rc}|${lbl}`;
 }
 
 // Module-level cache — persists across re-mounts of MapScreen
@@ -75,10 +76,13 @@ function OffscreenCapture({
         size={MARKER_ICON_SIZE}
       />
       {showLabel && label ? (
-        <View style={styles.captureLabel}>
-          <Text style={styles.captureLabelText} numberOfLines={1}>
-            {label}
-          </Text>
+        <View style={styles.captureLabelWrap}>
+          <View style={styles.captureLabelPointer} />
+          <View style={styles.captureLabel}>
+            <Text style={styles.captureLabelText} numberOfLines={1}>
+              {label}
+            </Text>
+          </View>
         </View>
       ) : null}
     </View>
@@ -163,11 +167,25 @@ const styles = StyleSheet.create({
   },
   captureLabel: {
     maxWidth: 96,
-    marginTop: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.sm,
     backgroundColor: colors.surface,
+  },
+  captureLabelWrap: {
+    marginTop: -5,
+    alignItems: 'center',
+  },
+  captureLabelPointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: colors.surface,
+    marginBottom: -1,
   },
   captureLabelText: {
     color: colors.text,

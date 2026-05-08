@@ -162,6 +162,9 @@ function HeaderActions() {
 }
 
 function ClienteDrawer() {
+  const { user } = useAuth();
+  const canAccessPayments = user?.tipo === 'responsavel';
+
   return (
     <Drawer.Navigator
       initialRouteName="Mapa"
@@ -197,11 +200,13 @@ function ClienteDrawer() {
         component={ManutencaoScreen}
         options={{ title: 'Manutenção' }}
       />
-      <Drawer.Screen
-        name="Pagamentos"
-        component={PagamentosScreen}
-        options={{ title: 'Pagamentos' }}
-      />
+      {canAccessPayments ? (
+        <Drawer.Screen
+          name="Pagamentos"
+          component={PagamentosScreen}
+          options={{ title: 'Pagamentos' }}
+        />
+      ) : null}
     </Drawer.Navigator>
   );
 }

@@ -65,6 +65,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       cliente: {
         select: {
           id: true, nome: true,
+          status: true,
           carnes: { select: { id: true }, take: 1 },
         },
       },
@@ -74,6 +75,10 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
   if (clienteLogin) {
     if (!clienteLogin.ativo) {
       res.status(401).json({ error: 'Acesso inativo. Contate o administrador.' });
+      return;
+    }
+    if (clienteLogin.cliente.status !== 'ATIVO') {
+      res.status(401).json({ error: 'Cliente inativo. Contate o administrador.' });
       return;
     }
     const senhaValida = await bcrypt.compare(senha, clienteLogin.senhaHash);
@@ -156,6 +161,7 @@ router.post('/cliente', async (req: Request, res: Response): Promise<void> => {
         select: {
           id: true,
           nome: true,
+          status: true,
           carnes: {
             select: { id: true },
             take: 1,
@@ -165,7 +171,7 @@ router.post('/cliente', async (req: Request, res: Response): Promise<void> => {
     },
   });
 
-  if (!login || !login.ativo) {
+  if (!login || !login.ativo || login.cliente.status !== 'ATIVO') {
     res.status(401).json({ error: 'Credenciais inválidas ou acesso inativo.' });
     return;
   }

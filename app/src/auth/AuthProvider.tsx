@@ -11,6 +11,7 @@ import {
 import { loginCliente } from './authService';
 import { sessionStorage } from './sessionStorage';
 import type { ClienteUser, LoginCredentials } from './authTypes';
+import { apiRequest, setUnauthorizedHandler } from '../services/api/apiClient';
 import {
   ensureExpoPushTokenRegistered,
   unregisterStoredExpoPushToken,
@@ -40,8 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     sessionStorage
       .get()
-      .then((session) => {
+      .then(async (session) => {
         if (!mounted || !session) return;
+        try {
+          await apiRequest('/cliente/perfil');
+        } catch {
+          await sessionStorage.clear();
+          return;
+        }
         setUser(session.user);
         setToken(session.token);
       })
@@ -52,6 +59,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(async () => {
+      await sessionStorage.clear();
+      setUser(null);
+      setToken(null);
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const signIn = useCallback(async (credentials: LoginCredentials) => {

@@ -6,6 +6,12 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
   auth?: boolean;
 };
 
+let unauthorizedHandler: (() => void | Promise<void>) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void | Promise<void>) | null) {
+  unauthorizedHandler = handler;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -60,6 +66,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
       typeof payload.error === 'string'
         ? payload.error
         : `Erro HTTP ${response.status}`;
+    if (response.status === 401 && shouldAttachToken && unauthorizedHandler) {
+      Promise.resolve(unauthorizedHandler()).catch(() => undefined);
+    }
     throw new ApiError(message, response.status, payload);
   }
 

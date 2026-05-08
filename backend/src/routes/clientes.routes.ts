@@ -213,11 +213,21 @@ router.patch('/:id/status', requireRoles('ADMIN', 'COLABORADOR'), async (req: Au
   }
 
   const novoStatus = existe.status === 'ATIVO' ? 'INATIVO' : 'ATIVO';
-  const cliente = await prisma.cliente.update({
-    where: { id },
-    data: { status: novoStatus },
-    select: { id: true, nome: true, status: true },
-  });
+  const [cliente] = await prisma.$transaction([
+    prisma.cliente.update({
+      where: { id },
+      data: { status: novoStatus },
+      select: { id: true, nome: true, status: true },
+    }),
+    ...(novoStatus === 'INATIVO'
+      ? [
+          prisma.clienteLogin.updateMany({
+            where: { clienteId: id },
+            data: { ativo: false },
+          }),
+        ]
+      : []),
+  ]);
 
   res.json(cliente);
 });
