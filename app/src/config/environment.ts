@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 type ExpoExtra = {
   apiUrl?: string;
   wsUrl?: string;
+  publicSiteUrl?: string;
   environment?: string;
   eas?: {
     projectId?: string;
@@ -24,6 +25,10 @@ export const environment = {
     nonEmpty(process.env.EXPO_PUBLIC_WS_URL) ??
     extra.wsUrl ??
     'wss://api.agillock.com.br/ws/rastreamento',
+  publicSiteUrl:
+    nonEmpty(process.env.EXPO_PUBLIC_SITE_URL) ??
+    extra.publicSiteUrl ??
+    'https://agillock.com.br',
   name: nonEmpty(process.env.EXPO_PUBLIC_APP_ENV) ?? extra.environment ?? 'production',
   easProjectId:
     nonEmpty(process.env.EXPO_PUBLIC_EAS_PROJECT_ID) ??

@@ -7,6 +7,7 @@ import { GeofenceCreateModal } from '../components/GeofenceCreateModal';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { resolveUploadUrl } from '../profile/profileService';
 import { apiRequest } from '../services/api/apiClient';
+import { environment } from '../config/environment';
 import {
   buildCircleArea,
   getDeviceGeofences,
@@ -317,19 +318,19 @@ export function MainVehicleCard({
   };
 
   const compartilhar = async () => {
-    if (!p?.latitude || !p?.longitude) {
-      toast.show({ message: 'Veículo sem posição para compartilhar.', type: 'error' });
-      return;
-    }
-    const url = `https://www.google.com/maps?q=${p.latitude},${p.longitude}&label=${encodeURIComponent(device.nome)}`;
     try {
+      const data = await apiRequest<{ token: string }>('/compartilhamento/gerar', {
+        method: 'POST',
+        body: { dispositivoId: device.dispositivoId },
+      });
+      const url = `${environment.publicSiteUrl.replace(/\/$/, '')}/rastreamento-publico.html?token=${encodeURIComponent(data.token)}`;
       await Share.share({
-        message: `📍 Posição de ${device.nome}${device.placa ? ` (${device.placa})` : ''}: ${url}`,
-        title: `Localização — ${device.nome}`,
+        message: `Acompanhe ${device.nome}${device.placa ? ` (${device.placa})` : ''}: ${url}`,
+        title: `Acompanhamento - ${device.nome}`,
       });
     } catch (err: any) {
       if (err?.code !== 'ERR_SHARING_CANCELLED') {
-        toast.show({ message: 'Não foi possível compartilhar.', type: 'error' });
+        toast.show({ message: err instanceof Error ? err.message : 'Não foi possível compartilhar.', type: 'error' });
       }
     }
   };
@@ -391,7 +392,7 @@ export function MainVehicleCard({
     });
     if (confirmed) {
       try {
-        await apiRequest(`/cliente/manutencoes/recorrencias/${id}/feito`, { method: 'POST' });
+        await apiRequest(`/cliente/manutencoes/recorrencias/${id}/feito`, { method: 'POST', body: {} });
         toast.show({ message: 'Manutenção confirmada!', type: 'success' });
         fetchRecurrences();
       } catch {

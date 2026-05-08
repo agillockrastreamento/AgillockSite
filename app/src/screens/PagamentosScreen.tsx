@@ -21,6 +21,7 @@ type Boleto = {
   status: 'PENDENTE' | 'PAGO' | 'ATRASADO' | 'CANCELADO' | 'REEMBOLSADO';
   valor: number;
   dataVencimento: string;
+  vencimento?: string;
   dataPagamento?: string | null;
   descricao?: string | null;
   linkBoleto?: string | null;
@@ -57,16 +58,25 @@ const STATUS_LABELS: Record<string, string> = {
   REEMBOLSADO: 'Reembolsado',
 };
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR');
+function fmtDate(iso: string | null | undefined) {
+  if (!iso) return '--/--/----';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '--/--/----';
+  return date.toLocaleDateString('pt-BR');
 }
 
 function fmtMoney(val: number) {
   return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function isOverdue(venc: string) {
-  return new Date(venc) < new Date();
+function getDueDate(boleto: Boleto) {
+  return boleto.dataVencimento ?? boleto.vencimento;
+}
+
+function isOverdue(venc: string | null | undefined) {
+  if (!venc) return false;
+  const date = new Date(venc);
+  return !Number.isNaN(date.getTime()) && date < new Date();
 }
 
 export function PagamentosScreen() {
@@ -215,7 +225,8 @@ function SummaryCard({
 function BoletoCard({ boleto }: { boleto: Boleto }) {
   const statusColor = STATUS_COLORS[boleto.status] ?? '#95a5a6';
   const statusLabel = STATUS_LABELS[boleto.status] ?? boleto.status;
-  const overdue = boleto.status === 'PENDENTE' && isOverdue(boleto.dataVencimento);
+  const dueDate = getDueDate(boleto);
+  const overdue = boleto.status === 'PENDENTE' && isOverdue(dueDate);
   const displayColor = overdue ? '#e74c3c' : statusColor;
 
   const placaDisplay =
@@ -251,7 +262,7 @@ function BoletoCard({ boleto }: { boleto: Boleto }) {
       <View style={styles.boletoBottomRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.boletoVenc}>
-            Venc.: {fmtDate(boleto.dataVencimento)}
+            Venc.: {fmtDate(dueDate)}
             {boleto.numeroParcela != null ? `  ·  Parc. ${boleto.numeroParcela}` : ''}
           </Text>
           {boleto.dataPagamento ? (

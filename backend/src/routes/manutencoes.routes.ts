@@ -265,7 +265,7 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { id } = req.params;
-    const { notas, fotos } = req.body;
+    const { notas, fotos } = req.body ?? {};
 
     const recorrencia = await prisma.manutencaoRecorrencia.findFirst({
       where: {

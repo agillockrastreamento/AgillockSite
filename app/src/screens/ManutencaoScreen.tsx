@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Icon, IconButton } from 'react-native-paper';
 
 import { BottomSheet } from '../components/BottomSheet';
@@ -32,6 +36,12 @@ type Recorrencia = {
   intervaloKm: number;
   kmBase: number;
   ativa: boolean;
+  origem?: string | null;
+};
+
+type ManutencaoFoto = {
+  nome: string;
+  dataUrl: string;
 };
 
 type Registro = {
@@ -43,6 +53,9 @@ type Registro = {
   kmRealizacao: number | null;
   custo: number | null;
   oficina: string | null;
+  notas?: string | null;
+  fotos?: ManutencaoFoto[];
+  origem?: string | null;
 };
 
 type AddRegistroPayload = {
@@ -52,6 +65,9 @@ type AddRegistroPayload = {
   kmRealizacao: string;
   custo: string;
   oficina: string;
+  dataRealizacao: string;
+  notas: string;
+  fotos: ManutencaoFoto[];
 };
 
 type AddRecorrenciaPayload = {
@@ -61,24 +77,22 @@ type AddRecorrenciaPayload = {
 };
 
 const TIPOS_MANUTENCAO = [
-  'Troca de óleo',
-  'Revisão geral',
-  'Freios',
-  'Pneus',
-  'Filtros',
-  'Correia dentada',
-  'Suspensão',
-  'Elétrica',
-  'Outros',
+  { value: 'preventiva', label: 'Preventiva' },
+  { value: 'corretiva', label: 'Corretiva' },
+  { value: 'revisao', label: 'Revisão' },
+  { value: 'personalizado', label: 'Personalizado' },
 ];
 
 const EMPTY_FORM: AddRegistroPayload = {
   titulo: '',
-  tipo: 'Outros',
+  tipo: 'preventiva',
   descricao: '',
   kmRealizacao: '',
   custo: '',
   oficina: '',
+  dataRealizacao: new Date().toISOString().slice(0, 10),
+  notas: '',
+  fotos: [],
 };
 
 const EMPTY_RECORRENCIA: AddRecorrenciaPayload = {
@@ -87,8 +101,15 @@ const EMPTY_RECORRENCIA: AddRecorrenciaPayload = {
   intervaloKm: '',
 };
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR');
+function todayInput() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fmtDate(iso: string | null | undefined) {
+  if (!iso) return '--/--/----';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '--/--/----';
+  return date.toLocaleDateString('pt-BR');
 }
 
 function fmtMoney(val: number | null) {
@@ -99,6 +120,17 @@ function fmtMoney(val: number | null) {
 function fmtKm(km: number | null) {
   if (km == null) return '—';
   return `${km.toLocaleString('pt-BR')} km`;
+}
+
+function tipoLabel(tipo: string | null | undefined) {
+  return TIPOS_MANUTENCAO.find(t => t.value === tipo)?.label ?? tipo ?? 'Preventiva';
+}
+
+function parseDateInput(value: string) {
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  const date = new Date(`${trimmed}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 export function ManutencaoScreen() {
@@ -113,9 +145,12 @@ export function ManutencaoScreen() {
   const [activeTab, setActiveTab] = useState<'recorrencias' | 'registros'>('recorrencias');
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [form, setForm] = useState<AddRegistroPayload>(EMPTY_FORM);
+  const [editingRegistroId, setEditingRegistroId] = useState<string | null>(null);
+  const [expandedRegistros, setExpandedRegistros] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [addRecModalVisible, setAddRecModalVisible] = useState(false);
   const [formRec, setFormRec] = useState<AddRecorrenciaPayload>(EMPTY_RECORRENCIA);
+  const [editingRecorrenciaId, setEditingRecorrenciaId] = useState<string | null>(null);
   const [isSavingRec, setIsSavingRec] = useState(false);
 
   const loadDispositivos = useCallback(async () => {
@@ -159,6 +194,75 @@ export function ManutencaoScreen() {
     if (selectedId) loadData();
   }, [selectedId, loadData]);
 
+  const resetRegistroForm = () => {
+    setEditingRegistroId(null);
+    setForm({ ...EMPTY_FORM, dataRealizacao: todayInput(), fotos: [] });
+  };
+
+  const resetRecorrenciaForm = () => {
+    setEditingRecorrenciaId(null);
+    setFormRec(EMPTY_RECORRENCIA);
+  };
+
+  const pickFotos = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      toast.show({ message: 'Permita acesso às fotos para anexar imagens.', type: 'error' });
+      return;
+    }
+    const remaining = 5 - form.fotos.length;
+    if (remaining <= 0) {
+      toast.show({ message: 'Máximo de 5 fotos por registro.', type: 'error' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.65,
+      base64: true,
+    });
+    if (result.canceled) return;
+    const fotos = result.assets
+      .filter(asset => asset.base64)
+      .slice(0, remaining)
+      .map((asset, index) => ({
+        nome: asset.fileName ?? `foto-${Date.now()}-${index}.jpg`,
+        dataUrl: `data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}`,
+      }));
+    setForm(prev => ({ ...prev, fotos: [...prev.fotos, ...fotos] }));
+  };
+
+  const removeFoto = (index: number) => {
+    setForm(prev => ({ ...prev, fotos: prev.fotos.filter((_, i) => i !== index) }));
+  };
+
+  const editRegistro = (r: Registro) => {
+    setEditingRegistroId(r.id);
+    setForm({
+      titulo: r.titulo,
+      tipo: r.tipo || 'preventiva',
+      descricao: r.descricao || '',
+      kmRealizacao: r.kmRealizacao != null ? String(Math.round(r.kmRealizacao)) : '',
+      custo: r.custo != null ? String(r.custo).replace('.', ',') : '',
+      oficina: r.oficina || '',
+      dataRealizacao: r.dataRealizacao ? new Date(r.dataRealizacao).toISOString().slice(0, 10) : todayInput(),
+      notas: r.notas || '',
+      fotos: Array.isArray(r.fotos) ? r.fotos : [],
+    });
+    setAddModalVisible(true);
+  };
+
+  const editRecorrencia = (r: Recorrencia) => {
+    setEditingRecorrenciaId(r.id);
+    setFormRec({
+      titulo: r.titulo,
+      descricao: r.descricao || '',
+      intervaloKm: String(r.intervaloKm),
+    });
+    setAddRecModalVisible(true);
+  };
+
   const markDone = async (r: Recorrencia) => {
     const confirmed = await confirm.show({
       title: 'Confirmar Manutenção',
@@ -167,7 +271,7 @@ export function ManutencaoScreen() {
     });
     if (!confirmed) return;
     try {
-      await apiRequest(`/cliente/manutencoes/recorrencias/${r.id}/feito`, { method: 'POST' });
+      await apiRequest(`/cliente/manutencoes/recorrencias/${r.id}/feito`, { method: 'POST', body: {} });
       toast.show({ message: 'Manutenção confirmada!', type: 'success' });
       loadData(true);
     } catch {
@@ -192,30 +296,54 @@ export function ManutencaoScreen() {
     }
   };
 
+  const deleteRecorrencia = async (id: string) => {
+    const confirmed = await confirm.show({
+      title: 'Excluir Programada',
+      message: 'Deseja excluir esta manutenção programada?',
+      confirmLabel: 'Excluir',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await apiRequest(`/cliente/manutencoes/recorrencias/${id}`, { method: 'DELETE' });
+      toast.show({ message: 'Manutenção programada excluída.', type: 'success' });
+      setRecorrencias(prev => prev.filter(r => r.id !== id));
+    } catch {
+      toast.show({ message: 'Erro ao excluir manutenção programada.', type: 'error' });
+    }
+  };
+
   const saveRegistro = async () => {
     if (!form.titulo.trim()) {
       toast.show({ message: 'Informe o título da manutenção.', type: 'error' });
       return;
     }
+    const dataRealizacao = parseDateInput(form.dataRealizacao);
+    if (!dataRealizacao) {
+      toast.show({ message: 'Informe a data no formato AAAA-MM-DD.', type: 'error' });
+      return;
+    }
     if (!selectedId) return;
     setIsSaving(true);
     try {
-      await apiRequest('/cliente/manutencoes/registros', {
-        method: 'POST',
+      await apiRequest(editingRegistroId ? `/cliente/manutencoes/registros/${editingRegistroId}` : '/cliente/manutencoes/registros', {
+        method: editingRegistroId ? 'PUT' : 'POST',
         body: {
-          dispositivoId: selectedId,
+          ...(editingRegistroId ? {} : { dispositivoId: selectedId }),
           titulo: form.titulo.trim(),
           tipo: form.tipo,
           descricao: form.descricao.trim() || null,
           kmRealizacao: form.kmRealizacao ? parseInt(form.kmRealizacao) : null,
           custo: form.custo ? parseFloat(form.custo.replace(',', '.')) : null,
           oficina: form.oficina.trim() || null,
-          dataRealizacao: new Date().toISOString(),
+          dataRealizacao,
+          notas: form.notas.trim() || null,
+          fotos: form.fotos,
         },
       });
-      toast.show({ message: 'Registro adicionado!', type: 'success' });
+      toast.show({ message: editingRegistroId ? 'Registro atualizado!' : 'Registro adicionado!', type: 'success' });
       setAddModalVisible(false);
-      setForm(EMPTY_FORM);
+      resetRegistroForm();
       setActiveTab('registros');
       loadData(true);
     } catch (err) {
@@ -241,18 +369,18 @@ export function ManutencaoScreen() {
     if (!selectedId) return;
     setIsSavingRec(true);
     try {
-      await apiRequest('/cliente/manutencoes/recorrencias', {
-        method: 'POST',
+      await apiRequest(editingRecorrenciaId ? `/cliente/manutencoes/recorrencias/${editingRecorrenciaId}` : '/cliente/manutencoes/recorrencias', {
+        method: editingRecorrenciaId ? 'PUT' : 'POST',
         body: {
-          dispositivoId: selectedId,
+          ...(editingRecorrenciaId ? {} : { dispositivoId: selectedId }),
           titulo: formRec.titulo.trim(),
           descricao: formRec.descricao.trim() || null,
           intervaloKm: intervaloKmNum,
         },
       });
-      toast.show({ message: 'Manutenção programada criada!', type: 'success' });
+      toast.show({ message: editingRecorrenciaId ? 'Manutenção programada atualizada!' : 'Manutenção programada criada!', type: 'success' });
       setAddRecModalVisible(false);
-      setFormRec(EMPTY_RECORRENCIA);
+      resetRecorrenciaForm();
       setActiveTab('recorrencias');
       loadData(true);
     } catch (err) {
@@ -361,14 +489,34 @@ export function ManutencaoScreen() {
                       </Text>
                     </View>
                     {selectedDevice?.podeGerenciarManutencao && (
-                      <Pressable
-                        accessibilityRole="button"
-                        style={styles.doneBtn}
-                        onPress={() => markDone(r)}
-                      >
-                        <Icon source="check-circle-outline" size={18} color={colors.success} />
-                        <Text style={styles.doneBtnText}>Feito</Text>
-                      </Pressable>
+                      <View style={styles.cardActions}>
+                        {r.origem !== 'ADMIN' ? (
+                          <>
+                            <Pressable
+                              accessibilityRole="button"
+                              style={styles.iconActionBtn}
+                              onPress={() => editRecorrencia(r)}
+                            >
+                              <Icon source="pencil" size={17} color="#2980b9" />
+                            </Pressable>
+                            <Pressable
+                              accessibilityRole="button"
+                              style={styles.iconActionBtn}
+                              onPress={() => deleteRecorrencia(r.id)}
+                            >
+                              <Icon source="delete-outline" size={17} color={colors.danger} />
+                            </Pressable>
+                          </>
+                        ) : null}
+                        <Pressable
+                          accessibilityRole="button"
+                          style={styles.doneBtn}
+                          onPress={() => markDone(r)}
+                        >
+                          <Icon source="check-circle-outline" size={18} color={colors.success} />
+                          <Text style={styles.doneBtnText}>Feito</Text>
+                        </Pressable>
+                      </View>
                     )}
                   </View>
                 </View>
@@ -386,47 +534,88 @@ export function ManutencaoScreen() {
                 </Text>
               </View>
             ) : (
-              registros.map(r => (
-                <View key={r.id} style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <View style={styles.cardIconWrap}>
-                      <Icon source="clipboard-check" size={20} color="#8e44ad" />
-                    </View>
-                    <View style={styles.cardBody}>
-                      <Text style={styles.cardTitle}>{r.titulo}</Text>
-                      <Text style={styles.cardMeta}>{fmtDate(r.dataRealizacao)}</Text>
-                      {r.tipo ? <Text style={styles.cardTag}>{r.tipo}</Text> : null}
-                      <View style={styles.cardStats}>
-                        {r.kmRealizacao != null && (
-                          <Text style={styles.cardStatText}>
-                            <Text style={styles.cardStatLabel}>KM: </Text>
-                            {fmtKm(r.kmRealizacao)}
-                          </Text>
-                        )}
-                        {r.custo != null && (
-                          <Text style={styles.cardStatText}>
-                            <Text style={styles.cardStatLabel}>Custo: </Text>
-                            {fmtMoney(r.custo)}
-                          </Text>
-                        )}
-                        {r.oficina ? (
-                          <Text style={styles.cardStatText}>
-                            <Text style={styles.cardStatLabel}>Oficina: </Text>
-                            {r.oficina}
-                          </Text>
+              registros.map(r => {
+                const fotos = Array.isArray(r.fotos) ? r.fotos : [];
+                const hasExtra = Boolean(r.notas || fotos.length);
+                const expanded = expandedRegistros[r.id];
+                return (
+                  <View key={r.id} style={styles.card}>
+                    <View style={styles.cardHeader}>
+                      <View style={styles.cardIconWrap}>
+                        <Icon source="clipboard-check" size={20} color="#8e44ad" />
+                      </View>
+                      <View style={styles.cardBody}>
+                        <View style={styles.titleRow}>
+                          <Text style={styles.cardTitle}>{r.titulo}</Text>
+                          {r.tipo ? <Text style={styles.cardTag}>{tipoLabel(r.tipo)}</Text> : null}
+                        </View>
+                        <Text style={styles.cardMeta}>{fmtDate(r.dataRealizacao)}</Text>
+                        <View style={styles.cardStats}>
+                          {r.kmRealizacao != null && (
+                            <Text style={styles.cardStatText}>
+                              <Text style={styles.cardStatLabel}>KM: </Text>
+                              {fmtKm(r.kmRealizacao)}
+                            </Text>
+                          )}
+                          {r.custo != null && (
+                            <Text style={styles.cardStatText}>
+                              <Text style={styles.cardStatLabel}>Custo: </Text>
+                              {fmtMoney(r.custo)}
+                            </Text>
+                          )}
+                          {r.oficina ? (
+                            <Text style={styles.cardStatText}>
+                              <Text style={styles.cardStatLabel}>Oficina: </Text>
+                              {r.oficina}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                      <View style={styles.cardActions}>
+                        {selectedDevice?.podeGerenciarManutencao && r.origem !== 'ADMIN' ? (
+                          <>
+                            <IconButton
+                              icon="pencil"
+                              size={18}
+                              iconColor="#2980b9"
+                              style={styles.deleteBtn}
+                              onPress={() => editRegistro(r)}
+                            />
+                            <IconButton
+                              icon="delete-outline"
+                              size={18}
+                              iconColor={colors.danger}
+                              style={styles.deleteBtn}
+                              onPress={() => deleteRegistro(r.id)}
+                            />
+                          </>
+                        ) : null}
+                        {hasExtra ? (
+                          <IconButton
+                            icon={expanded ? 'chevron-up' : 'chevron-down'}
+                            size={20}
+                            iconColor={colors.textMuted}
+                            style={styles.deleteBtn}
+                            onPress={() => setExpandedRegistros(prev => ({ ...prev, [r.id]: !prev[r.id] }))}
+                          />
                         ) : null}
                       </View>
                     </View>
-                    <IconButton
-                      icon="delete-outline"
-                      size={18}
-                      iconColor={colors.danger}
-                      style={styles.deleteBtn}
-                      onPress={() => deleteRegistro(r.id)}
-                    />
+                    {hasExtra && expanded ? (
+                      <View style={styles.extraBox}>
+                        {r.notas ? <Text style={styles.notesText}>{r.notas}</Text> : null}
+                        {fotos.length ? (
+                          <View style={styles.photoGrid}>
+                            {fotos.map((foto, index) => (
+                              <Image key={`${foto.nome}-${index}`} source={{ uri: foto.dataUrl }} style={styles.photoThumb} />
+                            ))}
+                          </View>
+                        ) : null}
+                      </View>
+                    ) : null}
                   </View>
-                </View>
-              ))
+                );
+              })
             )
           )}
         </ScrollView>
@@ -439,10 +628,10 @@ export function ManutencaoScreen() {
           style={styles.fab}
           onPress={() => {
             if (activeTab === 'recorrencias') {
-              setFormRec(EMPTY_RECORRENCIA);
+              resetRecorrenciaForm();
               setAddRecModalVisible(true);
             } else {
-              setForm(EMPTY_FORM);
+              resetRegistroForm();
               setAddModalVisible(true);
             }
           }}
@@ -454,11 +643,15 @@ export function ManutencaoScreen() {
       {/* Add recorrência — Bottom Sheet */}
       <BottomSheet
         visible={addRecModalVisible}
-        onClose={() => setAddRecModalVisible(false)}
-        title="Nova Manutenção Programada"
-        heightPercent={0.6}
+        onClose={() => {
+          setAddRecModalVisible(false);
+          resetRecorrenciaForm();
+        }}
+        title={editingRecorrenciaId ? 'Editar Manutenção Programada' : 'Nova Manutenção Programada'}
+        heightPercent={0.72}
       >
-        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalKeyboard}>
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
             style={styles.formInput}
@@ -499,19 +692,24 @@ export function ManutencaoScreen() {
             ) : (
               <Icon source="content-save" size={18} color={colors.primaryText} />
             )}
-            <Text style={styles.saveBtnText}>Salvar</Text>
+            <Text style={styles.saveBtnText}>{editingRecorrenciaId ? 'Atualizar' : 'Salvar'}</Text>
           </Pressable>
         </ScrollView>
+        </KeyboardAvoidingView>
       </BottomSheet>
 
       {/* Add registro — Bottom Sheet */}
       <BottomSheet
         visible={addModalVisible}
-        onClose={() => setAddModalVisible(false)}
-        title="Novo Registro de Manutenção"
+        onClose={() => {
+          setAddModalVisible(false);
+          resetRegistroForm();
+        }}
+        title={editingRegistroId ? 'Editar Registro de Manutenção' : 'Novo Registro de Manutenção'}
         heightPercent={0.88}
       >
-        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalKeyboard}>
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
             style={styles.formInput}
@@ -525,14 +723,23 @@ export function ManutencaoScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
             {TIPOS_MANUTENCAO.map(t => (
               <Pressable
-                key={t}
-                style={[styles.tipoChip, form.tipo === t && styles.tipoChipActive]}
-                onPress={() => setForm(f => ({ ...f, tipo: t }))}
+                key={t.value}
+                style={[styles.tipoChip, form.tipo === t.value && styles.tipoChipActive]}
+                onPress={() => setForm(f => ({ ...f, tipo: t.value }))}
               >
-                <Text style={[styles.tipoChipText, form.tipo === t && styles.tipoChipTextActive]}>{t}</Text>
+                <Text style={[styles.tipoChipText, form.tipo === t.value && styles.tipoChipTextActive]}>{t.label}</Text>
               </Pressable>
             ))}
           </ScrollView>
+
+          <Text style={styles.formLabel}>Data da realização</Text>
+          <TextInput
+            style={styles.formInput}
+            value={form.dataRealizacao}
+            onChangeText={v => setForm(f => ({ ...f, dataRealizacao: v }))}
+            placeholder="AAAA-MM-DD"
+            placeholderTextColor={colors.textMuted}
+          />
 
           <Text style={styles.formLabel}>KM na realização</Text>
           <TextInput
@@ -574,6 +781,37 @@ export function ManutencaoScreen() {
             numberOfLines={3}
           />
 
+          <Text style={styles.formLabel}>Notas</Text>
+          <TextInput
+            style={[styles.formInput, styles.formInputMulti]}
+            value={form.notas}
+            onChangeText={v => setForm(f => ({ ...f, notas: v }))}
+            placeholder="Notas internas, peças, garantias..."
+            placeholderTextColor={colors.textMuted}
+            multiline
+            numberOfLines={3}
+          />
+
+          <View style={styles.photosHeader}>
+            <Text style={styles.formLabel}>Fotos</Text>
+            <Pressable style={styles.addPhotoBtn} onPress={pickFotos}>
+              <Icon source="image-plus" size={16} color={colors.primaryText} />
+              <Text style={styles.addPhotoText}>Adicionar</Text>
+            </Pressable>
+          </View>
+          {form.fotos.length ? (
+            <View style={styles.photoGrid}>
+              {form.fotos.map((foto, index) => (
+                <View key={`${foto.nome}-${index}`} style={styles.photoPreviewItem}>
+                  <Image source={{ uri: foto.dataUrl }} style={styles.photoThumb} />
+                  <Pressable style={styles.removePhotoBtn} onPress={() => removeFoto(index)}>
+                    <Icon source="close" size={13} color="#fff" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <Pressable
             style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
             onPress={saveRegistro}
@@ -584,9 +822,10 @@ export function ManutencaoScreen() {
             ) : (
               <Icon source="content-save" size={18} color={colors.primaryText} />
             )}
-            <Text style={styles.saveBtnText}>Salvar Registro</Text>
+            <Text style={styles.saveBtnText}>{editingRegistroId ? 'Atualizar Registro' : 'Salvar Registro'}</Text>
           </Pressable>
         </ScrollView>
+        </KeyboardAvoidingView>
       </BottomSheet>
     </View>
   );
@@ -721,6 +960,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   cardTitle: {
     fontSize: 14,
     fontWeight: '800',
@@ -768,10 +1013,61 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.success,
   },
+  cardActions: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  iconActionBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
   deleteBtn: {
     margin: 0,
     marginTop: -4,
     marginRight: -4,
+  },
+  extraBox: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  notesText: {
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  photoThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.sm,
+    backgroundColor: colors.background,
+  },
+  photoPreviewItem: {
+    position: 'relative',
+  },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+    backgroundColor: colors.danger,
   },
   fab: {
     position: 'absolute',
@@ -793,6 +1089,9 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: 6,
     paddingBottom: spacing.xxl,
+  },
+  modalKeyboard: {
+    flex: 1,
   },
   formLabel: {
     fontSize: 12,
@@ -821,6 +1120,26 @@ const styles = StyleSheet.create({
   },
   tiposScroll: {
     marginBottom: spacing.sm,
+  },
+  photosHeader: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    height: 34,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary,
+  },
+  addPhotoText: {
+    color: colors.primaryText,
+    fontSize: 12,
+    fontWeight: '800',
   },
   tipoChip: {
     marginRight: spacing.sm,
