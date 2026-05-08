@@ -3,3 +3,5 @@ dist/
 .env
 cert/*.p12
 cert/*.pem
+
+CLAUDE.md

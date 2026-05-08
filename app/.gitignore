@@ -40,3 +40,5 @@ expo-start*.log
 # generated native folders
 /ios
 /android
+
+CLAUDE.md
