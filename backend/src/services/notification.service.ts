@@ -5,10 +5,19 @@ import ExpoPushService from './expo-push.service';
 
 type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null };
 
+// Normaliza subtipos de manutenção para a chave de preferência do admin
+function _tipoPreferenciaAdmin(tipo: string): string {
+  if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
+  return tipo;
+}
+
 class NotificationService {
   private _lastOverspeedAt = new Map<string, number>(); // Cache para cooldown de velocidade
   private _enderecoCache = new Map<string, string>();
   private _lastIgnitionState = new Map<string, boolean>(); // Cache para evitar alertas duplicados de ignição
+  private _lastAlarmAt = new Map<string, number>();        // Cooldown de alarme por dispositivo
+  private _lastAdminEventAt = new Map<string, number>();   // Dedup de eventos admin por dispositivo+tipo
+  private _adminPrefsCache: { data: { userId: string; prefs: unknown }[]; at: number } | null = null;
 
   private async resolverEnderecoEvento(dados: any): Promise<string | null> {
     if (dados.endereco) return dados.endereco;
@@ -89,14 +98,18 @@ class NotificationService {
             }
           }
         }
-        // 3. Verificar Alarmes de Hardware
-        if (dados.alarme) {
+        // 3. Verificar Alarmes de Hardware (com cooldown de 1 min por dispositivo)
+        if (dados.alarme && !dados._skipAlarm) {
           let tipoAlarme = 'alarm';
           if (dados.alarme === 'powerCut' || dados.alarme === 'powerRestored') tipoAlarme = 'powerCut';
-          
-          console.log(`[Notif] Detectado alarme de hardware (${dados.alarme}) para ${identificador} -> ${tipoAlarme}`);
-          const result = await this.processarEvento(identificador, tipoAlarme, dados, clienteLogin.id);
-          if (result) eventosDetectados.push(result);
+          const chaveAlarm = `${dispositivo.id}_${tipoAlarme}`;
+          const agoraAlarm = Date.now();
+          if (agoraAlarm - (this._lastAlarmAt.get(chaveAlarm) || 0) > 60_000) {
+            this._lastAlarmAt.set(chaveAlarm, agoraAlarm);
+            console.log(`[Notif] Detectado alarme de hardware (${dados.alarme}) para ${identificador} -> ${tipoAlarme}`);
+            const result = await this.processarEvento(identificador, tipoAlarme, dados, clienteLogin.id);
+            if (result) eventosDetectados.push(result);
+          }
         }
       }
     } catch (error: any) {
@@ -133,6 +146,15 @@ class NotificationService {
         return null;
       }
 
+      // Atualiza estado de ignição em memória para evitar que verificarEventosPosicao
+      // dispare duplicata quando evento nativo e posição chegam em mensagens separadas
+      if (tipo === 'ignitionOn') this._lastIgnitionState.set(`${dispositivo.id}_ignicao`, true);
+      if (tipo === 'ignitionOff') this._lastIgnitionState.set(`${dispositivo.id}_ignicao`, false);
+      // Atualiza cooldown de alarme para evitar duplicata via proactive check
+      if (tipo === 'alarm' || tipo === 'powerCut') {
+        this._lastAlarmAt.set(`${dispositivo.id}_${tipo}`, Date.now());
+      }
+
       // Se encontramos por identificador mas o traccarId no banco está nulo, aproveitamos para atualizar
       if (!dispositivo.traccarId && (dados as any).traccarDeviceId) {
         await prisma.dispositivo.update({
@@ -161,6 +183,13 @@ class NotificationService {
         console.log(`[Notif] Evento "${tipo}" (original: ${tipoOriginal}) para ${identificador} — ${clientesParaProcessar.length} cliente(s)`);
       }
 
+      // Geocerca de origem desconhecida (deletada do banco ou ainda não sincronizada):
+      // não há como verificar propriedade, então não notifica nenhum cliente.
+      if ((tipo === 'geofenceEnter' || tipo === 'geofenceExit') && dados.geofenceId && !dados.origemTipo) {
+        console.warn(`[Notif] Geocerca traccarId=${dados.geofenceId} não encontrada no banco — notificação ignorada.`);
+        return wsEvent;
+      }
+
       if ((tipo === 'geofenceEnter' || tipo === 'geofenceExit') && (dados.origemTipo === 'ADMIN' || dados.origemTipo === 'CLIENTE')) {
         const clienteAdminRef = (dados.origemTipo === 'CLIENTE' && dados.clienteId)
           ? clientesParaProcessar.find(c => c.id === dados.clienteId)
@@ -185,6 +214,13 @@ class NotificationService {
             },
           }).catch(err => console.error('[Notif] Erro ao salvar evento admin:', err.message));
         }
+      }
+
+      // Cria evento admin para tipos não-geocerca (geocerca já tem bloco dedicado acima)
+      if (tipo !== 'geofenceEnter' && tipo !== 'geofenceExit') {
+        await this._criarEventoAdmin(tipo, dispositivo, dados, clientesMap).catch(
+          err => console.error('[Notif] Erro ao criar evento admin:', err.message),
+        );
       }
 
       for (const cliente of clientesParaProcessar) {
@@ -655,6 +691,56 @@ class NotificationService {
       });
     }
     return wsEvent;
+  }
+
+  private async _getAdminPrefs() {
+    if (!this._adminPrefsCache || Date.now() - this._adminPrefsCache.at > 30_000) {
+      const data = await prisma.adminPreferencia.findMany();
+      this._adminPrefsCache = { data, at: Date.now() };
+    }
+    return this._adminPrefsCache.data;
+  }
+
+  private async _criarEventoAdmin(
+    tipo: string,
+    dispositivo: DispositivoBasico,
+    dados: any,
+    clientesMap: Map<string, { id: string; nome: string; login: { id: string; email: string; ativo: boolean } | null }>,
+  ) {
+    // Dedup: cria no máximo 1 evento admin por dispositivo+tipo por minuto
+    const chave = `${dispositivo.id}_${tipo}`;
+    const agora = Date.now();
+    if (agora - (this._lastAdminEventAt.get(chave) || 0) <= 60_000) return;
+
+    const tipoAdmin = _tipoPreferenciaAdmin(tipo);
+    const adminPrefs = await this._getAdminPrefs();
+    const algumAdminHabilitou = adminPrefs.some(a => !!(a.prefs as Record<string, unknown>)?.[tipoAdmin]);
+    if (!algumAdminHabilitou) return;
+
+    // Precisa de um clienteLoginId válido como âncora FK no schema
+    const refCliente = Array.from(clientesMap.values()).find(c => c.login?.ativo);
+    const refLoginId = refCliente?.login?.id;
+    if (!refLoginId) return;
+
+    this._lastAdminEventAt.set(chave, agora);
+
+    const mensagem = this.gerarMensagem(tipo, dispositivo.nome, dispositivo.placa, dados);
+    const endereco = await this.resolverEnderecoEvento(dados);
+    await prisma.eventoNotificacao.create({
+      data: {
+        clienteLoginId: refLoginId,
+        dispositivoId: dispositivo.id,
+        tipoEvento: tipo,
+        origemTipo: dados.origemTipo ?? null,
+        origemId: dados.origemId ?? (dados.geofenceId != null ? String(dados.geofenceId) : null),
+        adminEvento: true,
+        mensagem,
+        latitude: dados.latitude ?? null,
+        longitude: dados.longitude ?? null,
+        endereco,
+        velocidade: dados.velocidade ?? null,
+      },
+    });
   }
 
   private getLabelTipo(tipo: string) {

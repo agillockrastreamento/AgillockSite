@@ -312,6 +312,8 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
     });
     const mensagemFeita = `Manutenção "${recorrencia.titulo}" realizada! Contador reiniciado a partir de ${Math.round(kmAtual).toLocaleString('pt-BR')} km.`;
+
+    // Evento admin (sempre criado para histórico do admin)
     await prisma.eventoNotificacao.create({
       data: {
         clienteLoginId,
@@ -326,6 +328,26 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
         velocidade: null,
       },
     });
+
+    // Evento cliente (criado apenas se o cliente tem preferência habilitada)
+    if (prefFeita && (prefFeita.web || prefFeita.app)) {
+      await prisma.eventoNotificacao.create({
+        data: {
+          clienteLoginId,
+          dispositivoId: recorrencia.dispositivoId,
+          tipoEvento: 'manutencaoFeita',
+          origemTipo: recorrencia.origem,
+          origemId: recorrencia.id,
+          adminEvento: false,
+          mensagem: mensagemFeita,
+          latitude: null,
+          longitude: null,
+          velocidade: null,
+        },
+      });
+    }
+
+    // Broadcast único — evita que o frontend exiba a notificação em duplicata
     broadcastTrackingEvents([{
       deviceId: recorrencia.dispositivo.traccarId,
       dispositivoId: recorrencia.dispositivoId,
@@ -342,37 +364,6 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
       lng: null,
       endereco: null,
     }]);
-    if (prefFeita && (prefFeita.web || prefFeita.app)) {
-      await prisma.eventoNotificacao.create({
-        data: {
-          clienteLoginId,
-          dispositivoId: recorrencia.dispositivoId,
-          tipoEvento: 'manutencaoFeita',
-          origemTipo: recorrencia.origem,
-          origemId: recorrencia.id,
-          mensagem: `Manutenção "${recorrencia.titulo}" realizada! Contador reiniciado a partir de ${Math.round(kmAtual).toLocaleString('pt-BR')} km.`,
-          latitude: null,
-          longitude: null,
-          velocidade: null,
-        },
-      });
-      broadcastTrackingEvents([{
-        deviceId: recorrencia.dispositivo.traccarId,
-        dispositivoId: recorrencia.dispositivoId,
-        type: 'manutencaoFeita',
-        tipoLabel: 'Manutenção Realizada',
-        origemTipo: recorrencia.origem,
-        origemId: recorrencia.id,
-        clienteLoginId,
-        clienteId: req.cliente.clienteId,
-        adminEvento: false,
-        serverTime: new Date().toISOString(),
-        mensagem: mensagemFeita,
-        lat: null,
-        lng: null,
-        endereco: null,
-      }]);
-    }
 
     res.json({ message: 'Manutenção marcada como feita. Contador reiniciado.' });
   } catch (err) {
