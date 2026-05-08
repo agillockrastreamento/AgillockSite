@@ -494,17 +494,19 @@ export function ManutencaoScreen() {
                           <>
                             <Pressable
                               accessibilityRole="button"
-                              style={styles.iconActionBtn}
+                              style={styles.doneBtn}
                               onPress={() => editRecorrencia(r)}
                             >
                               <Icon source="pencil" size={17} color="#2980b9" />
+                              <Text style={[styles.doneBtnText, { color: '#2980b9' }]}>Editar</Text>
                             </Pressable>
                             <Pressable
                               accessibilityRole="button"
-                              style={styles.iconActionBtn}
+                              style={styles.doneBtn}
                               onPress={() => deleteRecorrencia(r.id)}
                             >
                               <Icon source="delete-outline" size={17} color={colors.danger} />
+                              <Text style={[styles.doneBtnText, { color: colors.danger }]}>Excluir</Text>
                             </Pressable>
                           </>
                         ) : null}
@@ -650,7 +652,7 @@ export function ManutencaoScreen() {
         title={editingRecorrenciaId ? 'Editar Manutenção Programada' : 'Nova Manutenção Programada'}
         heightPercent={0.72}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalKeyboard}>
+        <KeyboardAvoidingView behavior={'padding'} style={styles.modalKeyboard}>
         <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
@@ -708,7 +710,7 @@ export function ManutencaoScreen() {
         title={editingRegistroId ? 'Editar Registro de Manutenção' : 'Novo Registro de Manutenção'}
         heightPercent={0.88}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalKeyboard}>
+        <KeyboardAvoidingView behavior={'padding'} style={styles.modalKeyboard}>
         <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
@@ -1007,6 +1009,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.success,
     backgroundColor: '#f0faf4',
+    width: '100%'
   },
   doneBtnText: {
     fontSize: 11,

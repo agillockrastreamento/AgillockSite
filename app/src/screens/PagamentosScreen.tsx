@@ -254,7 +254,7 @@ function BoletoCard({ boleto }: { boleto: Boleto }) {
           </View>
         </View>
         <View style={styles.boletoRight}>
-          <Text style={styles.boletoValor}>{fmtMoney(boleto.valor)}</Text>
+          <Text style={styles.boletoValor}>R$ {fmtMoney(boleto.valor)}</Text>
         </View>
       </View>
 

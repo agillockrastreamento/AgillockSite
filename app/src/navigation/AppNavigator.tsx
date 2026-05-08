@@ -39,7 +39,6 @@ const routeIcons: Record<keyof ClienteDrawerParamList, string> = {
   Mapa: 'map-marker-radius-outline',
   Relatorio: 'file-chart-outline',
   Notificacoes: 'bell-outline',
-  Geocercas: 'vector-polygon',
   Manutencao: 'wrench-outline',
   Pagamentos: 'credit-card-outline',
 };
@@ -193,9 +192,6 @@ function ClienteDrawer() {
       <Drawer.Screen name="Mapa" component={MapScreen} />
       <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }} component={ReportScreen} />
       <Drawer.Screen name="Notificacoes" component={NotificationsScreen} options={{ title: 'Notificações' }} />
-      <Drawer.Screen name="Geocercas" options={{ title: 'Geocercas' }}>
-        {() => <PlaceholderScreen title="Geocercas" />}
-      </Drawer.Screen>
       <Drawer.Screen
         name="Manutencao"
         component={ManutencaoScreen}
