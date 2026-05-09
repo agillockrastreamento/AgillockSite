@@ -1820,10 +1820,10 @@ function cardVeiculoHtml(v) {
     mediaHtml = `<div class="cv-icone" style="display:flex;background:#f0f2f5;align-items:center;justify-content:center;">${_getSvgPlaceholder(v.categoria, cor)}</div>`;
   }
 
-  const isOnline = v.status === 'online';
-  const isMoving = isOnline && v.posicao?.emMovimento;
-  const statusTxt = isMoving ? `${v.posicao?.velocidade ?? 0} km/h` : isOnline ? 'Parado' : 'Offline';
-  const dotCls = isMoving ? 'dot-moving' : isOnline ? 'dot-online' : 'dot-offline';
+  //const isOnline = v.status === 'online';
+  //const isMoving = isOnline && v.posicao?.emMovimento;
+  //const statusTxt = isMoving ? `${v.posicao?.velocidade ?? 0} km/h` : isOnline ? 'Parado' : 'Offline';
+  //const dotCls = isMoving ? 'dot-moving' : isOnline ? 'dot-online' : 'dot-offline';
   const marcaModelo = [v.marca, v.modeloVeiculo].filter(Boolean).join(' ');
 
   return `<div class="card-veiculo${v.dispositivoId === ativoId ? ' ativo' : ''}" data-did="${v.dispositivoId}" onclick="focarCliente('${v.dispositivoId}')">
@@ -1833,7 +1833,6 @@ function cardVeiculoHtml(v) {
     </div>
     ${v.placa ? `<span class="cv-placa">${v.placa}</span>` : ''}
     <span class="cv-modelo" title="${marcaModelo || v.nome}">${marcaModelo || v.nome}</span>
-    <span class="cv-status ${dotCls}">● ${statusTxt}</span>
   </div>`;
 }
 
@@ -2142,12 +2141,6 @@ function mostrarCardDispositivo(id) {
   const horasHtml = `
     <div class="dcard-section dcard-val" style="font-size:10px">
       <div class="dcard-section-title">Última Atualização</div>
-      <div style="margin-bottom:4px">
-        <span id="dcard-status-text" style="color:${corStatus};font-size:10px">
-          <i class="fa fa-circle" style="font-size:8px;vertical-align:middle"></i> ${txtStatus}${tempoSufixo}
-        </span>
-        <span id="dcard-status-warning">${!p ? '&nbsp;<span style="color:#e67e22;font-size:10px"><i class="fa fa-exclamation-triangle"></i> Sem posição</span>' : ''}</span>
-      </div>
       ${p ? `
         <div style="margin-bottom:2px; margin-left:-4px"><i class="fa fa-mobile" style="${ico}"></i> <span style="margin-left:-2px" class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
       ` : ''}
