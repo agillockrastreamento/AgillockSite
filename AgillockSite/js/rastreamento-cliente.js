@@ -2721,6 +2721,16 @@ function _cancelarDesenhoCirculo() {
 // ── Botões de ação do card de dispositivo ─────────────────────────────────────
 
 window.acaoDispositivoCliente = async function(acao, dispositivoId) {
+  if (acao === 'seguir') {
+    const v = veiculosMap[dispositivoId];
+    if (!v?.posicao) {
+      AL_CLIENTE.showAlert('Posição do veículo indisponível.', 'warning');
+      return;
+    }
+    ativarFoco(dispositivoId);
+    _centralizarDispositivo(v.posicao, 16, 0, true);
+    return;
+  }
   if (acao === 'rota') { ativarRota(dispositivoId); return; }
   if (acao === 'compartilhar') { compartilharDispositivoCliente(dispositivoId); return; }
   if (acao === 'cerca') {
@@ -2749,6 +2759,10 @@ function _htmlAcoesCard(dispositivoId) {
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
       <div class= "dcard-section-title-title">AÇÕES</div>
       <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
+        <button class="dcard-acao" data-acao="seguir" onclick="acaoDispositivoCliente('seguir','${dispositivoId}')" title="Seguir veículo">
+          <span class="dcard-acao-icon"><i class="fa fa-location-arrow"></i></span>
+          <span>Seguir</span>
+        </button>
         <button class="dcard-acao${rotaAtiva ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivoCliente('rota','${dispositivoId}')" title="Rota">
           <span class="dcard-acao-icon"><i class="fa fa-road"></i></span>
           <span>Rota</span>

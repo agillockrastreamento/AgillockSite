@@ -1320,6 +1320,16 @@ async function ativarRota(dispositivoId) {
 }
 
 window.acaoDispositivo = async function (acao, dispositivoId) {
+  if (acao === 'seguir') {
+    const v = veiculosMap[dispositivoId];
+    if (!v?.posicao) {
+      AL.showAlert('Posição do veículo indisponível.', 'warning');
+      return;
+    }
+    ativarFoco(dispositivoId);
+    _centralizarDispositivo(v.posicao, 16, 0, true);
+    return;
+  }
   if (acao === 'rota') { ativarRota(dispositivoId); return; }
   if (acao === 'compartilhar') { compartilharDispositivo(dispositivoId); return; }
   if (acao === 'comando') { abrirModalComando(dispositivoId); return; }
@@ -2858,6 +2868,10 @@ function _htmlAcoesCard(dispositivoId) {
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
       <div class= "dcard-section-title-title">AÇÕES</div>
       <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
+        <button class="dcard-acao" data-acao="seguir" onclick="acaoDispositivo('seguir','${dispositivoId}')" title="Seguir veículo">
+          <div class="dcard-acao-icon"><i class="fa fa-location-arrow"></i></div>
+          <span>Seguir</span>
+        </button>
         <button class="dcard-acao${temRota ? ' ativo' : ''}" data-acao="rota" onclick="acaoDispositivo('rota','${dispositivoId}')" title="Rota">
           <div class="dcard-acao-icon"><i class="fa fa-road"></i></div>
           <span>Rota</span>
