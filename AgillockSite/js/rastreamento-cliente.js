@@ -1630,7 +1630,7 @@ function renderSidebar() {
   const offline = todos.length - online;
   const semPos = todos.filter(v => !v.posicao).length;
   const el = document.getElementById('topbar-counters');
-  if (el) el.innerHTML = `<span class="dot-moving">●</span> ${online} online &nbsp;·&nbsp; <span class="dot-offline">●</span> ${offline} offline${semPos ? `&nbsp;·&nbsp;<span style="color:#e67e22">${semPos} sem pos.</span>` : ''}`;
+  if (el) el.innerHTML = ``;
 }
 
 function renderBuscaResultados() {
