@@ -461,6 +461,15 @@ function inicializarEventosPanel() {
     renderEventosLista();
   });
 
+  const buscaTipo = dropdown.querySelector('[data-evt-tipos-busca]');
+  buscaTipo?.addEventListener('input', function () {
+    const termo = _normalizarTextoBuscaTipo(this.value);
+    dropdown.querySelectorAll('.evt-tipo-item').forEach(item => {
+      const texto = _normalizarTextoBuscaTipo(item.textContent || '');
+      item.style.display = !termo || texto.includes(termo) ? '' : 'none';
+    });
+  });
+
   document.getElementById('evt-tipo-btn').addEventListener('click', function (e) {
     e.stopPropagation();
     dropdown.classList.toggle('open');
@@ -569,11 +578,21 @@ function _normalizarPlacaFiltro(valor) {
 
 function _htmlAcoesFiltroTipoEventos() {
   return `
-    <div style="display:flex;gap:6px;padding:8px;border-bottom:1px solid rgba(128,128,128,.18);position:sticky;top:0;background:inherit;z-index:1">
-      <button type="button" data-evt-tipos="todos" class="btn btn-default btn-xs" style="flex:1;font-size:10px;padding:4px 6px">Marcar todos</button>
-      <button type="button" data-evt-tipos="nenhum" class="btn btn-default btn-xs" style="flex:1;font-size:10px;padding:4px 6px">Desmarcar todos</button>
+    <div style="padding:8px;border-bottom:1px solid rgba(128,128,128,.18);position:sticky;top:0;background:inherit;z-index:1">
+      <div style="position:relative;margin-bottom:7px">
+        <i class="fa fa-search" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);font-size:10px;color:#8a94a6"></i>
+        <input type="text" data-evt-tipos-busca class="form-control input-xs" placeholder="Buscar tipo" autocomplete="off" style="height:24px;font-size:11px;padding:3px 7px 3px 23px;border-radius:6px;">
+      </div>
+      <div style="display:flex;gap:6px">
+        <button type="button" data-evt-tipos="todos" class="btn btn-default btn-xs" style="flex:1;font-size:10px;padding:4px 6px">Marcar todos</button>
+        <button type="button" data-evt-tipos="nenhum" class="btn btn-default btn-xs" style="flex:1;font-size:10px;padding:4px 6px">Desmarcar todos</button>
+      </div>
     </div>
   `;
+}
+
+function _normalizarTextoBuscaTipo(valor) {
+  return String(valor || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
 function _placaEventoCliente(e) {
@@ -593,7 +612,7 @@ function _injetarFiltroPlacaEventosCliente() {
   }
   const wrap = document.createElement('div');
   wrap.id = 'evt-placa-filtro-wrap';
-  wrap.style.cssText = 'position:relative;margin-bottom:8px;width:calc(100% - 76px);';
+  wrap.style.cssText = 'position:relative;margin-bottom:8px;';
   wrap.innerHTML = `
     <i class="fa fa-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#8a94a6"></i>
     <input type="text" id="evt-placa-filtro" class="form-control input-sm" placeholder="Buscar por placa" autocomplete="off" style="height:28px;font-size:12px;padding:4px 26px 4px 26px;border-radius:7px;">
