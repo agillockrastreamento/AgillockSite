@@ -1620,6 +1620,12 @@ function _bindLabelVeiculo(marker, texto) {
   });
 }
 
+function _removerLabelVeiculo(marker) {
+  if (!marker || !marker.getTooltip()) return;
+  marker.closeTooltip();
+  marker.unbindTooltip();
+}
+
 function _atualizarBindingsPopup() {
   _togglingPopup = true;
   Object.entries(marcadores).forEach(([id, m]) => {
@@ -2272,6 +2278,8 @@ window.enviarComandoDaSidebar = async function(did, tipo) {
 window.fecharCardDispositivo = function (skipClosePopup) {
   if (_overlay.labels && ativoId && marcadores[ativoId]) {
     const mf = marcadores[ativoId];
+    const v = veiculosMap[ativoId];
+    if (v) _bindLabelVeiculo(mf, v.placa || v.nome);
     if (mf.getTooltip()) mf.openTooltip();
   }
   if (modoFoco) desativarFoco();
@@ -2424,16 +2432,18 @@ window.focar = function (did, opts = {}) {
 
   if (_overlay.labels && prevAtivoId && prevAtivoId !== did && marcadores[prevAtivoId]) {
     const mp = marcadores[prevAtivoId];
+    const vp = veiculosMap[prevAtivoId];
+    if (vp) _bindLabelVeiculo(mp, vp.placa || vp.nome);
     if (mp.getTooltip()) mp.openTooltip();
   }
   if (_overlay.labels && marcadores[did]) {
-    const mn = marcadores[did];
-    if (mn.getTooltip()) mn.closeTooltip();
+    _removerLabelVeiculo(marcadores[did]);
   }
 
   document.querySelectorAll('.card-veiculo').forEach(el => el.classList.toggle('ativo', el.dataset.did === did));
   const v = veiculosMap[did]; if (!v?.posicao) return;
   ativarFoco(did);
+  if (_overlay.labels) _removerLabelVeiculo(marcadores[did]);
   _centralizarDispositivo(v.posicao, 16, opts.offsetPx || 0, true, opts.offsetY || 0);
   setTimeout(() => {
     if (opts.abrirPopup === false) return;
