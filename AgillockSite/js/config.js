@@ -54,8 +54,8 @@ window.AL_ICONS_3D = {
         </linearGradient>
         <filter id="car-raster-color-${cor.replace('#','')}" x="-80%" y="-80%" width="260%" height="260%">
           <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="gray" />
-          <feFlood flood-color="${cor}" flood-opacity="0.9" result="paint" />
-          <feBlend in="gray" in2="paint" mode="multiply" result="tinted" />
+          <feFlood flood-color="${cor}" flood-opacity="1" result="paint" />
+          <feBlend in="gray" in2="paint" mode="screen" result="tinted" />
           <feComposite in="tinted" in2="SourceGraphic" operator="in" />
         </filter>
       </defs>
@@ -93,7 +93,7 @@ window.AL_ICONS_3D = {
       const filterId = `car-raster-color-${cor.replace('#','')}`;
       const rotationOffset = Number(window.AL_ICONS_3D.CAR_IMAGE_ROTATION_OFFSET) || 0;
       return `
-        <image href="${url}" x="-90" y="-90" width="180" height="180" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" transform="rotate(${rotationOffset})" />
+        <image href="${url}" x="-100" y="-100" width="200" height="200" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" transform="rotate(${rotationOffset})" />
       `;
     },
   },
