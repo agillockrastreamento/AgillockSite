@@ -2955,7 +2955,7 @@ function mostrarCardDispositivo(id) {
           <div class= "dcard-section-title-title">RESUMO DE HOJE</div>
           <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
           <div style="margin-top:10px">
-            <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-default" style="width:100%;text-align:center; border-radius:10px;">
+            <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;width:100%;text-align:center;">
               <i class="fa fa-history"></i> Ver Mais
             </a>
           </div>
