@@ -142,7 +142,9 @@ router.post('/clicksign',
  *   "message": "success"
  * }
  */
-router.post('/zhencb', async (req: Request, res: Response): Promise<void> => {
+router.post('/zhencb',
+  express.json(),
+  async (req: Request, res: Response): Promise<void> => {
   // DEBUG TEMPORÁRIO — remover após confirmar formato do payload
   console.log('[Webhook ZHENCB] Headers:', JSON.stringify(req.headers));
   console.log('[Webhook ZHENCB] Body raw:', JSON.stringify(req.body));
