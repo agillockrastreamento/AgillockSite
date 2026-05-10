@@ -24,12 +24,14 @@ window.AL_ICONS_3D = {
     const cat = this.mapCategoria(categoria);
     const shape = this.shapes[cat] || this.shapes['carro'];
     const gradId = `grad-body-${cor.replace('#','')}`;
+    const isCarImage = cat === 'carro';
+    const viewBox = isCarImage ? '-40 -40 180 180' : '0 0 100 100';
     const shapeHtml = cat === 'carro'
       ? this.imageLayers.carro(cor)
       : shape(cor, `url(#${gradId})`);
     
     return `
-    <svg width="${this.SIZE}" height="${this.SIZE}" viewBox="0 0 100 100" style="transform: rotate(${angle}deg); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4));">
+    <svg width="${this.SIZE}" height="${this.SIZE}" viewBox="${viewBox}" style="transform: rotate(${angle}deg); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4)); overflow: visible;">
       <defs>
         <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" style="stop-color:${cor};stop-opacity:1" />
