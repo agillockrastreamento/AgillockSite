@@ -18,7 +18,7 @@ window.AL_CAR_ICON_IMAGE_URL = window.AL_CAR_ICON_IMAGE_URL || (function () {
 window.AL_ICONS_3D = {
   SIZE: 52,
   CAR_IMAGE_URL: window.AL_CAR_ICON_IMAGE_URL,
-  CAR_IMAGE_ROTATION_OFFSET: 32,
+  CAR_IMAGE_ROTATION_OFFSET: 212,
 
   getSvgHtml: function(categoria, cor, course) {
     const angle = course || 0;
