@@ -24,14 +24,12 @@ window.AL_ICONS_3D = {
     const cat = this.mapCategoria(categoria);
     const shape = this.shapes[cat] || this.shapes['carro'];
     const gradId = `grad-body-${cor.replace('#','')}`;
-    const isCarImage = cat === 'carro';
-    const viewBox = isCarImage ? '-40 -40 180 180' : '0 0 100 100';
     const shapeHtml = cat === 'carro'
       ? this.imageLayers.carro(cor)
       : shape(cor, `url(#${gradId})`);
     
     return `
-    <svg width="${this.SIZE}" height="${this.SIZE}" viewBox="${viewBox}" style="transform: rotate(${angle}deg); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4)); overflow: visible;">
+    <svg width="${this.SIZE}" height="${this.SIZE}" viewBox="0 0 100 100" style="transform: rotate(${angle}deg); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4)); overflow: visible;">
       <defs>
         <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" style="stop-color:${cor};stop-opacity:1" />
@@ -53,7 +51,7 @@ window.AL_ICONS_3D = {
           <stop offset="50%" style="stop-color:#444;stop-opacity:1" />
           <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:1" />
         </linearGradient>
-        <filter id="car-raster-color-${cor.replace('#','')}" x="-20%" y="-20%" width="140%" height="140%">
+        <filter id="car-raster-color-${cor.replace('#','')}" x="-80%" y="-80%" width="260%" height="260%">
           <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="gray" />
           <feFlood flood-color="${cor}" flood-opacity="0.9" result="paint" />
           <feBlend in="gray" in2="paint" mode="multiply" result="tinted" />
@@ -93,7 +91,7 @@ window.AL_ICONS_3D = {
       if (!url) return '';
       const filterId = `car-raster-color-${cor.replace('#','')}`;
       return `
-        <image href="${url}" x="-62" y="-62" width="180" height="180" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" />
+        <image href="${url}" x="-90" y="-90" width="180" height="180" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" />
       `;
     },
   },
