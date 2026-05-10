@@ -143,11 +143,15 @@ router.post('/clicksign',
  * }
  */
 router.post('/zhencb', async (req: Request, res: Response): Promise<void> => {
+  // DEBUG TEMPORÁRIO — remover após confirmar formato do payload
+  console.log('[Webhook ZHENCB] Headers:', JSON.stringify(req.headers));
+  console.log('[Webhook ZHENCB] Body raw:', JSON.stringify(req.body));
+
   const payload = req.body;
   const devices = payload?.data;
 
   if (!Array.isArray(devices)) {
-    console.warn('[Webhook ZHENCB] Payload inválido: "data" não é um array');
+    console.warn('[Webhook ZHENCB] Payload inválido: "data" não é um array. Body recebido:', JSON.stringify(payload));
     res.status(400).json({ error: 'Payload inválido' });
     return;
   }
