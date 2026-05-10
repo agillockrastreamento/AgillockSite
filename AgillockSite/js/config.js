@@ -55,9 +55,9 @@ window.AL_ICONS_3D = {
         <filter id="car-raster-color-${cor.replace('#','')}" x="-80%" y="-80%" width="260%" height="260%">
           <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="gray" />
           <feComponentTransfer in="gray" result="grayBoost">
-            <feFuncR type="linear" slope="1.30" intercept="0.6" />
-            <feFuncG type="linear" slope="1.30" intercept="0.6" />
-            <feFuncB type="linear" slope="1.30" intercept="0.6" />
+            <feFuncR type="linear" slope="1.30" intercept="0.06" />
+            <feFuncG type="linear" slope="1.30" intercept="0.06" />
+            <feFuncB type="linear" slope="1.30" intercept="0.06" />
           </feComponentTransfer>
           <feFlood flood-color="${cor}" flood-opacity="1" result="paint" />
           <feBlend in="grayBoost" in2="paint" mode="multiply" result="tinted" />
