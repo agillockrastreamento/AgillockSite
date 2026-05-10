@@ -524,7 +524,7 @@ function inicializarEventosPanel() {
   _injetarFiltroPlacaEventosAdmin();
 
   const dropdown = document.getElementById('evt-tipo-dropdown');
-  dropdown.innerHTML = TIPOS_EVENTO_ADMIN_FILTRO.map(t =>
+  dropdown.innerHTML = _htmlAcoesFiltroTipoEventos() + TIPOS_EVENTO_ADMIN_FILTRO.map(t =>
     `<label class="evt-tipo-item">
       <input type="checkbox" data-tipo="${t.tipo}" checked>
       ${t.label}
@@ -537,6 +537,18 @@ function inicializarEventosPanel() {
       _atualizarFiltrosTipo();
       renderEventosLista();
     });
+  });
+
+  dropdown.querySelector('[data-evt-tipos="todos"]')?.addEventListener('click', function () {
+    dropdown.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = true; });
+    _atualizarFiltrosTipo();
+    renderEventosLista();
+  });
+
+  dropdown.querySelector('[data-evt-tipos="nenhum"]')?.addEventListener('click', function () {
+    dropdown.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = false; });
+    _atualizarFiltrosTipo();
+    renderEventosLista();
   });
 
   // Toggle do dropdown
@@ -617,6 +629,15 @@ function _normalizarPlacaFiltro(valor) {
   return String(valor || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+function _htmlAcoesFiltroTipoEventos() {
+  return `
+    <div style="display:flex;gap:6px;padding:8px;border-bottom:1px solid rgba(128,128,128,.18);position:sticky;top:0;background:inherit;z-index:1">
+      <button type="button" data-evt-tipos="todos" class="btn btn-default btn-xs" style="flex:1;font-size:10px;padding:4px 6px">Marcar todos</button>
+      <button type="button" data-evt-tipos="nenhum" class="btn btn-default btn-xs" style="flex:1;font-size:10px;padding:4px 6px">Desmarcar todos</button>
+    </div>
+  `;
+}
+
 function _placaEventoAdmin(e) {
   const v = veiculosMap[e.dispositivoId];
   return v?.placa || e.placa || e.devicePlate || e.devicePlaca || '';
@@ -634,7 +655,7 @@ function _injetarFiltroPlacaEventosAdmin() {
   }
   const wrap = document.createElement('div');
   wrap.id = 'evt-placa-filtro-wrap';
-  wrap.style.cssText = 'position:relative;margin-bottom:8px;';
+  wrap.style.cssText = 'position:relative;margin-bottom:8px;width:calc(100% - 76px);';
   wrap.innerHTML = `
     <i class="fa fa-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#8a94a6"></i>
     <input type="text" id="evt-placa-filtro" class="form-control input-sm" placeholder="Buscar por placa" autocomplete="off" style="height:28px;font-size:12px;padding:4px 26px 4px 26px;border-radius:7px;">
