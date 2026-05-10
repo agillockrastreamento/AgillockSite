@@ -25,7 +25,7 @@ window.AL_ICONS_3D = {
     const shape = this.shapes[cat] || this.shapes['carro'];
     const gradId = `grad-body-${cor.replace('#','')}`;
     const shapeHtml = cat === 'carro'
-      ? this.shapes.carro(cor, `url(#${gradId})`) + this.imageLayers.carro(cor)
+      ? this.imageLayers.carro(cor)
       : shape(cor, `url(#${gradId})`);
     
     return `
@@ -91,7 +91,7 @@ window.AL_ICONS_3D = {
       if (!url) return '';
       const filterId = `car-raster-color-${cor.replace('#','')}`;
       return `
-        <image href="${url}" x="-43" y="-43" width="86" height="86" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" />
+        <image href="${url}" x="-50" y="-50" width="100" height="100" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" />
       `;
     },
   },
