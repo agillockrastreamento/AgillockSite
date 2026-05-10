@@ -2941,12 +2941,12 @@ function mostrarCardDispositivo(id) {
   _fecharTrackingDrawer();
   _prepararTrackingDrawer();
   _ajustarAlturaCardDispositivo();
-
+ 
   if (_cardAdminExpandido) {
     const body = card.querySelector('.dcard-body');
     const acoesRapidas = body ? Array.from(body.children).find(el => el.tagName === 'DIV' && el.getAttribute('style') && el.getAttribute('style').indexOf('display:flex;gap:6px') !== -1) : null;
     if (acoesRapidas) {
-      acoesRapidas.outerHTML = `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary dcard-report-btn" style="border-radius:10px;"><i class="fa fa-bar-chart"></i>  Relatório</a>`;
+      acoesRapidas.outerHTML = `<a href="relatorio.html?id=${v.dispositivoId}" class="btn btn-xs btn-primary" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;width:100%;text-align:center;"><i class="fa fa-bar-chart"></i>  Relatório</a>`;
     }
     const acoesSection = body ? Array.from(body.children).find(el => el.innerHTML && el.innerHTML.indexOf('A') !== -1 && el.innerHTML.indexOf('dcard-acao') !== -1) : null;
     if (acoesSection && !body.querySelector(`#dcard-resumo-hoje-${id}`)) {
