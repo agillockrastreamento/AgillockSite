@@ -8,7 +8,7 @@ window.API_URL = 'https://api.agillock.com.br';
 
 window.AL_CAR_ICON_IMAGE_URL = window.AL_CAR_ICON_IMAGE_URL || (function () {
   const script = document.currentScript || Array.from(document.scripts).find(s => /\/js\/config\.js(?:\?|$)/.test(s.src));
-  return script ? new URL('../img/veiculos/carro-topo.jpeg', script.src).href : 'img/veiculos/carro-topo.jpeg';
+  return script ? new URL('../img/veiculos/carro-topo.png', script.src).href : 'img/veiculos/carro-topo.png';
 })();
 
 /**
