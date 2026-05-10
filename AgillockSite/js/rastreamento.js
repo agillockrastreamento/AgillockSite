@@ -2242,7 +2242,7 @@ function atualizarMarcador(dispositivoId) {
 })();
 
 function _corMarcador(v) {
-  if (!v.posicao || v.status !== 'online') return '#95a5a6';
+  if (!v.posicao || v.status !== 'online') return '#fab32c';
   if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c';
   if (v.posicao.emMovimento || v.posicao.ignicao === true) return '#2980b9';
   return '#27ae60';
