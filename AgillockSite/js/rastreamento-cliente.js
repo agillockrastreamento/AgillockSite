@@ -1826,11 +1826,11 @@ function cardVeiculoHtml(v) {
   //const dotCls = isMoving ? 'dot-moving' : isOnline ? 'dot-online' : 'dot-offline';
   const marcaModelo = [v.marca, v.modeloVeiculo].filter(Boolean).join(' ');
 
-  return `<div class="card-veiculo${v.dispositivoId === ativoId ? ' ativo' : ''}" data-did="${v.dispositivoId}" onclick="focarCliente('${v.dispositivoId}')">
-    <div class="btn-foto-wrap" onclick="event.stopPropagation()">
+  return `<div class="card-veiculo${v.dispositivoId === ativoId ? ' ativo' : ''}" data-did="${v.dispositivoId}" style="position:relative">
+    <div class="btn-foto-wrap">
       ${mediaHtml}
-      <button class="btn-upload-foto" onclick="handleUploadFoto('${v.dispositivoId}')" title="Alterar foto"><i class="fa fa-camera"></i></button>
     </div>
+    <button type="button" class="btn-upload-foto" title="Alterar foto" style="position:absolute;top:6px;right:6px;z-index:6"><i class="fa fa-camera"></i></button>
     ${v.placa ? `<span class="cv-placa">${v.placa}</span>` : ''}
     <span class="cv-modelo" title="${marcaModelo || v.nome}">${marcaModelo || v.nome}</span>
   </div>`;
