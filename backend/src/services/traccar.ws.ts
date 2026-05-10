@@ -237,8 +237,6 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       posicaoPorIdentificador as unknown as Map<string, any>,
     );
 
-    console.log(`[WS Traccar] Processadas ${atualizados.size} posições.`);
-
     atualizados.forEach((dispositivo, identificador) => {
       // Tentar preservar campos que o Traccar omite em alguns pacotes
       const anterior = estadoAnteriorMap.get(identificador);
