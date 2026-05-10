@@ -1448,7 +1448,7 @@ function _abrirSpider(chave, centroLatLng) {
     _spider.linhas.push(linha);
     const sm = L.marker(sp, { icon: criarIcone(v), zIndexOffset: 1000 });
     if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
-    if (_overlay.labels) sm.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
+    if (_overlay.labels) _bindLabelVeiculo(sm, v.placa || v.nome);
     sm.on('click', function (e) { L.DomEvent.stopPropagation(e); _fecharSpider(); focar(id); });
     sm.addTo(map); _spider.markers.push(sm);
   });
@@ -1473,7 +1473,7 @@ function renderMarcadores() {
       if (!marcadores[id]) {
         const m = L.marker([latitude, longitude], { icon: criarIcone(v) });
         if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
-        if (_overlay.labels) m.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
+        if (_overlay.labels) _bindLabelVeiculo(m, v.placa || v.nome);
         m.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = m; marcadoresIconeKey[id] = _iconeKey(id);
         if (visivel) m.addTo(map);
@@ -1519,6 +1519,13 @@ function atualizarMarcador(did) {
   const style = document.createElement('style');
   style.id = id;
   style.innerHTML = `
+    .leaflet-tooltip.label-veiculo-clean {
+      box-shadow: none !important;
+      filter: none !important;
+      text-shadow: none !important;
+      -webkit-filter: none !important;
+      will-change: transform;
+    }
     #eventos-lista .evento-item { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
     #eventos-lista .evento-item:hover { background: var(--evt-hover-bg) !important; border-color: var(--evt-color) !important; }
     #eventos-lista .evt-icon-wrap,
@@ -1599,12 +1606,26 @@ function criarPopupSimples(v) {
   return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px">${txt}</div>`;
 }
 
+function _bindLabelVeiculo(marker, texto) {
+  if (!marker) return;
+  if (marker.getTooltip()) {
+    marker.closeTooltip();
+    marker.unbindTooltip();
+  }
+  marker.bindTooltip(texto, {
+    permanent: true,
+    direction: 'top',
+    className: 'label-veiculo label-veiculo-clean',
+    offset: [0, -14],
+  });
+}
+
 function _atualizarBindingsPopup() {
   _togglingPopup = true;
   Object.entries(marcadores).forEach(([id, m]) => {
     const v = veiculosMap[id];
     if (_overlay.labels && v) {
-      m.bindTooltip(v.placa || v.nome, { permanent: true, direction: 'top', className: 'label-veiculo', offset: [0, -14] });
+      _bindLabelVeiculo(m, v.placa || v.nome);
       if (id === ativoId) m.closeTooltip();
     } else {
       if (m.getTooltip()) { m.closeTooltip(); m.unbindTooltip(); }
