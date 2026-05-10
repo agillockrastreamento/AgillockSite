@@ -91,7 +91,7 @@ window.AL_ICONS_3D = {
       if (!url) return '';
       const filterId = `car-raster-color-${cor.replace('#','')}`;
       return `
-        <image href="${url}" x="-50" y="-50" width="100" height="100" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" />
+        <image href="${url}" x="-62" y="-62" width="124" height="124" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" />
       `;
     },
   },
