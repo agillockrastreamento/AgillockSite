@@ -6,18 +6,27 @@
 
 window.API_URL = 'https://api.agillock.com.br';
 
+window.AL_CAR_ICON_IMAGE_URL = window.AL_CAR_ICON_IMAGE_URL || (function () {
+  const script = document.currentScript || Array.from(document.scripts).find(s => /\/js\/config\.js(?:\?|$)/.test(s.src));
+  return script ? new URL('../img/veiculos/carro-topo.jpeg', script.src).href : 'img/veiculos/carro-topo.jpeg';
+})();
+
 /**
  * Biblioteca de Ícones SVG 3D para Veículos - AgilLock
  * Vista superior com efeitos de profundidade, gradientes e sombras.
  */
 window.AL_ICONS_3D = {
   SIZE: 52,
+  CAR_IMAGE_URL: window.AL_CAR_ICON_IMAGE_URL,
 
   getSvgHtml: function(categoria, cor, course) {
     const angle = course || 0;
     const cat = this.mapCategoria(categoria);
-    const shape = this.shapes[cat] || this.shapes['carro_imagem'] || this.shapes['carro'];
+    const shape = this.shapes[cat] || this.shapes['carro'];
     const gradId = `grad-body-${cor.replace('#','')}`;
+    const shapeHtml = cat === 'carro'
+      ? this.shapes.carro(cor, `url(#${gradId})`) + this.imageLayers.carro(cor)
+      : shape(cor, `url(#${gradId})`);
     
     return `
     <svg width="${this.SIZE}" height="${this.SIZE}" viewBox="0 0 100 100" style="transform: rotate(${angle}deg); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4));">
@@ -42,17 +51,22 @@ window.AL_ICONS_3D = {
           <stop offset="50%" style="stop-color:#444;stop-opacity:1" />
           <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:1" />
         </linearGradient>
+        <filter id="car-raster-color-${cor.replace('#','')}" x="-20%" y="-20%" width="140%" height="140%">
+          <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="gray" />
+          <feFlood flood-color="${cor}" flood-opacity="0.9" result="paint" />
+          <feBlend in="gray" in2="paint" mode="multiply" result="tinted" />
+          <feComposite in="tinted" in2="SourceGraphic" operator="in" />
+        </filter>
       </defs>
       <g transform="translate(50, 50)">
-        ${shape(cor, `url(#${gradId})`)}
+        ${shapeHtml}
       </g>
     </svg>`;
   },
 
   mapCategoria: function(c) {
-    if (!c) return 'carro_imagem';
+    if (!c) return 'carro';
     const cleanC = c.toLowerCase();
-    if (/^carro($|_executivo|_hatchback|_luxo)/i.test(cleanC)) return 'carro_imagem';
     // Tenta buscar diretamente pelo nome exato do value (mais robusto)
     if (this.shapes[cleanC]) return cleanC;
     
@@ -68,36 +82,24 @@ window.AL_ICONS_3D = {
     if (/escavadeira|retro|maquina/i.test(cleanC)) return 'escavadeira';
     if (/aviao/i.test(cleanC)) return 'aviao_passageiros';
     if (/caixa|container/i.test(cleanC)) return 'container_40';
-    return 'carro_imagem';
+    return 'carro';
+  },
+
+  imageLayers: {
+    carro: function(cor) {
+      const url = window.AL_ICONS_3D.CAR_IMAGE_URL;
+      if (!url) return '';
+      const filterId = `car-raster-color-${cor.replace('#','')}`;
+      return `
+        <image href="${url}" x="-43" y="-43" width="86" height="86" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" />
+      `;
+    },
   },
 
   shapes: {
     // ==========================================
     // 1. CARROS E DERIVADOS (Detalhados)
     // ==========================================
-    carro_imagem: (cor, grad) => `
-      <g transform="rotate(-32) scale(1.04)">
-        <ellipse cx="3" cy="7" rx="17" ry="39" fill="#000" opacity="0.22" transform="rotate(-8)" />
-        <path d="M-12,-39 Q-2,-45 10,-40 Q18,-31 20,-14 L21,15 Q17,31 7,40 Q-4,43 -14,35 Q-20,23 -20,4 L-19,-16 Q-18,-30 -12,-39 Z" fill="${cor}" />
-        <path d="M-12,-39 Q-2,-45 10,-40 Q18,-31 20,-14 L21,15 Q17,31 7,40 Q-4,43 -14,35 Q-20,23 -20,4 L-19,-16 Q-18,-30 -12,-39 Z" fill="${grad}" opacity="0.68" />
-        <path d="M-9,-36 Q0,-41 9,-37 Q16,-27 17,-12 L18,13 Q14,27 6,35 Q-2,39 -11,32 Q-16,20 -16,4 L-15,-14 Q-15,-28 -9,-36 Z" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.2" />
-        <path d="M13,-32 Q19,-19 19,8 Q18,23 10,35" fill="none" stroke="#061b0b" stroke-width="3.2" opacity="0.38" stroke-linecap="round" />
-        <path d="M-16,-23 Q-6,-33 11,-33" fill="none" stroke="#fff" stroke-width="2.2" opacity="0.34" stroke-linecap="round" />
-        <path d="M-13,-10 Q-3,-18 12,-18" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.24" stroke-linecap="round" />
-        <path d="M-10,-28 Q-1,-34 10,-30 L14,-18 Q4,-21 -9,-16 Z" fill="url(#grad-glass)" />
-        <path d="M-12,4 Q0,-2 15,1 L14,17 Q4,25 -11,22 Z" fill="url(#grad-glass)" />
-        <path d="M-7,-26 Q0,-30 7,-28" fill="none" stroke="#fff" stroke-width="1.1" opacity="0.34" stroke-linecap="round" />
-        <path d="M-8,7 Q1,3 11,5" fill="none" stroke="#fff" stroke-width="1.1" opacity="0.28" stroke-linecap="round" />
-        <path d="M-19,-9 L-25,-5 L-23,1 L-18,-3 Z" fill="${cor}" />
-        <path d="M19,-8 L25,-4 L23,2 L19,-2 Z" fill="${cor}" />
-        <path d="M-16,-33 Q-5,-42 10,-39" fill="none" stroke="#0b1510" stroke-width="2.4" opacity="0.72" stroke-linecap="round" />
-        <path d="M-15,34 Q-4,43 8,38" fill="none" stroke="#0b1510" stroke-width="2.4" opacity="0.72" stroke-linecap="round" />
-        <path d="M-12,-39 L-5,-42" stroke="#f8f8f8" stroke-width="3" opacity="0.88" stroke-linecap="round" />
-        <path d="M6,-41 L13,-38" stroke="#f8f8f8" stroke-width="3" opacity="0.88" stroke-linecap="round" />
-        <path d="M-14,35 L-7,38" stroke="#d72828" stroke-width="3" opacity="0.92" stroke-linecap="round" />
-        <path d="M5,39 L12,35" stroke="#d72828" stroke-width="3" opacity="0.92" stroke-linecap="round" />
-      </g>
-    `,
     carro: (cor, grad) => `
       <ellipse cx="0" cy="4" rx="22" ry="41" fill="#000" opacity="0.16" />
       <rect x="-20" y="-24" width="6" height="17" rx="3" fill="#15191f" />
