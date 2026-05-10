@@ -6,31 +6,21 @@
 
 window.API_URL = 'https://api.agillock.com.br';
 
-window.AL_CAR_ICON_IMAGE_URL = window.AL_CAR_ICON_IMAGE_URL || (function () {
-  const script = document.currentScript || Array.from(document.scripts).find(s => /\/js\/config\.js(?:\?|$)/.test(s.src));
-  return script ? new URL('../img/veiculos/carro-topo.png', script.src).href : 'img/veiculos/carro-topo.png';
-})();
-
 /**
  * Biblioteca de Ícones SVG 3D para Veículos - AgilLock
  * Vista superior com efeitos de profundidade, gradientes e sombras.
  */
 window.AL_ICONS_3D = {
   SIZE: 52,
-  CAR_IMAGE_URL: window.AL_CAR_ICON_IMAGE_URL,
-  CAR_IMAGE_ROTATION_OFFSET: 212,
 
   getSvgHtml: function(categoria, cor, course) {
     const angle = course || 0;
     const cat = this.mapCategoria(categoria);
     const shape = this.shapes[cat] || this.shapes['carro'];
     const gradId = `grad-body-${cor.replace('#','')}`;
-    const shapeHtml = cat === 'carro'
-      ? this.imageLayers.carro(cor)
-      : shape(cor, `url(#${gradId})`);
     
     return `
-    <svg width="${this.SIZE}" height="${this.SIZE}" viewBox="0 0 100 100" style="transform: rotate(${angle}deg); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4)); overflow: visible;">
+    <svg width="${this.SIZE}" height="${this.SIZE}" viewBox="0 0 100 100" style="transform: rotate(${angle}deg); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4));">
       <defs>
         <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" style="stop-color:${cor};stop-opacity:1" />
@@ -52,20 +42,9 @@ window.AL_ICONS_3D = {
           <stop offset="50%" style="stop-color:#444;stop-opacity:1" />
           <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:1" />
         </linearGradient>
-        <filter id="car-raster-color-${cor.replace('#','')}" x="-80%" y="-80%" width="260%" height="260%">
-          <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="gray" />
-          <feComponentTransfer in="gray" result="grayBoost">
-            <feFuncR type="linear" slope="1.30" intercept="0.06" />
-            <feFuncG type="linear" slope="1.30" intercept="0.06" />
-            <feFuncB type="linear" slope="1.30" intercept="0.06" />
-          </feComponentTransfer>
-          <feFlood flood-color="${cor}" flood-opacity="1" result="paint" />
-          <feBlend in="grayBoost" in2="paint" mode="multiply" result="tinted" />
-          <feComposite in="tinted" in2="SourceAlpha" operator="in" />
-        </filter>
       </defs>
       <g transform="translate(50, 50)">
-        ${shapeHtml}
+        ${shape(cor, `url(#${gradId})`)}
       </g>
     </svg>`;
   },
@@ -89,18 +68,6 @@ window.AL_ICONS_3D = {
     if (/aviao/i.test(cleanC)) return 'aviao_passageiros';
     if (/caixa|container/i.test(cleanC)) return 'container_40';
     return 'carro';
-  },
-
-  imageLayers: {
-    carro: function(cor) {
-      const url = window.AL_ICONS_3D.CAR_IMAGE_URL;
-      if (!url) return '';
-      const filterId = `car-raster-color-${cor.replace('#','')}`;
-      const rotationOffset = Number(window.AL_ICONS_3D.CAR_IMAGE_ROTATION_OFFSET) || 0;
-      return `
-        <image href="${url}" x="-100" y="-100" width="200" height="200" preserveAspectRatio="xMidYMid meet" filter="url(#${filterId})" transform="rotate(${rotationOffset})" />
-      `;
-    },
   },
 
   shapes: {
