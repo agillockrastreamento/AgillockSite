@@ -91,6 +91,7 @@ const TIPOS_EVENTO_CLIENTE_FILTRO = TIPOS_EVENTO_CLIENTE.filter(t => t.tipo !== 
 
 let _evtFiltros = new Set();
 let _evtNotif = true;
+let _evtPlacaFiltro = '';
 const _eventos = [];
 const MAX_EVENTOS = 100;
 const EVENTOS_PANEL_STORAGE_KEY = 'rastreamento_cliente_eventos_min';
@@ -431,6 +432,7 @@ function inicializarEventosPanel() {
   // O painel inicia minimizado (Display none controlado via class)
   const panel = document.getElementById('eventos-panel');
   if (panel) panel.classList.add('minimizado');
+  _injetarFiltroPlacaEventosCliente();
 
   const dropdown = document.getElementById('evt-tipo-dropdown');
   dropdown.innerHTML = TIPOS_EVENTO_CLIENTE_FILTRO.map(t =>
@@ -549,6 +551,50 @@ function _aplicarEstadoPainelEventos() {
   btn.title = minimizado ? 'Expandir eventos' : 'Minimizar eventos';
 }
 
+function _normalizarPlacaFiltro(valor) {
+  return String(valor || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function _placaEventoCliente(e) {
+  const v = veiculosMap[e.dispositivoId];
+  return v?.placa || e.placa || e.devicePlate || e.devicePlaca || '';
+}
+
+function _injetarFiltroPlacaEventosCliente() {
+  const header = document.getElementById('eventos-header');
+  const filtros = document.getElementById('eventos-filtros');
+  if (!header || !filtros || document.getElementById('evt-placa-filtro')) return;
+  if (!document.getElementById('evt-placa-filtro-style')) {
+    const style = document.createElement('style');
+    style.id = 'evt-placa-filtro-style';
+    style.textContent = '#eventos-panel.minimizado #evt-placa-filtro-wrap{display:none!important}';
+    document.head.appendChild(style);
+  }
+  const wrap = document.createElement('div');
+  wrap.id = 'evt-placa-filtro-wrap';
+  wrap.style.cssText = 'position:relative;margin-bottom:8px;';
+  wrap.innerHTML = `
+    <i class="fa fa-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#8a94a6"></i>
+    <input type="text" id="evt-placa-filtro" class="form-control input-sm" placeholder="Buscar por placa" autocomplete="off" style="height:28px;font-size:12px;padding:4px 26px 4px 26px;border-radius:7px;">
+    <button type="button" id="evt-placa-limpar" title="Limpar busca" style="display:none;position:absolute;right:5px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#8a94a6;padding:2px 5px;line-height:1"><i class="fa fa-times"></i></button>
+  `;
+  header.insertBefore(wrap, filtros);
+  const input = wrap.querySelector('#evt-placa-filtro');
+  const limpar = wrap.querySelector('#evt-placa-limpar');
+  input.addEventListener('input', function () {
+    _evtPlacaFiltro = this.value || '';
+    limpar.style.display = _evtPlacaFiltro ? 'block' : 'none';
+    renderEventosLista();
+  });
+  limpar.addEventListener('click', function () {
+    input.value = '';
+    _evtPlacaFiltro = '';
+    limpar.style.display = 'none';
+    input.focus();
+    renderEventosLista();
+  });
+}
+
 function inicializarBarraVeiculos() {
   _aplicarEstadoBarraVeiculos();
   const btn = document.getElementById('barra-veiculos-toggle');
@@ -633,12 +679,17 @@ function _tocarSomEvento(tipo) {
 
 function renderEventosLista() {
   const lista = document.getElementById('eventos-lista');
-  const filtrados = _eventos.filter(e => !_evtFiltros.has(e.tipo));
+  const placaFiltro = _normalizarPlacaFiltro(_evtPlacaFiltro);
+  const filtrados = _eventos.filter(e => {
+    if (_evtFiltros.has(e.tipo)) return false;
+    if (!placaFiltro) return true;
+    return _normalizarPlacaFiltro(_placaEventoCliente(e)).includes(placaFiltro);
+  });
 
   if (!filtrados.length) {
     lista.innerHTML = `<div id="eventos-vazio">
       <i class="fa fa-bell-o" style="font-size:28px;display:block;margin-bottom:8px;color:#ddd"></i>
-      Aguardando eventos...
+      ${placaFiltro ? 'Nenhum evento para esta placa.' : 'Aguardando eventos...'}
     </div>`;
     return;
   }

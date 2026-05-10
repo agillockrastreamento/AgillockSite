@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Button,
@@ -54,6 +54,7 @@ export function NotificationsScreen() {
   const [dispositivoIdAtivo, setDispositivoIdAtivo] = useState<string>('');
   const [selectedVehicleName, setSelectedVehicleName] = useState('');
   const [vehicleSelectorVisible, setVehicleSelectorVisible] = useState(false);
+  const [vehiclePlateSearch, setVehiclePlateSearch] = useState('');
 
   // Preferences
   const [preferencias, setPreferencias] = useState<NotificationPreferencesResponse | null>(null);
@@ -78,6 +79,14 @@ export function NotificationsScreen() {
     { label: 'Sexta', value: 5 },
     { label: 'Sábado', value: 6 },
   ];
+
+  const normalizePlateSearch = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  const filteredVeiculos = useMemo(() => {
+    const filtro = normalizePlateSearch(vehiclePlateSearch);
+    if (!filtro) return veiculos;
+    return veiculos.filter(v => normalizePlateSearch(v.placa || '').includes(filtro));
+  }, [veiculos, vehiclePlateSearch]);
 
   const loadVeiculos = useCallback(async () => {
     try {
@@ -182,6 +191,7 @@ export function NotificationsScreen() {
   const handleVehicleSelect = (v: TrackingDevice) => {
     setDispositivoIdAtivo(v.dispositivoId);
     setSelectedVehicleName(`${v.nome}${v.placa ? ` (${v.placa})` : ''}`);
+    setVehiclePlateSearch('');
     setVehicleSelectorVisible(false);
   };
 
@@ -211,8 +221,20 @@ export function NotificationsScreen() {
                 onClose={() => setVehicleSelectorVisible(false)}
                 title="Selecionar Veículo"
               >
+                <TextInput
+                  mode="outlined"
+                  value={vehiclePlateSearch}
+                  onChangeText={setVehiclePlateSearch}
+                  placeholder="Buscar por placa"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  left={<TextInput.Icon icon="magnify" />}
+                  right={vehiclePlateSearch ? <TextInput.Icon icon="close" onPress={() => setVehiclePlateSearch('')} /> : undefined}
+                  style={styles.vehicleSearchInput}
+                  dense
+                />
                 <ScrollView style={styles.vehicleList}>
-                  {veiculos.map(v => (
+                  {filteredVeiculos.map(v => (
                     <Pressable
                       key={v.dispositivoId}
                       style={styles.vehicleItem}
@@ -223,6 +245,9 @@ export function NotificationsScreen() {
                       </Text>
                     </Pressable>
                   ))}
+                  {!filteredVeiculos.length && (
+                    <Text style={styles.vehicleEmptyText}>Nenhum veículo encontrado para esta placa.</Text>
+                  )}
                 </ScrollView>
               </BottomSheet>
             </>
@@ -449,6 +474,18 @@ const styles = StyleSheet.create({
   },
   vehicleList: {
     maxHeight: 300,
+  },
+  vehicleSearchInput: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  vehicleEmptyText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   vehicleItem: {
     paddingVertical: spacing.md,
