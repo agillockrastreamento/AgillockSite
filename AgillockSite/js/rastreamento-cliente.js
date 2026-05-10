@@ -1572,7 +1572,7 @@ function atualizarMarcador(did) {
 })();
 
 function _corMarcador(v) {
-  if (!v.posicao || v.status !== 'online') return '#95a5a6'; // cinza: offline ou sem dados
+  if (!v.posicao || v.status !== 'online') return '#fab32c'; // cinza: offline ou sem dados
   if (v.limiteVelocidade && v.posicao.velocidade > v.limiteVelocidade) return '#e74c3c'; // vermelho: excesso
   if (v.posicao.emMovimento || v.posicao.ignicao === true) return '#2980b9'; // azul: em movimento ou ignição ligada
   return '#27ae60'; // verde: parado / ignição desligada
