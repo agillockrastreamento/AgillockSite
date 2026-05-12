@@ -32,6 +32,77 @@
     if (el) el.textContent = texto ? ' - ' + texto : '';
   }
 
+  function normalizarPlacaBusca(valor) {
+    return String(valor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function garantirPickerDispositivo() {
+    if (document.getElementById('man-picker-dispositivo')) return;
+    const style = document.createElement('style');
+    style.textContent = `
+      .man-device-picker{position:relative}
+      .man-device-picker-btn{height:34px;width:100%;border:1px solid #ccc;background:#fff;border-radius:4px;text-align:left;padding:6px 30px 6px 12px;font-size:13px;color:#555;position:relative}
+      .man-device-picker-btn .fa-chevron-down{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#888}
+      .man-device-picker-menu{display:none;position:absolute;z-index:5000;left:0;right:0;top:38px;background:#fff;border:1px solid #ccd3dc;border-radius:7px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:8px}
+      .man-device-picker.open .man-device-picker-menu{display:block}
+      .man-device-picker-search{height:30px;font-size:12px;margin-bottom:7px}
+      .man-device-picker-list{max-height:210px;overflow-y:auto}
+      .man-device-picker-option{display:block;width:100%;border:0;background:transparent;text-align:left;padding:7px 8px;border-radius:5px;font-size:12px;color:#333}
+      .man-device-picker-option:hover,.man-device-picker-option.active{background:#eef6fd;color:#1f6f9f}
+      .man-device-picker-empty{padding:10px;text-align:center;color:#999;font-size:12px}
+      html.dark-theme .man-device-picker-btn,html.dark-theme .man-device-picker-menu{background:#252535;color:#e0e6f0;border-color:#3a3a5c}
+      html.dark-theme .man-device-picker-option{color:#e0e6f0}
+      html.dark-theme .man-device-picker-option:hover,html.dark-theme .man-device-picker-option.active{background:#1a3a5c;color:#fff}
+    `;
+    document.head.appendChild(style);
+    const sel = document.getElementById('filtro-dispositivo');
+    sel.style.display = 'none';
+    const picker = document.createElement('div');
+    picker.id = 'man-picker-dispositivo';
+    picker.className = 'man-device-picker';
+    picker.innerHTML = `
+      <button type="button" class="man-device-picker-btn" id="man-picker-dispositivo-btn"><span>Selecione um veículo...</span><i class="fa fa-chevron-down"></i></button>
+      <div class="man-device-picker-menu">
+        <input type="text" id="man-busca-placa-dispositivo" class="form-control man-device-picker-search" placeholder="Buscar por placa" autocomplete="off">
+        <div id="man-picker-dispositivo-lista" class="man-device-picker-list"></div>
+      </div>`;
+    sel.parentNode.insertBefore(picker, sel.nextSibling);
+    document.getElementById('man-picker-dispositivo-btn').addEventListener('click', function () {
+      picker.classList.toggle('open');
+      if (picker.classList.contains('open')) setTimeout(() => document.getElementById('man-busca-placa-dispositivo')?.focus(), 0);
+    });
+    document.getElementById('man-busca-placa-dispositivo').addEventListener('input', function () {
+      renderPickerDispositivo(this.value);
+    });
+    document.addEventListener('click', function (e) {
+      if (!picker.contains(e.target)) picker.classList.remove('open');
+    });
+  }
+
+  function renderPickerDispositivo(filtroPlaca) {
+    garantirPickerDispositivo();
+    const sel = document.getElementById('filtro-dispositivo');
+    const filtro = normalizarPlacaBusca(filtroPlaca);
+    const filtrados = filtro ? veiculos.filter(v => normalizarPlacaBusca(v.placa).includes(filtro)) : veiculos;
+    const label = document.querySelector('#man-picker-dispositivo-btn span');
+    const opt = sel.options[sel.selectedIndex];
+    if (label) label.textContent = opt && opt.value ? opt.text : 'Selecione um veículo...';
+    const lista = document.getElementById('man-picker-dispositivo-lista');
+    if (!lista) return;
+    lista.innerHTML = filtrados.length ? filtrados.map(v => {
+      const texto = v.nome + (v.placa ? ' (' + v.placa + ')' : '');
+      return `<button type="button" class="man-device-picker-option${String(v.dispositivoId) === String(sel.value) ? ' active' : ''}" data-id="${v.dispositivoId}">${texto}</button>`;
+    }).join('') : '<div class="man-device-picker-empty">Nenhum veículo encontrado.</div>';
+    lista.querySelectorAll('.man-device-picker-option').forEach(btn => {
+      btn.addEventListener('click', function () {
+        sel.value = this.dataset.id;
+        document.getElementById('man-picker-dispositivo').classList.remove('open');
+        renderPickerDispositivo(document.getElementById('man-busca-placa-dispositivo')?.value || '');
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  }
+
   function aplicarPermissaoManutencao() {
     const pode = podeGerenciarManutencao();
     const btnRegistro = document.getElementById('btn-novo-registro');
@@ -70,6 +141,7 @@
         veiculos.map(v =>
           `<option value="${v.dispositivoId}">${v.nome}${v.placa ? ' (' + v.placa + ')' : ''}</option>`
         ).join('');
+      renderPickerDispositivo('');
     } catch (err) {
       console.error('Erro ao carregar veículos', err);
     }
@@ -90,6 +162,7 @@
       document.getElementById('man-vazio').style.display = 'none';
       document.getElementById('man-container').style.display = 'block';
       carregarDados(id);
+      renderPickerDispositivo(document.getElementById('man-busca-placa-dispositivo')?.value || '');
     });
 
     document.getElementById('btn-novo-registro').addEventListener('click', abrirModalRegistro);
