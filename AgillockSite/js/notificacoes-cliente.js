@@ -30,6 +30,26 @@
   let dispositivoIdAtivo = null;
   let preferenciasAtivas = {};
 
+  function normalizarPlacaBusca(valor) {
+    return String(valor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function renderOpcoesVeiculos(filtroPlaca) {
+    const select = document.getElementById('filtro-dispositivo');
+    const ativo = select.value;
+    const filtro = normalizarPlacaBusca(filtroPlaca);
+    const filtrados = filtro
+      ? veiculos.filter(v => normalizarPlacaBusca(v.placa).includes(filtro))
+      : veiculos;
+
+    select.innerHTML = '<option value="">Selecione um ve&iacute;culo...</option>' +
+      filtrados.map(v => `<option value="${v.dispositivoId}">${v.placa ? v.nome + ' (' + v.placa + ')' : v.nome}</option>`).join('');
+
+    if (ativo && filtrados.some(v => String(v.dispositivoId) === String(ativo))) {
+      select.value = ativo;
+    }
+  }
+
   async function init() {
     await carregarVeiculos();
     bindEvents();
@@ -39,9 +59,7 @@
     try {
       const data = await AL_CLIENTE.apiGet('/api/cliente/rastreamento/posicoes');
       veiculos = data || [];
-      const select = document.getElementById('filtro-dispositivo');
-      select.innerHTML = '<option value="">Selecione um veículo...</option>' +
-        veiculos.map(v => `<option value="${v.dispositivoId}">${v.placa ? v.nome + ' (' + v.placa + ')' : v.nome}</option>`).join('');
+      renderOpcoesVeiculos(document.getElementById('busca-placa-dispositivo')?.value || '');
     } catch (err) {
       console.error('Erro ao carregar veículos', err);
     }
@@ -63,6 +81,9 @@
     });
 
     document.getElementById('btn-salvar-geral').addEventListener('click', salvarConfiguracoes);
+    document.getElementById('busca-placa-dispositivo').addEventListener('input', function () {
+      renderOpcoesVeiculos(this.value);
+    });
   }
 
   async function carregarPreferencias(dispositivoId) {

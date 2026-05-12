@@ -134,6 +134,10 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
+function _getCardApelido(dispositivoId) {
+  return String(veiculosMap[dispositivoId]?.apelidoCliente || '').trim();
+}
+
 function _isMobileTracking() { return window.innerWidth <= 700; }
 
 let _trackingDrawerAberta = false;
@@ -1539,7 +1543,7 @@ function _abrirSpider(chave, centroLatLng) {
     _spider.linhas.push(linha);
     const sm = L.marker(sp, { icon: criarIcone(v), zIndexOffset: 1000 });
     if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
-    if (_overlay.labels) _bindLabelVeiculo(sm, v.placa || v.nome);
+    if (_overlay.labels) _bindLabelVeiculo(sm, _textoLabelVeiculo(v));
     sm.on('click', function (e) { L.DomEvent.stopPropagation(e); _fecharSpider(); focar(id); });
     sm.addTo(map); _spider.markers.push(sm);
   });
@@ -1564,7 +1568,7 @@ function renderMarcadores() {
       if (!marcadores[id]) {
         const m = L.marker([latitude, longitude], { icon: criarIcone(v) });
         if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
-        if (_overlay.labels) _bindLabelVeiculo(m, v.placa || v.nome);
+        if (_overlay.labels) _bindLabelVeiculo(m, _textoLabelVeiculo(v));
         m.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = m; marcadoresIconeKey[id] = _iconeKey(id);
         if (visivel) m.addTo(map);
@@ -1647,6 +1651,15 @@ function atualizarMarcador(did) {
     .dark-theme .evt-tipo-dropdown { background: #1a202c; border-color: #2d3748; }
     .dark-theme .evt-tipo-item { color: #c9d1d9; }
     .dark-theme .evt-tipo-item:hover { background: #2d3748; }
+    .card-veiculo .cv-apelido-row { width: 100%; min-height: 16px; display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: auto; }
+    .card-veiculo .cv-apelido-text { min-width: 0; max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 1.2; color: #4b5563; font-weight: 700; }
+    .dark-theme .card-veiculo .cv-apelido-text { color: #d7dde6; }
+    .card-veiculo .btn-editar-apelido { width: 17px; height: 17px; border: 0; border-radius: 50%; background: #2980b9; color: #fff; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 9px; opacity: 0; transition: opacity .2s, background .15s; flex: 0 0 auto; }
+    .card-veiculo:hover .btn-editar-apelido { opacity: 1; }
+    .card-veiculo .btn-editar-apelido:hover { background: #1f6f9f; }
+    #modal-apelido-card .modal-content { border-radius: 8px; }
+    html.dark-theme #modal-apelido-card .modal-content { background: #1f2937; color: #f8fafc; }
+    html.dark-theme #modal-apelido-card .form-control { background: #111827; border-color: #374151; color: #f8fafc; }
     html.dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
     html.dark-theme .popup-evento-moderno .leaflet-popup-tip,
     .dark-theme .popup-evento-moderno .leaflet-popup-content-wrapper,
@@ -1693,8 +1706,13 @@ let _mostrarPopup = true;
 let _togglingPopup = false;
 
 function criarPopupSimples(v) {
-  const txt = v.placa || v.nome;
+  const txt = _textoLabelVeiculo(v);
   return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px">${txt}</div>`;
+}
+
+function _textoLabelVeiculo(v) {
+  if (!v) return '';
+  return [v.nome, v.placa].filter(Boolean).join(' | ') || v.dispositivoId || '';
 }
 
 function _bindLabelVeiculo(marker, texto) {
@@ -1722,7 +1740,7 @@ function _atualizarBindingsPopup() {
   Object.entries(marcadores).forEach(([id, m]) => {
     const v = veiculosMap[id];
     if (_overlay.labels && v) {
-      _bindLabelVeiculo(m, v.placa || v.nome);
+      _bindLabelVeiculo(m, _textoLabelVeiculo(v));
       if (id === ativoId) m.closeTooltip();
     } else {
       if (m.getTooltip()) { m.closeTooltip(); m.unbindTooltip(); }
@@ -1839,12 +1857,18 @@ function bindCardsBarra() {
   if (!barra) return;
   barra.querySelectorAll('.card-veiculo').forEach(function (el) {
     el.addEventListener('click', function (e) {
-      if (e.target.closest('.btn-upload-foto')) return;
+      if (e.target.closest('.btn-upload-foto, .btn-editar-apelido')) return;
       focarCliente(this.dataset.did);
     });
   });
   barra.querySelectorAll('.btn-upload-foto').forEach(function (btn) {
     bindUploadFoto(btn.closest('.card-veiculo'));
+  });
+  barra.querySelectorAll('.btn-editar-apelido').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      abrirModalApelidoCard(this.closest('.card-veiculo')?.dataset.did);
+    });
   });
 }
 
@@ -1943,6 +1967,7 @@ function cardVeiculoHtml(v) {
   //const statusTxt = isMoving ? `${v.posicao?.velocidade ?? 0} km/h` : isOnline ? 'Parado' : 'Offline';
   //const dotCls = isMoving ? 'dot-moving' : isOnline ? 'dot-online' : 'dot-offline';
   const marcaModelo = [v.marca, v.modeloVeiculo].filter(Boolean).join(' ');
+  const apelido = _getCardApelido(v.dispositivoId);
 
   return `<div class="card-veiculo${v.dispositivoId === ativoId ? ' ativo' : ''}" data-did="${v.dispositivoId}" style="position:relative">
     <div class="btn-foto-wrap">
@@ -1951,7 +1976,71 @@ function cardVeiculoHtml(v) {
     <button type="button" class="btn-upload-foto" title="Alterar foto" style="position:absolute;top:6px;right:6px;z-index:6"><i class="fa fa-camera"></i></button>
     ${v.placa ? `<span class="cv-placa">${v.placa}</span>` : ''}
     <span class="cv-modelo" title="${marcaModelo || v.nome}">${marcaModelo || v.nome}</span>
+    <div class="cv-apelido-row">
+      <span class="cv-apelido-text" title="${esc(apelido)}">${apelido ? esc(apelido) : '&nbsp;'}</span>
+      <button type="button" class="btn-editar-apelido" title="Editar identificação"><i class="fa fa-pencil"></i></button>
+    </div>
   </div>`;
+}
+
+function garantirModalApelidoCard() {
+  if (document.getElementById('modal-apelido-card')) return;
+  const modal = document.createElement('div');
+  modal.className = 'modal fade';
+  modal.id = 'modal-apelido-card';
+  modal.tabIndex = -1;
+  modal.innerHTML = `
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title">Identificação do veículo</h4>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="modal-apelido-card-did">
+          <input type="text" id="modal-apelido-card-texto" class="form-control" maxlength="40" placeholder="Nome da pessoa">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btn-salvar-apelido-card"><i class="fa fa-save"></i> Salvar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('btn-salvar-apelido-card').addEventListener('click', salvarApelidoCard);
+  document.getElementById('modal-apelido-card-texto').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') salvarApelidoCard();
+  });
+}
+
+window.abrirModalApelidoCard = function (dispositivoId) {
+  if (!dispositivoId) return;
+  garantirModalApelidoCard();
+  document.getElementById('modal-apelido-card-did').value = dispositivoId;
+  document.getElementById('modal-apelido-card-texto').value = _getCardApelido(dispositivoId);
+  $('#modal-apelido-card').modal('show');
+  setTimeout(() => document.getElementById('modal-apelido-card-texto')?.focus(), 180);
+};
+
+function salvarApelidoCard() {
+  const did = document.getElementById('modal-apelido-card-did')?.value;
+  if (!did) return;
+  const texto = document.getElementById('modal-apelido-card-texto')?.value || '';
+  const btn = document.getElementById('btn-salvar-apelido-card');
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
+  AL_CLIENTE.apiPatch(`/api/cliente/dispositivos/${did}/apelido`, { apelidoCliente: texto })
+    .then(function (data) {
+      if (veiculosMap[did]) veiculosMap[did].apelidoCliente = data.apelidoCliente || '';
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(Object.values(veiculosMap))); } catch (e) {}
+      atualizarCardBarra(did);
+      $('#modal-apelido-card').modal('hide');
+      AL_CLIENTE.showAlert('Identificação atualizada.', 'success');
+    })
+    .catch(function (err) { AL_CLIENTE.showAlert(err.message); })
+    .finally(function () {
+      if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    });
 }
 
 function _getSvgPlaceholder(cat, cor) {
@@ -1977,6 +2066,12 @@ function atualizarCardBarra(did) {
       svg = svg.replace('width="42"', 'width="28"').replace('height="42"', 'height="28"');
       icone.innerHTML = svg;
     }
+  }
+  const apelidoEl = card.querySelector('.cv-apelido-text');
+  if (apelidoEl) {
+    const apelido = _getCardApelido(did);
+    apelidoEl.innerHTML = apelido ? esc(apelido) : '&nbsp;';
+    apelidoEl.title = apelido;
   }
   card.classList.toggle('ativo', did === ativoId);
 }
@@ -2370,7 +2465,7 @@ window.fecharCardDispositivo = function (skipClosePopup) {
   if (_overlay.labels && ativoId && marcadores[ativoId]) {
     const mf = marcadores[ativoId];
     const v = veiculosMap[ativoId];
-    if (v) _bindLabelVeiculo(mf, v.placa || v.nome);
+    if (v) _bindLabelVeiculo(mf, _textoLabelVeiculo(v));
     if (mf.getTooltip()) mf.openTooltip();
   }
   if (modoFoco) desativarFoco();
@@ -2524,7 +2619,7 @@ window.focar = function (did, opts = {}) {
   if (_overlay.labels && prevAtivoId && prevAtivoId !== did && marcadores[prevAtivoId]) {
     const mp = marcadores[prevAtivoId];
     const vp = veiculosMap[prevAtivoId];
-    if (vp) _bindLabelVeiculo(mp, vp.placa || vp.nome);
+    if (vp) _bindLabelVeiculo(mp, _textoLabelVeiculo(vp));
     if (mp.getTooltip()) mp.openTooltip();
   }
   if (_overlay.labels && marcadores[did]) {

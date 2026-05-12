@@ -584,17 +584,12 @@
         sw.addEventListener('click', function () {
           var did = this.dataset.did;
           if (this.classList.contains('on')) {
-            AL.confirmar({
-              titulo: 'Desvincular Dispositivo',
-              mensagem: 'Deseja desvincular este dispositivo deste cliente?',
-              consequencias: 'O dispositivo ficará sem vínculo com este cliente mas não será excluído.',
-              btnTexto: '<i class="fa fa-chain-broken"></i> Desvincular',
-            }).then(function (ok) {
-              if (!ok) return;
-              AL.apiDelete('/api/dispositivos/' + did + '/clientes/' + clienteId)
-                .then(function () { renderDispositivos(); })
-                .catch(function (err) { AL.showAlert(err.message); });
-            });
+            AL.apiDelete('/api/dispositivos/' + did + '/clientes/' + clienteId)
+              .then(function () {
+                AL.showAlert('Dispositivo desvinculado com sucesso.', 'success');
+                renderDispositivos();
+              })
+              .catch(function (err) { AL.showAlert(err.message); });
           } else {
             AL.apiPost('/api/dispositivos/' + did + '/clientes', { clienteId: clienteId })
               .then(function () { renderDispositivos(); })
@@ -623,17 +618,12 @@
       listDiv.querySelectorAll('.btn-desv-disp').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var did = this.dataset.did;
-          AL.confirmar({
-            titulo: 'Desvincular Dispositivo',
-            mensagem: 'Deseja desvincular este dispositivo deste cliente?',
-            consequencias: 'O dispositivo ficará sem vínculo com este cliente mas não será excluído.',
-            btnTexto: '<i class="fa fa-chain-broken"></i> Desvincular',
-          }).then(function (ok) {
-            if (!ok) return;
-            AL.apiDelete('/api/dispositivos/' + did + '/clientes/' + clienteId)
-              .then(function () { renderDispositivos(); })
-              .catch(function (err) { AL.showAlert(err.message); });
-          });
+          AL.apiDelete('/api/dispositivos/' + did + '/clientes/' + clienteId)
+            .then(function () {
+              AL.showAlert('Dispositivo desvinculado com sucesso.', 'success');
+              renderDispositivos();
+            })
+            .catch(function (err) { AL.showAlert(err.message); });
         });
       });
 

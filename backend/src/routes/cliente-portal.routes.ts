@@ -319,7 +319,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
       select: {
         id: true, nome: true, identificador: true, placa: true,
         categoria: true, marca: true, modeloVeiculo: true, cor: true,
-        limiteVelocidade: true, imagemUrlCliente: true, clienteId: true,
+        limiteVelocidade: true, imagemUrlCliente: true, apelidoCliente: true, clienteId: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { select: { id: true, nome: true } },
       },
@@ -364,6 +364,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
       placa: d.placa,
       categoria: d.categoria,
       imagemUrlCliente: d.imagemUrlCliente,
+      apelidoCliente: d.apelidoCliente,
       marca: d.marca,
       modeloVeiculo: d.modeloVeiculo,
       cor: d.cor,
@@ -942,6 +943,33 @@ router.post(
     res.json({ imagemUrlCliente });
   },
 );
+
+// ── PATCH /api/cliente/dispositivos/:id/apelido ───────────────────────────────
+router.patch('/dispositivos/:dispositivoId/apelido', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'dispositivoId');
+  const apelidoCliente = String(req.body?.apelidoCliente || '').trim().slice(0, 40);
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: {
+      id: dispositivoId,
+      ativo: true,
+      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+    },
+    select: { id: true },
+  });
+  if (!dispositivo) {
+    res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
+    return;
+  }
+
+  await prisma.dispositivo.update({
+    where: { id: dispositivoId },
+    data: { apelidoCliente: apelidoCliente || null },
+  });
+
+  res.json({ apelidoCliente: apelidoCliente || null });
+});
 
 // ── DELETE /api/cliente/dispositivos/:id/foto ─────────────────────────────────
 router.delete('/dispositivos/:dispositivoId/foto', async (req: ClienteRequest, res: Response): Promise<void> => {

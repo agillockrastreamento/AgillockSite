@@ -38,9 +38,30 @@
   // ── Section A: Client notifications ────────────────────────────────────
 
   let clientes = [];
+  let clienteDispositivos = [];
   let clienteLoginIdAtivo = null;
   let clienteDispositivoId = null;
   let clientePreferencias = {};
+
+  function normalizarPlacaBusca(valor) {
+    return String(valor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function renderOpcoesDispositivosCliente(filtroPlaca) {
+    const sel = document.getElementById('filtro-dispositivo-cliente');
+    const ativo = sel.value;
+    const filtro = normalizarPlacaBusca(filtroPlaca);
+    const filtrados = filtro
+      ? clienteDispositivos.filter(d => normalizarPlacaBusca(d.placa).includes(filtro))
+      : clienteDispositivos;
+
+    sel.innerHTML = '<option value="">Selecione um dispositivo...</option>' +
+      filtrados.map(d => `<option value="${d.id}">${d.nome}${d.placa ? ' (' + d.placa + ')' : ''}</option>`).join('');
+
+    if (ativo && filtrados.some(d => String(d.id) === String(ativo))) {
+      sel.value = ativo;
+    }
+  }
 
   async function carregarClientes() {
     try {
@@ -60,8 +81,8 @@
     document.getElementById('filtro-dispositivo-wrap').style.display = 'block';
     try {
       const data = await AL.apiGet(`/api/notificacoes-admin/clientes/${clienteLoginId}/dispositivos`);
-      sel.innerHTML = '<option value="">Selecione um dispositivo...</option>' +
-        (data || []).map(d => `<option value="${d.id}">${d.nome}${d.placa ? ' (' + d.placa + ')' : ''}</option>`).join('');
+      clienteDispositivos = data || [];
+      renderOpcoesDispositivosCliente(document.getElementById('busca-placa-dispositivo-cliente')?.value || '');
     } catch (err) {
       AL.showAlert('Erro ao carregar dispositivos: ' + err.message);
     }
@@ -230,7 +251,13 @@
       document.getElementById('cliente-notif-vazio').style.display    = 'block';
       document.getElementById('filtro-dispositivo-wrap').style.display = id ? 'block' : 'none';
       document.getElementById('filtro-dispositivo-cliente').innerHTML  = '<option value="">Selecione um dispositivo...</option>';
+      document.getElementById('busca-placa-dispositivo-cliente').value = '';
+      clienteDispositivos = [];
       if (id) carregarDispositivosCliente(id);
+    });
+
+    document.getElementById('busca-placa-dispositivo-cliente').addEventListener('input', function () {
+      renderOpcoesDispositivosCliente(this.value);
     });
 
     document.getElementById('filtro-dispositivo-cliente').addEventListener('change', function () {

@@ -2169,7 +2169,7 @@ function _abrirSpider(chave, centroLatLng) {
     _spider.linhas.push(linha);
     const sm = L.marker(spiderLatLng, { icon: criarIcone(v), zIndexOffset: 1000 });
     if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
-    if (_overlay.labels) _bindLabelVeiculo(sm, v.placa || v.nome);
+    if (_overlay.labels) _bindLabelVeiculo(sm, _textoLabelVeiculo(v));
     sm.on('click', function (e) {
       L.DomEvent.stopPropagation(e);
       _fecharSpider();
@@ -2208,7 +2208,7 @@ function renderMarcadores() {
         marcadoresIconeKey[id] = _iconeKey(v);
         const marker = L.marker([latitude, longitude], { icon: icone });
         if (_mostrarPopup) marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
-        if (_overlay.labels) _bindLabelVeiculo(marker, v.placa || v.nome);
+        if (_overlay.labels) _bindLabelVeiculo(marker, _textoLabelVeiculo(v));
         marker.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = marker;
         if (visivel) marker.addTo(map);
@@ -2364,8 +2364,13 @@ let _mostrarPopup = true;
 let _togglingPopup = false;
 
 function criarPopupSimples(v) {
-  const txt = v.placa || v.nome;
+  const txt = _textoLabelVeiculo(v);
   return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px">${txt}</div>`;
+}
+
+function _textoLabelVeiculo(v) {
+  if (!v) return '';
+  return [v.nome, v.placa].filter(Boolean).join(' | ') || v.dispositivoId || '';
 }
 
 function _bindLabelVeiculo(marker, texto) {
@@ -2393,7 +2398,7 @@ function _atualizarBindingsPopup() {
   Object.entries(marcadores).forEach(([id, m]) => {
     const v = veiculosMap[id];
     if (_overlay.labels && v) {
-      _bindLabelVeiculo(m, v.placa || v.nome);
+      _bindLabelVeiculo(m, _textoLabelVeiculo(v));
       if (id === ativoId) m.closeTooltip();
     } else {
       if (m.getTooltip()) { m.closeTooltip(); m.unbindTooltip(); }
@@ -3034,7 +3039,7 @@ window.fecharCardDispositivo = function (skipClosePopup) {
   if (_overlay.labels && ativoId && marcadores[ativoId]) {
     const mf = marcadores[ativoId];
     const v = veiculosMap[ativoId];
-    if (v) _bindLabelVeiculo(mf, v.placa || v.nome);
+    if (v) _bindLabelVeiculo(mf, _textoLabelVeiculo(v));
     if (mf.getTooltip()) mf.openTooltip();
   }
   if (modoFoco) desativarFoco();
@@ -3144,7 +3149,7 @@ window.focar = function (dispositivoId, opts = {}) {
   if (_overlay.labels && prevAtivoId && prevAtivoId !== dispositivoId && marcadores[prevAtivoId]) {
     const mp = marcadores[prevAtivoId];
     const vp = veiculosMap[prevAtivoId];
-    if (vp) _bindLabelVeiculo(mp, vp.placa || vp.nome);
+    if (vp) _bindLabelVeiculo(mp, _textoLabelVeiculo(vp));
     if (mp.getTooltip()) mp.openTooltip();
   }
   if (_overlay.labels && marcadores[dispositivoId]) {

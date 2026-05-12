@@ -260,6 +260,7 @@ model Dispositivo {
   // Imagem
   imagemUrl        String?
   imagemUrlCliente String?
+  apelidoCliente   String?
 
   // Billing (equivalente a Placa)
   valorPadrao Decimal? @db.Decimal(10, 2)

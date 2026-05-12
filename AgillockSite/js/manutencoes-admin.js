@@ -20,6 +20,19 @@
     preventiva:'fa-shield', corretiva:'fa-wrench',
     revisao:'fa-search', personalizado:'fa-star',
   };
+
+  function textoVeiculoModal() {
+    const sel = document.getElementById('filtro-dispositivo');
+    if (!sel || !sel.value) return '';
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? opt.text.replace(/\s*\(([^)]*)\)\s*$/, ' $1').trim() : '';
+  }
+
+  function atualizarVeiculoModal(tipo) {
+    const el = document.getElementById(tipo === 'recorrencia' ? 'modalRecorrencia-veiculo' : 'modalRegistro-veiculo');
+    const texto = textoVeiculoModal();
+    if (el) el.textContent = texto ? ' - ' + texto : '';
+  }
   const TIPO_LABEL = {
     preventiva:'Preventiva', corretiva:'Corretiva',
     revisao:'Revisão', personalizado:'Personalizado',
@@ -268,6 +281,7 @@
   // ── Modais ────────────────────────────────────────────────────────────────────
   function abrirModalRegistro() {
     editandoRegistroId = null;
+    atualizarVeiculoModal('registro');
     document.getElementById('modalRegistro-title').textContent = 'Registrar Manutenção';
     document.getElementById('btn-salvar-registro').innerHTML = '<i class="fa fa-save"></i> Salvar Registro';
     document.getElementById('reg-data').value = new Date().toISOString().slice(0, 10);
@@ -287,6 +301,7 @@
 
   function abrirModalRecorrencia() {
     editandoRecorrenciaId = null;
+    atualizarVeiculoModal('recorrencia');
     document.getElementById('modalRecorrencia-title').textContent = 'Nova Recorrência de Manutenção';
     document.getElementById('btn-salvar-recorrencia').innerHTML = '<i class="fa fa-repeat"></i> Criar Recorrência';
     _carregarCanaisRecorrencia();
@@ -303,6 +318,7 @@
     const r = registros.find(x => x.id === id);
     if (!r) return;
     editandoRegistroId = id;
+    atualizarVeiculoModal('registro');
     document.getElementById('modalRegistro-title').textContent = 'Editar Manutenção';
     document.getElementById('btn-salvar-registro').innerHTML = '<i class="fa fa-save"></i> Salvar Alterações';
     document.getElementById('reg-titulo').value = r.titulo || '';
@@ -327,6 +343,7 @@
     const r = recorrencias.find(x => x.id === id);
     if (!r) return;
     editandoRecorrenciaId = id;
+    atualizarVeiculoModal('recorrencia');
     document.getElementById('modalRecorrencia-title').textContent = 'Editar Recorrência';
     document.getElementById('btn-salvar-recorrencia').innerHTML = '<i class="fa fa-save"></i> Salvar Alterações';
     document.getElementById('rec-titulo').value = r.titulo || '';

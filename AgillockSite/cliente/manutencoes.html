@@ -202,6 +202,8 @@
     html.dark-theme .modal-title { color: #e0e6f0; }
     /* Scroll no modal-body para não "vazar" o fundo */
     .man-modal .modal-body { max-height: calc(100vh - 220px); overflow-y: auto; }
+    .man-modal-veiculo { margin-left: 10px; font-size: 12px; font-weight: 700; color: #6c7a8f; vertical-align: middle; }
+    html.dark-theme .man-modal-veiculo { color: #aeb8c7; }
     /* Aviso feito */
     .man-feito-aviso {
       display: flex; align-items: flex-start; gap: 10px;
@@ -370,7 +372,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-          <h4 class="modal-title"><i class="fa fa-wrench" style="color:#27ae60;margin-right:8px;"></i><span id="modalRegistro-title">Registrar Manutenção</span></h4>
+          <h4 class="modal-title"><i class="fa fa-wrench" style="color:#27ae60;margin-right:8px;"></i><span id="modalRegistro-title">Registrar Manutenção</span><span id="modalRegistro-veiculo" class="man-modal-veiculo"></span></h4>
         </div>
         <div class="modal-body">
           <div class="man-info-box" style="margin-bottom:20px;">
@@ -453,7 +455,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-          <h4 class="modal-title"><i class="fa fa-repeat" style="color:#e67e22;margin-right:8px;"></i><span id="modalRecorrencia-title">Nova Recorrência de Manutenção</span></h4>
+          <h4 class="modal-title"><i class="fa fa-repeat" style="color:#e67e22;margin-right:8px;"></i><span id="modalRecorrencia-title">Nova Recorrência de Manutenção</span><span id="modalRecorrencia-veiculo" class="man-modal-veiculo"></span></h4>
         </div>
         <div class="modal-body">
           <div class="man-info-box" style="margin-bottom:20px;">
