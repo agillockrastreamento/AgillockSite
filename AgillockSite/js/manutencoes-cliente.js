@@ -29,7 +29,7 @@
   function atualizarVeiculoModal(tipo) {
     const el = document.getElementById(tipo === 'recorrencia' ? 'modalRecorrencia-veiculo' : 'modalRegistro-veiculo');
     const texto = textoVeiculoModal();
-    if (el) el.textContent = texto ? ' - ' + texto : '';
+    if (el) el.textContent = texto ? ' — ' + texto : '';
   }
 
   function normalizarPlacaBusca(valor) {
@@ -364,7 +364,7 @@
   };
 
   // ── Modais ────────────────────────────────────────────────────────────────────
-  function abrirModalRegistro() {
+  function abrirModalRegistro() { 
     if (!podeGerenciarManutencao()) { AL_CLIENTE.showAlert('Apenas o responsavel pelo faturamento pode registrar manutencoes deste dispositivo.', 'warning'); return; }
     editandoRegistroId = null;
     atualizarVeiculoModal('registro');

@@ -31,7 +31,7 @@
   function atualizarVeiculoModal(tipo) {
     const el = document.getElementById(tipo === 'recorrencia' ? 'modalRecorrencia-veiculo' : 'modalRegistro-veiculo');
     const texto = textoVeiculoModal();
-    if (el) el.textContent = texto ? ' - ' + texto : '';
+    if (el) el.textContent = texto ? ' — ' + texto : '';
   }
 
   function normalizarPlacaBusca(valor) {
