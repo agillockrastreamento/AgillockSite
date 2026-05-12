@@ -851,7 +851,7 @@ function _restaurarPopupVeiculoAdmin(dispositivoId) {
   marker._eventOriginalPopup = null;
   marker._eventPopupToken = null;
   if (_mostrarPopup) {
-    marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+    marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 240 });
   } else {
     marker.unbindPopup();
   }
@@ -2168,7 +2168,7 @@ function _abrirSpider(chave, centroLatLng) {
     }).addTo(map);
     _spider.linhas.push(linha);
     const sm = L.marker(spiderLatLng, { icon: criarIcone(v), zIndexOffset: 1000 });
-    if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+    if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 240 });
     if (_overlay.labels) _bindLabelVeiculo(sm, _textoLabelVeiculo(v));
     sm.on('click', function (e) {
       L.DomEvent.stopPropagation(e);
@@ -2207,7 +2207,7 @@ function renderMarcadores() {
         const icone = criarIcone(v);
         marcadoresIconeKey[id] = _iconeKey(v);
         const marker = L.marker([latitude, longitude], { icon: icone });
-        if (_mostrarPopup) marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+        if (_mostrarPopup) marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 240 });
         if (_overlay.labels) _bindLabelVeiculo(marker, _textoLabelVeiculo(v));
         marker.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = marker;
@@ -2365,7 +2365,7 @@ let _togglingPopup = false;
 
 function criarPopupSimples(v) {
   const txt = _textoLabelVeiculo(v);
-  return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px">${txt}</div>`;
+  return `<div style="padding:4px 9px;font-size:13px;font-weight:700;letter-spacing:0.5px">${txt}</div>`;
 }
 
 function _textoLabelVeiculo(v) {
@@ -2404,7 +2404,7 @@ function _atualizarBindingsPopup() {
       if (m.getTooltip()) { m.closeTooltip(); m.unbindTooltip(); }
     }
     if (_mostrarPopup && v) {
-      m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+      m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 240 });
     } else {
       m.closePopup();
       m.unbindPopup();

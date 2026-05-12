@@ -47,7 +47,60 @@
     return String(valor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
+  function garantirPickerDispositivosCliente() {
+    if (document.getElementById('picker-dispositivo-cliente')) return;
+    const style = document.createElement('style');
+    style.textContent = `
+      .notif-device-picker{position:relative}
+      .notif-device-picker-btn{height:34px;width:100%;border:1px solid #ccc;background:#fff;border-radius:4px;text-align:left;padding:6px 30px 6px 12px;font-size:13px;color:#555;position:relative}
+      .notif-device-picker-btn .fa-chevron-down{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#888}
+      .notif-device-picker-menu{display:none;position:absolute;z-index:5000;left:0;right:0;top:38px;background:#fff;border:1px solid #ccd3dc;border-radius:7px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:8px}
+      .notif-device-picker.open .notif-device-picker-menu{display:block}
+      .notif-device-picker-search{height:30px;font-size:12px;margin-bottom:7px}
+      .notif-device-picker-list{max-height:210px;overflow-y:auto}
+      .notif-device-picker-option{display:block;width:100%;border:0;background:transparent;text-align:left;padding:7px 8px;border-radius:5px;font-size:12px;color:#333}
+      .notif-device-picker-option:hover,.notif-device-picker-option.active{background:#eef6fd;color:#1f6f9f}
+      .notif-device-picker-empty{padding:10px;text-align:center;color:#999;font-size:12px}
+      html.dark-theme .notif-device-picker-btn,html.dark-theme .notif-device-picker-menu{background:#252535;color:#e0e6f0;border-color:#3a3a5c}
+      html.dark-theme .notif-device-picker-option{color:#e0e6f0}
+      html.dark-theme .notif-device-picker-option:hover,html.dark-theme .notif-device-picker-option.active{background:#1a3a5c;color:#fff}
+    `;
+    document.head.appendChild(style);
+
+    const select = document.getElementById('filtro-dispositivo-cliente');
+    select.style.display = 'none';
+    const picker = document.createElement('div');
+    picker.id = 'picker-dispositivo-cliente';
+    picker.className = 'notif-device-picker';
+    picker.innerHTML = `
+      <button type="button" class="notif-device-picker-btn" id="picker-dispositivo-cliente-btn"><span>Selecione um dispositivo...</span><i class="fa fa-chevron-down"></i></button>
+      <div class="notif-device-picker-menu">
+        <input type="text" id="busca-placa-dispositivo-cliente" class="form-control notif-device-picker-search" placeholder="Buscar por placa" autocomplete="off">
+        <div id="picker-dispositivo-cliente-lista" class="notif-device-picker-list"></div>
+      </div>`;
+    select.parentNode.insertBefore(picker, select.nextSibling);
+    document.getElementById('picker-dispositivo-cliente-btn').addEventListener('click', function () {
+      picker.classList.toggle('open');
+      if (picker.classList.contains('open')) setTimeout(() => document.getElementById('busca-placa-dispositivo-cliente')?.focus(), 0);
+    });
+    document.getElementById('busca-placa-dispositivo-cliente').addEventListener('input', function () {
+      renderOpcoesDispositivosCliente(this.value);
+    });
+    document.addEventListener('click', function (e) {
+      if (!picker.contains(e.target)) picker.classList.remove('open');
+    });
+  }
+
+  function atualizarLabelPickerDispositivosCliente() {
+    const sel = document.getElementById('filtro-dispositivo-cliente');
+    const btnLabel = document.querySelector('#picker-dispositivo-cliente-btn span');
+    if (!btnLabel) return;
+    const opt = sel.options[sel.selectedIndex];
+    btnLabel.textContent = opt && opt.value ? opt.text : 'Selecione um dispositivo...';
+  }
+
   function renderOpcoesDispositivosCliente(filtroPlaca) {
+    garantirPickerDispositivosCliente();
     const sel = document.getElementById('filtro-dispositivo-cliente');
     const ativo = sel.value;
     const filtro = normalizarPlacaBusca(filtroPlaca);
@@ -60,6 +113,22 @@
 
     if (ativo && filtrados.some(d => String(d.id) === String(ativo))) {
       sel.value = ativo;
+    }
+    atualizarLabelPickerDispositivosCliente();
+    const lista = document.getElementById('picker-dispositivo-cliente-lista');
+    if (lista) {
+      lista.innerHTML = filtrados.length ? filtrados.map(d => {
+        const texto = d.nome + (d.placa ? ' (' + d.placa + ')' : '');
+        return `<button type="button" class="notif-device-picker-option${String(d.id) === String(sel.value) ? ' active' : ''}" data-id="${d.id}">${texto}</button>`;
+      }).join('') : '<div class="notif-device-picker-empty">Nenhum dispositivo encontrado.</div>';
+      lista.querySelectorAll('.notif-device-picker-option').forEach(btn => {
+        btn.addEventListener('click', function () {
+          sel.value = this.dataset.id;
+          document.getElementById('picker-dispositivo-cliente').classList.remove('open');
+          atualizarLabelPickerDispositivosCliente();
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      });
     }
   }
 
@@ -251,13 +320,10 @@
       document.getElementById('cliente-notif-vazio').style.display    = 'block';
       document.getElementById('filtro-dispositivo-wrap').style.display = id ? 'block' : 'none';
       document.getElementById('filtro-dispositivo-cliente').innerHTML  = '<option value="">Selecione um dispositivo...</option>';
-      document.getElementById('busca-placa-dispositivo-cliente').value = '';
+      if (document.getElementById('busca-placa-dispositivo-cliente')) document.getElementById('busca-placa-dispositivo-cliente').value = '';
       clienteDispositivos = [];
+      renderOpcoesDispositivosCliente('');
       if (id) carregarDispositivosCliente(id);
-    });
-
-    document.getElementById('busca-placa-dispositivo-cliente').addEventListener('input', function () {
-      renderOpcoesDispositivosCliente(this.value);
     });
 
     document.getElementById('filtro-dispositivo-cliente').addEventListener('change', function () {

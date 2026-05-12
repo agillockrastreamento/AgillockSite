@@ -1651,12 +1651,12 @@ function atualizarMarcador(did) {
     .dark-theme .evt-tipo-dropdown { background: #1a202c; border-color: #2d3748; }
     .dark-theme .evt-tipo-item { color: #c9d1d9; }
     .dark-theme .evt-tipo-item:hover { background: #2d3748; }
-    .card-veiculo .cv-apelido-row { width: 100%; min-height: 16px; display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: auto; }
-    .card-veiculo .cv-apelido-text { min-width: 0; max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 1.2; color: #4b5563; font-weight: 700; }
+    .card-veiculo .cv-apelido-row { position: absolute; left: 20px; right: 20px; bottom: 7px; min-height: 16px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .card-veiculo .cv-apelido-text { min-width: 0; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 1.2; color: #4b5563; font-weight: 700; text-align: center; }
     .dark-theme .card-veiculo .cv-apelido-text { color: #d7dde6; }
-    .card-veiculo .btn-editar-apelido { width: 17px; height: 17px; border: 0; border-radius: 50%; background: #2980b9; color: #fff; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 9px; opacity: 0; transition: opacity .2s, background .15s; flex: 0 0 auto; }
+    .card-veiculo .btn-editar-apelido { position: absolute; right: 6px; bottom: 6px; z-index: 6; width: 18px; height: 18px; border: 0; border-radius: 50%; background: #fab32c; color: #fff; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 9px; opacity: 0; transition: opacity .2s, background .15s; }
     .card-veiculo:hover .btn-editar-apelido { opacity: 1; }
-    .card-veiculo .btn-editar-apelido:hover { background: #1f6f9f; }
+    .card-veiculo .btn-editar-apelido:hover { background: #e0a025; }
     #modal-apelido-card .modal-content { border-radius: 8px; }
     html.dark-theme #modal-apelido-card .modal-content { background: #1f2937; color: #f8fafc; }
     html.dark-theme #modal-apelido-card .form-control { background: #111827; border-color: #374151; color: #f8fafc; }
@@ -1978,8 +1978,8 @@ function cardVeiculoHtml(v) {
     <span class="cv-modelo" title="${marcaModelo || v.nome}">${marcaModelo || v.nome}</span>
     <div class="cv-apelido-row">
       <span class="cv-apelido-text" title="${esc(apelido)}">${apelido ? esc(apelido) : '&nbsp;'}</span>
-      <button type="button" class="btn-editar-apelido" title="Editar identificação"><i class="fa fa-pencil"></i></button>
     </div>
+    <button type="button" class="btn-editar-apelido" title="Editar identificação"><i class="fa fa-pencil"></i></button>
   </div>`;
 }
 
