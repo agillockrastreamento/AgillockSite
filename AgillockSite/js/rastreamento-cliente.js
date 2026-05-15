@@ -1651,7 +1651,7 @@ function atualizarMarcador(did) {
     .card-veiculo .cv-apelido-row { position: absolute; left: 20px; right: 20px; bottom: 4px; min-height: 17px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
     .card-veiculo .cv-apelido-text { margin-top: 4px; min-width: 0; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 1.2; color: #4b5563; font-weight: 700; text-align: center; }
     .dark-theme .card-veiculo .cv-apelido-text { color: #d7dde6; }
-    .card-veiculo .btn-editar-apelido { position: absolute; right: 6px; bottom: 8px; z-index: 6; width: 18px; height: 18px; border: 0; border-radius: 50%; background: #fab32c; color: #fff; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 9px; opacity: 0; transition: opacity .2s, background .15s; }
+    .card-veiculo .btn-editar-apelido { position: absolute; right: 6px; bottom: 12px; z-index: 6; width: 18px; height: 18px; border: 0; border-radius: 50%; background: #fab32c; color: #fff; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 9px; opacity: 0; transition: opacity .2s, background .15s; }
     .card-veiculo:hover .btn-editar-apelido { opacity: 1; }
     .card-veiculo .btn-editar-apelido:hover { background: #e0a025; }
     #modal-apelido-card .modal-content { border-radius: 8px; }
