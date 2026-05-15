@@ -10,6 +10,7 @@
   // O script fica no final do <body> (depois do HTML já parseado), então injeta
   // diretamente sem esperar DOMContentLoaded.
   if (document.getElementById('al-rastr-bar')) return; // proteção contra dupla injeção
+  document.documentElement.classList.add('al-rastr-ativa');
 
   var bar = document.createElement('div');
   bar.id = 'al-rastr-bar';

@@ -1042,34 +1042,34 @@ html.dark-theme #lista-resultados-busca { background: #1e1e2e; border-color: #33
     padding: 0;
 }
 #topbar-busca-toggle:hover { color: #fab32c; }
-html.rastr-bar-fechada #topbar-busca-toggle { top: 0; }
-/* Ajustes de posição: sidebar + topbar descem 40px */
-.admin-sidebar {
+html.al-rastr-ativa.rastr-bar-fechada #topbar-busca-toggle { top: 0; }
+/* Ajustes de posição: sidebar + topbar descem 40px — só quando a barra global está ativa */
+html.al-rastr-ativa .admin-sidebar {
     top: 40px;
     height: calc(100vh - 40px);
     transition: top .22s ease, height .22s ease;
 }
-.admin-topbar {
+html.al-rastr-ativa .admin-topbar {
     top: 40px;
     transition: top .22s ease;
 }
-.admin-content {
+html.al-rastr-ativa .admin-content {
     padding-top: calc(80px + 40px);
     transition: padding-top .22s ease;
 }
 /* Quando a barra fecha, tudo volta ao topo */
-html.rastr-bar-fechada .admin-sidebar  { top: 0; height: 100vh; }
-html.rastr-bar-fechada .admin-topbar   { top: 0; }
-html.rastr-bar-fechada .admin-content  { padding-top: 80px; }
+html.al-rastr-ativa.rastr-bar-fechada .admin-sidebar  { top: 0; height: 100vh; }
+html.al-rastr-ativa.rastr-bar-fechada .admin-topbar   { top: 0; }
+html.al-rastr-ativa.rastr-bar-fechada .admin-content  { padding-top: 80px; }
 @media (max-width: 767px) {
-    .admin-content { padding-top: calc(72px + 40px); }
-    html.rastr-bar-fechada .admin-content { padding-top: 72px; }
+    html.al-rastr-ativa .admin-content { padding-top: calc(72px + 40px); }
+    html.al-rastr-ativa.rastr-bar-fechada .admin-content { padding-top: 72px; }
     #al-rastr-menu-btn { display: flex; }
     #topbar-busca-toggle { transform: translateX(-50%); }
 }
 @media (max-width: 991px) and (min-width: 768px) {
-    .admin-sidebar { top: 40px; height: calc(100vh - 40px); }
-    html.rastr-bar-fechada .admin-sidebar { top: 0; height: 100vh; }
+    html.al-rastr-ativa .admin-sidebar { top: 40px; height: calc(100vh - 40px); }
+    html.al-rastr-ativa.rastr-bar-fechada .admin-sidebar { top: 0; height: 100vh; }
 }
 
 /* ─── Botão de tema ─────────────────────────────────────────────────────── */
