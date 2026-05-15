@@ -110,10 +110,13 @@
       height: 100vh;
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
     /* ── Topbar com busca e contadores ── */
     .admin-topbar {
+      position: relative !important; /* sobrescreve position:fixed do admin.css */
+      left: auto !important;         /* anula left:240px do admin.css */
       z-index: 5000;
       flex-shrink: 0;
       display: flex;
@@ -124,18 +127,21 @@
       height: 56px;
       transition: height .22s ease, box-shadow .22s ease;
     }
+    /* Layout 3 colunas: esquerda | centro (busca) | direita */
+    .admin-topbar > div:first-child { flex: 1; }
     #topbar-busca-wrap {
-      flex: 1;
-      max-width: 280px;
+      flex: none;
+      width: 280px;
       position: relative;
       z-index: 5001 !important;
     }
     #filtro { width: 100%; }
     #topbar-counters {
+      flex: 1;
+      text-align: right;
       font-size: 11px;
       color: #888;
       white-space: nowrap;
-      flex-shrink: 0;
     }
     /* Topbar fechado */
     body.topbar-busca-fechada .admin-topbar {
@@ -144,9 +150,9 @@
       border-bottom: none !important;
       box-shadow: none !important;
     }
-    /* Botão de toggle — fixed, flutua abaixo do topbar */
+    /* Botão de toggle — absolute em relação ao admin-content */
     #topbar-busca-toggle {
-      position: fixed;
+      position: absolute;
       top: 56px;
       left: 50%;
       transform: translateX(-50%);
@@ -832,8 +838,10 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      .admin-topbar > div:first-child { flex: 0 0 auto; }
       #topbar-busca-wrap {
         flex: 1 1 auto;
+        width: auto;
         min-width: 0;
         max-width: none;
       }
@@ -1036,7 +1044,7 @@
   <!-- Conteúdo -->
   <div class="admin-content">
     <div class="admin-topbar">
-      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;">
         <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
         <h2 class="topbar-title" style="white-space:nowrap">Mapa</h2>
       </div>
