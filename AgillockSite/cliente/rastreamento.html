@@ -110,13 +110,10 @@
       height: 100vh;
       display: flex;
       flex-direction: column;
-      position: relative;
     }
 
     /* ── Topbar com busca e contadores ── */
     .admin-topbar {
-      position: relative !important; /* sobrescreve position:fixed do admin.css */
-      left: auto !important;         /* anula left:240px do admin.css */
       z-index: 5000;
       flex-shrink: 0;
       display: flex;
@@ -124,7 +121,6 @@
       gap: 10px;
       padding: 0 14px;
       flex-wrap: nowrap;
-      height: 56px;
       transition: height .22s ease, box-shadow .22s ease;
     }
     /* Layout 3 colunas: esquerda | centro (busca) | direita */
@@ -150,9 +146,9 @@
       border-bottom: none !important;
       box-shadow: none !important;
     }
-    /* Botão de toggle — absolute em relação ao admin-content */
+    /* Botão de toggle — fixed, flutua logo abaixo do topbar */
     #topbar-busca-toggle {
-      position: absolute;
+      position: fixed;
       top: 56px;
       left: 50%;
       transform: translateX(-50%);

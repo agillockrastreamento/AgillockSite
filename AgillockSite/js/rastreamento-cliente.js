@@ -687,7 +687,6 @@ function inicializarTopbarBusca() {
       if (filtro) filtro.value = '';
       if (lista) { lista.style.display = 'none'; lista.innerHTML = ''; }
     }
-    setTimeout(function () { if (map) map.invalidateSize(); }, 240);
   });
 }
 
