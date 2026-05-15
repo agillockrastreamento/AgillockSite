@@ -300,6 +300,7 @@
       });
       document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
       AL_CLIENTE.initThemeToggle('btn-tema');
+      if (user.tipo === 'responsavel') document.getElementById('li-pagamentos').style.display = 'block';
     })();
   </script>
   <script src="../js/geocercas-form-cliente.js"></script>

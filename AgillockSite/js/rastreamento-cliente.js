@@ -1704,7 +1704,7 @@ let _togglingPopup = false;
 
 function criarPopupSimples(v) {
   const txt = _textoLabelVeiculo(v);
-  return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px">${txt}</div>`;
+  return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px;white-space:nowrap">${txt}</div>`;
 }
 
 function _textoLabelVeiculo(v) {

@@ -193,8 +193,7 @@
       });
       document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
       AL_CLIENTE.initThemeToggle('btn-tema');
-      var liPag = document.getElementById('li-pagamentos');
-      if (user.temBoleto) liPag.style.display = '';
+      if (user.tipo === 'responsavel') document.getElementById('li-pagamentos').style.display = 'block';
     })();
   </script>
   <script src="../js/geocercas-cliente.js"></script>
