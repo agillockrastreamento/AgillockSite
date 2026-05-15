@@ -110,10 +110,7 @@
       height: 100vh;
       display: flex;
       flex-direction: column;
-      padding: 56px 0 0 0 !important; /* reserva espaço para o topbar fixo, sem bordas laterais */
-      overflow: hidden;
     }
-    body.topbar-busca-fechada .admin-content { padding: 0 !important; }
 
     /* ── Topbar com busca e contadores ── */
     .admin-topbar {
@@ -124,62 +121,20 @@
       gap: 10px;
       padding: 0 14px;
       flex-wrap: nowrap;
-      transition: height .22s ease, box-shadow .22s ease;
     }
-    /* Layout 3 colunas: esquerda | centro (busca) | direita */
-    .admin-topbar > div:first-child { flex: 1; }
     #topbar-busca-wrap {
-      flex: none;
-      width: 280px;
+      flex: 1;
+      max-width: 280px;
       position: relative;
       z-index: 5001 !important;
     }
     #filtro { width: 100%; }
     #topbar-counters {
-      flex: 1;
-      text-align: right;
       font-size: 11px;
       color: #888;
       white-space: nowrap;
+      flex-shrink: 0;
     }
-    /* Topbar fechado */
-    body.topbar-busca-fechada .admin-topbar {
-      height: 0 !important;
-      overflow: hidden;
-      border-bottom: none !important;
-      box-shadow: none !important;
-    }
-    /* Botão de toggle — fixed, flutua logo abaixo do topbar */
-    #topbar-busca-toggle {
-      position: fixed;
-      top: 56px;
-      transform: translateX(-50%);
-      width: 44px;
-      height: 20px;
-      border: 1px solid #d7d7d7;
-      border-top: none;
-      border-radius: 0 0 12px 12px;
-      background: #fff;
-      color: #888;
-      font-size: 11px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
-      transition: color .15s, border-color .15s, background .15s, top .22s ease;
-      z-index: 5002;
-      padding: 0;
-    }
-    html.dark-theme #topbar-busca-toggle {
-      background: #141820;
-      border-color: #2d3748;
-      color: #888;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.28);
-    }
-    #topbar-busca-toggle:hover { color: #2980b9; border-color: #2980b9; }
-    body.topbar-busca-fechada #topbar-busca-toggle { top: 0; }
-    body.topbar-busca-fechada #topbar-busca-toggle i { transform: rotate(180deg); }
 
     /* ── Bandeja de camadas ── */
     #mapa-tray {
@@ -300,25 +255,27 @@
       flex-direction: column;
       position: relative;
       overflow: hidden;
-      border-radius: 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
       background: #fff;
     }
-    html.dark-theme #mapa-area { background: #1e2530; }
-    #mapa { flex: 1; border-radius: 0; overflow: hidden; }
+    html.dark-theme #mapa-area {
+      background: #1e2530;
+      box-shadow: 0 2px 12px rgba(0,0,0,.28);
+    }
+    #mapa { flex: 1; border-radius: 8px; overflow: hidden; }
     .leaflet-grab { cursor: crosshair !important; }
     .leaflet-drag-target { cursor: grabbing !important; }
 
-    /* ── Barra de veículos (rodapé do mapa) — filho flex de #mapa-area ── */
+    /* ── Barra de veículos (rodapé do mapa) ── */
     #barra-veiculos-wrap {
       flex-shrink: 0;
       position: relative;
-      z-index: 9100;
-      max-height: 35vh;
       display: flex;
       flex-direction: column;
       background: #fff;
       border-top: 1px solid #e0e0e0;
-      transition: height .22s ease, min-height .22s ease;
+      transition: height .22s ease, min-height .22s ease, border-top-color .22s ease, background .22s ease;
     }
     .dark-theme #barra-veiculos-wrap {
       background: #1e1e2e;
@@ -327,45 +284,47 @@
     #barra-veiculos-wrap.minimizada {
       height: 28px;
       min-height: 28px;
-      /* sem overflow:hidden — conteúdo já oculto via opacity:0, toggle precisa ficar visível */
+      overflow: hidden;
     }
     #barra-veiculos-toggle {
       position: absolute;
-      top: -20px;
+      top: -25px;
       left: 50%;
       transform: translateX(-50%);
-      width: 44px;
-      height: 20px;
+      width: 48px;
+      height: 26px;
       border: 1px solid #d7d7d7;
       border-bottom: none;
       border-radius: 12px 12px 0 0;
       background: #fff;
-      color: #888;
-      font-size: 11px;
+      color: #666;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      z-index: 9200;
+      z-index: 920;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.12);
-      transition: color .15s, border-color .15s, background .15s;
-      padding: 0;
+      transition: color .15s, border-color .15s, background .15s, top .22s ease;
     }
     .dark-theme #barra-veiculos-toggle {
-      background: #141820;
-      border-color: #2d3748;
-      color: #888;
+      background: #252535;
+      border-color: #444;
+      color: #e2e8f0;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.28);
     }
-    #barra-veiculos-toggle:hover { color: #2980b9; border-color: #2980b9; }
+    #barra-veiculos-toggle:hover {
+      color: #2980b9;
+      border-color: #2980b9;
+    }
     #barra-veiculos-wrap.minimizada #barra-veiculos-toggle {
+      top: -2px;
       border-radius: 0 0 12px 12px;
-      border-top: none;
       border-bottom: 1px solid #d7d7d7;
+      border-top: none;
       box-shadow: 0 2px 10px rgba(0,0,0,0.12);
     }
     .dark-theme #barra-veiculos-wrap.minimizada #barra-veiculos-toggle {
-      border-bottom-color: #2d3748;
+      border-bottom-color: #444;
       box-shadow: 0 2px 10px rgba(0,0,0,0.28);
     }
     #barra-veiculos-wrap.minimizada #barra-veiculos-toggle i {
@@ -442,15 +401,15 @@
     #device-detail-card {
       display: none;
       position: absolute;
-      top: 68px;
+      top: 12px;
       left: 12px;
-      z-index: 6000 !important;
+      z-index: 6000 !important; /* Garantido acima de tudo */
       width: 280px;
       background: #fff;
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.22);
       overflow: hidden;
-      max-height: calc(100% - 220px); /* topbar (56px) + margin (12px) + rodapé (~150px) */
+      max-height: calc(100% - 150px); /* Desconta rodapé (180px) + top margin */
       scrollbar-width: thin;
       scrollbar-color: #ccc #fff;
       border: 1px solid rgba(0,0,0,0.05);
@@ -788,12 +747,9 @@
       font-weight: 700;
       letter-spacing: 0.3px;
       box-shadow: 0 1px 5px rgba(0,0,0,0.18);
-      white-space: nowrap !important;
-      max-width: none !important;
+      white-space: nowrap;
     }
     .leaflet-tooltip.label-veiculo::before { display: none; }
-    .popup-veiculo .leaflet-popup-content-wrapper { max-width: none !important; width: auto !important; }
-    .popup-veiculo .leaflet-popup-content { white-space: nowrap; }
     html.dark-theme .leaflet-tooltip.label-veiculo {
       background: #1e2530;
       color: #f0f2f5;
@@ -835,10 +791,8 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      .admin-topbar > div:first-child { flex: 0 0 auto; }
       #topbar-busca-wrap {
         flex: 1 1 auto;
-        width: auto;
         min-width: 0;
         max-width: none;
       }
@@ -856,9 +810,8 @@
         justify-content: center;
       }
       #topbar-counters { display: none; }
-      #topbar-busca-toggle { top: 52px; }
       #rastreamento-layout { position: relative; }
-      #mapa-area { width: 100%; height: 100%; }
+      #mapa-area { width: 100%; height: 100%; margin: 8px; border-radius: 8px; }
       .leaflet-control-attribution { display: none !important; }
       .leaflet-control-container .leaflet-top.leaflet-right { top: 4px; right: 4px; }
       .leaflet-control-layers,
@@ -906,7 +859,14 @@
       .ml-btn > span:not(.ml-btn-icon) { display: none; }
       .ml-btn-icon { width: 32px; height: 32px; }
 
-      #barra-veiculos-wrap { max-height: 28vh; }
+      #barra-veiculos-wrap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 28vh;
+        z-index: 900;
+      }
       #barra-veiculos {
         flex-wrap: nowrap;
         overflow-x: auto;
@@ -1034,7 +994,7 @@
   <!-- Conteúdo -->
   <div class="admin-content">
     <div class="admin-topbar">
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
         <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
         <h2 class="topbar-title" style="white-space:nowrap">Mapa</h2>
       </div>
@@ -1044,7 +1004,6 @@
       </div>
       <div id="topbar-counters">Carregando...</div>
     </div>
-    <button id="topbar-busca-toggle" type="button" title="Ocultar busca"><i class="fa fa-chevron-up"></i></button>
 
     <div id="rastreamento-layout">
 

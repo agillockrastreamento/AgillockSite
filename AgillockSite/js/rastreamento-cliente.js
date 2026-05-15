@@ -94,7 +94,6 @@ const _eventos = [];
 const MAX_EVENTOS = 100;
 const EVENTOS_PANEL_STORAGE_KEY = 'rastreamento_cliente_eventos_min';
 const BARRA_VEICULOS_STORAGE_KEY = 'rastreamento_cliente_barra_min';
-const TOPBAR_BUSCA_STORAGE_KEY = 'rastreamento_cliente_topbar_busca_min';
 let _eventoPopupAtualIdx = null;
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
@@ -275,7 +274,6 @@ document.addEventListener('DOMContentLoaded', function () {
     _aplicarPreferenciasOverlay();
     carregarUltimaLeituraCliente().finally(function () { inicializarEventosPanel(); });
     inicializarBarraVeiculos();
-    inicializarTopbarBusca();
     carregarPosicoes();
     _instalarMobileOutsideClick();
     document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
@@ -669,58 +667,6 @@ function _aplicarEstadoBarraVeiculos() {
   try { minimizada = localStorage.getItem(BARRA_VEICULOS_STORAGE_KEY) === '1'; } catch {}
   wrap.classList.toggle('minimizada', minimizada);
   btn.title = minimizada ? 'Expandir dispositivos' : 'Minimizar dispositivos';
-}
-
-function _posicionarBotaoTopbar() {
-  const topbar = document.querySelector('.admin-topbar');
-  const btn = document.getElementById('topbar-busca-toggle');
-  if (!topbar || !btn) return;
-  const rect = topbar.getBoundingClientRect();
-  btn.style.left = (rect.left + rect.width / 2) + 'px';
-}
-
-function inicializarTopbarBusca() {
-  _aplicarEstadoTopbarBusca();
-  _posicionarBotaoTopbar();
-  const btn = document.getElementById('topbar-busca-toggle');
-  if (!btn) return;
-
-  btn.addEventListener('click', function () {
-    document.body.classList.toggle('topbar-busca-fechada');
-    const fechada = document.body.classList.contains('topbar-busca-fechada');
-    try { localStorage.setItem(TOPBAR_BUSCA_STORAGE_KEY, fechada ? '1' : '0'); } catch {}
-    btn.title = fechada ? 'Mostrar busca' : 'Ocultar busca';
-    if (fechada) {
-      const filtro = document.getElementById('filtro');
-      const lista = document.getElementById('lista-resultados-busca');
-      if (filtro) filtro.value = '';
-      if (lista) { lista.style.display = 'none'; lista.innerHTML = ''; }
-    }
-    setTimeout(function () { if (map) map.invalidateSize(); }, 240);
-  });
-
-  window.addEventListener('resize', _posicionarBotaoTopbar);
-
-  const topbar = document.querySelector('.admin-topbar');
-  if (topbar && window.ResizeObserver) {
-    new ResizeObserver(_posicionarBotaoTopbar).observe(topbar);
-  }
-
-  const sidebarToggle = document.getElementById('sidebar-toggle');
-  if (sidebarToggle) {
-    sidebarToggle.addEventListener('click', function () {
-      setTimeout(_posicionarBotaoTopbar, 320);
-    });
-  }
-}
-
-function _aplicarEstadoTopbarBusca() {
-  const btn = document.getElementById('topbar-busca-toggle');
-  if (!btn) return;
-  let fechada = false;
-  try { fechada = localStorage.getItem(TOPBAR_BUSCA_STORAGE_KEY) === '1'; } catch {}
-  document.body.classList.toggle('topbar-busca-fechada', fechada);
-  btn.title = fechada ? 'Mostrar busca' : 'Ocultar busca';
 }
 
 function _atualizarFiltrosTipo() {
@@ -1758,7 +1704,7 @@ let _togglingPopup = false;
 
 function criarPopupSimples(v) {
   const txt = _textoLabelVeiculo(v);
-  return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px;white-space:nowrap">${txt}</div>`;
+  return `<div style="padding:3px 8px;font-size:12px;font-weight:700;letter-spacing:0.5px">${txt}</div>`;
 }
 
 function _textoLabelVeiculo(v) {
