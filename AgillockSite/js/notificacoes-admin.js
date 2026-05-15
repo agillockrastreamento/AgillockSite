@@ -132,6 +132,73 @@
     }
   }
 
+  function garantirPickerCliente() {
+    if (document.getElementById('picker-cliente')) return;
+    const style = document.createElement('style');
+    style.textContent = `
+      .notif-client-picker{position:relative}
+      .notif-client-picker-btn{height:34px;width:100%;border:1px solid #ccc;background:#fff;border-radius:4px;text-align:left;padding:6px 30px 6px 12px;font-size:13px;color:#555;position:relative}
+      .notif-client-picker-btn .fa-chevron-down{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#888}
+      .notif-client-picker-menu{display:none;position:absolute;z-index:5000;left:0;right:0;top:38px;background:#fff;border:1px solid #ccd3dc;border-radius:7px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:8px}
+      .notif-client-picker.open .notif-client-picker-menu{display:block}
+      .notif-client-picker-search{height:30px;font-size:12px;margin-bottom:7px}
+      .notif-client-picker-list{max-height:210px;overflow-y:auto}
+      .notif-client-picker-option{display:block;width:100%;border:0;background:transparent;text-align:left;padding:7px 8px;border-radius:5px;font-size:12px;color:#333}
+      .notif-client-picker-option:hover,.notif-client-picker-option.active{background:#eef6fd;color:#1f6f9f}
+      .notif-client-picker-empty{padding:10px;text-align:center;color:#999;font-size:12px}
+      html.dark-theme .notif-client-picker-btn,html.dark-theme .notif-client-picker-menu{background:#252535;color:#e0e6f0;border-color:#3a3a5c}
+      html.dark-theme .notif-client-picker-option{color:#e0e6f0}
+      html.dark-theme .notif-client-picker-option:hover,html.dark-theme .notif-client-picker-option.active{background:#1a3a5c;color:#fff}
+    `;
+    document.head.appendChild(style);
+    const sel = document.getElementById('filtro-cliente');
+    sel.style.display = 'none';
+    const picker = document.createElement('div');
+    picker.id = 'picker-cliente';
+    picker.className = 'notif-client-picker';
+    picker.innerHTML = `
+      <button type="button" class="notif-client-picker-btn" id="picker-cliente-btn"><span>Selecione um cliente...</span><i class="fa fa-chevron-down"></i></button>
+      <div class="notif-client-picker-menu">
+        <input type="text" id="busca-cliente" class="form-control notif-client-picker-search" placeholder="Buscar por nome" autocomplete="off">
+        <div id="picker-cliente-lista" class="notif-client-picker-list"></div>
+      </div>`;
+    sel.parentNode.insertBefore(picker, sel.nextSibling);
+    document.getElementById('picker-cliente-btn').addEventListener('click', function () {
+      picker.classList.toggle('open');
+      if (picker.classList.contains('open')) setTimeout(() => document.getElementById('busca-cliente')?.focus(), 0);
+    });
+    document.getElementById('busca-cliente').addEventListener('input', function () {
+      renderPickerCliente(this.value);
+    });
+    document.addEventListener('click', function (e) {
+      if (!picker.contains(e.target)) picker.classList.remove('open');
+    });
+  }
+
+  function renderPickerCliente(filtro) {
+    garantirPickerCliente();
+    const sel = document.getElementById('filtro-cliente');
+    const f = (filtro || '').toLowerCase().trim();
+    const opts = Array.from(sel.options).filter(opt => opt.value);
+    const filtrados = f ? opts.filter(opt => opt.text.toLowerCase().includes(f)) : opts;
+    const label = document.querySelector('#picker-cliente-btn span');
+    const opt = sel.options[sel.selectedIndex];
+    if (label) label.textContent = opt && opt.value ? opt.text : 'Selecione um cliente...';
+    const lista = document.getElementById('picker-cliente-lista');
+    if (!lista) return;
+    lista.innerHTML = filtrados.length ? filtrados.map(opt =>
+      `<button type="button" class="notif-client-picker-option${String(opt.value) === String(sel.value) ? ' active' : ''}" data-id="${opt.value}">${opt.text}</button>`
+    ).join('') : '<div class="notif-client-picker-empty">Nenhum cliente encontrado.</div>';
+    lista.querySelectorAll('.notif-client-picker-option').forEach(btn => {
+      btn.addEventListener('click', function () {
+        sel.value = this.dataset.id;
+        document.getElementById('picker-cliente').classList.remove('open');
+        renderPickerCliente(document.getElementById('busca-cliente')?.value || '');
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  }
+
   async function carregarClientes() {
     try {
       const data = await AL.apiGet('/api/notificacoes-admin/clientes');
@@ -139,6 +206,7 @@
       const sel = document.getElementById('filtro-cliente');
       sel.innerHTML = '<option value="">Selecione um cliente...</option>' +
         clientes.map(c => `<option value="${c.id}">${c.nome} — ${c.email}</option>`).join('');
+      renderPickerCliente('');
     } catch (err) {
       AL.showAlert('Erro ao carregar clientes: ' + err.message);
     }
