@@ -1784,13 +1784,9 @@ function renderBuscaResultados() {
   filtrados.sort((a, b) => pesoStatus(a) - pesoStatus(b));
   el.innerHTML = filtrados.map(v => {
     const p = v.posicao;
-    let dot = 'dot-offline', txt = 'Offline';
-    if (v.status === 'online' && p?.emMovimento) { dot = 'dot-moving'; txt = `Em movimento · ${p.velocidade} km/h`; }
-    else if (v.status === 'online') { dot = 'dot-online'; txt = 'Parado'; }
     const apelido = v.apelidoCliente ? `<span style="color:#fab32c;font-size:11px;font-weight:700;">&nbsp;· ${esc(v.apelidoCliente)}</span>` : '';
     return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" onclick="selecionarDaBusca('${v.dispositivoId}')">
       <div class="v-nome">${v.nome}${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}${apelido}</div>
-      <div class="v-status"><i class="fa fa-circle ${dot}"></i> ${txt}</div>
     </div>`;
   }).join('');
   el.style.display = 'block';
