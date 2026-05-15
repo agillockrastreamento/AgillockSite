@@ -968,13 +968,13 @@ html.rastr-bar-fechada #al-rastr-bar {
     transition: background .15s, color .15s;
 }
 #al-rastr-menu-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
-/* Campo de busca */
-#topbar-busca-wrap {
+/* Campo de busca — escopado dentro da barra global para não afetar outras páginas */
+#al-rastr-bar #topbar-busca-wrap {
     flex: 1;
     max-width: 320px;
     position: relative;
 }
-#filtro {
+#al-rastr-bar #filtro {
     width: 100%;
     height: 28px;
     font-size: 12px;
@@ -987,8 +987,8 @@ html.rastr-bar-fechada #al-rastr-bar {
     outline: none;
     transition: border-color .15s, background .15s;
 }
-#filtro::placeholder { color: rgba(255,255,255,.4); }
-#filtro:focus {
+#al-rastr-bar #filtro::placeholder { color: rgba(255,255,255,.4); }
+#al-rastr-bar #filtro:focus {
     border-color: rgba(250,179,44,.6);
     background: rgba(255,255,255,.12);
 }
