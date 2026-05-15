@@ -773,23 +773,6 @@
     .dcard-summary-val { font-size: 17px; font-weight: 700; color: #2980b9; }
     .dcard-summary-lbl { font-size: 10px; color: #aaa; margin-top: 1px; }
     .cerca-tooltip { font-size: 11px; font-weight: 600; }
-    html.dark-theme #modal-confirmar-troca-oleo .modal-content,
-    html.dark-theme #modal-troca-oleo .modal-content { background: #1e2530; border-color: #2d3748; }
-    html.dark-theme #modal-confirmar-troca-oleo .modal-body,
-    html.dark-theme #modal-troca-oleo .modal-body { color: #c9d1d9; }
-    html.dark-theme #modal-confirmar-troca-oleo .modal-body p,
-    html.dark-theme #modal-troca-oleo .modal-body p { color: #c9d1d9 !important; }
-    html.dark-theme #modal-confirmar-troca-oleo .modal-footer,
-    html.dark-theme #modal-troca-oleo .modal-footer { border-top-color: #2d3748; background: #1e2530; }
-    html.dark-theme #modal-troca-oleo .modal-body label { color: #adb5bd !important; }
-    html.dark-theme #oleo-intervalo-atual { color: #c9d1d9 !important; }
-    html.dark-theme #oleo-input-km { background: #252535; border-color: #3a3a5c; color: #f0f2f5; }
-    html.dark-theme #modal-troca-oleo .modal-body span[style*="color:#27ae60"] { color: #2ecc71 !important; }
-    html.dark-theme #modal-confirmar-troca-oleo .btn-default,
-    html.dark-theme #modal-troca-oleo .btn-default { background: #252535; border-color: #3a3a5c; color: #c9d1d9; }
-    html.dark-theme #modal-confirmar-troca-oleo .btn-default:hover,
-    html.dark-theme #modal-troca-oleo .btn-default:hover { background: #2d3748; }
-
     #tracking-drawer-handle { display: none; }
 
     @media (max-width: 700px) {
@@ -1237,72 +1220,6 @@
           <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">Cancelar</button>
           <button type="button" class="btn btn-success btn-sm" id="btn-modal-feito-card-confirmar" style="font-weight:700;">
             <i class="fa fa-check"></i> Confirmar
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal — confirmar troca de óleo realizada -->
-  <div class="modal fade" id="modal-confirmar-troca-oleo" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-sm" role="document">
-      <div class="modal-content">
-        <div class="modal-header" style="background:#27ae60;border-radius:6px 6px 0 0;">
-          <button type="button" class="close" data-dismiss="modal" style="color:#fff;opacity:.8;font-size:20px;margin-top:-2px;">&times;</button>
-          <h4 class="modal-title" style="color:#fff;font-size:15px;font-weight:700;">
-            <i class="fa fa-check-circle"></i> Confirmar Troca de Óleo
-          </h4>
-        </div>
-        <div class="modal-body" style="padding:20px 24px;">
-          <p style="font-size:13px;color:#2c3e50;margin-bottom:8px;">
-            Confirme que a troca de óleo foi realizada no veículo.
-          </p>
-          <p style="font-size:12px;color:#888;margin-bottom:0;">
-            O contador será reiniciado a partir do odômetro atual e as notificações serão resetadas.
-          </p>
-        </div>
-        <div class="modal-footer" style="padding:12px 16px;border-top:1px solid #eee;">
-          <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">Cancelar</button>
-          <button type="button" class="btn btn-success btn-sm" id="btn-confirmar-oleo-salvar" style="font-weight:700;">
-            <i class="fa fa-check"></i> Confirmar
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal — editar intervalo de troca de óleo -->
-  <div class="modal fade" id="modal-troca-oleo" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-sm" role="document">
-      <div class="modal-content">
-        <div class="modal-header" style="background:#27ae60;border-radius:6px 6px 0 0;">
-          <button type="button" class="close" data-dismiss="modal" style="color:#fff;opacity:.8;font-size:20px;margin-top:-2px;">&times;</button>
-          <h4 class="modal-title" style="color:#fff;font-size:15px;font-weight:700;">
-            <i class="fa fa-tint"></i> Troca de Óleo
-          </h4>
-        </div>
-        <div class="modal-body" style="padding:20px 24px;">
-          <p style="font-size:12px;color:#888;margin-bottom:16px;">
-            Intervalo atual: <strong id="oleo-intervalo-atual" style="color:#2c3e50;">—</strong> km
-          </p>
-          <div class="form-group" style="margin-bottom:0;">
-            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#555;">
-              Novo intervalo (km)
-            </label>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-              <input type="number" id="oleo-input-km" class="form-control" placeholder="5000" min="100" max="99999"
-                style="border-radius:7px;height:38px;font-size:15px;font-weight:700;text-align:center;max-width:130px;" />
-              <span style="font-size:13px;font-weight:700;color:#27ae60;">km</span>
-            </div>
-            <p style="font-size:11px;color:#8a9ab0;margin-top:8px;margin-bottom:0;">
-              O contador é reiniciado a partir do odômetro atual.
-            </p>
-          </div>
-        </div>
-        <div class="modal-footer" style="padding:12px 16px;border-top:1px solid #eee;">
-          <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">Cancelar</button>
-          <button type="button" class="btn btn-success btn-sm" id="btn-oleo-salvar" style="font-weight:700;">
-            <i class="fa fa-check"></i> Salvar
           </button>
         </div>
       </div>

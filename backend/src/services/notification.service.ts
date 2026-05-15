@@ -382,7 +382,6 @@ class NotificationService {
         if (!clienteLogin?.ativo) continue;
         await this._verificarKmExcedida(clienteLogin.id, dispositivo, odometroMetros);
         await this._verificarKmReduzida(clienteLogin.id, dispositivo, odometroMetros);
-        await this._verificarTrocaOleo(clienteLogin.id, dispositivo, odometroMetros);
       }
       eventosDetectados.push(...await this._verificarManutencaoRecorrencias(dispositivo, odometroMetros, clientes.map(c => c.login).filter((l): l is { id: string; email: string; ativo: boolean } => !!l?.ativo)));
     } catch (error) {

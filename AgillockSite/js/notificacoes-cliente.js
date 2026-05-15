@@ -13,7 +13,6 @@
     { id: 'deviceUnlocked',label: 'Veículo Desbloqueado',        icon: 'fa-unlock',               iconClass: 'ic-lock' },
     { id: 'kmExcedida',    label: 'Km Excedida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'kmReduzida',    label: 'Km Reduzida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
-    { id: 'trocaOleo',          label: 'Troca de Óleo',              icon: 'fa-tint',                 iconClass: 'ic-oleo' },
     { id: 'manutencao',         label: 'Manutenções (Recorrências)', icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
     { id: 'manutencaoAlerta',   label: 'Alerta de Manutenção',       icon: 'fa-wrench',               iconClass: 'ic-manutencao-alerta', hidden: true },
     { id: 'manutencaoAtrasada', label: 'Manutenção Atrasada',        icon: 'fa-exclamation-triangle', iconClass: 'ic-manutencao-atrasada', hidden: true },
@@ -169,9 +168,6 @@
         document.getElementById('select-dia-semana').value = data.kmReduzida.diaSemanaRenovacao;
       }
 
-      // Fill troca de oleo config
-      document.getElementById('input-km-oleo').value = data?.kmTrocaOleo || '';
-
       document.getElementById('notif-container').style.display = 'block';
       document.getElementById('notif-vazio').style.display = 'none';
     } catch (err) {
@@ -207,7 +203,6 @@
     document.getElementById('config-velocidade').style.display = 'block';
     document.getElementById('input-vel-limite').value = preferenciasAtivas.overspeedLimit || 100;
     document.getElementById('config-km-periodo').style.display = 'block';
-    document.getElementById('config-troca-oleo').style.display = 'block';
   }
 
   window.toggleChannel = function(el, tipoId, canalId) {
@@ -233,7 +228,6 @@
         kmMinimo7Dias: parseInt(document.getElementById('input-km-min').value) || null,
         diaSemanaRenovacao: parseInt(document.getElementById('select-dia-semana').value),
       },
-      kmTrocaOleo: parseInt(document.getElementById('input-km-oleo').value) || null,
     };
 
     document.querySelectorAll('.notif-card').forEach(card => {

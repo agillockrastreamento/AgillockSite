@@ -13,7 +13,6 @@
     { id: 'deviceUnlocked', label: 'Veículo Desbloqueado',        icon: 'fa-unlock',               iconClass: 'ic-lock' },
     { id: 'kmExcedida',     label: 'Km Excedida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'kmReduzida',     label: 'Km Reduzida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
-    { id: 'trocaOleo',          label: 'Troca de Óleo',              icon: 'fa-tint',                 iconClass: 'ic-oleo' },
     { id: 'manutencao',         label: 'Manutenções (Recorrências)', icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
     { id: 'manutencaoAlerta',   label: 'Alerta de Manutenção',       icon: 'fa-wrench',               iconClass: 'ic-manutencao-alerta', hidden: true },
     { id: 'manutencaoAtrasada', label: 'Manutenção Atrasada',        icon: 'fa-exclamation-triangle', iconClass: 'ic-manutencao-atrasada', hidden: true },
@@ -239,8 +238,6 @@
       if (data?.kmReduzida?.diaSemanaRenovacao != null) {
         document.getElementById('c-select-dia-semana').value = data.kmReduzida.diaSemanaRenovacao;
       }
-      document.getElementById('c-input-km-oleo').value  = data?.kmTrocaOleo || '';
-
       document.getElementById('cliente-notif-container').style.display = 'block';
       document.getElementById('cliente-notif-vazio').style.display    = 'none';
     } catch (err) {
@@ -272,7 +269,6 @@
     document.getElementById('c-config-velocidade').style.display = 'block';
     document.getElementById('c-input-vel-limite').value = clientePreferencias.overspeedLimit || 100;
     document.getElementById('c-config-km-periodo').style.display = 'block';
-    document.getElementById('c-config-troca-oleo').style.display  = 'block';
   }
 
   async function salvarPreferenciasCliente() {
@@ -293,7 +289,6 @@
         kmMinimo7Dias:       parseInt(document.getElementById('c-input-km-min').value) || null,
         diaSemanaRenovacao:  parseInt(document.getElementById('c-select-dia-semana').value),
       },
-      kmTrocaOleo: parseInt(document.getElementById('c-input-km-oleo').value) || null,
     };
 
     document.querySelectorAll('.notif-card[data-tipo-c]').forEach(card => {
