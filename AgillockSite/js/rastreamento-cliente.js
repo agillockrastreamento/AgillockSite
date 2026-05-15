@@ -674,12 +674,11 @@ function _aplicarEstadoBarraVeiculos() {
 function inicializarTopbarBusca() {
   _aplicarEstadoTopbarBusca();
   const btn = document.getElementById('topbar-busca-toggle');
-  const topbar = document.querySelector('.admin-topbar');
-  if (!btn || !topbar) return;
+  if (!btn) return;
 
   btn.addEventListener('click', function () {
-    topbar.classList.toggle('busca-fechada');
-    const fechada = topbar.classList.contains('busca-fechada');
+    document.body.classList.toggle('topbar-busca-fechada');
+    const fechada = document.body.classList.contains('topbar-busca-fechada');
     try { localStorage.setItem(TOPBAR_BUSCA_STORAGE_KEY, fechada ? '1' : '0'); } catch {}
     btn.title = fechada ? 'Mostrar busca' : 'Ocultar busca';
     if (fechada) {
@@ -692,12 +691,11 @@ function inicializarTopbarBusca() {
 }
 
 function _aplicarEstadoTopbarBusca() {
-  const topbar = document.querySelector('.admin-topbar');
   const btn = document.getElementById('topbar-busca-toggle');
-  if (!topbar || !btn) return;
+  if (!btn) return;
   let fechada = false;
   try { fechada = localStorage.getItem(TOPBAR_BUSCA_STORAGE_KEY) === '1'; } catch {}
-  topbar.classList.toggle('busca-fechada', fechada);
+  document.body.classList.toggle('topbar-busca-fechada', fechada);
   btn.title = fechada ? 'Mostrar busca' : 'Ocultar busca';
 }
 
