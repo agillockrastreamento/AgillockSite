@@ -74,7 +74,7 @@
     picker.innerHTML = `
       <button type="button" class="notif-device-picker-btn" id="picker-dispositivo-cliente-btn"><span>Selecione um dispositivo...</span><i class="fa fa-chevron-down"></i></button>
       <div class="notif-device-picker-menu">
-        <input type="text" id="busca-placa-dispositivo-cliente" class="form-control notif-device-picker-search" placeholder="Buscar por placa" autocomplete="off">
+        <input type="text" id="busca-placa-dispositivo-cliente" class="form-control notif-device-picker-search" placeholder="Buscar por nome ou placa" autocomplete="off">
         <div id="picker-dispositivo-cliente-lista" class="notif-device-picker-list"></div>
       </div>`;
     select.parentNode.insertBefore(picker, select.nextSibling);
@@ -104,7 +104,7 @@
     const ativo = sel.value;
     const filtro = normalizarPlacaBusca(filtroPlaca);
     const filtrados = filtro
-      ? clienteDispositivos.filter(d => normalizarPlacaBusca(d.placa).includes(filtro))
+      ? clienteDispositivos.filter(d => normalizarPlacaBusca(d.nome + ' ' + d.placa).includes(filtro))
       : clienteDispositivos;
 
     sel.innerHTML = '<option value="">Selecione um dispositivo...</option>' +

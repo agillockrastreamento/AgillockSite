@@ -65,7 +65,7 @@
     picker.innerHTML = `
       <button type="button" class="man-device-picker-btn" id="man-picker-dispositivo-btn"><span>Selecione um dispositivo...</span><i class="fa fa-chevron-down"></i></button>
       <div class="man-device-picker-menu">
-        <input type="text" id="man-busca-placa-dispositivo" class="form-control man-device-picker-search" placeholder="Buscar por placa" autocomplete="off">
+        <input type="text" id="man-busca-placa-dispositivo" class="form-control man-device-picker-search" placeholder="Buscar por nome ou placa" autocomplete="off">
         <div id="man-picker-dispositivo-lista" class="man-device-picker-list"></div>
       </div>`;
     sel.parentNode.insertBefore(picker, sel.nextSibling);

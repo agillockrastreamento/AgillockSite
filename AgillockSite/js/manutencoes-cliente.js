@@ -63,7 +63,7 @@
     picker.innerHTML = `
       <button type="button" class="man-device-picker-btn" id="man-picker-dispositivo-btn"><span>Selecione um veículo...</span><i class="fa fa-chevron-down"></i></button>
       <div class="man-device-picker-menu">
-        <input type="text" id="man-busca-placa-dispositivo" class="form-control man-device-picker-search" placeholder="Buscar por placa" autocomplete="off">
+        <input type="text" id="man-busca-placa-dispositivo" class="form-control man-device-picker-search" placeholder="Buscar por nome ou placa" autocomplete="off">
         <div id="man-picker-dispositivo-lista" class="man-device-picker-list"></div>
       </div>`;
     sel.parentNode.insertBefore(picker, sel.nextSibling);
@@ -83,7 +83,7 @@
     garantirPickerDispositivo();
     const sel = document.getElementById('filtro-dispositivo');
     const filtro = normalizarPlacaBusca(filtroPlaca);
-    const filtrados = filtro ? veiculos.filter(v => normalizarPlacaBusca(v.placa).includes(filtro)) : veiculos;
+    const filtrados = filtro ? veiculos.filter(v => normalizarPlacaBusca(v.nome + ' ' + v.placa).includes(filtro)) : veiculos;
     const label = document.querySelector('#man-picker-dispositivo-btn span');
     const opt = sel.options[sel.selectedIndex];
     if (label) label.textContent = opt && opt.value ? opt.text : 'Selecione um veículo...';

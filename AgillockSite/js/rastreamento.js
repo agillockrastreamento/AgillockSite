@@ -332,8 +332,6 @@ const TIPOS_EVENTO_ADMIN = [
   { tipo: 'manutencaoAtrasada', label: 'Manutencao Atrasada',   css: 'tipo-overspeed' },
   { tipo: 'kmExcedida',      label: 'Km Excedida (Período)',     css: 'tipo-overspeed' },
   { tipo: 'kmReduzida',      label: 'Km Reduzida (Período)',     css: 'tipo-geofence' },
-  { tipo: 'trocaOleo',       label: 'Troca de Óleo',             css: 'tipo-alarm' },
-  { tipo: 'trocaOleoFeita',  label: 'Troca de Óleo Realizada',  css: 'tipo-ignition' },
   { tipo: 'manutencaoFeita', label: 'Manutenção Realizada',     css: 'tipo-ignition' },
 ];
 const TIPOS_EVENTO_ADMIN_FILTRO = TIPOS_EVENTO_ADMIN
@@ -797,9 +795,8 @@ function renderEventosLista() {
       case 'ignitionOff': return { color: '#e67e22', icon: 'fa-power-off' };
       case 'overspeed': case 'deviceOverspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': return { color: '#e74c3c', icon: 'fa-exclamation-triangle' };
       case 'geofenceEnter': case 'kmReduzida': return { color: '#2980b9', icon: 'fa-sign-in' };
-      case 'geofenceExit': case 'trocaOleo': case 'manutencaoAlerta': return { color: '#e67e22', icon: tipo === 'manutencaoAlerta' ? 'fa-wrench' : 'fa-sign-out' };
+      case 'geofenceExit': case 'manutencaoAlerta': return { color: '#e67e22', icon: tipo === 'manutencaoAlerta' ? 'fa-wrench' : 'fa-sign-out' };
       case 'manutencaoAtrasada': return { color: '#e74c3c', icon: 'fa-exclamation-triangle' };
-      case 'trocaOleoFeita': return { color: '#27ae60', icon: 'fa-check-circle' };
       case 'manutencaoFeita': return { color: '#27ae60', icon: 'fa-check-circle' };
       default: return { color: '#2980b9', icon: 'fa-bell' };
     }
