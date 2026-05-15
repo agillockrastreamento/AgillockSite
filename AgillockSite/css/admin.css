@@ -187,7 +187,6 @@ html.al-sb-collapsed .admin-sidebar { width: 64px !important; }
     margin-left: 240px;
     min-height: 100vh;
     padding: 80px 24px 24px; /* padding-top = altura do topbar fixo */
-    transition: padding-top .22s ease;
 }
 
 /* ─── Topbar ───────────────────────────────────────────────────────────── */
@@ -929,86 +928,146 @@ input:focus, select:focus, textarea:focus {
 .input-suffix input { flex: 1; }
 .input-suffix .suffix { color: #888; font-size: 13px; white-space: nowrap; }
 
-/* ─── Busca de veículos global na topbar ────────────────────────────────── */
-.admin-topbar {
-    transition: height .22s ease, box-shadow .22s ease, border-color .22s ease;
+/* ─── Barra global de rastreamento (acima de sidebar e topbar) ──────────── */
+#al-rastr-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    z-index: 9999;
+    background: #1e2530;
+    border-bottom: 1px solid #2d3748;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    overflow: visible;
+    transition: height .22s ease, opacity .18s ease;
 }
+html.rastr-bar-fechada #al-rastr-bar {
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+/* Botão menu na barra (visível apenas no mobile) */
+#al-rastr-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 6px;
+    color: #adb5bd;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+    transition: background .15s, color .15s;
+}
+#al-rastr-menu-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
+/* Campo de busca */
 #topbar-busca-wrap {
     flex: 1;
-    max-width: 280px;
+    max-width: 320px;
     position: relative;
-    z-index: 5001;
-    transition: max-width .22s ease, opacity .22s ease;
 }
-#filtro { width: 100%; }
-#topbar-counters {
-    font-size: 11px;
-    color: #888;
-    white-space: nowrap;
-    flex-shrink: 0;
-    transition: opacity .22s;
+#filtro {
+    width: 100%;
+    height: 28px;
+    font-size: 12px;
+    padding: 3px 8px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 6px;
+    color: #e0e6f0;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s, background .15s;
 }
-html.dark-theme #topbar-counters { color: #8b949e; }
+#filtro::placeholder { color: rgba(255,255,255,.4); }
+#filtro:focus {
+    border-color: rgba(250,179,44,.6);
+    background: rgba(255,255,255,.12);
+}
+/* Dropdown de resultados */
 #lista-resultados-busca {
     position: absolute;
     top: 100%;
     left: 0;
     right: 0;
-    z-index: 5002;
+    margin-top: 4px;
+    z-index: 10000;
     background: #fff;
     border: 1px solid #ddd;
-    border-top: none;
-    border-radius: 0 0 6px 6px;
+    border-radius: 6px;
     max-height: 260px;
     overflow-y: auto;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
 }
 html.dark-theme #lista-resultados-busca { background: #1e1e2e; border-color: #333; }
-/* Estado fechado */
-body.topbar-busca-fechada .admin-topbar {
-    height: 0 !important;
-    overflow: hidden;
-    border-bottom: none !important;
-    box-shadow: none !important;
+/* Contadores */
+#topbar-counters {
+    font-size: 11px;
+    color: rgba(255,255,255,.55);
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: auto;
 }
-body.topbar-busca-fechada .admin-content {
-    padding-top: 0 !important;
-}
-/* Botão toggle (flutua logo abaixo do topbar) */
+/* Botão toggle (aba que fica logo abaixo da barra) */
 #topbar-busca-toggle {
     position: fixed;
-    top: 56px;
+    top: 40px;
     left: 50%;
     transform: translateX(-50%);
     width: 44px;
-    height: 20px;
-    border: 1px solid #d7d7d7;
+    height: 18px;
+    border: 1px solid #2d3748;
     border-top: none;
-    border-radius: 0 0 12px 12px;
-    background: #fff;
-    color: #888;
-    font-size: 11px;
+    border-radius: 0 0 10px 10px;
+    background: #1e2530;
+    color: rgba(255,255,255,.45);
+    font-size: 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
-    transition: color .15s, border-color .15s, top .22s ease;
-    z-index: 5002;
+    transition: top .22s ease, color .15s;
+    z-index: 9998;
     padding: 0;
 }
-html.dark-theme #topbar-busca-toggle {
-    background: #141820;
-    border-color: #2d3748;
-    color: #888;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.28);
+#topbar-busca-toggle:hover { color: #fab32c; }
+html.rastr-bar-fechada #topbar-busca-toggle { top: 0; }
+html.rastr-bar-fechada #topbar-busca-toggle i { transform: rotate(180deg); }
+/* Ajustes de posição: sidebar + topbar descem 40px */
+.admin-sidebar {
+    top: 40px;
+    height: calc(100vh - 40px);
+    transition: top .22s ease, height .22s ease;
 }
-#topbar-busca-toggle:hover { color: #2980b9; border-color: #2980b9; }
-body.topbar-busca-fechada #topbar-busca-toggle { top: 0; }
-body.topbar-busca-fechada #topbar-busca-toggle i { transform: rotate(180deg); }
-@media (min-width: 768px) {
-    #topbar-busca-toggle { left: calc(120px + 50%); transform: none; }
-    body.topbar-busca-fechada #topbar-busca-toggle { top: 0; }
+.admin-topbar {
+    top: 40px;
+    transition: top .22s ease;
+}
+.admin-content {
+    padding-top: calc(80px + 40px);
+    transition: padding-top .22s ease;
+}
+/* Quando a barra fecha, tudo volta ao topo */
+html.rastr-bar-fechada .admin-sidebar  { top: 0; height: 100vh; }
+html.rastr-bar-fechada .admin-topbar   { top: 0; }
+html.rastr-bar-fechada .admin-content  { padding-top: 80px; }
+@media (max-width: 767px) {
+    .admin-content { padding-top: calc(72px + 40px); }
+    html.rastr-bar-fechada .admin-content { padding-top: 72px; }
+    #al-rastr-menu-btn { display: flex; }
+    #topbar-busca-toggle { transform: translateX(-50%); }
+}
+@media (max-width: 991px) and (min-width: 768px) {
+    .admin-sidebar { top: 40px; height: calc(100vh - 40px); }
+    html.rastr-bar-fechada .admin-sidebar { top: 0; height: 100vh; }
 }
 
 /* ─── Botão de tema ─────────────────────────────────────────────────────── */

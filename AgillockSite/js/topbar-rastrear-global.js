@@ -1,53 +1,56 @@
 'use strict';
 
 (function () {
-  var STORAGE_KEY = 'al_topbar_busca_aberta';
+  var STORAGE_KEY = 'al_rastr_bar_aberta';
   var _veiculosGlobal = null;
   var _veiculosCarregando = false;
   var _isRastrPage = /rastreamento\.html/.test(window.location.pathname);
 
-  // ── Injeção imediata no DOM ────────────────────────────────────────────────
-  // O script fica no final do <body>, depois do HTML do topbar, então pode
-  // injetar diretamente sem esperar DOMContentLoaded.
-  var topbar = document.querySelector('.admin-topbar');
-  if (!topbar || document.getElementById('topbar-busca-wrap')) return;
+  // ── Injeção imediata — roda antes do DOMContentLoaded ─────────────────────
+  // O script fica no final do <body> (depois do HTML já parseado), então injeta
+  // diretamente sem esperar DOMContentLoaded.
+  if (document.getElementById('al-rastr-bar')) return; // proteção contra dupla injeção
 
-  topbar.insertAdjacentHTML('beforeend',
+  var bar = document.createElement('div');
+  bar.id = 'al-rastr-bar';
+  bar.innerHTML =
+    '<button type="button" id="al-rastr-menu-btn" title="Menu"><i class="fa fa-bars"></i></button>' +
     '<div id="topbar-busca-wrap">' +
-      '<input type="text" id="filtro" class="form-control input-sm"' +
-      ' placeholder="Buscar veículo, placa, IMEI ou cliente..." autocomplete="off">' +
+      '<input type="text" id="filtro" class="form-control" autocomplete="off"' +
+      ' placeholder="Buscar veículo, placa, IMEI ou cliente...">' +
       '<div id="lista-resultados-busca" style="display:none"></div>' +
     '</div>' +
-    '<div id="topbar-counters"></div>'
-  );
+    '<div id="topbar-counters"></div>';
+  document.body.insertBefore(bar, document.body.firstChild);
 
   var toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.id = 'topbar-busca-toggle';
-  toggle.title = 'Mostrar/ocultar busca';
+  toggle.title = 'Mostrar/ocultar barra de rastreamento';
   toggle.innerHTML = '<i class="fa fa-chevron-up"></i>';
   document.body.appendChild(toggle);
 
   // ── Estado inicial ─────────────────────────────────────────────────────────
   var aberta = true;
-  try {
-    var saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === '0') aberta = false;
-  } catch {}
+  try { if (localStorage.getItem(STORAGE_KEY) === '0') aberta = false; } catch {}
   _aplicarEstado(aberta, false);
 
   // ── Eventos ────────────────────────────────────────────────────────────────
   toggle.addEventListener('click', function () {
-    var estaAberta = !document.body.classList.contains('topbar-busca-fechada');
-    _aplicarEstado(!estaAberta);
+    _aplicarEstado(document.documentElement.classList.contains('rastr-bar-fechada'));
+  });
+
+  document.getElementById('al-rastr-menu-btn').addEventListener('click', function () {
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.toggle('open');
+    if (overlay) overlay.classList.toggle('open');
   });
 
   var filtroEl = document.getElementById('filtro');
-  // Na página de rastreamento, rastreamento.js já faz o binding; nas outras, tratamos aqui.
+  // Na página de rastreamento, rastreamento.js faz o próprio binding; nas outras, usamos aqui.
   if (!_isRastrPage) {
-    filtroEl.addEventListener('input', function () {
-      _buscarGlobal(this.value);
-    });
+    filtroEl.addEventListener('input', function () { _buscarGlobal(this.value); });
   }
 
   document.addEventListener('click', function (e) {
@@ -61,7 +64,7 @@
   // ── Lógica ─────────────────────────────────────────────────────────────────
 
   function _aplicarEstado(novaAberta, salvar) {
-    document.body.classList.toggle('topbar-busca-fechada', !novaAberta);
+    document.documentElement.classList.toggle('rastr-bar-fechada', !novaAberta);
     var btn = document.getElementById('topbar-busca-toggle');
     if (btn) btn.querySelector('i').className = novaAberta ? 'fa fa-chevron-up' : 'fa fa-chevron-down';
     if (salvar !== false) {
@@ -102,7 +105,6 @@
       return;
     }
 
-    // Recheck após await — query pode ter mudado
     var qAtual = ((document.getElementById('filtro') || {}).value || '').toLowerCase().trim();
     if (!qAtual) { el.style.display = 'none'; el.innerHTML = ''; return; }
 
@@ -135,9 +137,7 @@
     if (f) f.value = '';
     if (l) l.style.display = 'none';
     if (_isRastrPage) {
-      if (typeof window.selecionarDaBusca === 'function') {
-        window.selecionarDaBusca(id);
-      }
+      if (typeof window.selecionarDaBusca === 'function') window.selecionarDaBusca(id);
     } else {
       var base = window.location.href.replace(/\/[^/?#]+(\?.*)?$/, '/');
       window.location.href = base + 'rastreamento.html?focus=' + encodeURIComponent(id);
@@ -146,11 +146,8 @@
 
   function _esc(s) {
     return String(s || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
 })();
