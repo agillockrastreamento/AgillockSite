@@ -809,7 +809,7 @@ function _restaurarPopupVeiculoCliente(did) {
   marker._eventOriginalPopup = null;
   marker._eventPopupToken = null;
   if (_mostrarPopup) {
-    marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+    marker.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 500 });
   } else {
     marker.unbindPopup();
   }
@@ -1539,7 +1539,7 @@ function _abrirSpider(chave, centroLatLng) {
     const linha = L.polyline([centroLatLng, sp], { color: '#666', weight: 1.5, opacity: 0.6, dashArray: '4,4' }).addTo(map);
     _spider.linhas.push(linha);
     const sm = L.marker(sp, { icon: criarIcone(v), zIndexOffset: 1000 });
-    if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+    if (_mostrarPopup) sm.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 500 });
     if (_overlay.labels) _bindLabelVeiculo(sm, _textoLabelVeiculo(v));
     sm.on('click', function (e) { L.DomEvent.stopPropagation(e); _fecharSpider(); focar(id); });
     sm.addTo(map); _spider.markers.push(sm);
@@ -1564,7 +1564,7 @@ function renderMarcadores() {
       const visivel = modoFoco ? id === ativoId : !isCluster;
       if (!marcadores[id]) {
         const m = L.marker([latitude, longitude], { icon: criarIcone(v) });
-        if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+        if (_mostrarPopup) m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 500 });
         if (_overlay.labels) _bindLabelVeiculo(m, _textoLabelVeiculo(v));
         m.on('click', function (e) { L.DomEvent.stopPropagation(e); focar(id); });
         marcadores[id] = m; marcadoresIconeKey[id] = _iconeKey(id);
@@ -1743,7 +1743,7 @@ function _atualizarBindingsPopup() {
       if (m.getTooltip()) { m.closeTooltip(); m.unbindTooltip(); }
     }
     if (_mostrarPopup && v) {
-      m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 180 });
+      m.bindPopup(criarPopupSimples(v), { className: 'popup-veiculo', closeButton: false, maxWidth: 500 });
     } else {
       m.closePopup();
       m.unbindPopup();
