@@ -94,6 +94,7 @@ const _eventos = [];
 const MAX_EVENTOS = 100;
 const EVENTOS_PANEL_STORAGE_KEY = 'rastreamento_cliente_eventos_min';
 const BARRA_VEICULOS_STORAGE_KEY = 'rastreamento_cliente_barra_min';
+const TOPBAR_BUSCA_STORAGE_KEY = 'rastreamento_cliente_topbar_busca_min';
 let _eventoPopupAtualIdx = null;
 let _googleMapLayers = {};
 let _googleMapType = 'roadmap';
@@ -274,6 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
     _aplicarPreferenciasOverlay();
     carregarUltimaLeituraCliente().finally(function () { inicializarEventosPanel(); });
     inicializarBarraVeiculos();
+    inicializarTopbarBusca();
     carregarPosicoes();
     _instalarMobileOutsideClick();
     document.getElementById('filtro').addEventListener('input', renderBuscaResultados);
@@ -667,6 +669,36 @@ function _aplicarEstadoBarraVeiculos() {
   try { minimizada = localStorage.getItem(BARRA_VEICULOS_STORAGE_KEY) === '1'; } catch {}
   wrap.classList.toggle('minimizada', minimizada);
   btn.title = minimizada ? 'Expandir dispositivos' : 'Minimizar dispositivos';
+}
+
+function inicializarTopbarBusca() {
+  _aplicarEstadoTopbarBusca();
+  const btn = document.getElementById('topbar-busca-toggle');
+  const topbar = document.querySelector('.admin-topbar');
+  if (!btn || !topbar) return;
+
+  btn.addEventListener('click', function () {
+    topbar.classList.toggle('busca-fechada');
+    const fechada = topbar.classList.contains('busca-fechada');
+    try { localStorage.setItem(TOPBAR_BUSCA_STORAGE_KEY, fechada ? '1' : '0'); } catch {}
+    btn.title = fechada ? 'Mostrar busca' : 'Ocultar busca';
+    if (fechada) {
+      const filtro = document.getElementById('filtro');
+      const lista = document.getElementById('lista-resultados-busca');
+      if (filtro) filtro.value = '';
+      if (lista) { lista.style.display = 'none'; lista.innerHTML = ''; }
+    }
+  });
+}
+
+function _aplicarEstadoTopbarBusca() {
+  const topbar = document.querySelector('.admin-topbar');
+  const btn = document.getElementById('topbar-busca-toggle');
+  if (!topbar || !btn) return;
+  let fechada = false;
+  try { fechada = localStorage.getItem(TOPBAR_BUSCA_STORAGE_KEY) === '1'; } catch {}
+  topbar.classList.toggle('busca-fechada', fechada);
+  btn.title = fechada ? 'Mostrar busca' : 'Ocultar busca';
 }
 
 function _atualizarFiltrosTipo() {
