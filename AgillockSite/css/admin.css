@@ -1008,6 +1008,9 @@ html.rastr-bar-fechada #al-rastr-bar {
     box-shadow: 0 4px 16px rgba(0,0,0,0.18);
 }
 html.dark-theme #lista-resultados-busca { background: #1e1e2e; border-color: #333; }
+/* Bolinhas de status nos contadores */
+.dot-moving  { color: #2980b9; }
+.dot-offline { color: #bdc3c7; }
 /* Contadores */
 #topbar-counters {
     font-size: 11px;
