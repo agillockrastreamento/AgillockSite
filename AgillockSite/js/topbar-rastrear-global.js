@@ -51,6 +51,7 @@
   // Na página de rastreamento, rastreamento.js faz o próprio binding; nas outras, usamos aqui.
   if (!_isRastrPage) {
     filtroEl.addEventListener('input', function () { _buscarGlobal(this.value); });
+    _iniciarContadores();
   }
 
   document.addEventListener('click', function (e) {
@@ -143,6 +144,27 @@
       window.location.href = base + 'rastreamento.html?focus=' + encodeURIComponent(id);
     }
   };
+
+  function _renderContadores(lista) {
+    var el = document.getElementById('topbar-counters');
+    if (!el) return;
+    var online  = lista.filter(function (v) { return v.status === 'online'; }).length;
+    var offline = lista.length - online;
+    el.innerHTML =
+      '<span class="dot-moving">●</span> ' + online + ' online' +
+      ' &nbsp;·&nbsp; ' +
+      '<span class="dot-offline">●</span> ' + offline + ' offline';
+  }
+
+  async function _iniciarContadores() {
+    var lista = await _carregarVeiculos();
+    if (lista) _renderContadores(lista);
+    setInterval(async function () {
+      _veiculosGlobal = null;
+      var l = await _carregarVeiculos();
+      if (l) _renderContadores(l);
+    }, 30000);
+  }
 
   function _esc(s) {
     return String(s || '')
