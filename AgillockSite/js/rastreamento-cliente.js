@@ -1775,6 +1775,7 @@ function renderBuscaResultados() {
   const filtrados = Object.values(veiculosMap).filter(v =>
     v.nome.toLowerCase().includes(filtro) ||
     (v.placa && v.placa.toLowerCase().includes(filtro)) ||
+    (v.apelidoCliente && v.apelidoCliente.toLowerCase().includes(filtro)) ||
     (v.cliente?.nome?.toLowerCase().includes(filtro))
   ).slice(0, 8);
 
@@ -1786,8 +1787,9 @@ function renderBuscaResultados() {
     let dot = 'dot-offline', txt = 'Offline';
     if (v.status === 'online' && p?.emMovimento) { dot = 'dot-moving'; txt = `Em movimento · ${p.velocidade} km/h`; }
     else if (v.status === 'online') { dot = 'dot-online'; txt = 'Parado'; }
+    const apelido = v.apelidoCliente ? `<span style="color:#fab32c;font-size:11px;font-weight:700;">&nbsp;· ${esc(v.apelidoCliente)}</span>` : '';
     return `<div class="veiculo-item${v.dispositivoId === ativoId ? ' ativo' : ''}" onclick="selecionarDaBusca('${v.dispositivoId}')">
-      <div class="v-nome">${v.nome}${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}</div>
+      <div class="v-nome">${v.nome}${v.placa ? `&nbsp;<span class="v-placa">${v.placa}</span>` : ''}${apelido}</div>
       <div class="v-status"><i class="fa fa-circle ${dot}"></i> ${txt}</div>
     </div>`;
   }).join('');
