@@ -109,34 +109,18 @@
       }
        
 
+    /* ── Layout da tela de rastreamento — topbar fixo global ── */
     .admin-content {
+      padding: 56px 0 0 0 !important;
       height: 100vh;
-      display: flex;
-      flex-direction: column;
+      overflow: hidden;
     }
-
-    /* ── Topbar estendida com busca e contadores ── */
+    body.topbar-busca-fechada .admin-content {
+      padding-top: 0 !important;
+    }
     .admin-topbar {
-      z-index: 5000;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 0 14px;
-      flex-wrap: nowrap;
-    }
-    #topbar-busca-wrap {
-      flex: 1;
-      max-width: 280px;
-      position: relative;
-      z-index: 5001 !important;
-    }
-    #filtro { width: 100%; }
-    #topbar-counters {
-      font-size: 11px;
-      color: #888;
-      white-space: nowrap;
-      flex-shrink: 0;
+      z-index: 5000 !important;
+      padding: 0 14px !important;
     }
 
     /* ── Bandeja de camadas ── */
@@ -223,31 +207,15 @@
     html.dark-theme .map-btn-notif .badge-count { border-color: #1e2530; }
     .map-btn-notif .badge-count.has-notifications { display: inline-block; }
 
-    /* ── Lista de resultados flutuante (abaixo do input na topbar) ── */
-    #lista-resultados-busca {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      z-index: 2000;
-      background: #fff;
-      border: 1px solid #ddd;
-      border-top: none;
-      border-radius: 0 0 6px 6px;
-      max-height: 260px;
-      overflow-y: auto;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-    }
-    .dark-theme #lista-resultados-busca {
-      background: #1e1e2e;
-      border-color: #333;
-    }
-
     /* ── Layout principal ── */
     #rastreamento-layout {
-      flex: 1;
+      height: calc(100vh - 56px);
       display: flex;
       overflow: hidden;
+      transition: height .22s ease;
+    }
+    body.topbar-busca-fechada #rastreamento-layout {
+      height: 100vh;
     }
 
     /* ── Área do mapa ── */
@@ -1020,12 +988,16 @@
 
     @media (max-width: 700px) {
       html, body { width: 100%; height: 100%; overflow: hidden; }
-      .admin-content { height: 100dvh; }
+      .admin-content {
+        padding-top: 52px !important;
+        height: 100dvh;
+      }
+      body.topbar-busca-fechada .admin-content { padding-top: 0 !important; }
       .admin-topbar {
-        min-height: 52px;
-        height: auto;
-        padding: 6px 8px;
-        gap: 6px;
+        min-height: 52px !important;
+        height: auto !important;
+        padding: 6px 8px !important;
+        gap: 6px !important;
       }
       .admin-topbar > div:first-child { gap: 6px !important; }
       .topbar-title {
@@ -1035,9 +1007,9 @@
         text-overflow: ellipsis;
       }
       #topbar-busca-wrap {
-        flex: 1 1 auto;
+        flex: 1 1 auto !important;
         min-width: 0;
-        max-width: none;
+        max-width: none !important;
       }
       #filtro {
         height: 28px;
@@ -1052,8 +1024,12 @@
         align-items: center;
         justify-content: center;
       }
-      #topbar-counters { display: none; }
-      #rastreamento-layout { position: relative; }
+      #topbar-counters { display: none !important; }
+      #rastreamento-layout {
+        height: calc(100dvh - 52px);
+        position: relative;
+      }
+      body.topbar-busca-fechada #rastreamento-layout { height: 100dvh; }
       #mapa-area { width: 100%; height: 100%; }
       #mapa-area { margin: 8px; border-radius: 8px; }
       .leaflet-control-attribution { display: none !important; }
@@ -1235,13 +1211,6 @@
         <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
         <h2 class="topbar-title" style="white-space:nowrap">Rastreamento</h2>
       </div>
-      <!-- Busca na topbar -->
-      <div id="topbar-busca-wrap">
-        <input type="text" id="filtro" class="form-control input-sm" placeholder="Buscar veículo, placa, IMEI ou cliente...">
-        <div id="lista-resultados-busca" style="display:none"></div>
-      </div>
-      <!-- Contadores de status -->
-      <div id="topbar-counters">Carregando...</div>
     </div>
 
     <div id="rastreamento-layout">
@@ -1442,6 +1411,7 @@
       });
     })();
   </script>
+  <script src="../js/topbar-rastrear-global.js"></script>
   <script src="../js/rastreamento.js"></script>
 
 </body>
