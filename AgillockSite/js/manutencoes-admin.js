@@ -109,7 +109,8 @@
     const style = document.createElement('style');
     style.textContent = `
       .man-client-picker{position:relative}
-      .man-client-picker-btn{height:34px;width:100%;border:1px solid #ccc;background:#fff;border-radius:4px;text-align:left;padding:6px 30px 6px 12px;font-size:13px;color:#555;position:relative}
+      .man-client-picker-btn{height:34px;width:100%;border:1px solid #ccc;background:#fff;border-radius:4px;text-align:left;padding:6px 30px 6px 12px;font-size:13px;color:#555;position:relative;overflow:hidden}
+      .man-client-picker-btn span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .man-client-picker-btn .fa-chevron-down{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#888}
       .man-client-picker-menu{display:none;position:absolute;z-index:5000;left:0;right:0;top:38px;background:#fff;border:1px solid #ccd3dc;border-radius:7px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:8px}
       .man-client-picker.open .man-client-picker-menu{display:block}
