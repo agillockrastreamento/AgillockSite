@@ -141,7 +141,10 @@
       if (typeof window.selecionarDaBusca === 'function') window.selecionarDaBusca(id);
     } else {
       var base = window.location.href.replace(/\/[^/?#]+(\?.*)?$/, '/');
-      window.location.href = base + 'rastreamento.html?focus=' + encodeURIComponent(id);
+      var target = /\/admin\//.test(window.location.pathname)
+        ? base + 'rastreamento.html'
+        : base + '../admin/rastreamento.html';
+      window.location.href = target + '?focus=' + encodeURIComponent(id);
     }
   };
 
