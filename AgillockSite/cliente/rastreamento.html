@@ -110,7 +110,9 @@
       height: 100vh;
       display: flex;
       flex-direction: column;
+      transition: padding-top .22s ease;
     }
+    body.topbar-busca-fechada .admin-content { padding-top: 0 !important; }
 
     /* ── Topbar com busca e contadores ── */
     .admin-topbar {
@@ -150,7 +152,6 @@
     #topbar-busca-toggle {
       position: fixed;
       top: 56px;
-      left: 50%;
       transform: translateX(-50%);
       width: 44px;
       height: 20px;

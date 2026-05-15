@@ -671,8 +671,17 @@ function _aplicarEstadoBarraVeiculos() {
   btn.title = minimizada ? 'Expandir dispositivos' : 'Minimizar dispositivos';
 }
 
+function _posicionarBotaoTopbar() {
+  const topbar = document.querySelector('.admin-topbar');
+  const btn = document.getElementById('topbar-busca-toggle');
+  if (!topbar || !btn) return;
+  const rect = topbar.getBoundingClientRect();
+  btn.style.left = (rect.left + rect.width / 2) + 'px';
+}
+
 function inicializarTopbarBusca() {
   _aplicarEstadoTopbarBusca();
+  _posicionarBotaoTopbar();
   const btn = document.getElementById('topbar-busca-toggle');
   if (!btn) return;
 
@@ -687,7 +696,22 @@ function inicializarTopbarBusca() {
       if (filtro) filtro.value = '';
       if (lista) { lista.style.display = 'none'; lista.innerHTML = ''; }
     }
+    setTimeout(function () { if (map) map.invalidateSize(); }, 240);
   });
+
+  window.addEventListener('resize', _posicionarBotaoTopbar);
+
+  const topbar = document.querySelector('.admin-topbar');
+  if (topbar && window.ResizeObserver) {
+    new ResizeObserver(_posicionarBotaoTopbar).observe(topbar);
+  }
+
+  const sidebarToggle = document.getElementById('sidebar-toggle');
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', function () {
+      setTimeout(_posicionarBotaoTopbar, 320);
+    });
+  }
 }
 
 function _aplicarEstadoTopbarBusca() {
