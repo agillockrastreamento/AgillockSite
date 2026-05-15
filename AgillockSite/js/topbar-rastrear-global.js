@@ -150,10 +150,12 @@
     if (!el) return;
     var online  = lista.filter(function (v) { return v.status === 'online'; }).length;
     var offline = lista.length - online;
+    var semPos  = lista.filter(function (v) { return !v.posicao; }).length;
     el.innerHTML =
       '<span class="dot-moving">●</span> ' + online + ' online' +
       ' &nbsp;·&nbsp; ' +
-      '<span class="dot-offline">●</span> ' + offline + ' offline';
+      '<span class="dot-offline">●</span> ' + offline + ' offline' +
+      (semPos ? ' &nbsp;·&nbsp; <span style="color:#e67e22">' + semPos + ' sem pos.</span>' : '');
   }
 
   async function _iniciarContadores() {
