@@ -4,6 +4,7 @@ import { Router } from 'express';
 import prisma from '../utils/prisma';
 import { clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
 import { broadcastTrackingEvents } from '../services/traccar.ws';
+import { traccarGetDeviceByImei, traccarGetPositions } from '../services/traccar.service';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
@@ -77,6 +78,18 @@ async function _ativarNotificacaoManutencao(clienteLoginId: string, dispositivoI
     });
   } catch (err) {
     console.error('Erro ao ativar notificação de manutenção:', err);
+  }
+}
+
+async function _kmAtualDoDispositivo(identificador: string, traccarId?: number | null, odometroSistemaMetros?: number | null): Promise<number> {
+  if (odometroSistemaMetros != null) return odometroSistemaMetros / 1000;
+  try {
+    const deviceId = traccarId ?? (await traccarGetDeviceByImei(identificador))?.id;
+    if (!deviceId) return 0;
+    const posicoes = await traccarGetPositions([deviceId]);
+    return (posicoes[0]?.attributes?.totalDistance ?? 0) / 1000;
+  } catch {
+    return 0;
   }
 }
 
@@ -242,9 +255,13 @@ router.post('/recorrencias', async (req: any, res) => {
 
     const dispositivo = await prisma.dispositivo.findUnique({
       where: { id: dispositivoId },
-      select: { odometroSistemaMetros: true },
+      select: { odometroSistemaMetros: true, identificador: true, traccarId: true },
     });
-    const kmBase = (dispositivo?.odometroSistemaMetros ?? 0) / 1000;
+    const kmBase = await _kmAtualDoDispositivo(
+      dispositivo?.identificador ?? '',
+      dispositivo?.traccarId,
+      dispositivo?.odometroSistemaMetros,
+    );
 
     const recorrencia = await prisma.manutencaoRecorrencia.create({
       data: {
@@ -285,7 +302,7 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
         ],
       },
       include: {
-        dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true } },
+        dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true, identificador: true } },
       },
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
@@ -294,7 +311,11 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode confirmar manutencoes deste dispositivo.' });
     }
 
-    const kmAtual = (recorrencia.dispositivo.odometroSistemaMetros ?? 0) / 1000;
+    const kmAtual = await _kmAtualDoDispositivo(
+      recorrencia.dispositivo.identificador,
+      recorrencia.dispositivo.traccarId,
+      recorrencia.dispositivo.odometroSistemaMetros,
+    );
 
     await prisma.manutencaoRecorrencia.update({
       where: { id },

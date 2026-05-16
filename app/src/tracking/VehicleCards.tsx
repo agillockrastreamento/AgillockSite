@@ -403,7 +403,7 @@ export function MainVehicleCard({
   };
 
   const maintenanceAlerts = recurrences.filter(r => {
-    const odometroM = r.dispositivo?.odometroSistemaMetros ?? null;
+    const odometroM = r.dispositivo?.odometroSistemaMetros ?? p?.odometro ?? null;
     if (odometroM == null) return false;
     const kmPercorrido = (odometroM / 1000) - r.kmBase;
     const kmRestante = r.intervaloKm - kmPercorrido;
@@ -484,7 +484,7 @@ export function MainVehicleCard({
         </View>
 
         {maintenanceAlerts.map(r => {
-          const odometroM = r.dispositivo?.odometroSistemaMetros ?? 0;
+          const odometroM = r.dispositivo?.odometroSistemaMetros ?? p?.odometro ?? 0;
           const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
           const pastDue = kmRestante < 0;
           return (
