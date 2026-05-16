@@ -35,6 +35,7 @@ let _googleMapType = 'roadmap';
 let _googleMapTypeControl = null;
 let dispositivoIdsAtuais = [];
 let dispositivosMap = {};
+function nomeDisp(d) { return d.nome + (d.placa ? ` (${d.placa})` : ''); }
 let dispositivoLocalParaTraccar = {};
 const _reverseGeocodeCache = {};
 
@@ -475,7 +476,7 @@ function criarIconeParada() {
 function criarPopupParadaMapa(p, index) {
   const d = dispositivosMap[p.deviceId] || { nome: p.nome || 'Dispositivo' };
   const duracao = p.duracao != null ? p.duracao : Math.round((Number(p.duration) || 0) / 60000);
-  return `<b>${d.nome} - Parada ${index + 1}</b><br>${fmtHora(p.inicio || p.startTime)} - ${fmtHora(p.fim || p.endTime)}<br>${fmtDuracao(duracao)}`;
+  return `<b>${nomeDisp(d)} - Parada ${index + 1}</b><br>${fmtHora(p.inicio || p.startTime)} - ${fmtHora(p.fim || p.endTime)}<br>${fmtDuracao(duracao)}`;
 }
 
 function renderMarcadoresParada(paradas, group) {
@@ -721,7 +722,7 @@ function renderRota(data, paradas) {
     const cor = _COLORS[idx % _COLORS.length];
     const dInfo = dispositivosMap[did] || { nome: did };
     const coords = pos.map(p => [p.latitude, p.longitude]);
-    const poly = L.polyline(coords, { color: cor, weight: 4, opacity: 0.8 }).bindTooltip(`<b>${dInfo.nome}</b>`).addTo(rotaLayerGroup);
+    const poly = L.polyline(coords, { color: cor, weight: 4, opacity: 0.8 }).bindTooltip(`<b>${nomeDisp(dInfo)}</b>`).addTo(rotaLayerGroup);
     group.addLayer(poly);
     const ini = pos[0], fim = pos[pos.length - 1];
     
@@ -735,7 +736,7 @@ function renderRota(data, paradas) {
       iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
     });
     const markerInicio = L.marker([ini.latitude, ini.longitude], { icon: iconeIni })
-      .bindPopup(`<b>Início: ${dInfo.nome}</b><br>${fmtHora(ini.fixTime)}`)
+      .bindPopup(`<b>Início: ${nomeDisp(dInfo)}</b><br>${fmtHora(ini.fixTime)}`)
       .addTo(rotaLayerGroup);
     routeEndpointMarkers.push(markerInicio);
       
@@ -746,7 +747,7 @@ function renderRota(data, paradas) {
       iconAnchor: [window.AL_ICONS_3D.SIZE / 2, window.AL_ICONS_3D.SIZE / 2]
     });
     const markerFim = L.marker([fim.latitude, fim.longitude], { icon: iconeFim })
-      .bindPopup(`<b>Fim: ${dInfo.nome}</b><br>${fmtHora(fim.fixTime)}`)
+      .bindPopup(`<b>Fim: ${nomeDisp(dInfo)}</b><br>${fmtHora(fim.fixTime)}`)
       .addTo(rotaLayerGroup);
     routeEndpointMarkers.push(markerFim);
       
@@ -771,7 +772,7 @@ function renderEventos(lista) {
       const info = _EVENTO_LABEL[e.tipo] || { label: e.tipo, cls: 'ev-default' };
       const d = dispositivosMap[e.deviceId] || { nome: '—' };
       const det = Object.entries(e.atributos || {}).filter(([k]) => !['protocol','alarm'].includes(k)).map(([k,v]) => `${k}: ${v}`).join(', ');
-      return `<tr><td><strong>${d.nome}</strong></td><td style="white-space:nowrap">${fmtHora(e.hora)}</td><td><span class="ev-badge ${info.cls}">${info.label}</span></td><td style="font-size:11px;color:#888">${det||'—'}</td></tr>`;
+      return `<tr><td><strong>${nomeDisp(d)}</strong></td><td style="white-space:nowrap">${fmtHora(e.hora)}</td><td><span class="ev-badge ${info.cls}">${info.label}</span></td><td style="font-size:11px;color:#888">${det||'—'}</td></tr>`;
     }).join('')}
   </tbody></table></div>`;
 }
@@ -796,7 +797,7 @@ async function renderViagens(lista) {
         const origem = await resolverEndereco(v.startAddress || v.origem, v.startLat || v.origemLat, v.startLon || v.origemLng);
         const destino = await resolverEndereco(v.endAddress || v.destino, v.endLat || v.destinoLat, v.endLon || v.destinoLng);
         return `<tr>
-          <td><strong>${d.nome}</strong></td>
+          <td><strong>${nomeDisp(d)}</strong></td>
           <td style="color:#888">${i+1}</td>
           <td style="white-space:nowrap">${fmtHora(getInicioViagem(v))}</td>
           <td style="white-space:nowrap">${fmtHora(getFimViagem(v))}</td>
@@ -821,7 +822,7 @@ async function renderParadas(lista) {
     return `<div class="parada-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
         <div style="min-width:0;flex:1">
-          <div style="font-weight:600;font-size:13px;text-align:left"><i class="fa fa-map-marker" style="color:#fab32c"></i> ${d.nome} — Parada ${i + 1}</div>
+          <div style="font-weight:600;font-size:13px;text-align:left"><i class="fa fa-map-marker" style="color:#fab32c"></i> ${nomeDisp(d)} — Parada ${i + 1}</div>
           <div style="font-size:11px;color:#888;margin-top:2px;text-align:left">${endereco}</div>
         </div> 
         <div style="text-align:right;font-size:12px;color:#888;white-space:nowrap"><div><i class="fa fa-clock-o"></i> ${fmtDuracao(duracao)}</div></div>
@@ -858,7 +859,7 @@ function renderResumoBatch(lista) {
     const d = dispositivosMap[r.deviceId] || { nome: '—' };
     el.innerHTML = `
       <div style="margin-bottom:15px; font-weight:700; color:#888; text-align:center; text-transform:uppercase; letter-spacing:1px;">
-        Resumo Geral — ${d.nome}
+        Resumo Geral — ${nomeDisp(d)}
       </div>
       <div class="resumo-grid">
         <div class="resumo-card">
@@ -884,7 +885,7 @@ function renderResumoBatch(lista) {
   el.innerHTML = `<div class="resumo-grid">${lista.map(r => {
     const d = dispositivosMap[r.deviceId] || { nome: '—' };
     return `<div class="resumo-card">
-      <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-transform:uppercase">${d.nome}</div>
+      <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;text-transform:uppercase">${nomeDisp(d)}</div>
       <div class="rc-val" style="font-size:22px">${(r.distance / 1000).toFixed(1)} <small style="font-size:12px">km</small></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px;font-size:11px;color:#666">
         <div>Média: <strong>${Math.round(r.averageSpeed * 1.852)}</strong></div><div>Máxima: <strong>${Math.round(r.maxSpeed * 1.852)}</strong></div>
@@ -957,7 +958,7 @@ function renderGraficoBatch(data) {
     const cor = _COLORS[idx % _COLORS.length];
     const porHorario = new Map(porDispositivo[did].map(p => [p.label, p.velocidade]));
     datasets.push({
-      label: d.nome,
+      label: nomeDisp(d),
       data: labels.map(label => porHorario.has(label) ? porHorario.get(label) : null),
       borderColor: cor,
       backgroundColor: cor + (isSingle ? '33' : '15'),

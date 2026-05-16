@@ -95,7 +95,11 @@ function buildTraccarDeviceSyncData(dispositivo: Record<string, unknown>): Tracc
   const odometroMetros = numberOrNull(dispositivo.odometroSistemaMetros);
   const limiteVelocidade = numberOrNull(dispositivo.limiteVelocidade);
   return {
-    name: String(dispositivo.nome || '').trim(),
+    name: (() => {
+      const nome = String(dispositivo.nome || '').trim();
+      const placa = dispositivo.placa ? String(dispositivo.placa).trim() : '';
+      return placa ? `${nome} (${placa})` : nome;
+    })(),
     uniqueId: String(dispositivo.identificador || '').trim(),
     category: dispositivo.categoria ? String(dispositivo.categoria) : 'car',
     model: dispositivo.modeloRastreador ? String(dispositivo.modeloRastreador) : null,

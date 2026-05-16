@@ -1005,7 +1005,9 @@ export function ReportScreen() {
         <Pressable style={styles.deviceBtn} onPress={() => setShowDeviceSelector(true)}>
           <Icon source="car-outline" size={18} color={colors.textMuted} />
           <Text style={styles.deviceBtnText} numberOfLines={1}>
-            {selectedDevice?.nome ?? 'Selecionar veículo'}
+            {selectedDevice
+              ? selectedDevice.nome + (selectedDevice.placa ? ` (${selectedDevice.placa})` : '')
+              : 'Selecionar veículo'}
           </Text>
           <Icon source="chevron-down" size={18} color={colors.textMuted} />
         </Pressable>
