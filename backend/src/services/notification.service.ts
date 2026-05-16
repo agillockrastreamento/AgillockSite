@@ -3,7 +3,7 @@ import EmailService from './email.service';
 import { reverseGeocode } from '../utils/reverse-geocode';
 import ExpoPushService from './expo-push.service';
 
-type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null };
+type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null; clienteId?: string | null };
 
 // Normaliza subtipos de manutenção para a chave de preferência do admin
 function _tipoPreferenciaAdmin(tipo: string): string {
@@ -551,9 +551,16 @@ class NotificationService {
 
     const recorrenciasRaw = await prisma.manutencaoRecorrencia.findMany({
       where: { dispositivoId: dispositivo.id, ativa: true },
+      include: { clienteLogin: { select: { clienteId: true } } },
       orderBy: { createdAt: 'asc' },
     });
-    const recorrencias = this._deduplicarRecorrenciasManutencao(recorrenciasRaw);
+
+    // Ignora recorrências CLIENTE cujo criador não é mais o responsável atual pelo dispositivo
+    const recorrenciasValidas = recorrenciasRaw.filter(r => {
+      if (r.origem === 'ADMIN') return true;
+      return r.clienteLogin?.clienteId === dispositivo.clienteId;
+    });
+    const recorrencias = this._deduplicarRecorrenciasManutencao(recorrenciasValidas);
 
     const odometroKm = odometroMetros / 1000;
     const nome = dispositivo.nome;

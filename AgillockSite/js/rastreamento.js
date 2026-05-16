@@ -2739,18 +2739,18 @@ function _carregarResumoHojeAdmin(dispositivoId) {
 function _buildManutencoesAdminHtml(dispositivoId) {
   const v = veiculosMap[dispositivoId];
   const recs = _manutencoesAdminCache[dispositivoId] || [];
-  const p = v?.posicao;
-  if (!p || p.odometro == null || !recs.length) return '';
+  if (!recs.length) return '';
 
-  const odoKm = p.odometro / 1000;
   const isDark = document.documentElement.classList.contains('dark-theme');
   const btnBg = isDark ? '#2d3748' : '#e9ecef';
   const btnBd = isDark ? '#4a5568' : '#ccc';
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
   const visiveis = recs.filter(r => {
-    const kmRestante = Math.round(r.intervaloKm - (odoKm - r.kmBase));
-    return kmRestante <= 100;
+    const odometroM = r.dispositivo?.odometroSistemaMetros ?? null;
+    if (odometroM == null) return false;
+    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+    return kmRestante <= 1000;
   });
   if (!visiveis.length) return '';
 
@@ -2758,7 +2758,8 @@ function _buildManutencoesAdminHtml(dispositivoId) {
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
       <div class="dcard-section-title">Manutenções</div>
       ${visiveis.map(r => {
-        const kmRestante = Math.round(r.intervaloKm - (odoKm - r.kmBase));
+        const odometroM = r.dispositivo?.odometroSistemaMetros ?? 0;
+        const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
         const atrasada = kmRestante < 0;
         const kmAbs = Math.abs(kmRestante);
         const cor = atrasada ? '#e74c3c' : '#f39c12';

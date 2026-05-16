@@ -2121,25 +2121,24 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
 }
 
 function buildOleoStatusHtml(p, v) {
-  if (!p || p.odometro == null) return '';
   const recs = v?._recorrencias;
   if (!recs || !recs.length) return '';
   const podeGerenciar = !!v?.podeGerenciarManutencao;
-  const odoKm = p.odometro / 1000;
   const isDark = document.documentElement.classList.contains('dark-theme');
   const btnBg = isDark ? '#2d3748' : '#e9ecef';
   const btnBd = isDark ? '#4a5568' : '#ccc';
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
   const visibles = recs.filter(r => {
-    const kmPercorrido = odoKm - r.kmBase;
-    const kmRestante = Math.round(r.intervaloKm - kmPercorrido);
-    return kmRestante <= 100; // shows when ≤100km remaining OR past due
+    const odometroM = r.dispositivo?.odometroSistemaMetros ?? null;
+    if (odometroM == null) return false;
+    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+    return kmRestante <= 1000;
   });
   if (!visibles.length) return '';
   return visibles.map(r => {
-    const kmPercorrido = odoKm - r.kmBase;
-    const kmRestante = Math.round(r.intervaloKm - kmPercorrido);
+    const odometroM = r.dispositivo?.odometroSistemaMetros ?? 0;
+    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
     const pastDue = kmRestante < 0;
     const kmAbs = Math.abs(kmRestante);
     const cor = pastDue ? '#e74c3c' : '#f39c12';
