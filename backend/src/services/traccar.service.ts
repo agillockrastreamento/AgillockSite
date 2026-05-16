@@ -412,7 +412,9 @@ export function normalizeAttributes(attr: TraccarPosition['attributes']) {
     ignicao: attr.ignition ?? null,
     emMovimento: attr.motion ?? null,
     alarme_codigo,
-    alarme: alarme_codigo ? (ALARM_LABELS[alarme_codigo] ?? alarme_codigo) : null,
+    alarme: alarme_codigo
+      ? [...new Set(alarme_codigo.split(',').map(a => ALARM_LABELS[a.trim()] ?? a.trim()))].join(', ')
+      : null,
     sinal: attr.rssi ?? null,
     satelites: attr.sat ?? null,
     tensao: attr.power ?? null,
