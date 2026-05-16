@@ -330,6 +330,19 @@
         </div>
       </div>
 
+      <!-- Card Manutenção -->
+      <div class="card-section">
+        <h5><i class="fa fa-wrench"></i> Manutenção</h5>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="d-manutencao-ativa" checked />
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="d-manutencao-ativa-label" style="font-size:13px;font-weight:600;">Manutenções ativas</span>
+        </div>
+        <p style="margin-top:10px;font-size:13px;color:#888;margin-bottom:0;">Quando ativo, o cliente poderá registrar manutenções e configurar recorrências para este dispositivo.</p>
+      </div>
+
       <!-- Card Imagem -->
       <div class="card-section">
         <h5><i class="fa fa-image"></i> Imagem</h5>
@@ -540,6 +553,11 @@
       document.getElementById('d-ativo-label').textContent = this.checked ? 'Ativo' : 'Inativo';
     });
 
+    // ── Toggle manutenção ─────────────────────────────────────────────────
+    document.getElementById('d-manutencao-ativa').addEventListener('change', function() {
+      document.getElementById('d-manutencao-ativa-label').textContent = this.checked ? 'Manutenções ativas' : 'Manutenções desativadas';
+    });
+
     // ── Busca de clientes ─────────────────────────────────────────────────
     var clienteTimer = null;
     document.getElementById('d-cliente-busca').addEventListener('input', function() {
@@ -726,6 +744,9 @@
       document.getElementById('d-velocidade').value = d.limiteVelocidade || '';
       document.getElementById('d-senha').value = d.senha || '';
       document.getElementById('d-ignorar-odometro').checked = !!d.ignorarOdometro;
+      var manutAtiva = d.manutencaoAtiva !== false;
+      document.getElementById('d-manutencao-ativa').checked = manutAtiva;
+      document.getElementById('d-manutencao-ativa-label').textContent = manutAtiva ? 'Manutenções ativas' : 'Manutenções desativadas';
       // Imagem existente
       if (d.imagemUrl) {
         document.getElementById('img-preview-wrap').innerHTML =
@@ -783,6 +804,7 @@
       formData.append('limiteVelocidade', document.getElementById('d-velocidade').value.trim());
       formData.append('senha', document.getElementById('d-senha').value.trim());
       formData.append('ignorarOdometro', document.getElementById('d-ignorar-odometro').checked ? 'true' : 'false');
+      formData.append('manutencaoAtiva', document.getElementById('d-manutencao-ativa').checked ? 'true' : 'false');
       formData.append('clienteId', document.getElementById('d-cliente-id').value);
       formData.append('clientesExtras', JSON.stringify(clientesExtras.map(function(c){ return c.id; })));
       if (selectedFile) formData.append('imagem', selectedFile);

@@ -25,6 +25,7 @@ type Dispositivo = {
   nome: string;
   placa: string | null;
   podeGerenciarManutencao: boolean;
+  manutencaoAtiva: boolean;
 };
 
 type Recorrencia = {
@@ -159,6 +160,7 @@ export function ManutencaoScreen() {
         nome: d.nome,
         placa: d.placa ?? null,
         podeGerenciarManutencao: d.podeGerenciarManutencao ?? false,
+        manutencaoAtiva: d.manutencaoAtiva !== false,
       }));
       setDispositivos(devs);
       if (devs.length > 0 && !selectedId) setSelectedId(devs[0].id);
@@ -450,6 +452,15 @@ export function ManutencaoScreen() {
         </Pressable>
       </View>
 
+      {selectedDevice && !selectedDevice.manutencaoAtiva && (
+        <View style={styles.manutencaoBanner}>
+          <Icon source="wrench-off" size={18} color="#856404" />
+          <Text style={styles.manutencaoBannerText}>
+            Manutenções desativadas para este dispositivo.
+          </Text>
+        </View>
+      )}
+
       {isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />
@@ -465,7 +476,9 @@ export function ManutencaoScreen() {
                 <Icon source="wrench-clock" size={40} color={colors.textMuted} />
                 <Text style={styles.emptyText}>Nenhuma manutenção programada</Text>
                 <Text style={styles.emptySubText}>
-                  {selectedDevice?.podeGerenciarManutencao
+                  {!selectedDevice?.manutencaoAtiva
+                    ? 'Manutenções desativadas para este dispositivo.'
+                    : selectedDevice?.podeGerenciarManutencao
                     ? 'Toque + para programar uma manutenção recorrente.'
                     : 'Apenas o responsável pelo faturamento pode configurar manutenções.'}
                 </Text>
@@ -486,7 +499,7 @@ export function ManutencaoScreen() {
                         A cada {r.intervaloKm.toLocaleString('pt-BR')} km
                       </Text>
                     </View>
-                    {selectedDevice?.podeGerenciarManutencao && (
+                    {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
                       <View style={styles.cardActions}>
                         {r.origem !== 'ADMIN' ? (
                           <>
@@ -572,7 +585,7 @@ export function ManutencaoScreen() {
                         </View>
                       </View>
                       <View style={styles.cardActions}>
-                        {selectedDevice?.podeGerenciarManutencao && r.origem !== 'ADMIN' ? (
+                        {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && r.origem !== 'ADMIN' ? (
                           <>
                             <IconButton
                               icon="pencil"
@@ -621,8 +634,8 @@ export function ManutencaoScreen() {
         </ScrollView>
       )}
 
-      {/* FAB — only show if user can manage this device */}
-      {selectedDevice?.podeGerenciarManutencao && (
+      {/* FAB — only show if user can manage this device and maintenance is enabled */}
+      {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
         <Pressable
           accessibilityRole="button"
           style={styles.fab}
@@ -900,6 +913,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: colors.primaryText,
+  },
+  manutencaoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: '#fff3cd',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: '#ffc107',
+  },
+  manutencaoBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#856404',
   },
   loading: {
     flex: 1,

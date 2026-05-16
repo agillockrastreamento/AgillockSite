@@ -250,6 +250,7 @@ model Dispositivo {
   limiteVelocidade Float?
   senha            String?
   ignorarOdometro  Boolean  @default(false)
+  manutencaoAtiva  Boolean  @default(true)
   odometroSistemaMetros    Float?
   horimetroSistemaSegundos Int      @default(0)
   telemetriaUltimaPosicaoEm DateTime?

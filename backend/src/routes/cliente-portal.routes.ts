@@ -319,7 +319,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
       select: {
         id: true, nome: true, identificador: true, placa: true,
         categoria: true, marca: true, modeloVeiculo: true, cor: true,
-        limiteVelocidade: true, imagemUrlCliente: true, apelidoCliente: true, clienteId: true,
+        limiteVelocidade: true, imagemUrlCliente: true, apelidoCliente: true, clienteId: true, manutencaoAtiva: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { select: { id: true, nome: true } },
       },
@@ -370,6 +370,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
       cor: d.cor,
       limiteVelocidade: d.limiteVelocidade,
       podeGerenciarManutencao: d.clienteId === clienteId,
+      manutencaoAtiva: d.manutencaoAtiva,
       cliente: d.cliente,
       traccarId: traccar?.id ?? null,
       status: traccar?.status ?? 'unknown',

@@ -146,6 +146,11 @@ router.post('/registros', async (req: any, res) => {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
 
+    const dispCheck = await prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { manutencaoAtiva: true } });
+    if (!dispCheck?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
+
     const registro = await prisma.manutencaoRegistro.create({
       data: {
         dispositivoId,
@@ -255,8 +260,11 @@ router.post('/recorrencias', async (req: any, res) => {
 
     const dispositivo = await prisma.dispositivo.findUnique({
       where: { id: dispositivoId },
-      select: { odometroSistemaMetros: true, identificador: true, traccarId: true },
+      select: { odometroSistemaMetros: true, identificador: true, traccarId: true, manutencaoAtiva: true },
     });
+    if (!dispositivo?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
     const kmBase = await _kmAtualDoDispositivo(
       dispositivo?.identificador ?? '',
       dispositivo?.traccarId,
@@ -302,13 +310,17 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
         ],
       },
       include: {
-        dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true, identificador: true } },
+        dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true, identificador: true, manutencaoAtiva: true } },
       },
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
 
     if (!await _podeGerenciarManutencao(clienteLoginId, recorrencia.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode confirmar manutencoes deste dispositivo.' });
+    }
+
+    if (!recorrencia.dispositivo.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
     }
 
     const kmAtual = await _kmAtualDoDispositivo(
@@ -415,6 +427,10 @@ router.put('/registros/:id', async (req: any, res) => {
     if (!await _podeGerenciarManutencao(clienteLoginId, existing.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
+    const dispCheckReg = await prisma.dispositivo.findUnique({ where: { id: existing.dispositivoId }, select: { manutencaoAtiva: true } });
+    if (!dispCheckReg?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
     const updated = await prisma.manutencaoRegistro.update({
       where: { id },
       data: {
@@ -448,6 +464,10 @@ router.put('/recorrencias/:id', async (req: any, res) => {
     if (!existing) return res.status(404).json({ message: 'Recorrência não encontrada.' });
     if (!await _podeGerenciarManutencao(clienteLoginId, existing.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
+    }
+    const dispCheckRec = await prisma.dispositivo.findUnique({ where: { id: existing.dispositivoId }, select: { manutencaoAtiva: true } });
+    if (!dispCheckRec?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
     }
     const updated = await prisma.manutencaoRecorrencia.update({
       where: { id },
