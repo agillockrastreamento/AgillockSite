@@ -1043,6 +1043,7 @@ html.dark-theme #lista-resultados-busca { background: #1e1e2e; border-color: #33
 }
 #topbar-busca-toggle:hover { color: #fab32c; }
 html.al-rastr-ativa.rastr-bar-fechada #topbar-busca-toggle { top: 0; }
+body.modal-open #topbar-busca-toggle { display: none; }
 /* Ajustes de posição: sidebar + topbar descem 40px — só quando a barra global está ativa */
 html.al-rastr-ativa .admin-sidebar {
     top: 40px;
