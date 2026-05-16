@@ -207,10 +207,10 @@ export function NotificationsBottomSheet({
     setExpandedEvent((prev) => (prev === id ? null : id));
   }, []);
 
-  const getDeviceName = (dispositivoId: string | null) => {
-    if (!dispositivoId) return null;
-    const device = devices.find((d) => d.dispositivoId === dispositivoId);
-    return device?.nome ?? device?.placa ?? dispositivoId;
+  const getDeviceName = (event: NotificationEvent) => {
+    if (!event.dispositivoId) return null;
+    const device = devices.find((d) => d.dispositivoId === event.dispositivoId);
+    return device?.nome ?? device?.placa ?? event.dispositivoNome ?? event.dispositivoPlaca ?? null;
   };
 
   const formatFullDate = (dateStr: string | undefined) => {
@@ -313,7 +313,7 @@ export function NotificationsBottomSheet({
           >
             {filteredEvents.map((item) => {
               const config = getTipoConfig(item.tipo);
-              const deviceName = getDeviceName(item.dispositivoId);
+              const deviceName = getDeviceName(item);
               const isExpanded = expandedEvent === item.id;
 
               return (

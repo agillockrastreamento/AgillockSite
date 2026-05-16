@@ -761,8 +761,8 @@ function renderEventosLista() {
     const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
     const v = veiculosMap[e.dispositivoId];
-    const nomeDev = v ? v.nome : (e.dispositivoId || '—');
-    const placaDev = v?.placa ? `(${v.placa})` : '';
+    const nomeDev = v ? v.nome : (e.dispositivoNome || '—');
+    const placaDev = v?.placa ? `(${v.placa})` : (e.dispositivoPlaca ? `(${e.dispositivoPlaca})` : '');
     const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
 
     return `<div class="evento-item" style="border-left:none !important; --evt-color:${style.color}; --evt-hover-bg:${hexToRgba(style.color, isDark ? 0.24 : 0.12)};" onclick="clicarEvento(${_eventos.indexOf(e)})">

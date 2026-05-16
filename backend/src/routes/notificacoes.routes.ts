@@ -294,8 +294,29 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
       }
     }
 
+    const clienteLogin = await prisma.clienteLogin.findUnique({
+      where: { id: clienteLoginId },
+      select: { clienteId: true },
+    });
+    if (!clienteLogin) return res.status(401).json({ message: 'Sessão inválida.' });
+
     const eventos = await prisma.eventoNotificacao.findMany({
-      where: { clienteLoginId, adminEvento: false, createdAt: dateFilter },
+      where: {
+        clienteLoginId,
+        adminEvento: false,
+        createdAt: dateFilter,
+        OR: [
+          { dispositivoId: null },
+          {
+            dispositivo: {
+              OR: [
+                { clienteId: clienteLogin.clienteId },
+                { clientesVinculados: { some: { clienteId: clienteLogin.clienteId } } },
+              ],
+            },
+          },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         dispositivo: { select: { nome: true, placa: true } },
