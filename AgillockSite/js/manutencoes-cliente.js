@@ -20,6 +20,11 @@
     return !!(v && v.podeGerenciarManutencao);
   }
 
+  function manutencaoAtiva() {
+    const v = veiculos.find(v => v.dispositivoId === dispositivoIdAtivo);
+    return !v || v.manutencaoAtiva !== false;
+  }
+
   function textoVeiculoModal() {
     const v = veiculos.find(v => v.dispositivoId === dispositivoIdAtivo);
     if (!v) return '';
@@ -105,16 +110,20 @@
 
   function aplicarPermissaoManutencao() {
     const pode = podeGerenciarManutencao();
+    const ativa = manutencaoAtiva();
+    const podeOperar = pode && ativa;
     const btnRegistro = document.getElementById('btn-novo-registro');
     const btnRecorrencia = document.getElementById('btn-nova-recorrencia');
     if (btnRegistro) {
-      btnRegistro.disabled = !dispositivoIdAtivo || !pode;
-      btnRegistro.title = pode ? '' : 'Apenas o responsavel pelo faturamento pode registrar manutencoes.';
+      btnRegistro.disabled = !dispositivoIdAtivo || !podeOperar;
+      btnRegistro.title = !ativa ? 'Manutenções desativadas para este veículo.' : (!pode ? 'Apenas o responsavel pelo faturamento pode registrar manutencoes.' : '');
     }
     if (btnRecorrencia) {
-      btnRecorrencia.disabled = !dispositivoIdAtivo || !pode;
-      btnRecorrencia.title = pode ? '' : 'Apenas o responsavel pelo faturamento pode criar recorrencias.';
+      btnRecorrencia.disabled = !dispositivoIdAtivo || !podeOperar;
+      btnRecorrencia.title = !ativa ? 'Manutenções desativadas para este veículo.' : (!pode ? 'Apenas o responsavel pelo faturamento pode criar recorrencias.' : '');
     }
+    const banner = document.getElementById('man-banner-desativado');
+    if (banner) banner.classList.toggle('visivel', !!dispositivoIdAtivo && !ativa);
   }
 
   const TIPO_ICON = {
@@ -156,6 +165,8 @@
         document.getElementById('man-vazio').style.display = 'flex';
         document.getElementById('btn-novo-registro').disabled = true;
         document.getElementById('btn-nova-recorrencia').disabled = true;
+        var bannerVazio = document.getElementById('man-banner-desativado');
+        if (bannerVazio) bannerVazio.classList.remove('visivel');
         return;
       }
       aplicarPermissaoManutencao();
