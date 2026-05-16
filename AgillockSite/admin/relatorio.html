@@ -39,7 +39,11 @@
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
+      margin-top: 56px;
+      transition: margin-top .22s ease;
     }
+    html.al-rastr-ativa .rel-toolbar { margin-top: calc(56px + 40px); }
+    html.al-rastr-ativa.rastr-bar-fechada .rel-toolbar { margin-top: 56px; }
     html.dark-theme .rel-toolbar {
       background: #191e28;
       border-color: #2d3748;
@@ -502,7 +506,7 @@
     </div>
 
     <!-- Toolbar de seleção -->
-    <div class="rel-toolbar" style="margin-top:56px">
+    <div class="rel-toolbar">
       <div style="flex:1; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <select id="sel-dispositivo" class="form-control" multiple="multiple" style="width:100%"></select>
 
