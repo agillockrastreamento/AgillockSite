@@ -1063,7 +1063,7 @@ html.al-rastr-ativa.rastr-bar-fechada .admin-sidebar  { top: 0; height: 100vh; }
 html.al-rastr-ativa.rastr-bar-fechada .admin-topbar   { top: 0; }
 html.al-rastr-ativa.rastr-bar-fechada .admin-content  { padding-top: 80px; }
 /* Modais descem para não ficarem sob a barra global */
-html.al-rastr-ativa .modal-dialog { margin-top: 40px; transition: margin-top .22s ease; }
+html.al-rastr-ativa .modal-dialog { margin-top: 56px; transition: margin-top .22s ease; }
 html.al-rastr-ativa.rastr-bar-fechada .modal-dialog { margin-top: 0; }
 @media (max-width: 767px) {
     html.al-rastr-ativa .admin-content { padding-top: calc(72px + 40px); }
