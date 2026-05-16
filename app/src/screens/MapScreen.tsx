@@ -547,8 +547,8 @@ export function MapScreen() {
   }, [confirm, toast]);
 
   const handleWebSocketMessage = useCallback(
-    (message: import('../tracking/trackingWebSocket').TrackingMessage, dispositivoId: string) => {
-      setDevices((current) => updateDeviceFromMessage(current, dispositivoId, message));
+    (position: import('../tracking/trackingWebSocket').WsPosition, dispositivoId: string) => {
+      setDevices((current) => updateDeviceFromMessage(current, dispositivoId, position));
     },
     [],
   );

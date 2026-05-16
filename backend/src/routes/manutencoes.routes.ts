@@ -204,13 +204,22 @@ router.get('/recorrencias', async (req: any, res) => {
       },
       include: {
         dispositivo: {
-          select: { nome: true, placa: true, odometroSistemaMetros: true },
+          select: { nome: true, placa: true, odometroSistemaMetros: true, clienteId: true },
+        },
+        clienteLogin: {
+          select: { clienteId: true },
         },
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    res.json(_deduplicarRecorrencias(recorrencias));
+    // Exclui recorrências CLIENTE cujo criador não é mais o responsável atual do dispositivo
+    const filtradas = recorrencias.filter(r => {
+      if (r.origem === 'ADMIN') return true;
+      return r.clienteLogin?.clienteId === r.dispositivo.clienteId;
+    });
+
+    res.json(_deduplicarRecorrencias(filtradas));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao carregar recorrências.' });
@@ -445,10 +454,6 @@ router.delete('/recorrencias/:id', async (req: any, res) => {
       where: { id, clienteLoginId, origem: 'CLIENTE' },
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada ou não pode ser excluída.' });
-
-    if (!await _podeGerenciarManutencao(clienteLoginId, recorrencia.dispositivoId)) {
-      return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
-    }
 
     await prisma.manutencaoRecorrencia.update({ where: { id }, data: { ativa: false } });
     res.json({ message: 'Recorrência removida com sucesso.' });

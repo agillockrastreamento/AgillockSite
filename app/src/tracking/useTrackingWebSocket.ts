@@ -1,16 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { trackingWs, type TrackingMessage } from './trackingWebSocket';
+import { trackingWs, type TrackingMessage, type WsPosition } from './trackingWebSocket';
 import type { TrackingDevice, TraccarDeviceIndex } from './trackingTypes';
-
-function hasDeviceId(msg: TrackingMessage): msg is TrackingMessage & { deviceId: number } {
-  return 'deviceId' in msg && typeof msg.deviceId === 'number';
-}
 
 export function useTrackingWebSocket(
   _devices: TrackingDevice[],
   traccarIndex: TraccarDeviceIndex,
-  onMessage: (message: TrackingMessage, dispositivoId: string) => void,
+  onMessage: (position: WsPosition, dispositivoId: string) => void,
 ) {
   // Refs keep the latest values without triggering effect re-runs
   const traccarIndexRef = useRef(traccarIndex);
@@ -23,10 +19,10 @@ export function useTrackingWebSocket(
     let unsubscribe: (() => void) | undefined;
 
     const handler = (message: TrackingMessage) => {
-      if (hasDeviceId(message)) {
-        const dispositivoId = traccarIndexRef.current[message.deviceId];
+      for (const pos of message.positions ?? []) {
+        const dispositivoId = traccarIndexRef.current[pos.deviceId];
         if (dispositivoId) {
-          onMessageRef.current(message, dispositivoId);
+          onMessageRef.current(pos, dispositivoId);
         }
       }
     };
@@ -39,7 +35,7 @@ export function useTrackingWebSocket(
       unsubscribe?.();
       trackingWs.disconnect();
     };
-  }, []); // Run once — handler always reads latest values via refs
+  }, []); // Run once — handler reads latest values via refs
 
   const isConnected = useCallback(() => trackingWs.isConnected(), []);
   return { isConnected };
@@ -48,50 +44,33 @@ export function useTrackingWebSocket(
 export function updateDeviceFromMessage(
   devices: TrackingDevice[],
   dispositivoId: string,
-  message: TrackingMessage,
+  position: WsPosition,
 ): TrackingDevice[] {
-  if (message.type === 'POSITION') {
-    return devices.map((device) => {
-      if (device.dispositivoId === dispositivoId) {
-        return {
-          ...device,
-          status: 'online',
-          posicao: message.position,
-          lastUpdate: message.position.serverTime ?? message.position.deviceTime ?? null,
-        };
-      }
-      return device;
-    });
-  }
-
-  if (message.type === 'ALARM') {
-    return devices.map((device) => {
-      if (device.dispositivoId === dispositivoId) {
-        return {
-          ...device,
-          status: 'online',
-          posicao: message.position ?? device.posicao,
-          lastUpdate: message.position?.serverTime ?? message.position?.deviceTime ?? device.lastUpdate,
-          alarme: message.alarm,
-        };
-      }
-      return device;
-    });
-  }
-
-  if (message.type === 'EVENT') {
-    return devices.map((device) => {
-      if (device.dispositivoId === dispositivoId) {
-        return {
-          ...device,
-          status: 'online',
-          posicao: message.position ?? device.posicao,
-          lastUpdate: message.position?.serverTime ?? message.position?.deviceTime ?? device.lastUpdate,
-        };
-      }
-      return device;
-    });
-  }
-
-  return devices;
+  return devices.map((device) => {
+    if (device.dispositivoId !== dispositivoId) return device;
+    return {
+      ...device,
+      status: 'online',
+      posicao: {
+        latitude: position.latitude,
+        longitude: position.longitude,
+        velocidade: position.velocidade ?? null,
+        curso: position.curso ?? null,
+        fixTime: position.fixTime ?? null,
+        deviceTime: position.deviceTime ?? null,
+        serverTime: position.serverTime ?? null,
+        endereco: position.endereco ?? null,
+        ignicao: position.ignicao ?? null,
+        emMovimento: position.emMovimento ?? null,
+        alarme: position.alarme ?? null,
+        bloqueado: position.bloqueado ?? null,
+        bateria_nivel: position.bateria_nivel ?? null,
+        tensao: position.tensao ?? null,
+        sinal: position.sinal ?? null,
+        odometro: position.odometro ?? null,
+        horas_motor: position.horas_motor ?? null,
+      },
+      lastUpdate: position.serverTime ?? position.deviceTime ?? null,
+    };
+  });
 }

@@ -364,6 +364,22 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     },
   });
 
+  // Desativa recorrências CLIENTE do responsável antigo ao trocar a titularidade via PUT
+  if (clienteId !== undefined) {
+    const novoClienteIdPut = clienteId || null;
+    if (existe.clienteId && existe.clienteId !== novoClienteIdPut) {
+      await prisma.manutencaoRecorrencia.updateMany({
+        where: {
+          dispositivoId: id,
+          ativa: true,
+          origem: 'CLIENTE',
+          clienteLogin: { clienteId: existe.clienteId },
+        },
+        data: { ativa: false },
+      });
+    }
+  }
+
   // Sincronizar clientes extras (junction) — substitui todos
   const clientesExtrasRaw = req.body.clientesExtras;
   if (clientesExtrasRaw !== undefined) {
@@ -427,7 +443,7 @@ router.patch('/:id/vincular', requireRoles('ADMIN', 'COLABORADOR'), async (req: 
     return;
   }
 
-  const existe = await prisma.dispositivo.findUnique({ where: { id }, select: { id: true } });
+  const existe = await prisma.dispositivo.findUnique({ where: { id }, select: { id: true, clienteId: true } });
   if (!existe) {
     res.status(404).json({ error: 'Dispositivo não encontrado.' });
     return;
@@ -441,11 +457,25 @@ router.patch('/:id/vincular', requireRoles('ADMIN', 'COLABORADOR'), async (req: 
     }
   }
 
+  const novoClienteId = clienteId || null;
   const dispositivo = await prisma.dispositivo.update({
     where: { id },
-    data: { clienteId: clienteId || null },
+    data: { clienteId: novoClienteId },
     select: { id: true, nome: true, clienteId: true, ativo: true },
   });
+
+  // Desativa recorrências CLIENTE do responsável antigo ao trocar a titularidade
+  if (existe.clienteId && existe.clienteId !== novoClienteId) {
+    await prisma.manutencaoRecorrencia.updateMany({
+      where: {
+        dispositivoId: id,
+        ativa: true,
+        origem: 'CLIENTE',
+        clienteLogin: { clienteId: existe.clienteId },
+      },
+      data: { ativa: false },
+    });
+  }
 
   res.json(dispositivo);
 });

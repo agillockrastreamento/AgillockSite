@@ -1,28 +1,44 @@
 import { tokenStorage } from '../storage/tokenStorage';
 import { environment } from '../config/environment';
-import type { TrackingPosition } from './trackingTypes';
 
-export type TrackingMessage =
-  | {
-      type: 'POSITION';
-      deviceId: number;
-      position: TrackingPosition;
-    }
-  | {
-      type: 'ALARM';
-      deviceId: number;
-      alarm: string;
-      position?: TrackingPosition;
-    }
-  | {
-      type: 'EVENT';
-      deviceId: number;
-      eventType: string;
-      position?: TrackingPosition;
-    }
-  | {
-      type: 'ACK';
-    };
+// Formato exato que o backend envia via WebSocket
+export type WsPosition = {
+  deviceId: number;
+  latitude: number;
+  longitude: number;
+  velocidade?: number | null;
+  curso?: number | null;
+  fixTime?: string | null;
+  deviceTime?: string | null;
+  serverTime?: string | null;
+  endereco?: string | null;
+  ignicao?: boolean | null;
+  emMovimento?: boolean | null;
+  alarme?: string | null;
+  bloqueado?: boolean | null;
+  bateria_nivel?: number | null;
+  tensao?: number | null;
+  sinal?: number | null;
+  odometro?: number | null;
+  horas_motor?: number | null;
+};
+
+export type WsEvent = {
+  deviceId?: number;
+  dispositivoId?: string;
+  type: string;
+  tipoLabel?: string;
+  serverTime?: string;
+  mensagem?: string;
+  lat?: number | null;
+  lng?: number | null;
+  endereco?: string | null;
+};
+
+export type TrackingMessage = {
+  positions?: WsPosition[];
+  events?: WsEvent[];
+};
 
 export type TrackingMessageHandler = (message: TrackingMessage) => void;
 
