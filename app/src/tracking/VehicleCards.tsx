@@ -26,11 +26,12 @@ export function getStatusColor(status: string, position?: TrackingPosition | nul
   const isMoving = isOnline && position?.emMovimento;
   if (isMoving) return '#2980b9';
   if (isOnline) return '#27ae60';
-  return '#e67e22';
+  return '#fab32c';
 }
 
 export function getMarkerColor(device: TrackingDevice) {
-  if (!device.posicao || device.status !== 'online') return '#95a5a6';
+  if (device.status !== 'online') return '#fab32c';
+  if (!device.posicao) return '#fab32c';
   if (device.limiteVelocidade && (device.posicao.velocidade || 0) > device.limiteVelocidade) return '#e74c3c';
   if (device.posicao.emMovimento || device.posicao.ignicao === true) return '#2980b9';
   return '#27ae60';

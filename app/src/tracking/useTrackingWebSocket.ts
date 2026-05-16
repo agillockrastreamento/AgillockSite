@@ -8,38 +8,40 @@ function hasDeviceId(msg: TrackingMessage): msg is TrackingMessage & { deviceId:
 }
 
 export function useTrackingWebSocket(
-  devices: TrackingDevice[],
+  _devices: TrackingDevice[],
   traccarIndex: TraccarDeviceIndex,
   onMessage: (message: TrackingMessage, dispositivoId: string) => void,
 ) {
-  const devicesRef = useRef(devices);
-  devicesRef.current = devices;
+  // Refs keep the latest values without triggering effect re-runs
+  const traccarIndexRef = useRef(traccarIndex);
+  traccarIndexRef.current = traccarIndex;
 
-  const handleMessage = useCallback(
-    (message: TrackingMessage) => {
-      if (hasDeviceId(message)) {
-        const dispositivoId = traccarIndex[message.deviceId];
-        if (dispositivoId) {
-          onMessage(message, dispositivoId);
-        }
-      }
-    },
-    [traccarIndex, onMessage],
-  );
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
 
   useEffect(() => {
-    trackingWs.connect().then(() => {
-      const unsubscribe = trackingWs.subscribe(handleMessage);
-      return unsubscribe;
-    });
+    let unsubscribe: (() => void) | undefined;
+
+    const handler = (message: TrackingMessage) => {
+      if (hasDeviceId(message)) {
+        const dispositivoId = traccarIndexRef.current[message.deviceId];
+        if (dispositivoId) {
+          onMessageRef.current(message, dispositivoId);
+        }
+      }
+    };
+
+    trackingWs.connect()
+      .then(() => { unsubscribe = trackingWs.subscribe(handler); })
+      .catch(() => {});
 
     return () => {
+      unsubscribe?.();
       trackingWs.disconnect();
     };
-  }, [handleMessage]);
+  }, []); // Run once — handler always reads latest values via refs
 
   const isConnected = useCallback(() => trackingWs.isConnected(), []);
-
   return { isConnected };
 }
 
@@ -53,6 +55,7 @@ export function updateDeviceFromMessage(
       if (device.dispositivoId === dispositivoId) {
         return {
           ...device,
+          status: 'online',
           posicao: message.position,
           lastUpdate: message.position.serverTime ?? message.position.deviceTime ?? null,
         };
@@ -66,6 +69,7 @@ export function updateDeviceFromMessage(
       if (device.dispositivoId === dispositivoId) {
         return {
           ...device,
+          status: 'online',
           posicao: message.position ?? device.posicao,
           lastUpdate: message.position?.serverTime ?? message.position?.deviceTime ?? device.lastUpdate,
           alarme: message.alarm,
@@ -80,6 +84,7 @@ export function updateDeviceFromMessage(
       if (device.dispositivoId === dispositivoId) {
         return {
           ...device,
+          status: 'online',
           posicao: message.position ?? device.posicao,
           lastUpdate: message.position?.serverTime ?? message.position?.deviceTime ?? device.lastUpdate,
         };
