@@ -111,6 +111,9 @@ export function OffscreenCapturePool({
 
 // ─── useMarkerBitmaps ────────────────────────────────────────────────────────
 
+// Per-device last-known bitmap URI (module-level, persists across re-mounts)
+const lastBitmapByDevice = new Map<string, string>();
+
 export function useMarkerBitmaps(devices: TrackingDevice[], showLabels: boolean) {
   const [bitmaps, setBitmaps] = useState<ReadonlyMap<string, string>>(bitmapCache);
   const [pending, setPending] = useState<PendingCapture[]>([]);
@@ -146,7 +149,16 @@ export function useMarkerBitmaps(devices: TrackingDevice[], showLabels: boolean)
       const color = getMarkerColor(device);
       const course = device.posicao?.curso ?? 0;
       const label = device.placa ?? device.nome ?? null;
-      return bitmaps.get(makeCaptureKey(device.categoria, color, course, label, showLabels));
+      const key = makeCaptureKey(device.categoria, color, course, label, showLabels);
+      const uri = bitmaps.get(key);
+      if (uri) {
+        // Update last-known bitmap for this device
+        lastBitmapByDevice.set(device.dispositivoId, uri);
+        return uri;
+      }
+      // Cache miss: return the previous bitmap to prevent flickering while
+      // the new bitmap (e.g. updated course angle) is being captured
+      return lastBitmapByDevice.get(device.dispositivoId);
     },
     [bitmaps, showLabels],
   );

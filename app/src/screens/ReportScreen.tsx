@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   ActivityIndicator,
   Dimensions,
   FlatList,
@@ -15,7 +16,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { AnimatedRegion, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+
+const MarkerAnimated = Animated.createAnimatedComponent(Marker);
 import Svg, { G, Line, Path, Text as SvgText } from 'react-native-svg';
 import { Icon, IconButton } from 'react-native-paper';
 import { captureRef } from 'react-native-view-shot';
@@ -214,6 +217,11 @@ function RouteTab({
   const [playerIndex, setPlayerIndex] = useState(0);
   const [playerSpeedMult, setPlayerSpeedMult] = useState(1);
 
+  // AnimatedRegion interpola lat/lng nativamente entre cada par de pontos GPS
+  const animCoordinate = useRef(
+    new AnimatedRegion({ latitude: 0, longitude: 0, latitudeDelta: 0, longitudeDelta: 0 })
+  ).current;
+
   const markerColor = device?.cor ?? '#2980b9';
 
   const valid = useMemo(
@@ -271,6 +279,20 @@ function RouteTab({
     return () => clearTimeout(timer);
   }, [valid.length]);
 
+  // Reset player and snap animCoordinate to first point when a new route loads
+  useEffect(() => {
+    if (valid.length === 0) return;
+    setPlayerActive(false);
+    setPlayerIndex(0);
+    const pos = valid[0]!;
+    animCoordinate.timing({
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      duration: 0,
+      useNativeDriver: false,
+    } as any).start();
+  }, [valid]);
+
   // Route player tick
   useEffect(() => {
     if (!playerActive || valid.length < 2) return;
@@ -292,12 +314,17 @@ function RouteTab({
     };
   }, [playerActive, playerSpeedMult, valid.length]);
 
-  // Pan map camera to follow player
+  // Animate marker coordinate and pan camera to follow player
   useEffect(() => {
-    if (!playerActive || !mapRef.current) return;
     const pos = valid[playerIndex];
-    if (!pos) return;
-    mapRef.current.animateCamera(
+    if (!pos || !playerActive) return;
+    animCoordinate.timing({
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      duration: PLAYER_TICK_MS,
+      useNativeDriver: false,
+    } as any).start();
+    mapRef.current?.animateCamera(
       { center: { latitude: pos.latitude, longitude: pos.longitude } },
       { duration: PLAYER_TICK_MS - 10 },
     );
@@ -421,22 +448,24 @@ function RouteTab({
           )}
           {playerActive && playerPos ? (
             vehicleBitmap ? (
-              <Marker
+              <MarkerAnimated
                 key="player-pos"
-                coordinate={{ latitude: playerPos.latitude, longitude: playerPos.longitude }}
+                coordinate={animCoordinate as any}
                 zIndex={10}
                 rotation={playerPos.curso ?? 0}
                 anchor={{ x: 0.5, y: 0.5 }}
                 image={{ uri: vehicleBitmap }}
+                tracksViewChanges={false}
               />
             ) : (
-              <Marker
+              <MarkerAnimated
                 key="player-pos"
-                coordinate={{ latitude: playerPos.latitude, longitude: playerPos.longitude }}
+                coordinate={animCoordinate as any}
                 zIndex={10}
                 rotation={playerPos.curso ?? 0}
                 anchor={{ x: 0.5, y: 0.5 }}
                 pinColor={markerColor}
+                tracksViewChanges={false}
               />
             )
           ) : null}
