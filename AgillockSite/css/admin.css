@@ -928,6 +928,10 @@ input:focus, select:focus, textarea:focus {
 .input-suffix input { flex: 1; }
 .input-suffix .suffix { color: #888; font-size: 13px; white-space: nowrap; }
 
+/* ─── Modais acima da barra global de rastreamento ──────────────────────── */
+.modal-backdrop { z-index: 10050; }
+.modal          { z-index: 10100; }
+
 /* ─── Barra global de rastreamento (acima de sidebar e topbar) ──────────── */
 #al-rastr-bar {
     position: fixed;
