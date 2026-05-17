@@ -181,11 +181,11 @@
 
   const TIPO_ICON = {
     preventiva:'fa-shield', corretiva:'fa-wrench',
-    revisao:'fa-search', personalizado:'fa-star', recorrencia:'fa-calendar-check-o',
+    revisao:'fa-search', personalizado:'fa-star', recorrencia:'fa-road', recorrenciaData:'fa-calendar-check-o',
   };
   const TIPO_LABEL = {
     preventiva:'Preventiva', corretiva:'Corretiva',
-    revisao:'Revisão', personalizado:'Personalizado', recorrencia:'Recorrência',
+    revisao:'Revisão', personalizado:'Personalizado', recorrencia:'Recorrência KM', recorrenciaData:'Recorrência Data',
   };
 
   // ── Init ─────────────────────────────────────────────────────────────────────

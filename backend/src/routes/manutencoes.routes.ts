@@ -722,7 +722,7 @@ router.post('/recorrencias-data/:id/feito', async (req: any, res) => {
         dispositivoId: recorrencia.dispositivoId,
         clienteLoginId,
         titulo: `${recorrencia.titulo} — confirmado`,
-        tipo: 'recorrencia',
+        tipo: 'recorrenciaData',
         descricao: `Recorrência por data "${recorrencia.titulo}" confirmada como realizada.`,
         dataRealizacao: agora,
         notas: notas || null,

@@ -183,7 +183,35 @@ function fmtKm(km: number | null) {
 }
 
 function tipoLabel(tipo: string | null | undefined) {
+  if (tipo === 'recorrencia') return 'Recorrência KM';
+  if (tipo === 'recorrenciaData') return 'Recorrência Data';
   return TIPOS_MANUTENCAO.find(t => t.value === tipo)?.label ?? tipo ?? 'Preventiva';
+}
+
+function tipoRegistroNormalizado(registro: Registro) {
+  const tipo = registro.tipo || 'preventiva';
+  const texto = `${registro.titulo || ''} ${registro.descricao || ''}`.toLowerCase();
+  if (tipo === 'recorrencia' && texto.includes('por data')) return 'recorrenciaData';
+  return tipo;
+}
+
+function registroVisual(tipo: string) {
+  switch (tipo) {
+    case 'preventiva':
+      return { icon: 'shield-check-outline', color: '#27ae60', bg: 'rgba(39,174,96,.1)' };
+    case 'corretiva':
+      return { icon: 'wrench-outline', color: '#e67e22', bg: 'rgba(230,126,34,.1)' };
+    case 'revisao':
+      return { icon: 'clipboard-search-outline', color: '#2980b9', bg: 'rgba(41,128,185,.1)' };
+    case 'personalizado':
+      return { icon: 'star-outline', color: '#8e44ad', bg: 'rgba(142,68,173,.1)' };
+    case 'recorrencia':
+      return { icon: 'speedometer', color: '#b47d00', bg: 'rgba(250,179,44,.14)' };
+    case 'recorrenciaData':
+      return { icon: 'calendar-check-outline', color: '#8e44ad', bg: 'rgba(142,68,173,.1)' };
+    default:
+      return { icon: 'clipboard-check-outline', color: colors.primary, bg: 'rgba(31,111,159,.1)' };
+  }
 }
 
 function parseDateInput(value: string) {
@@ -900,36 +928,50 @@ export function ManutencaoScreen() {
                 const fotos = Array.isArray(r.fotos) ? r.fotos : [];
                 const hasExtra = Boolean(r.notas || fotos.length);
                 const expanded = expandedRegistros[r.id];
+                const tipoNormalizado = tipoRegistroNormalizado(r);
+                const visual = registroVisual(tipoNormalizado);
+                const isAdmin = r.origem === 'ADMIN';
                 return (
-                  <View key={r.id} style={styles.card}>
+                  <View key={r.id} style={[styles.card, { borderLeftWidth: 2, borderLeftColor: visual.color }]}>
                     <View style={styles.cardHeader}>
-                      <View style={styles.cardIconWrap}>
-                        <Icon source="clipboard-check" size={20} color="#8e44ad" />
+                      <View style={[styles.cardIconWrap, { backgroundColor: visual.bg }]}>
+                        <Icon source={visual.icon} size={20} color={visual.color} />
                       </View>
                       <View style={styles.cardBody}>
                         <View style={styles.titleRow}>
                           <Text style={styles.cardTitle}>{r.titulo}</Text>
-                          {r.tipo ? <Text style={styles.cardTag}>{tipoLabel(r.tipo)}</Text> : null}
+                          <Text style={[styles.cardTag, { color: visual.color, backgroundColor: visual.bg }]}>
+                            {tipoLabel(tipoNormalizado)}
+                          </Text>
+                          {isAdmin ? (
+                            <Text style={styles.adminTag}>Admin</Text>
+                          ) : null}
                         </View>
-                        <Text style={styles.cardMeta}>{fmtDate(r.dataRealizacao)}</Text>
-                        <View style={styles.cardStats}>
+                        {r.descricao ? (
+                          <Text style={styles.historyDescription} numberOfLines={2}>{r.descricao}</Text>
+                        ) : null}
+                        <View style={styles.historyMetaGrid}>
+                          <View style={styles.historyMetaPill}>
+                            <Icon source="calendar-month-outline" size={13} color={colors.textMuted} />
+                            <Text style={styles.historyMetaText}>{fmtDate(r.dataRealizacao)}</Text>
+                          </View>
                           {r.kmRealizacao != null && (
-                            <Text style={styles.cardStatText}>
-                              <Text style={styles.cardStatLabel}>KM: </Text>
-                              {fmtKm(r.kmRealizacao)}
-                            </Text>
+                            <View style={styles.historyMetaPill}>
+                              <Icon source="road-variant" size={13} color={colors.textMuted} />
+                              <Text style={styles.historyMetaText}>{fmtKm(r.kmRealizacao)}</Text>
+                            </View>
                           )}
                           {r.custo != null && (
-                            <Text style={styles.cardStatText}>
-                              <Text style={styles.cardStatLabel}>Custo: </Text>
-                              {fmtMoney(r.custo)}
-                            </Text>
+                            <View style={styles.historyMetaPill}>
+                              <Icon source="cash" size={13} color={colors.textMuted} />
+                              <Text style={styles.historyMetaText}>{fmtMoney(r.custo)}</Text>
+                            </View>
                           )}
                           {r.oficina ? (
-                            <Text style={styles.cardStatText}>
-                              <Text style={styles.cardStatLabel}>Oficina: </Text>
-                              {r.oficina}
-                            </Text>
+                            <View style={styles.historyMetaPill}>
+                              <Icon source="store-outline" size={13} color={colors.textMuted} />
+                              <Text style={styles.historyMetaText}>{r.oficina}</Text>
+                            </View>
                           ) : null}
                         </View>
                       </View>
@@ -1592,6 +1634,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.sm,
+  },
+  adminTag: {
+    alignSelf: 'flex-start',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1f6f9f',
+    backgroundColor: 'rgba(31,111,159,.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  historyDescription: {
+    fontSize: 12,
+    color: colors.text,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  historyMetaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  historyMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.background,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  historyMetaText: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontWeight: '600',
   },
   cardTagKm: {
     alignSelf: 'flex-start',

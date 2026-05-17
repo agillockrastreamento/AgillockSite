@@ -767,7 +767,7 @@ router.post('/clientes/:clienteLoginId/recorrencias-data/:id/feito', async (req:
         clienteLoginId: clienteLoginIdCanonical,
         criadoPorAdminId: adminId,
         titulo: `${recorrencia.titulo} — confirmado pelo admin`,
-        tipo: 'recorrencia',
+        tipo: 'recorrenciaData',
         descricao: mensagem,
         dataRealizacao: agora,
         fotos: [],
