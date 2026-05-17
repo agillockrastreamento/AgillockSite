@@ -108,32 +108,11 @@
     });
   }
 
-  function uploadLogo(file) {
-    var token = getToken();
-    var form = new FormData();
-    form.append('logo', file);
-    return fetch(BASE + '/api/cliente/perfil/logo', {
-      method: 'POST',
-      headers: token ? { 'Authorization': 'Bearer ' + token } : {},
-      body: form,
-    }).then(function (res) {
-      if (res.status === 204) return null;
-      return res.json().then(function (data) {
-        if (!res.ok) return Promise.reject(new Error(data.error || ('Erro ' + res.status)));
-        return data;
-      });
-    });
-  }
-
-  function deleteLogo() {
-    return apiRequest('DELETE', '/api/cliente/perfil/logo', null);
-  }
-
   // ─── Logo do cliente no sidebar ───────────────────────────────────────────
 
-  var _logoInputEl = null;
-
   function _buildLogoSection(logoUrl) {
+    if (!logoUrl) return null;
+
     var wrap = document.createElement('div');
     wrap.id = 'sidebar-logo-wrap';
     wrap.className = 'sidebar-cliente-logo';
@@ -150,17 +129,11 @@
     return wrap;
   }
 
-  function _reloadLogoSection() {
-    apiGet('/api/cliente/perfil').then(function (perfil) {
-      var existing = document.getElementById('sidebar-logo-wrap');
-      if (!existing) return;
-      var novo = _buildLogoSection(perfil.logoUrl || null);
-      existing.parentNode.replaceChild(novo, existing);
-    }).catch(function () { });
-  }
-
   function initClienteLogo() {
     apiGet('/api/cliente/perfil').then(function (perfil) {
+      var logoSection = _buildLogoSection(perfil.logoUrl || null);
+      if (!logoSection) return;
+
       var sidebar = document.getElementById('sidebar');
       if (!sidebar) return;
       var footer = sidebar.querySelector('.sidebar-footer');
@@ -172,14 +145,13 @@
 
       var spacer1 = document.createElement('div');
       spacer1.className = 'sidebar-logo-spacer';
-      var logoSection = _buildLogoSection(perfil.logoUrl || null);
       var spacer2 = document.createElement('div');
       spacer2.className = 'sidebar-logo-spacer';
 
       sidebar.insertBefore(spacer1, footer);
       sidebar.insertBefore(logoSection, footer);
       sidebar.insertBefore(spacer2, footer);
-    }).catch(function () { });
+    }).catch(function () {});
   }
 
   // ─── Toast ────────────────────────────────────────────────────────────────
@@ -257,13 +229,13 @@
 
     var LOGO_FULL = '../img/logo_agillock_white_new.png';
     var LOGO_ICON = '../favicon.ico';
-    var logoImg = sidebar.querySelector('.sidebar-brand img');
-    var brand = sidebar.querySelector('.sidebar-brand');
+    var logoImg   = sidebar.querySelector('.sidebar-brand img');
+    var brand     = sidebar.querySelector('.sidebar-brand');
 
     var collapseBtn = document.createElement('button');
-    collapseBtn.id = 'btn-sidebar-collapse';
+    collapseBtn.id        = 'btn-sidebar-collapse';
     collapseBtn.className = 'btn-sidebar-collapse';
-    collapseBtn.title = 'Recolher/Expandir';
+    collapseBtn.title     = 'Recolher/Expandir';
     collapseBtn.innerHTML = '<i id="icon-sidebar-collapse" class="fa fa-chevron-left"></i>';
     if (brand) brand.appendChild(collapseBtn);
 
@@ -287,7 +259,7 @@
       var rect = el.getBoundingClientRect();
       sidebarTooltip.textContent = label;
       sidebarTooltip.style.display = 'block';
-      sidebarTooltip.style.top = Math.round(rect.top + rect.height / 2) + 'px';
+      sidebarTooltip.style.top  = Math.round(rect.top + rect.height / 2) + 'px';
       sidebarTooltip.style.left = Math.round(rect.right + 12) + 'px';
     }
     function hideTooltip() { sidebarTooltip.style.display = 'none'; }
@@ -308,10 +280,10 @@
       if (logoImg) logoImg.src = c ? LOGO_ICON : LOGO_FULL;
       var icon = document.getElementById('icon-sidebar-collapse');
       if (icon) icon.className = c ? 'fa fa-chevron-right' : 'fa fa-chevron-left';
-      var topbar = document.querySelector('.admin-topbar');
+      var topbar  = document.querySelector('.admin-topbar');
       var content = document.querySelector('.admin-content');
       var px = c ? '64px' : '';
-      if (topbar) topbar.style.left = px;
+      if (topbar)  topbar.style.left        = px;
       if (content) content.style.marginLeft = px;
       if (!animate) {
         requestAnimationFrame(function () {
@@ -352,8 +324,6 @@
     apiPatch: apiPatch,
     apiDelete: apiDelete,
     uploadFoto: uploadFoto,
-    uploadLogo: uploadLogo,
-    deleteLogo: deleteLogo,
     showAlert: showAlert,
     initThemeToggle: initThemeToggle,
     fmtDate: fmtDate,

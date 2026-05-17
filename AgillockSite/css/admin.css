@@ -195,49 +195,6 @@ html.al-sb-collapsed .admin-sidebar { width: 64px !important; }
     border-radius: 8px;
     transition: max-width 0.3s, max-height 0.3s;
 }
-.sidebar-cliente-logo-actions {
-    display: flex;
-    justify-content: center;
-    gap: 6px;
-}
-.sidebar-cliente-logo-action-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 5px;
-    border: 1px solid rgba(255,255,255,0.18);
-    background: rgba(255,255,255,0.07);
-    color: rgba(255,255,255,0.65);
-    cursor: pointer;
-    font-size: 12px;
-    transition: background 0.15s, color 0.15s;
-}
-.sidebar-cliente-logo-action-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
-.sidebar-cliente-logo-delete-btn { border-color: rgba(231,76,60,0.4); color: #e74c3c; }
-.sidebar-cliente-logo-delete-btn:hover { background: rgba(231,76,60,0.15); color: #e74c3c; }
-.sidebar-cliente-logo-placeholder {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    color: #6b7a8d;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 8px 10px;
-    border: 1.5px dashed #3a4555;
-    border-radius: 6px;
-    width: 100%;
-    text-align: center;
-    transition: border-color 0.2s, color 0.2s;
-    background: transparent;
-}
-.sidebar-cliente-logo-placeholder:hover { border-color: #fab32c; color: #fab32c; }
-.sidebar-cliente-logo-placeholder .fa { font-size: 14px; }
-
 /* Recolhido: esconde ações e texto, mostra ícone pequeno */
 .admin-sidebar.collapsed .sidebar-cliente-logo {
     padding: 8px 0;
@@ -254,16 +211,6 @@ html.al-sb-collapsed .admin-sidebar { width: 64px !important; }
     border-radius: 50%;
     object-fit: cover;
 }
-.admin-sidebar.collapsed .sidebar-cliente-logo-actions { display: none; }
-.admin-sidebar.collapsed .sidebar-cliente-logo-placeholder {
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border-radius: 50%;
-    font-size: 0;
-    gap: 0;
-}
-.admin-sidebar.collapsed .sidebar-cliente-logo-placeholder .fa { font-size: 14px; }
 
 /* ─── Usuário no sidebar ───────────────────────────────────────────────── */
 .sidebar-user {

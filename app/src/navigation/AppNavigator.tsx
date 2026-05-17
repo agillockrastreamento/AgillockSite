@@ -6,14 +6,13 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, Avatar, Icon } from 'react-native-paper';
-import * as ImagePicker from 'expo-image-picker';
 
 import { useAuth } from '../auth/AuthProvider';
 import { ProfileModal } from '../profile/ProfileModal';
-import { getClientePerfil, resolveUploadUrl, uploadClienteLogo, deleteClienteLogo } from '../profile/profileService';
+import { getClientePerfil, resolveUploadUrl } from '../profile/profileService';
 import type { ClientePerfil } from '../profile/profileTypes';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -29,7 +28,6 @@ import { NotificationHandlers } from '../notifications/NotificationHandlers';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
-import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import type { ClienteDrawerParamList, RootStackParamList } from './routes';
 
 const drawerLogo = require('../../assets/agillock_new_symbol.png');
@@ -60,11 +58,9 @@ const navigationTheme = {
 function ClienteDrawerContent(props: DrawerContentComponentProps) {
   const { user, signOut } = useAuth();
   const toast = useToast();
-  const confirmDialog = useConfirmDialog();
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [profile, setProfile] = useState<ClientePerfil | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
-  const [isLogoLoading, setIsLogoLoading] = useState(false);
   const avatarUri = resolveUploadUrl(profile?.avatarUrl);
   const logoUri = resolveUploadUrl(profile?.logoUrl);
 
@@ -84,56 +80,6 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const handleDeleteLogo = useCallback(async () => {
-    if (isLogoLoading) return;
-    const confirmed = await confirmDialog.show({
-      title: 'Remover logo',
-      message: 'Deseja remover a logo?',
-      confirmLabel: 'Remover',
-      destructive: true,
-    });
-    if (!confirmed) return;
-    setIsLogoLoading(true);
-    try {
-      await deleteClienteLogo();
-      setProfile((prev) => prev ? { ...prev, logoUrl: null } : prev);
-    } catch {
-      toast.show({ message: 'Erro ao remover logo.', type: 'error' });
-    } finally {
-      setIsLogoLoading(false);
-    }
-  }, [isLogoLoading, confirmDialog, toast]);
-
-  const pickAndUploadLogo = useCallback(async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      toast.show({ message: 'Permissão para acessar fotos negada.', type: 'error' });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.85,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    const asset = result.assets[0];
-    setIsLogoLoading(true);
-    try {
-      const response = await uploadClienteLogo({
-        uri: asset.uri,
-        fileName: asset.fileName,
-        mimeType: asset.mimeType,
-      });
-      setProfile((prev) => prev ? { ...prev, logoUrl: response.logoUrl } : prev);
-      toast.show({ message: 'Logo atualizada!', type: 'success' });
-    } catch {
-      toast.show({ message: 'Erro ao enviar logo.', type: 'error' });
-    } finally {
-      setIsLogoLoading(false);
-    }
   }, []);
 
   return (
@@ -156,17 +102,11 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
       </View>
 
       <View style={styles.logoSpacer} />
-      <View style={styles.logoContainer}>
-        {isLogoLoading ? (
-          <ActivityIndicator size="small" color={colors.primary} />
-        ) : logoUri ? (
-          <>
-            <Image source={{ uri: logoUri }} style={styles.logoImage} />
-          </>
-        ) : (
-          <View></View>
-        )}
-      </View>
+      {logoUri ? (
+        <View style={styles.logoContainer}>
+          <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
+        </View>
+      ) : null}
       <View style={styles.logoSpacer} />
 
       <View style={styles.profileArea}>
@@ -412,45 +352,6 @@ const styles = StyleSheet.create({
     height: 115,
     borderRadius: radius.lg,
     overflow: 'hidden',
-  },
-  logoActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  logoActionBtn: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  logoDeleteBtn: {
-    borderColor: '#ffd6d6',
-    backgroundColor: '#fff1ef',
-  },
-  logoPlaceholder: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    backgroundColor: colors.background,
-    width: '100%',
-    height: 70,
-  },
-  logoPlaceholderText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
   },
   profileArea: {
     padding: spacing.lg,
