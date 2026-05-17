@@ -591,4 +591,205 @@ router.post('/bulk/recorrencias', async (req: any, res) => {
   }
 });
 
+// ── Recorrências por Data (Admin) ─────────────────────────────────────────────
+
+import { _calcularProximaData } from './manutencoes.routes';
+
+// GET /api/manutencoes-admin/clientes/:clienteLoginId/recorrencias-data?dispositivoId=X
+router.get('/clientes/:clienteLoginId/recorrencias-data', async (req, res) => {
+  try {
+    const { clienteLoginId } = req.params;
+    const { dispositivoId } = req.query as { dispositivoId?: string };
+
+    const ctx = await _contextoDispositivoCliente(clienteLoginId, dispositivoId);
+    if (!ctx.idsPermitidos.length) return res.json([]);
+
+    const recorrencias = await prisma.manutencaoRecorrenciaData.findMany({
+      where: {
+        dispositivoId: ctx.filtroDispositivo ?? { in: ctx.idsPermitidos },
+        ativa: true,
+        OR: [
+          { origem: 'ADMIN' },
+          { clienteLoginId: { in: ctx.responsavelLoginIds } },
+          { clienteLogin: { clienteId: { in: ctx.responsavelClienteIds } } },
+        ],
+      },
+      include: { dispositivo: { select: { nome: true, placa: true } } },
+      orderBy: { dataReferencia: 'asc' },
+    });
+
+    res.json(recorrencias);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao carregar recorrências por data.' });
+  }
+});
+
+// POST /api/manutencoes-admin/clientes/:clienteLoginId/recorrencias-data
+router.post('/clientes/:clienteLoginId/recorrencias-data', async (req: any, res) => {
+  try {
+    const adminId: string = req.user.userId;
+    const { clienteLoginId } = req.params;
+    const { dispositivoId, titulo, descricao, tipoRecorrencia, dataReferencia, intervaloDias, diasSemana, diaDoMes, mesDoAno, canalNotificacao } = req.body;
+
+    if (!dispositivoId || !titulo || !tipoRecorrencia || !dataReferencia) {
+      return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, tipoRecorrencia, dataReferencia.' });
+    }
+
+    const ctx = await _contextoDispositivoCliente(clienteLoginId, dispositivoId);
+    if (!ctx.idsPermitidos.includes(dispositivoId)) {
+      return res.status(403).json({ message: 'Dispositivo não pertence a este cliente.' });
+    }
+    const clienteLoginIdCanonical = ctx.loginCanonicalPorDispositivo.get(dispositivoId) || clienteLoginId;
+
+    const dispCheck = await prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { manutencaoAtiva: true } });
+    if (!dispCheck?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
+
+    const recorrencia = await prisma.manutencaoRecorrenciaData.create({
+      data: {
+        dispositivoId,
+        clienteLoginId: clienteLoginIdCanonical,
+        criadoPorAdminId: adminId,
+        titulo,
+        descricao: descricao || null,
+        tipoRecorrencia,
+        dataReferencia: new Date(dataReferencia),
+        intervaloDias: intervaloDias ? parseInt(intervaloDias) : null,
+        diasSemana: diasSemana || null,
+        diaDoMes: diaDoMes ? parseInt(diaDoMes) : null,
+        mesDoAno: mesDoAno ? parseInt(mesDoAno) : null,
+        canalNotificacao: canalNotificacao || 'todos',
+        origem: 'ADMIN',
+      },
+      include: { dispositivo: { select: { nome: true, placa: true } } },
+    });
+
+    await _ativarNotificacaoManutencao(clienteLoginIdCanonical, dispositivoId);
+    res.json(recorrencia);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao criar recorrência por data.' });
+  }
+});
+
+// PUT /api/manutencoes-admin/recorrencias-data/:id
+router.put('/recorrencias-data/:id', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { titulo, descricao, tipoRecorrencia, dataReferencia, intervaloDias, diasSemana, diaDoMes, mesDoAno, canalNotificacao } = req.body;
+
+    const existing = await prisma.manutencaoRecorrenciaData.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Recorrência não encontrada.' });
+
+    const updated = await prisma.manutencaoRecorrenciaData.update({
+      where: { id },
+      data: {
+        titulo: titulo || existing.titulo,
+        descricao: descricao !== undefined ? (descricao || null) : existing.descricao,
+        tipoRecorrencia: tipoRecorrencia || existing.tipoRecorrencia,
+        dataReferencia: dataReferencia ? new Date(dataReferencia) : existing.dataReferencia,
+        intervaloDias: intervaloDias !== undefined ? (intervaloDias ? parseInt(intervaloDias) : null) : existing.intervaloDias,
+        diasSemana: diasSemana !== undefined ? (diasSemana || null) : existing.diasSemana,
+        diaDoMes: diaDoMes !== undefined ? (diaDoMes ? parseInt(diaDoMes) : null) : existing.diaDoMes,
+        mesDoAno: mesDoAno !== undefined ? (mesDoAno ? parseInt(mesDoAno) : null) : existing.mesDoAno,
+        canalNotificacao: canalNotificacao || existing.canalNotificacao,
+        ...(dataReferencia ? { alerta7dEnviado: false, alerta4dEnviado: false, alerta2dEnviado: false, alerta1dEnviado: false, alertaDiaEnviado: false, ultimoAlertaPosDue: null } : {}),
+      },
+      include: { dispositivo: { select: { nome: true, placa: true } } },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao atualizar recorrência por data.' });
+  }
+});
+
+// POST /api/manutencoes-admin/clientes/:clienteLoginId/recorrencias-data/:id/feito
+router.post('/clientes/:clienteLoginId/recorrencias-data/:id/feito', async (req: any, res) => {
+  try {
+    const adminId: string = req.user.userId;
+    const { clienteLoginId, id } = req.params;
+
+    const recorrencia = await prisma.manutencaoRecorrenciaData.findUnique({
+      where: { id },
+      include: { dispositivo: { select: { nome: true, placa: true, traccarId: true } } },
+    });
+    if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
+
+    const agora = new Date();
+    const novoCiclos = recorrencia.ciclosCompletos + 1;
+    let novaData: Date | null = null;
+    if (recorrencia.tipoRecorrencia !== 'AVULSA') {
+      novaData = _calcularProximaData(recorrencia as any, agora);
+    }
+
+    if (novaData) {
+      await prisma.manutencaoRecorrenciaData.update({
+        where: { id },
+        data: { dataReferencia: novaData, ciclosCompletos: novoCiclos, alerta7dEnviado: false, alerta4dEnviado: false, alerta2dEnviado: false, alerta1dEnviado: false, alertaDiaEnviado: false, ultimoAlertaPosDue: null },
+      });
+    } else {
+      await prisma.manutencaoRecorrenciaData.update({ where: { id }, data: { ativa: false, ciclosCompletos: novoCiclos } });
+    }
+
+    const clienteLoginIdCanonical = recorrencia.clienteLoginId || clienteLoginId;
+    const nome = recorrencia.dispositivo.nome;
+    const pl = recorrencia.dispositivo.placa ? ` (${recorrencia.dispositivo.placa})` : '';
+    const mensagem = `Recorrência "${recorrencia.titulo}" no veículo ${nome}${pl} marcada como realizada pelo administrador!`;
+
+    await prisma.manutencaoRegistro.create({
+      data: {
+        dispositivoId: recorrencia.dispositivoId,
+        clienteLoginId: clienteLoginIdCanonical,
+        criadoPorAdminId: adminId,
+        titulo: `${recorrencia.titulo} — confirmado pelo admin`,
+        tipo: 'preventiva',
+        descricao: mensagem,
+        dataRealizacao: agora,
+        fotos: [],
+        origem: 'ADMIN',
+      },
+    });
+
+    await prisma.eventoNotificacao.create({
+      data: { clienteLoginId: clienteLoginIdCanonical, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'recorrenciaDataFeita', origemTipo: 'ADMIN', origemId: recorrencia.id, adminEvento: true, mensagem, latitude: null, longitude: null, velocidade: null },
+    });
+
+    broadcastTrackingEvents([{
+      deviceId: recorrencia.dispositivo.traccarId,
+      dispositivoId: recorrencia.dispositivoId,
+      type: 'recorrenciaDataFeita',
+      tipoLabel: 'Recorrência Realizada',
+      origemTipo: 'ADMIN',
+      origemId: recorrencia.id,
+      clienteLoginId: clienteLoginIdCanonical,
+      adminEvento: true,
+      serverTime: agora.toISOString(),
+      mensagem,
+      lat: null,
+      lng: null,
+      endereco: null,
+    }]);
+
+    res.json({ message: 'Recorrência por data confirmada pelo admin.', proximaData: novaData });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao confirmar recorrência por data.' });
+  }
+});
+
+// DELETE /api/manutencoes-admin/recorrencias-data/:id
+router.delete('/recorrencias-data/:id', async (_req, res) => {
+  try {
+    const { id } = _req.params;
+    await prisma.manutencaoRecorrenciaData.update({ where: { id }, data: { ativa: false } });
+    res.json({ message: 'Recorrência por data removida com sucesso.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao remover recorrência por data.' });
+  }
+});
+
 export default router;

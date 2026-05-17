@@ -372,6 +372,10 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
       where: { dispositivoId: id, ativa: true },
       data: { ativa: false },
     });
+    await prisma.manutencaoRecorrenciaData.updateMany({
+      where: { dispositivoId: id, ativa: true },
+      data: { ativa: false },
+    });
   }
 
   // Desativa recorrências CLIENTE do responsável antigo ao trocar a titularidade via PUT
@@ -379,12 +383,11 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     const novoClienteIdPut = clienteId || null;
     if (existe.clienteId && existe.clienteId !== novoClienteIdPut) {
       await prisma.manutencaoRecorrencia.updateMany({
-        where: {
-          dispositivoId: id,
-          ativa: true,
-          origem: 'CLIENTE',
-          clienteLogin: { clienteId: existe.clienteId },
-        },
+        where: { dispositivoId: id, ativa: true, origem: 'CLIENTE', clienteLogin: { clienteId: existe.clienteId } },
+        data: { ativa: false },
+      });
+      await prisma.manutencaoRecorrenciaData.updateMany({
+        where: { dispositivoId: id, ativa: true, origem: 'CLIENTE', clienteLogin: { clienteId: existe.clienteId } },
         data: { ativa: false },
       });
     }
@@ -477,12 +480,11 @@ router.patch('/:id/vincular', requireRoles('ADMIN', 'COLABORADOR'), async (req: 
   // Desativa recorrências CLIENTE do responsável antigo ao trocar a titularidade
   if (existe.clienteId && existe.clienteId !== novoClienteId) {
     await prisma.manutencaoRecorrencia.updateMany({
-      where: {
-        dispositivoId: id,
-        ativa: true,
-        origem: 'CLIENTE',
-        clienteLogin: { clienteId: existe.clienteId },
-      },
+      where: { dispositivoId: id, ativa: true, origem: 'CLIENTE', clienteLogin: { clienteId: existe.clienteId } },
+      data: { ativa: false },
+    });
+    await prisma.manutencaoRecorrenciaData.updateMany({
+      where: { dispositivoId: id, ativa: true, origem: 'CLIENTE', clienteLogin: { clienteId: existe.clienteId } },
       data: { ativa: false },
     });
   }

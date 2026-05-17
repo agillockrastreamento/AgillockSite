@@ -8,6 +8,7 @@ type DispositivoBasico = { id: string; nome: string; placa: string | null; ident
 // Normaliza subtipos de manutenção para a chave de preferência do admin
 function _tipoPreferenciaAdmin(tipo: string): string {
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
+  if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'manutencao';
   return tipo;
 }
 
@@ -619,6 +620,157 @@ class NotificationService {
     return eventosDetectados;
   }
 
+  async verificarRecorrenciasDataTodas() {
+    try {
+      const agora = new Date();
+      agora.setHours(0, 0, 0, 0);
+
+      // Busca todas as recorrências ativas cujo dataReferencia já é relevante (até 7 dias à frente)
+      const limite7d = new Date(agora);
+      limite7d.setDate(limite7d.getDate() + 7);
+
+      const recorrencias = await prisma.manutencaoRecorrenciaData.findMany({
+        where: {
+          ativa: true,
+          dataReferencia: { lte: limite7d },
+        },
+        include: {
+          dispositivo: { select: { id: true, nome: true, placa: true, identificador: true, traccarId: true, clienteId: true, manutencaoAtiva: true } },
+          clienteLogin: { select: { id: true, clienteId: true, ativo: true } },
+        },
+      });
+
+      for (const rec of recorrencias) {
+        if (!rec.dispositivo.manutencaoAtiva) continue;
+
+        // Verifica se o criador ainda é responsável
+        if (rec.origem === 'CLIENTE' && rec.clienteLogin?.clienteId !== rec.dispositivo.clienteId) continue;
+
+        await this._verificarAlertasRecorrenciaData(rec as any, agora);
+      }
+
+      // Verifica recorrências atrasadas (passaram da data e não foram marcadas como feitas)
+      const recAtrasadas = await prisma.manutencaoRecorrenciaData.findMany({
+        where: { ativa: true, dataReferencia: { lt: agora } },
+        include: {
+          dispositivo: { select: { id: true, nome: true, placa: true, identificador: true, traccarId: true, clienteId: true, manutencaoAtiva: true } },
+          clienteLogin: { select: { id: true, clienteId: true, ativo: true } },
+        },
+      });
+
+      for (const rec of recAtrasadas) {
+        if (!rec.dispositivo.manutencaoAtiva) continue;
+        if (rec.origem === 'CLIENTE' && rec.clienteLogin?.clienteId !== rec.dispositivo.clienteId) continue;
+        await this._verificarAlertaPosDueData(rec as any, agora);
+      }
+    } catch (err) {
+      console.error('[NotifData] Erro ao verificar recorrências por data:', err);
+    }
+  }
+
+  private async _verificarAlertasRecorrenciaData(rec: any, agora: Date) {
+    const data = new Date(rec.dataReferencia);
+    data.setHours(0, 0, 0, 0);
+    const diffDias = Math.ceil((data.getTime() - agora.getTime()) / (1000 * 60 * 60 * 24));
+
+    const targets = await this._buscarTargetsRecorrenciaData(rec);
+    if (!targets.length) return;
+
+    const nome = rec.dispositivo.nome;
+    const pl = rec.dispositivo.placa ? ` (${rec.dispositivo.placa})` : '';
+    const dataStr = data.toLocaleDateString('pt-BR');
+
+    const atualizacoes: Record<string, boolean> = {};
+
+    if (!rec.alerta7dEnviado && diffDias <= 7 && diffDias > 4) {
+      const msg = `Lembrete: "${rec.titulo}" no veículo ${nome}${pl} está agendado para ${dataStr} (em ${diffDias} dias).`;
+      await this._notificarTargetsData(targets, rec.dispositivo, 'recorrenciaDataAlerta', msg, rec.origem, rec.id, rec.canalNotificacao);
+      atualizacoes.alerta7dEnviado = true;
+    }
+    if (!rec.alerta4dEnviado && diffDias <= 4 && diffDias > 2) {
+      const msg = `Lembrete: "${rec.titulo}" no veículo ${nome}${pl} está em ${diffDias} dias (${dataStr}).`;
+      await this._notificarTargetsData(targets, rec.dispositivo, 'recorrenciaDataAlerta', msg, rec.origem, rec.id, rec.canalNotificacao);
+      atualizacoes.alerta4dEnviado = true;
+    }
+    if (!rec.alerta2dEnviado && diffDias <= 2 && diffDias > 1) {
+      const msg = `Atenção: "${rec.titulo}" no veículo ${nome}${pl} é em 2 dias (${dataStr}).`;
+      await this._notificarTargetsData(targets, rec.dispositivo, 'recorrenciaDataAlerta', msg, rec.origem, rec.id, rec.canalNotificacao);
+      atualizacoes.alerta2dEnviado = true;
+    }
+    if (!rec.alerta1dEnviado && diffDias <= 1 && diffDias > 0) {
+      const msg = `Urgente: "${rec.titulo}" no veículo ${nome}${pl} é AMANHÃ (${dataStr})!`;
+      await this._notificarTargetsData(targets, rec.dispositivo, 'recorrenciaDataAlerta', msg, rec.origem, rec.id, rec.canalNotificacao);
+      atualizacoes.alerta1dEnviado = true;
+    }
+    if (!rec.alertaDiaEnviado && diffDias === 0) {
+      const msg = `Hoje: "${rec.titulo}" no veículo ${nome}${pl} está agendado para HOJE!`;
+      await this._notificarTargetsData(targets, rec.dispositivo, 'recorrenciaDataAlerta', msg, rec.origem, rec.id, rec.canalNotificacao);
+      atualizacoes.alertaDiaEnviado = true;
+    }
+
+    if (Object.keys(atualizacoes).length) {
+      await prisma.manutencaoRecorrenciaData.update({ where: { id: rec.id }, data: atualizacoes });
+    }
+  }
+
+  private async _verificarAlertaPosDueData(rec: any, agora: Date) {
+    const ultima = rec.ultimoAlertaPosDue ? new Date(rec.ultimoAlertaPosDue) : null;
+    const umDia = 24 * 60 * 60 * 1000;
+    if (ultima && agora.getTime() - ultima.getTime() < umDia) return;
+
+    const targets = await this._buscarTargetsRecorrenciaData(rec);
+    if (!targets.length) return;
+
+    const data = new Date(rec.dataReferencia);
+    const diffDias = Math.ceil((agora.getTime() - data.getTime()) / (1000 * 60 * 60 * 24));
+    const nome = rec.dispositivo.nome;
+    const pl = rec.dispositivo.placa ? ` (${rec.dispositivo.placa})` : '';
+    const dataStr = data.toLocaleDateString('pt-BR');
+    const msg = `Pendente: "${rec.titulo}" no veículo ${nome}${pl} estava agendado para ${dataStr} (há ${diffDias} dia(s)) e ainda não foi confirmado.`;
+
+    await this._notificarTargetsData(targets, rec.dispositivo, 'recorrenciaDataNaoFeita', msg, rec.origem, rec.id, rec.canalNotificacao);
+    await prisma.manutencaoRecorrenciaData.update({ where: { id: rec.id }, data: { ultimoAlertaPosDue: agora } });
+  }
+
+  private async _buscarTargetsRecorrenciaData(rec: any): Promise<Array<{ clienteLoginId: string; pref: { web: boolean; app: boolean; email: boolean } }>> {
+    const targets: Array<{ clienteLoginId: string; pref: { web: boolean; app: boolean; email: boolean } }> = [];
+
+    const candidatos = rec.clienteLoginId
+      ? [{ id: rec.clienteLoginId }]
+      : await prisma.clienteLogin.findMany({
+          where: { cliente: { dispositivos: { some: { id: rec.dispositivoId } } }, ativo: true },
+          select: { id: true },
+        });
+
+    for (const c of candidatos) {
+      const pref = await prisma.preferenciaNotificacao.findUnique({
+        where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId: c.id, dispositivoId: rec.dispositivoId, tipoEvento: 'manutencao' } },
+      });
+      const canal = rec.canalNotificacao || 'todos';
+      const webOn = canal === 'todos' || canal === 'app';
+      const emailOn = canal === 'todos' || canal === 'email';
+      const appOn = canal === 'todos' || canal === 'app';
+      if (pref && (pref.web || pref.app || pref.email)) {
+        targets.push({ clienteLoginId: c.id, pref: { web: pref.web && webOn, app: pref.app && appOn, email: pref.email && emailOn } });
+      }
+    }
+    return targets;
+  }
+
+  private async _notificarTargetsData(
+    targets: Array<{ clienteLoginId: string; pref: { web: boolean; app: boolean; email: boolean } }>,
+    dispositivo: DispositivoBasico,
+    tipo: 'recorrenciaDataAlerta' | 'recorrenciaDataNaoFeita',
+    mensagem: string,
+    origemTipo?: string | null,
+    origemId?: string | null,
+    _canal?: string,
+  ) {
+    for (const target of targets) {
+      await this._salvarEEnviar(target.clienteLoginId, dispositivo, target.pref, tipo, mensagem, origemTipo, origemId);
+    }
+  }
+
   private _deduplicarRecorrenciasManutencao<T extends { titulo: string; intervaloKm: number; kmBase: number; origem?: string | null; clienteLoginId?: string | null; id?: string }>(recorrencias: T[]): T[] {
     const vistos = new Set<string>();
     return recorrencias.filter((rec) => {
@@ -767,6 +919,9 @@ class NotificationService {
       manutencaoAlerta: 'Alerta de Manutenção',
       manutencaoAtrasada: 'Manutenção Atrasada',
       manutencaoFeita:  'Manutenção Realizada',
+      recorrenciaDataAlerta: 'Alerta de Recorrência',
+      recorrenciaDataNaoFeita: 'Recorrência Pendente',
+      recorrenciaDataFeita: 'Recorrência Realizada',
       boletoVencendoHoje: 'Boleto vence hoje',
       boletoAtrasado: 'Boleto em atraso',
       pagamentoRecebido: 'Pagamento recebido',

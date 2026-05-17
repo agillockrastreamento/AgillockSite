@@ -373,8 +373,12 @@
               <i class="fa fa-history"></i> Histórico
             </button>
             <button class="man-subtab-btn" data-subtab="subtab-recorrencias">
-              <i class="fa fa-repeat"></i> Recorrências
+              <i class="fa fa-tachometer"></i> Recorrência de Manutenção
               <span id="c-badge-rec" class="badge" style="background:#e67e22;color:#fff;margin-left:4px;display:none;">0</span>
+            </button>
+            <button class="man-subtab-btn" data-subtab="subtab-recorrencias-data">
+              <i class="fa fa-calendar"></i> Recorrência por Data
+              <span id="c-badge-rec-data" class="badge" style="background:#8e44ad;color:#fff;margin-left:4px;display:none;">0</span>
             </button>
           </div>
 
@@ -397,7 +401,7 @@
             </div>
           </div>
 
-          <!-- Sub-tab: Recorrências -->
+          <!-- Sub-tab: Recorrências de Manutenção (KM) -->
           <div id="subtab-recorrencias" style="display:none;">
             <div class="man-info-box">
               <i class="fa fa-info-circle"></i>
@@ -406,8 +410,34 @@
             <div id="c-list-recorrencias" class="man-list"></div>
             <div id="c-empty-recorrencias" class="man-empty" style="display:none;">
               <div class="man-empty-icon"><i class="fa fa-repeat"></i></div>
-              <h6>Nenhuma recorrência configurada</h6>
+              <h6>Nenhuma recorrência de manutenção configurada</h6>
               <p>Crie uma recorrência para alertar o cliente automaticamente por quilometragem.</p>
+            </div>
+          </div>
+
+          <!-- Sub-tab: Recorrências por Data -->
+          <div id="subtab-recorrencias-data" style="display:none;">
+            <div class="man-info-box" style="background:rgba(142,68,173,.06);border-color:rgba(142,68,173,.2);color:#8e44ad;">
+              <i class="fa fa-calendar"></i>
+              <span>Recorrências por data alertam o cliente em datas específicas (IPVA, revisão anual, etc). Suporta recorrência <strong>avulsa, semanal, mensal, anual e por intervalo de dias</strong>. Notificações são enviadas com 7, 4, 2 e 1 dias de antecedência, no dia e diariamente após a data.</span>
+            </div>
+            <div id="c-section-header-rec-data" class="man-section-header">
+              <div class="man-section-title">
+                <div class="man-section-icon" style="background:rgba(142,68,173,.12);color:#8e44ad;"><i class="fa fa-calendar-check-o"></i></div>
+                <div>
+                  <h5>Recorrências por Data</h5>
+                  <small id="c-rec-data-subtitulo">Lembretes baseados em data para este veículo</small>
+                </div>
+              </div>
+              <button class="btn btn-sm" id="btn-nova-rec-data" style="background:#8e44ad;color:#fff;border-radius:8px;font-weight:700;" onclick="abrirModalNovaRecorrenciaData()">
+                <i class="fa fa-plus"></i> Nova Recorrência por Data
+              </button>
+            </div>
+            <div id="c-list-recorrencias-data" class="man-list"></div>
+            <div id="c-empty-recorrencias-data" class="man-empty" style="display:none;">
+              <div class="man-empty-icon" style="color:#8e44ad;"><i class="fa fa-calendar-o"></i></div>
+              <h6>Nenhuma recorrência por data configurada</h6>
+              <p>Crie lembretes baseados em data: IPVA, revisão anual, seguro, vistoria e mais.</p>
             </div>
           </div>
 
@@ -704,6 +734,140 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
           <button type="button" class="btn btn-danger" id="btn-confirmar-excluir">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Nova / Editar Recorrência por Data ═══ -->
+  <div class="modal fade man-modal" id="modalRecorrenciaData" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-calendar" style="color:#8e44ad;margin-right:8px;"></i><span id="modalRecData-title">Nova Recorrência por Data</span><span id="modalRecData-veiculo" class="man-modal-veiculo"></span></h4>
+        </div>
+        <div class="modal-body">
+          <div class="man-info-box" style="background:rgba(142,68,173,.06);border-color:rgba(142,68,173,.2);color:#8e44ad;margin-bottom:20px;">
+            <i class="fa fa-calendar"></i>
+            <span>Configure um lembrete baseado em data. O cliente será notificado com <strong>7, 4, 2 e 1 dias</strong> de antecedência, no dia e diariamente caso não confirme.</span>
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Título <span style="color:#e74c3c;">*</span></label>
+            <input type="text" id="recdata-titulo" class="form-control" placeholder="Ex: IPVA, Revisão anual, Seguro..." />
+          </div>
+          <div class="form-group">
+            <label class="man-modal-label">Tipo de recorrência <span style="color:#e74c3c;">*</span></label>
+            <select id="recdata-tipo" class="form-control" onchange="atualizarCamposRecData()">
+              <option value="AVULSA">Avulsa (data única)</option>
+              <option value="INTERVALO">Intervalo de dias</option>
+              <option value="SEMANAL">Semanal (dias da semana)</option>
+              <option value="MENSAL">Mensal (dia do mês)</option>
+              <option value="ANUAL">Anual (data fixa por ano)</option>
+            </select>
+          </div>
+
+          <!-- AVULSA / MENSAL / ANUAL: data base -->
+          <div id="recdata-campo-data" class="form-group">
+            <label class="man-modal-label" id="recdata-campo-data-label">Data <span style="color:#e74c3c;">*</span></label>
+            <input type="date" id="recdata-data" class="form-control" style="max-width:200px;" />
+            <small id="recdata-campo-data-hint" class="text-muted"></small>
+          </div>
+
+          <!-- INTERVALO: N dias -->
+          <div id="recdata-campo-intervalo" class="form-group" style="display:none;">
+            <label class="man-modal-label">Repetir a cada (dias) <span style="color:#e74c3c;">*</span></label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <input type="number" id="recdata-intervalo-dias" class="form-control" placeholder="Ex: 30" min="1" max="365" style="max-width:120px;" />
+              <span style="font-size:12px;color:#888;">dias a partir da próxima conclusão</span>
+            </div>
+            <label class="man-modal-label" style="margin-top:12px;">Primeira data <span style="color:#e74c3c;">*</span></label>
+            <input type="date" id="recdata-intervalo-inicio" class="form-control" style="max-width:200px;" />
+          </div>
+
+          <!-- SEMANAL: dias da semana -->
+          <div id="recdata-campo-semanal" class="form-group" style="display:none;">
+            <label class="man-modal-label">Dias da semana <span style="color:#e74c3c;">*</span></label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+              <label style="display:flex;align-items:center;gap:4px;font-weight:400;font-size:12px;cursor:pointer;padding:5px 10px;border:1px solid #ddd;border-radius:6px;margin:0;" id="lbl-dia-0"><input type="checkbox" class="recdata-dia-semana" value="0" /> Dom</label>
+              <label style="display:flex;align-items:center;gap:4px;font-weight:400;font-size:12px;cursor:pointer;padding:5px 10px;border:1px solid #ddd;border-radius:6px;margin:0;" id="lbl-dia-1"><input type="checkbox" class="recdata-dia-semana" value="1" /> Seg</label>
+              <label style="display:flex;align-items:center;gap:4px;font-weight:400;font-size:12px;cursor:pointer;padding:5px 10px;border:1px solid #ddd;border-radius:6px;margin:0;" id="lbl-dia-2"><input type="checkbox" class="recdata-dia-semana" value="2" /> Ter</label>
+              <label style="display:flex;align-items:center;gap:4px;font-weight:400;font-size:12px;cursor:pointer;padding:5px 10px;border:1px solid #ddd;border-radius:6px;margin:0;" id="lbl-dia-3"><input type="checkbox" class="recdata-dia-semana" value="3" /> Qua</label>
+              <label style="display:flex;align-items:center;gap:4px;font-weight:400;font-size:12px;cursor:pointer;padding:5px 10px;border:1px solid #ddd;border-radius:6px;margin:0;" id="lbl-dia-4"><input type="checkbox" class="recdata-dia-semana" value="4" /> Qui</label>
+              <label style="display:flex;align-items:center;gap:4px;font-weight:400;font-size:12px;cursor:pointer;padding:5px 10px;border:1px solid #ddd;border-radius:6px;margin:0;" id="lbl-dia-5"><input type="checkbox" class="recdata-dia-semana" value="5" /> Sex</label>
+              <label style="display:flex;align-items:center;gap:4px;font-weight:400;font-size:12px;cursor:pointer;padding:5px 10px;border:1px solid #ddd;border-radius:6px;margin:0;" id="lbl-dia-6"><input type="checkbox" class="recdata-dia-semana" value="6" /> Sáb</label>
+            </div>
+            <label class="man-modal-label" style="margin-top:12px;">Próxima ocorrência (data de início) <span style="color:#e74c3c;">*</span></label>
+            <input type="date" id="recdata-semanal-inicio" class="form-control" style="max-width:200px;" />
+          </div>
+
+          <!-- MENSAL: dia do mês -->
+          <div id="recdata-campo-mensal" class="form-group" style="display:none;">
+            <label class="man-modal-label">Dia do mês <span style="color:#e74c3c;">*</span></label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <input type="number" id="recdata-dia-mes" class="form-control" placeholder="Ex: 5" min="1" max="31" style="max-width:100px;" />
+              <span style="font-size:12px;color:#888;">todo mês neste dia</span>
+            </div>
+          </div>
+
+          <!-- ANUAL: mês + dia -->
+          <div id="recdata-campo-anual" class="form-group" style="display:none;">
+            <label class="man-modal-label">Data (todo ano) <span style="color:#e74c3c;">*</span></label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="recdata-mes-ano" class="form-control" style="max-width:140px;">
+                <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+                <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+                <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+                <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+              </select>
+              <span style="font-size:12px;color:#888;">dia</span>
+              <input type="number" id="recdata-dia-anual" class="form-control" placeholder="15" min="1" max="31" style="max-width:80px;" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="man-modal-label">Descrição (opcional)</label>
+            <textarea id="recdata-descricao" class="form-control" rows="2" placeholder="Detalhes ou instruções para o cliente..."></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="man-modal-label"><i class="fa fa-bell" style="margin-right:4px;color:#8e44ad;"></i>Canal de notificação</label>
+            <select id="recdata-canal" class="form-control" style="max-width:200px;margin-top:6px;">
+              <option value="todos">App + E-mail</option>
+              <option value="app">Somente App</option>
+              <option value="email">Somente E-mail</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-sm" id="btn-salvar-recdata" style="background:#8e44ad;color:#fff;font-weight:700;padding:7px 18px;border-radius:7px;">
+            <i class="fa fa-calendar-check-o"></i> <span id="btn-salvar-recdata-label">Criar Recorrência</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: Confirmar Realizado (Recorrência por Data) ═══ -->
+  <div class="modal fade man-modal" id="modalFeitoData" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+          <h4 class="modal-title"><i class="fa fa-check-circle" style="color:#8e44ad;margin-right:8px;"></i>Confirmar Realizado</h4>
+        </div>
+        <div class="modal-body">
+          <p id="feito-data-msg" style="font-size:13px;color:#4a5568;margin:0 0 10px;"></p>
+          <div class="form-group" style="margin:0;">
+            <label class="man-modal-label">Anotações (opcional)</label>
+            <textarea id="feito-data-notas" class="form-control" rows="2" placeholder="Observações sobre esta ocorrência..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-sm" id="btn-confirmar-feito-data" style="background:#8e44ad;color:#fff;font-weight:700;border-radius:7px;padding:7px 16px;">
+            <i class="fa fa-check"></i> Confirmar
+          </button>
         </div>
       </div>
     </div>

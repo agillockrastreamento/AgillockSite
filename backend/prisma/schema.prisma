@@ -66,6 +66,7 @@ model User {
 
   manutencoesAdmin     ManutencaoRegistro[]    @relation("ManutencaoAdmin")
   recorrenciasAdmin    ManutencaoRecorrencia[] @relation("RecorrenciaAdmin")
+  recorrenciasDataAdmin ManutencaoRecorrenciaData[] @relation("RecorrenciaDataAdmin")
   clientesCriados      Cliente[]          @relation("ClienteCriador")
   clientesVendidos     Cliente[]          @relation("ClienteVendedor")
   carnesGerados        Carne[]            @relation("CarneGeradoPor")
@@ -282,6 +283,7 @@ model Dispositivo {
   estadosKmNotificacao     EstadoKmNotificacao[]
   manutencoesRegistros     ManutencaoRegistro[]
   manutencoesRecorrencias  ManutencaoRecorrencia[]
+  recorrenciasData         ManutencaoRecorrenciaData[]
   geocercas                GeocercaDispositivo[]
 
   createdAt DateTime @default(now())
@@ -380,6 +382,7 @@ model ClienteLogin {
   estadosKmNotificacao     EstadoKmNotificacao[]
   manutencoesRegistros     ManutencaoRegistro[]
   manutencoesRecorrencias  ManutencaoRecorrencia[]
+  recorrenciasData         ManutencaoRecorrenciaData[]
   appPushTokens            AppPushToken[]
   notificacoesFinanceiras  NotificacaoFinanceiraEnvio[]
 }
@@ -528,6 +531,43 @@ model ManutencaoRecorrencia {
   dispositivo    Dispositivo   @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
   clienteLogin   ClienteLogin? @relation(fields: [clienteLoginId], references: [id], onDelete: SetNull)
   criadoPorAdmin User?         @relation("RecorrenciaAdmin", fields: [criadoPorAdminId], references: [id], onDelete: SetNull)
+}
+
+model ManutencaoRecorrenciaData {
+  id               String    @id @default(uuid())
+  dispositivoId    String
+  clienteLoginId   String?
+  criadoPorAdminId String?
+  titulo           String
+  descricao        String?   @db.Text
+
+  // AVULSA | INTERVALO | SEMANAL | MENSAL | ANUAL
+  tipoRecorrencia  String    @default("AVULSA")
+  dataReferencia   DateTime  // próxima ocorrência
+
+  intervaloDias    Int?      // INTERVALO: a cada N dias
+  diasSemana       Json?     // SEMANAL: [0-6] (0=dom)
+  diaDoMes         Int?      // MENSAL/ANUAL: dia (1-31)
+  mesDoAno         Int?      // ANUAL: mês (1-12)
+
+  alerta7dEnviado  Boolean   @default(false)
+  alerta4dEnviado  Boolean   @default(false)
+  alerta2dEnviado  Boolean   @default(false)
+  alerta1dEnviado  Boolean   @default(false)
+  alertaDiaEnviado Boolean   @default(false)
+  ultimoAlertaPosDue DateTime?
+
+  ciclosCompletos  Int       @default(0)
+  ativa            Boolean   @default(true)
+  origem           String    @default("CLIENTE")
+  canalNotificacao String    @default("todos")   // app | email | todos
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  dispositivo    Dispositivo   @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  clienteLogin   ClienteLogin? @relation(fields: [clienteLoginId], references: [id], onDelete: SetNull)
+  criadoPorAdmin User?         @relation("RecorrenciaDataAdmin", fields: [criadoPorAdminId], references: [id], onDelete: SetNull)
 }
 
 model Geocerca {

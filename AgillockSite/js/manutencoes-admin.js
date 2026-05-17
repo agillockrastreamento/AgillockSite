@@ -9,10 +9,13 @@
   let dispositivoIdAtivo = null;
   let registros = [];
   let recorrencias = [];
+  let recorrenciasData = [];
   let fotosPendentes = [];
   let editandoRegistroId = null;
   let editandoRecorrenciaId = null;
+  let editandoRecDataId = null;
   let recorrenciaFeitoId = null;
+  let recorrenciaDataFeitoId = null;
   let excluirId = null;
   let excluirTipo = null;
   let gPage = 1;
@@ -230,14 +233,17 @@
 
   async function carregarDados(loginId, dispositivoId) {
     try {
-      const [regs, recs] = await Promise.all([
+      const [regs, recs, recsData] = await Promise.all([
         AL.apiGet('/api/manutencoes-admin/clientes/' + loginId + '/registros?dispositivoId=' + dispositivoId),
         AL.apiGet('/api/manutencoes-admin/clientes/' + loginId + '/recorrencias?dispositivoId=' + dispositivoId),
+        AL.apiGet('/api/manutencoes-admin/clientes/' + loginId + '/recorrencias-data?dispositivoId=' + dispositivoId),
       ]);
       registros = regs || [];
       recorrencias = recs || [];
+      recorrenciasData = recsData || [];
       renderRegistros();
       renderRecorrencias();
+      renderRecorrenciasData();
     } catch (err) {
       AL.showAlert('Erro ao carregar manutenções: ' + err.message);
     }
@@ -295,6 +301,8 @@
     document.getElementById('btn-confirmar-feito').addEventListener('click', confirmarFeito);
     document.getElementById('btn-salvar-bulk').addEventListener('click', salvarBulk);
     document.getElementById('btn-confirmar-excluir').addEventListener('click', executarExcluir);
+    document.getElementById('btn-salvar-recdata').addEventListener('click', salvarRecorrenciaData);
+    document.getElementById('btn-confirmar-feito-data').addEventListener('click', confirmarFeitoData);
 
     document.getElementById('reg-fotos-input').addEventListener('change', function () {
       processarFotos(this.files, fotosPendentes, 'reg-fotos-preview');
@@ -527,9 +535,10 @@
   window._confirmarExcluir = function (id, tipo) {
     excluirId = id;
     excluirTipo = tipo;
-    const msg = tipo === 'registro'
-      ? 'Tem certeza que deseja excluir este registro de manutenção?'
-      : 'Tem certeza que deseja cancelar esta recorrência? Os alertas automáticos serão interrompidos.';
+    let msg;
+    if (tipo === 'registro') msg = 'Tem certeza que deseja excluir este registro de manutenção?';
+    else if (tipo === 'recorrencia-data') msg = 'Tem certeza que deseja cancelar esta recorrência por data? Os alertas serão interrompidos.';
+    else msg = 'Tem certeza que deseja cancelar esta recorrência? Os alertas automáticos serão interrompidos.';
     document.getElementById('excluir-msg').textContent = msg;
     $('#modalConfirmarExcluir').modal('show');
   };
@@ -543,6 +552,9 @@
       if (excluirTipo === 'registro') {
         await AL.apiDelete('/api/manutencoes-admin/registros/' + excluirId);
         AL.showAlert('Registro excluído.', 'success');
+      } else if (excluirTipo === 'recorrencia-data') {
+        await AL.apiDelete('/api/manutencoes-admin/recorrencias-data/' + excluirId);
+        AL.showAlert('Recorrência por data cancelada.', 'success');
       } else {
         await AL.apiDelete('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias/' + excluirId);
         AL.showAlert('Recorrência cancelada.', 'success');
@@ -812,6 +824,243 @@
   function fecharLightbox() {
     document.getElementById('man-lightbox').classList.remove('open');
     document.getElementById('man-lightbox-img').src = '';
+  }
+
+  // ── Recorrências por Data ─────────────────────────────────────────────────────
+
+  const DIAS_SEMANA_LABELS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const MESES_LABELS = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const TIPO_REC_DATA_LABELS = {
+    AVULSA: 'Avulsa', INTERVALO: 'Intervalo', SEMANAL: 'Semanal', MENSAL: 'Mensal', ANUAL: 'Anual',
+  };
+
+  function _labelRecData(r) {
+    switch (r.tipoRecorrencia) {
+      case 'AVULSA': return 'Data única';
+      case 'INTERVALO': return 'A cada ' + r.intervaloDias + ' dias';
+      case 'SEMANAL': {
+        const dias = Array.isArray(r.diasSemana) ? r.diasSemana.map(d => DIAS_SEMANA_LABELS[d]).join(', ') : '—';
+        return 'Toda semana: ' + dias;
+      }
+      case 'MENSAL': return 'Todo dia ' + r.diaDoMes + ' do mês';
+      case 'ANUAL': return 'Todo ' + r.diaDoMes + '/' + MESES_LABELS[r.mesDoAno];
+      default: return r.tipoRecorrencia;
+    }
+  }
+
+  function _diffDias(dataStr) {
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const data = new Date(dataStr); data.setHours(0,0,0,0);
+    return Math.ceil((data - hoje) / 86400000);
+  }
+
+  function renderRecorrenciasData() {
+    const list = document.getElementById('c-list-recorrencias-data');
+    const empty = document.getElementById('c-empty-recorrencias-data');
+    const badge = document.getElementById('c-badge-rec-data');
+    if (!list) return;
+
+    const urgentes = recorrenciasData.filter(r => _diffDias(r.dataReferencia) <= 2).length;
+    badge.textContent = urgentes;
+    badge.style.display = urgentes > 0 ? '' : 'none';
+
+    if (!recorrenciasData.length) { list.innerHTML = ''; if (empty) empty.style.display = 'flex'; return; }
+    if (empty) empty.style.display = 'none';
+
+    list.innerHTML = recorrenciasData.map(r => {
+      const diff = _diffDias(r.dataReferencia);
+      const dataStr = new Date(r.dataReferencia).toLocaleDateString('pt-BR');
+      const isAdmin = r.origem === 'ADMIN';
+
+      let statusClass, statusLabel, statusIcon, borderColor;
+      if (diff > 4) {
+        statusClass = 'status-ok'; statusLabel = 'Em ' + diff + ' dias — ' + dataStr; statusIcon = 'fa-calendar-o'; borderColor = '#27ae60';
+      } else if (diff > 2) {
+        statusClass = 'status-warn'; statusLabel = 'Em breve — ' + diff + ' dias (' + dataStr + ')'; statusIcon = 'fa-calendar-check-o'; borderColor = '#e67e22';
+      } else if (diff >= 0) {
+        statusClass = 'status-urgent'; statusLabel = diff === 0 ? 'Hoje!' : 'Amanhã!'; statusIcon = 'fa-exclamation-circle'; borderColor = '#e74c3c';
+      } else {
+        statusClass = 'status-overdue'; statusLabel = 'Pendente — ' + Math.abs(diff) + ' dia(s) atrás'; statusIcon = 'fa-times-circle'; borderColor = '#c0392b';
+      }
+
+      return `
+        <div class="man-rec-card" style="border-left:4px solid ${borderColor};">
+          <div class="man-rec-top">
+            <div class="man-rec-icon" style="background:rgba(142,68,173,.12);color:#8e44ad;"><i class="fa fa-calendar"></i></div>
+            <div class="man-rec-body">
+              <div class="man-rec-title">
+                ${_esc(r.titulo)}
+                <span class="man-badge ${isAdmin ? 'man-badge-admin' : 'man-badge-cliente'}" style="margin-left:6px;">
+                  <i class="fa ${isAdmin ? 'fa-shield' : 'fa-user'}" style="margin-right:3px;"></i>${isAdmin ? 'Admin' : 'Cliente'}
+                </span>
+                <span style="font-size:10px;background:rgba(142,68,173,.1);color:#8e44ad;padding:2px 7px;border-radius:10px;margin-left:4px;">${TIPO_REC_DATA_LABELS[r.tipoRecorrencia]||r.tipoRecorrencia}</span>
+              </div>
+              <div class="man-rec-sub">
+                ${_labelRecData(r)}${r.descricao ? ' — ' + _esc(r.descricao) : ''}
+              </div>
+              <div class="man-status-badge ${statusClass}" style="margin-top:6px;">
+                <i class="fa ${statusIcon}"></i>${statusLabel}
+              </div>
+              ${r.ciclosCompletos > 0 ? `<small style="color:#8a9ab0;margin-top:4px;display:block;"><i class="fa fa-check"></i> ${r.ciclosCompletos} ciclo(s) concluído(s)</small>` : ''}
+            </div>
+            <div class="man-rec-actions">
+              <button class="btn btn-sm" onclick="_abrirFeitoData('${r.id}', ${JSON.stringify(_esc(r.titulo))})" style="background:#8e44ad;color:#fff;font-weight:700;border-radius:7px;">
+                <i class="fa fa-check"></i> Feito
+              </button>
+              <button class="btn btn-info btn-xs" onclick="_editarRecorrenciaData('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>
+              <button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','recorrencia-data')" title="Cancelar"><i class="fa fa-times"></i></button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.atualizarCamposRecData = function () {
+    const tipo = document.getElementById('recdata-tipo').value;
+    document.getElementById('recdata-campo-data').style.display = ['AVULSA'].includes(tipo) ? '' : 'none';
+    document.getElementById('recdata-campo-intervalo').style.display = tipo === 'INTERVALO' ? '' : 'none';
+    document.getElementById('recdata-campo-semanal').style.display = tipo === 'SEMANAL' ? '' : 'none';
+    document.getElementById('recdata-campo-mensal').style.display = tipo === 'MENSAL' ? '' : 'none';
+    document.getElementById('recdata-campo-anual').style.display = tipo === 'ANUAL' ? '' : 'none';
+    const hint = document.getElementById('recdata-campo-data-hint');
+    if (tipo === 'AVULSA') hint.textContent = 'Ocorre apenas nesta data.';
+    else hint.textContent = '';
+  };
+
+  window.abrirModalNovaRecorrenciaData = function () {
+    editandoRecDataId = null;
+    document.getElementById('modalRecData-title').textContent = 'Nova Recorrência por Data';
+    document.getElementById('btn-salvar-recdata-label').textContent = 'Criar Recorrência';
+    const veiculo = textoVeiculoModal();
+    document.getElementById('modalRecData-veiculo').textContent = veiculo ? ' — ' + veiculo : '';
+    ['recdata-titulo','recdata-descricao'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('recdata-tipo').value = 'AVULSA';
+    document.getElementById('recdata-data').value = '';
+    document.getElementById('recdata-canal').value = 'todos';
+    document.querySelectorAll('.recdata-dia-semana').forEach(cb => { cb.checked = false; });
+    atualizarCamposRecData();
+    $('#modalRecorrenciaData').modal('show');
+  };
+
+  window._editarRecorrenciaData = function (id) {
+    const r = recorrenciasData.find(x => x.id === id);
+    if (!r) return;
+    editandoRecDataId = id;
+    document.getElementById('modalRecData-title').textContent = 'Editar Recorrência por Data';
+    document.getElementById('btn-salvar-recdata-label').textContent = 'Salvar Alterações';
+    const veiculo = textoVeiculoModal();
+    document.getElementById('modalRecData-veiculo').textContent = veiculo ? ' — ' + veiculo : '';
+    document.getElementById('recdata-titulo').value = r.titulo || '';
+    document.getElementById('recdata-descricao').value = r.descricao || '';
+    document.getElementById('recdata-tipo').value = r.tipoRecorrencia || 'AVULSA';
+    document.getElementById('recdata-data').value = r.dataReferencia ? new Date(r.dataReferencia).toISOString().slice(0,10) : '';
+    document.getElementById('recdata-canal').value = r.canalNotificacao || 'todos';
+    if (r.intervaloDias) document.getElementById('recdata-intervalo-dias').value = r.intervaloDias;
+    if (r.diaDoMes) document.getElementById('recdata-dia-mes').value = r.diaDoMes;
+    if (r.diaDoMes) document.getElementById('recdata-dia-anual').value = r.diaDoMes;
+    if (r.mesDoAno) document.getElementById('recdata-mes-ano').value = r.mesDoAno;
+    if (Array.isArray(r.diasSemana)) {
+      document.querySelectorAll('.recdata-dia-semana').forEach(cb => { cb.checked = r.diasSemana.includes(parseInt(cb.value)); });
+    }
+    atualizarCamposRecData();
+    $('#modalRecorrenciaData').modal('show');
+  };
+
+  window._abrirFeitoData = function (id, titulo) {
+    recorrenciaDataFeitoId = id;
+    document.getElementById('feito-data-msg').textContent = 'Confirmar que "' + titulo + '" foi realizado? Um registro será criado automaticamente.';
+    document.getElementById('feito-data-notas').value = '';
+    $('#modalFeitoData').modal('show');
+  };
+
+  async function salvarRecorrenciaData() {
+    const titulo = document.getElementById('recdata-titulo').value.trim();
+    const tipo = document.getElementById('recdata-tipo').value;
+    if (!titulo) { AL.showAlert('Preencha o título.'); return; }
+
+    let dataReferencia, intervaloDias = null, diasSemana = null, diaDoMes = null, mesDoAno = null;
+
+    if (tipo === 'AVULSA') {
+      dataReferencia = document.getElementById('recdata-data').value;
+      if (!dataReferencia) { AL.showAlert('Informe a data.'); return; }
+    } else if (tipo === 'INTERVALO') {
+      intervaloDias = parseInt(document.getElementById('recdata-intervalo-dias').value);
+      dataReferencia = document.getElementById('recdata-intervalo-inicio').value;
+      if (!intervaloDias || !dataReferencia) { AL.showAlert('Informe o intervalo de dias e a data de início.'); return; }
+    } else if (tipo === 'SEMANAL') {
+      diasSemana = Array.from(document.querySelectorAll('.recdata-dia-semana:checked')).map(cb => parseInt(cb.value));
+      dataReferencia = document.getElementById('recdata-semanal-inicio').value;
+      if (!diasSemana.length || !dataReferencia) { AL.showAlert('Selecione ao menos um dia da semana e a data de início.'); return; }
+    } else if (tipo === 'MENSAL') {
+      diaDoMes = parseInt(document.getElementById('recdata-dia-mes').value);
+      if (!diaDoMes || diaDoMes < 1 || diaDoMes > 31) { AL.showAlert('Informe um dia válido (1-31).'); return; }
+      const hoje = new Date();
+      const proximoMes = diaDoMes <= hoje.getDate() ? new Date(hoje.getFullYear(), hoje.getMonth() + 1, diaDoMes) : new Date(hoje.getFullYear(), hoje.getMonth(), diaDoMes);
+      dataReferencia = proximoMes.toISOString().slice(0,10);
+    } else if (tipo === 'ANUAL') {
+      diaDoMes = parseInt(document.getElementById('recdata-dia-anual').value);
+      mesDoAno = parseInt(document.getElementById('recdata-mes-ano').value);
+      if (!diaDoMes || !mesDoAno) { AL.showAlert('Informe o dia e mês.'); return; }
+      const hoje = new Date();
+      let ano = hoje.getFullYear();
+      const candidata = new Date(ano, mesDoAno - 1, diaDoMes);
+      if (candidata <= hoje) ano++;
+      dataReferencia = new Date(ano, mesDoAno - 1, diaDoMes).toISOString().slice(0,10);
+    }
+
+    const payload = {
+      dispositivoId: dispositivoIdAtivo,
+      titulo,
+      descricao: document.getElementById('recdata-descricao').value.trim() || null,
+      tipoRecorrencia: tipo,
+      dataReferencia,
+      intervaloDias,
+      diasSemana,
+      diaDoMes,
+      mesDoAno,
+      canalNotificacao: document.getElementById('recdata-canal').value,
+    };
+
+    const btn = document.getElementById('btn-salvar-recdata');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
+    try {
+      if (editandoRecDataId) {
+        await AL.apiPut('/api/manutencoes-admin/recorrencias-data/' + editandoRecDataId, payload);
+        AL.showAlert('Recorrência por data atualizada!', 'success');
+      } else {
+        await AL.apiPost('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias-data', payload);
+        AL.showAlert('Recorrência por data criada!', 'success');
+      }
+      $('#modalRecorrenciaData').modal('hide');
+      carregarDados(clienteLoginIdAtivo, dispositivoIdAtivo);
+    } catch (err) {
+      AL.showAlert('Erro ao salvar: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-calendar-check-o"></i> ' + document.getElementById('btn-salvar-recdata-label').textContent;
+    }
+  }
+
+  async function confirmarFeitoData() {
+    if (!recorrenciaDataFeitoId) return;
+    const btn = document.getElementById('btn-confirmar-feito-data');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    try {
+      const result = await AL.apiPost('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias-data/' + recorrenciaDataFeitoId + '/feito', {
+        notas: document.getElementById('feito-data-notas').value.trim() || null,
+      });
+      AL.showAlert('Confirmado!' + (result.proximaData ? ' Próxima: ' + new Date(result.proximaData).toLocaleDateString('pt-BR') : ''), 'success');
+      $('#modalFeitoData').modal('hide');
+      carregarDados(clienteLoginIdAtivo, dispositivoIdAtivo);
+    } catch (err) {
+      AL.showAlert('Erro: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-check"></i> Confirmar';
+    }
   }
 
   // ── Utils ─────────────────────────────────────────────────────────────────────

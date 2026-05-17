@@ -38,6 +38,22 @@ type Recorrencia = {
   origem?: string | null;
 };
 
+type RecorrenciaData = {
+  id: string;
+  titulo: string;
+  descricao?: string | null;
+  tipoRecorrencia: string;
+  dataReferencia: string;
+  intervaloDias?: number | null;
+  diasSemana?: number[] | null;
+  diaDoMes?: number | null;
+  mesDoAno?: number | null;
+  ciclosCompletos: number;
+  ativa: boolean;
+  origem?: string | null;
+  canalNotificacao?: string | null;
+};
+
 type ManutencaoFoto = {
   nome: string;
   dataUrl: string;
@@ -75,12 +91,35 @@ type AddRecorrenciaPayload = {
   intervaloKm: string;
 };
 
+type AddRecorrenciaDataPayload = {
+  titulo: string;
+  descricao: string;
+  tipoRecorrencia: string;
+  dataReferencia: string;
+  intervaloDias: string;
+  diasSemana: number[];
+  diaDoMes: string;
+  mesDoAno: string;
+};
+
 const TIPOS_MANUTENCAO = [
   { value: 'preventiva', label: 'Preventiva' },
   { value: 'corretiva', label: 'Corretiva' },
   { value: 'revisao', label: 'Revisão' },
   { value: 'personalizado', label: 'Personalizado' },
 ];
+
+const TIPOS_REC_DATA = [
+  { value: 'AVULSA', label: 'Avulsa' },
+  { value: 'INTERVALO', label: 'Intervalo' },
+  { value: 'SEMANAL', label: 'Semanal' },
+  { value: 'MENSAL', label: 'Mensal' },
+  { value: 'ANUAL', label: 'Anual' },
+];
+
+const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 const EMPTY_FORM: AddRegistroPayload = {
   titulo: '',
@@ -98,6 +137,17 @@ const EMPTY_RECORRENCIA: AddRecorrenciaPayload = {
   titulo: '',
   descricao: '',
   intervaloKm: '',
+};
+
+const EMPTY_REC_DATA: AddRecorrenciaDataPayload = {
+  titulo: '',
+  descricao: '',
+  tipoRecorrencia: 'AVULSA',
+  dataReferencia: new Date().toISOString().slice(0, 10),
+  intervaloDias: '',
+  diasSemana: [],
+  diaDoMes: '',
+  mesDoAno: '',
 };
 
 function todayInput() {
@@ -132,12 +182,27 @@ function parseDateInput(value: string) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function descRecData(r: RecorrenciaData): string {
+  switch (r.tipoRecorrencia) {
+    case 'AVULSA': return 'Data única';
+    case 'INTERVALO': return `A cada ${r.intervaloDias ?? '?'} dias`;
+    case 'SEMANAL': return `Semanal: ${(r.diasSemana ?? []).map(d => DIAS_SEMANA[d]).join(', ')}`;
+    case 'MENSAL': return `Todo dia ${r.diaDoMes} do mês`;
+    case 'ANUAL': {
+      const mesIdx = (r.mesDoAno ?? 1) - 1;
+      return `Todo ${r.diaDoMes}/${MESES_ABREV[mesIdx] ?? r.mesDoAno}`;
+    }
+    default: return '';
+  }
+}
+
 export function ManutencaoScreen() {
   const toast = useToast();
   const confirm = useConfirmDialog();
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([]);
+  const [recorrenciasData, setRecorrenciasData] = useState<RecorrenciaData[]>([]);
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -151,6 +216,11 @@ export function ManutencaoScreen() {
   const [formRec, setFormRec] = useState<AddRecorrenciaPayload>(EMPTY_RECORRENCIA);
   const [editingRecorrenciaId, setEditingRecorrenciaId] = useState<string | null>(null);
   const [isSavingRec, setIsSavingRec] = useState(false);
+  const [chooserVisible, setChooserVisible] = useState(false);
+  const [addRecDataModalVisible, setAddRecDataModalVisible] = useState(false);
+  const [formRecData, setFormRecData] = useState<AddRecorrenciaDataPayload>(EMPTY_REC_DATA);
+  const [editingRecDataId, setEditingRecDataId] = useState<string | null>(null);
+  const [isSavingRecData, setIsSavingRecData] = useState(false);
 
   const loadDispositivos = useCallback(async () => {
     try {
@@ -174,12 +244,14 @@ export function ManutencaoScreen() {
     if (silent) setIsRefreshing(true);
     else setIsLoading(true);
     try {
-      const [rec, reg] = await Promise.all([
+      const [rec, reg, recData] = await Promise.all([
         apiRequest<Recorrencia[]>(`/cliente/manutencoes/recorrencias?dispositivoId=${selectedId}`).catch(() => []),
         apiRequest<Registro[]>(`/cliente/manutencoes/registros?dispositivoId=${selectedId}`).catch(() => []),
+        apiRequest<RecorrenciaData[]>(`/cliente/manutencoes/recorrencias-data?dispositivoId=${selectedId}`).catch(() => []),
       ]);
       setRecorrencias((rec ?? []).filter(r => r.ativa !== false));
       setRegistros(reg ?? []);
+      setRecorrenciasData((recData ?? []).filter(r => r.ativa !== false));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -208,6 +280,11 @@ export function ManutencaoScreen() {
   const resetRecorrenciaForm = () => {
     setEditingRecorrenciaId(null);
     setFormRec(EMPTY_RECORRENCIA);
+  };
+
+  const resetRecDataForm = () => {
+    setEditingRecDataId(null);
+    setFormRecData({ ...EMPTY_REC_DATA, dataReferencia: todayInput() });
   };
 
   const pickFotos = async () => {
@@ -269,6 +346,21 @@ export function ManutencaoScreen() {
     setAddRecModalVisible(true);
   };
 
+  const editRecorrenciaData = (r: RecorrenciaData) => {
+    setEditingRecDataId(r.id);
+    setFormRecData({
+      titulo: r.titulo,
+      descricao: r.descricao || '',
+      tipoRecorrencia: r.tipoRecorrencia || 'AVULSA',
+      dataReferencia: r.dataReferencia ? new Date(r.dataReferencia).toISOString().slice(0, 10) : todayInput(),
+      intervaloDias: r.intervaloDias != null ? String(r.intervaloDias) : '',
+      diasSemana: Array.isArray(r.diasSemana) ? r.diasSemana : [],
+      diaDoMes: r.diaDoMes != null ? String(r.diaDoMes) : '',
+      mesDoAno: r.mesDoAno != null ? String(r.mesDoAno) : '',
+    });
+    setAddRecDataModalVisible(true);
+  };
+
   const markDone = async (r: Recorrencia) => {
     const confirmed = await confirm.show({
       title: 'Confirmar Manutenção',
@@ -279,6 +371,25 @@ export function ManutencaoScreen() {
     try {
       await apiRequest(`/cliente/manutencoes/recorrencias/${r.id}/feito`, { method: 'POST', body: {} });
       toast.show({ message: 'Manutenção confirmada!', type: 'success' });
+      loadData(true);
+    } catch {
+      toast.show({ message: 'Erro ao confirmar manutenção.', type: 'error' });
+    }
+  };
+
+  const markDoneData = async (r: RecorrenciaData) => {
+    const confirmed = await confirm.show({
+      title: 'Confirmar Manutenção',
+      message: `Confirmar que "${r.titulo}" foi realizada?${r.tipoRecorrencia !== 'AVULSA' ? '\n\nA próxima data será calculada automaticamente.' : '\n\nEsta ocorrência avulsa será encerrada.'}`,
+      confirmLabel: 'Confirmar',
+    });
+    if (!confirmed) return;
+    try {
+      const result = await apiRequest<{ proximaData?: string }>(`/cliente/manutencoes/recorrencias-data/${r.id}/feito`, { method: 'POST', body: {} });
+      const msg = result?.proximaData
+        ? `Confirmado! Próxima ocorrência: ${fmtDate(result.proximaData)}.`
+        : 'Manutenção confirmada!';
+      toast.show({ message: msg, type: 'success' });
       loadData(true);
     } catch {
       toast.show({ message: 'Erro ao confirmar manutenção.', type: 'error' });
@@ -316,6 +427,23 @@ export function ManutencaoScreen() {
       setRecorrencias(prev => prev.filter(r => r.id !== id));
     } catch {
       toast.show({ message: 'Erro ao excluir manutenção programada.', type: 'error' });
+    }
+  };
+
+  const deleteRecorrenciaData = async (id: string) => {
+    const confirmed = await confirm.show({
+      title: 'Cancelar Recorrência',
+      message: 'Deseja cancelar esta recorrência por data? Os alertas serão interrompidos.',
+      confirmLabel: 'Cancelar',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await apiRequest(`/cliente/manutencoes/recorrencias-data/${id}`, { method: 'DELETE' });
+      toast.show({ message: 'Recorrência por data removida.', type: 'success' });
+      setRecorrenciasData(prev => prev.filter(r => r.id !== id));
+    } catch {
+      toast.show({ message: 'Erro ao remover recorrência por data.', type: 'error' });
     }
   };
 
@@ -399,7 +527,83 @@ export function ManutencaoScreen() {
     }
   };
 
+  const saveRecorrenciaData = async () => {
+    if (!formRecData.titulo.trim()) {
+      toast.show({ message: 'Informe o título.', type: 'error' });
+      return;
+    }
+    const dataRef = parseDateInput(formRecData.dataReferencia);
+    if (!dataRef) {
+      toast.show({ message: 'Informe a data no formato AAAA-MM-DD.', type: 'error' });
+      return;
+    }
+    if (formRecData.tipoRecorrencia === 'INTERVALO') {
+      const n = parseInt(formRecData.intervaloDias);
+      if (!formRecData.intervaloDias || isNaN(n) || n < 1) {
+        toast.show({ message: 'Informe um intervalo de dias válido.', type: 'error' });
+        return;
+      }
+    }
+    if (formRecData.tipoRecorrencia === 'SEMANAL' && formRecData.diasSemana.length === 0) {
+      toast.show({ message: 'Selecione ao menos um dia da semana.', type: 'error' });
+      return;
+    }
+    if (formRecData.tipoRecorrencia === 'MENSAL' || formRecData.tipoRecorrencia === 'ANUAL') {
+      const dia = parseInt(formRecData.diaDoMes);
+      if (!formRecData.diaDoMes || isNaN(dia) || dia < 1 || dia > 31) {
+        toast.show({ message: 'Informe um dia do mês válido (1-31).', type: 'error' });
+        return;
+      }
+    }
+    if (formRecData.tipoRecorrencia === 'ANUAL') {
+      const mes = parseInt(formRecData.mesDoAno);
+      if (!formRecData.mesDoAno || isNaN(mes) || mes < 1 || mes > 12) {
+        toast.show({ message: 'Informe um mês válido (1-12).', type: 'error' });
+        return;
+      }
+    }
+    if (!selectedId) return;
+    setIsSavingRecData(true);
+    try {
+      await apiRequest(
+        editingRecDataId
+          ? `/cliente/manutencoes/recorrencias-data/${editingRecDataId}`
+          : '/cliente/manutencoes/recorrencias-data',
+        {
+          method: editingRecDataId ? 'PUT' : 'POST',
+          body: {
+            ...(editingRecDataId ? {} : { dispositivoId: selectedId }),
+            titulo: formRecData.titulo.trim(),
+            descricao: formRecData.descricao.trim() || null,
+            tipoRecorrencia: formRecData.tipoRecorrencia,
+            dataReferencia: dataRef,
+            intervaloDias: formRecData.tipoRecorrencia === 'INTERVALO' ? parseInt(formRecData.intervaloDias) : null,
+            diasSemana: formRecData.tipoRecorrencia === 'SEMANAL' ? formRecData.diasSemana : null,
+            diaDoMes: ['MENSAL', 'ANUAL'].includes(formRecData.tipoRecorrencia) ? parseInt(formRecData.diaDoMes) : null,
+            mesDoAno: formRecData.tipoRecorrencia === 'ANUAL' ? parseInt(formRecData.mesDoAno) : null,
+          },
+        }
+      );
+      toast.show({
+        message: editingRecDataId ? 'Recorrência por data atualizada!' : 'Recorrência por data criada!',
+        type: 'success',
+      });
+      setAddRecDataModalVisible(false);
+      resetRecDataForm();
+      setActiveTab('recorrencias');
+      loadData(true);
+    } catch (err) {
+      toast.show({
+        message: err instanceof Error ? err.message : 'Erro ao salvar recorrência por data.',
+        type: 'error',
+      });
+    } finally {
+      setIsSavingRecData(false);
+    }
+  };
+
   const selectedDevice = dispositivos.find(d => d.id === selectedId);
+  const totalProgramadas = recorrencias.length + recorrenciasData.length;
 
   return (
     <View style={styles.container}>
@@ -445,9 +649,9 @@ export function ManutencaoScreen() {
               <Text style={[styles.tabText, activeTab === 'recorrencias' && styles.tabTextActive]}>
                 Programadas
               </Text>
-              {recorrencias.length > 0 && (
+              {totalProgramadas > 0 && (
                 <View style={styles.tabBadge}>
-                  <Text style={styles.tabBadgeText}>{recorrencias.length}</Text>
+                  <Text style={styles.tabBadgeText}>{totalProgramadas}</Text>
                 </View>
               )}
             </Pressable>
@@ -480,7 +684,7 @@ export function ManutencaoScreen() {
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => loadData(true)} />}
         >
           {activeTab === 'recorrencias' && (
-            recorrencias.length === 0 ? (
+            totalProgramadas === 0 ? (
               <View style={styles.empty}>
                 <Icon source="wrench-clock" size={40} color={colors.textMuted} />
                 <Text style={styles.emptyText}>Nenhuma manutenção programada</Text>
@@ -493,56 +697,116 @@ export function ManutencaoScreen() {
                 </Text>
               </View>
             ) : (
-              recorrencias.map(r => (
-                <View key={r.id} style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <View style={styles.cardIconWrap}>
-                      <Icon source="wrench-clock" size={20} color={colors.primary} />
-                    </View>
-                    <View style={styles.cardBody}>
-                      <Text style={styles.cardTitle}>{r.titulo}</Text>
-                      {r.descricao ? (
-                        <Text style={styles.cardMeta}>{r.descricao}</Text>
-                      ) : null}
-                      <Text style={styles.cardMeta}>
-                        A cada {r.intervaloKm.toLocaleString('pt-BR')} km
-                      </Text>
-                    </View>
-                    {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
-                      <View style={styles.cardActions}>
-                        {r.origem !== 'ADMIN' ? (
-                          <>
-                            <Pressable
-                              accessibilityRole="button"
-                              style={styles.doneBtn}
-                              onPress={() => editRecorrencia(r)}
-                            >
-                              <Icon source="pencil" size={17} color="#2980b9" />
-                              <Text style={[styles.doneBtnText, { color: '#2980b9' }]}>Editar</Text>
-                            </Pressable>
-                            <Pressable
-                              accessibilityRole="button"
-                              style={styles.doneBtn}
-                              onPress={() => deleteRecorrencia(r.id)}
-                            >
-                              <Icon source="delete-outline" size={17} color={colors.danger} />
-                              <Text style={[styles.doneBtnText, { color: colors.danger }]}>Excluir</Text>
-                            </Pressable>
-                          </>
-                        ) : null}
-                        <Pressable
-                          accessibilityRole="button"
-                          style={styles.doneBtn}
-                          onPress={() => markDone(r)}
-                        >
-                          <Icon source="check-circle-outline" size={18} color={colors.success} />
-                          <Text style={styles.doneBtnText}>Feito</Text>
-                        </Pressable>
+              <>
+                {recorrencias.map(r => (
+                  <View key={r.id} style={styles.card}>
+                    <View style={styles.cardHeader}>
+                      <View style={styles.cardIconWrap}>
+                        <Icon source="wrench-clock" size={20} color={colors.primary} />
                       </View>
-                    )}
+                      <View style={styles.cardBody}>
+                        <View style={styles.titleRow}>
+                          <Text style={styles.cardTitle}>{r.titulo}</Text>
+                          <Text style={styles.cardTagKm}>Por KM</Text>
+                        </View>
+                        {r.descricao ? (
+                          <Text style={styles.cardMeta}>{r.descricao}</Text>
+                        ) : null}
+                        <Text style={styles.cardMeta}>
+                          A cada {r.intervaloKm.toLocaleString('pt-BR')} km
+                        </Text>
+                      </View>
+                      {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
+                        <View style={styles.cardActions}>
+                          {r.origem !== 'ADMIN' ? (
+                            <>
+                              <Pressable
+                                accessibilityRole="button"
+                                style={styles.doneBtn}
+                                onPress={() => editRecorrencia(r)}
+                              >
+                                <Icon source="pencil" size={17} color="#2980b9" />
+                                <Text style={[styles.doneBtnText, { color: '#2980b9' }]}>Editar</Text>
+                              </Pressable>
+                              <Pressable
+                                accessibilityRole="button"
+                                style={styles.doneBtn}
+                                onPress={() => deleteRecorrencia(r.id)}
+                              >
+                                <Icon source="delete-outline" size={17} color={colors.danger} />
+                                <Text style={[styles.doneBtnText, { color: colors.danger }]}>Excluir</Text>
+                              </Pressable>
+                            </>
+                          ) : null}
+                          <Pressable
+                            accessibilityRole="button"
+                            style={styles.doneBtn}
+                            onPress={() => markDone(r)}
+                          >
+                            <Icon source="check-circle-outline" size={18} color={colors.success} />
+                            <Text style={styles.doneBtnText}>Feito</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))
+                ))}
+
+                {recorrenciasData.map(r => (
+                  <View key={r.id} style={styles.card}>
+                    <View style={styles.cardHeader}>
+                      <View style={styles.cardIconWrap}>
+                        <Icon source="calendar-clock" size={20} color="#1f6f9f" />
+                      </View>
+                      <View style={styles.cardBody}>
+                        <View style={styles.titleRow}>
+                          <Text style={styles.cardTitle}>{r.titulo}</Text>
+                          <Text style={styles.cardTagData}>Por Data</Text>
+                        </View>
+                        {r.descricao ? (
+                          <Text style={styles.cardMeta}>{r.descricao}</Text>
+                        ) : null}
+                        <Text style={styles.cardMeta}>{descRecData(r)}</Text>
+                        <Text style={styles.cardMeta}>
+                          Próxima: <Text style={{ fontWeight: '700', color: colors.text }}>{fmtDate(r.dataReferencia)}</Text>
+                        </Text>
+                      </View>
+                      {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
+                        <View style={styles.cardActions}>
+                          {r.origem !== 'ADMIN' ? (
+                            <>
+                              <Pressable
+                                accessibilityRole="button"
+                                style={styles.doneBtn}
+                                onPress={() => editRecorrenciaData(r)}
+                              >
+                                <Icon source="pencil" size={17} color="#2980b9" />
+                                <Text style={[styles.doneBtnText, { color: '#2980b9' }]}>Editar</Text>
+                              </Pressable>
+                              <Pressable
+                                accessibilityRole="button"
+                                style={styles.doneBtn}
+                                onPress={() => deleteRecorrenciaData(r.id)}
+                              >
+                                <Icon source="delete-outline" size={17} color={colors.danger} />
+                                <Text style={[styles.doneBtnText, { color: colors.danger }]}>Excluir</Text>
+                              </Pressable>
+                            </>
+                          ) : null}
+                          <Pressable
+                            accessibilityRole="button"
+                            style={styles.doneBtn}
+                            onPress={() => markDoneData(r)}
+                          >
+                            <Icon source="check-circle-outline" size={18} color={colors.success} />
+                            <Text style={styles.doneBtnText}>Feito</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </>
             )
           )}
 
@@ -643,15 +907,14 @@ export function ManutencaoScreen() {
         </ScrollView>
       ))}
 
-      {/* FAB — only show if user can manage this device and maintenance is enabled */}
+      {/* FAB */}
       {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
         <Pressable
           accessibilityRole="button"
           style={styles.fab}
           onPress={() => {
             if (activeTab === 'recorrencias') {
-              resetRecorrenciaForm();
-              setAddRecModalVisible(true);
+              setChooserVisible(true);
             } else {
               resetRegistroForm();
               setAddModalVisible(true);
@@ -662,14 +925,62 @@ export function ManutencaoScreen() {
         </Pressable>
       )}
 
-      {/* Add recorrência — Bottom Sheet */}
+      {/* Chooser — tipo de recorrência */}
+      <BottomSheet
+        visible={chooserVisible}
+        onClose={() => setChooserVisible(false)}
+        title="Tipo de Manutenção Programada"
+        heightPercent={0.38}
+      >
+        <View style={styles.chooserBody}>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.chooserOption}
+            onPress={() => {
+              setChooserVisible(false);
+              resetRecorrenciaForm();
+              setAddRecModalVisible(true);
+            }}
+          >
+            <View style={[styles.chooserIconWrap, { backgroundColor: '#fff7e3' }]}>
+              <Icon source="counter" size={26} color={colors.primary} />
+            </View>
+            <View style={styles.chooserOptionBody}>
+              <Text style={styles.chooserOptionTitle}>Por KM</Text>
+              <Text style={styles.chooserOptionSub}>A cada X quilômetros rodados</Text>
+            </View>
+            <Icon source="chevron-right" size={20} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            style={styles.chooserOption}
+            onPress={() => {
+              setChooserVisible(false);
+              resetRecDataForm();
+              setAddRecDataModalVisible(true);
+            }}
+          >
+            <View style={[styles.chooserIconWrap, { backgroundColor: '#e8f4fd' }]}>
+              <Icon source="calendar-clock" size={26} color="#1f6f9f" />
+            </View>
+            <View style={styles.chooserOptionBody}>
+              <Text style={styles.chooserOptionTitle}>Por Data</Text>
+              <Text style={styles.chooserOptionSub}>Avulsa, semanal, mensal, anual...</Text>
+            </View>
+            <Icon source="chevron-right" size={20} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      </BottomSheet>
+
+      {/* Add recorrência por KM — Bottom Sheet */}
       <BottomSheet
         visible={addRecModalVisible}
         onClose={() => {
           setAddRecModalVisible(false);
           resetRecorrenciaForm();
         }}
-        title={editingRecorrenciaId ? 'Editar Manutenção Programada' : 'Nova Manutenção Programada'}
+        title={editingRecorrenciaId ? 'Editar Manutenção Programada' : 'Nova Manutenção por KM'}
         heightPercent={0.72}
       >
         <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
@@ -714,6 +1025,154 @@ export function ManutencaoScreen() {
               <Icon source="content-save" size={18} color={colors.primaryText} />
             )}
             <Text style={styles.saveBtnText}>{editingRecorrenciaId ? 'Atualizar' : 'Salvar'}</Text>
+          </Pressable>
+        </ScrollView>
+      </BottomSheet>
+
+      {/* Add recorrência por Data — Bottom Sheet */}
+      <BottomSheet
+        visible={addRecDataModalVisible}
+        onClose={() => {
+          setAddRecDataModalVisible(false);
+          resetRecDataForm();
+        }}
+        title={editingRecDataId ? 'Editar Recorrência por Data' : 'Nova Recorrência por Data'}
+        heightPercent={0.88}
+      >
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+          <Text style={styles.formLabel}>Título *</Text>
+          <TextInput
+            style={styles.formInput}
+            value={formRecData.titulo}
+            onChangeText={v => setFormRecData(f => ({ ...f, titulo: v }))}
+            placeholder="Ex: Revisão anual"
+            placeholderTextColor={colors.textMuted}
+          />
+
+          <Text style={styles.formLabel}>Tipo de Recorrência *</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
+            {TIPOS_REC_DATA.map(t => (
+              <Pressable
+                key={t.value}
+                style={[styles.tipoChip, formRecData.tipoRecorrencia === t.value && styles.tipoChipDataActive]}
+                onPress={() => setFormRecData(f => ({ ...f, tipoRecorrencia: t.value }))}
+              >
+                <Text style={[styles.tipoChipText, formRecData.tipoRecorrencia === t.value && styles.tipoChipDataTextActive]}>
+                  {t.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.formLabel}>
+            {formRecData.tipoRecorrencia === 'AVULSA' ? 'Data da ocorrência *' : 'Próxima ocorrência *'}
+          </Text>
+          <TextInput
+            style={styles.formInput}
+            value={formRecData.dataReferencia}
+            onChangeText={v => setFormRecData(f => ({ ...f, dataReferencia: v }))}
+            placeholder="AAAA-MM-DD"
+            placeholderTextColor={colors.textMuted}
+          />
+
+          {formRecData.tipoRecorrencia === 'INTERVALO' && (
+            <>
+              <Text style={styles.formLabel}>A cada quantos dias? *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={formRecData.intervaloDias}
+                onChangeText={v => setFormRecData(f => ({ ...f, intervaloDias: v.replace(/\D/g, '') }))}
+                placeholder="Ex: 30"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+              />
+            </>
+          )}
+
+          {formRecData.tipoRecorrencia === 'SEMANAL' && (
+            <>
+              <Text style={styles.formLabel}>Dias da semana *</Text>
+              <View style={styles.diasSemanaGrid}>
+                {DIAS_SEMANA.map((dia, idx) => (
+                  <Pressable
+                    key={idx}
+                    accessibilityRole="checkbox"
+                    style={[styles.diaChip, formRecData.diasSemana.includes(idx) && styles.diaChipActive]}
+                    onPress={() =>
+                      setFormRecData(f => ({
+                        ...f,
+                        diasSemana: f.diasSemana.includes(idx)
+                          ? f.diasSemana.filter(d => d !== idx)
+                          : [...f.diasSemana, idx],
+                      }))
+                    }
+                  >
+                    <Text style={[styles.diaChipText, formRecData.diasSemana.includes(idx) && styles.diaChipTextActive]}>
+                      {dia}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
+          {(formRecData.tipoRecorrencia === 'MENSAL' || formRecData.tipoRecorrencia === 'ANUAL') && (
+            <>
+              <Text style={styles.formLabel}>Dia do mês *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={formRecData.diaDoMes}
+                onChangeText={v => setFormRecData(f => ({ ...f, diaDoMes: v.replace(/\D/g, '') }))}
+                placeholder="Ex: 15"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+              />
+            </>
+          )}
+
+          {formRecData.tipoRecorrencia === 'ANUAL' && (
+            <>
+              <Text style={styles.formLabel}>Mês (1-12) *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
+                {MESES_ABREV.map((mes, idx) => {
+                  const num = idx + 1;
+                  const ativo = formRecData.mesDoAno === String(num);
+                  return (
+                    <Pressable
+                      key={idx}
+                      style={[styles.tipoChip, ativo && styles.tipoChipDataActive]}
+                      onPress={() => setFormRecData(f => ({ ...f, mesDoAno: String(num) }))}
+                    >
+                      <Text style={[styles.tipoChipText, ativo && styles.tipoChipDataTextActive]}>{mes}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </>
+          )}
+
+          <Text style={styles.formLabel}>Observações</Text>
+          <TextInput
+            style={[styles.formInput, styles.formInputMulti]}
+            value={formRecData.descricao}
+            onChangeText={v => setFormRecData(f => ({ ...f, descricao: v }))}
+            placeholder="Detalhes da manutenção..."
+            placeholderTextColor={colors.textMuted}
+            multiline
+            numberOfLines={3}
+          />
+
+          <Pressable
+            style={[styles.saveBtn, isSavingRecData && styles.saveBtnDisabled]}
+            onPress={saveRecorrenciaData}
+            disabled={isSavingRecData}
+          >
+            {isSavingRecData ? (
+              <ActivityIndicator size="small" color={colors.primaryText} />
+            ) : (
+              <Icon source="content-save" size={18} color={colors.primaryText} />
+            )}
+            <Text style={styles.saveBtnText}>{editingRecDataId ? 'Atualizar' : 'Salvar'}</Text>
           </Pressable>
         </ScrollView>
       </BottomSheet>
@@ -1021,6 +1480,26 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radius.sm,
   },
+  cardTagKm: {
+    alignSelf: 'flex-start',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#b47d00',
+    backgroundColor: '#fff7e3',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  cardTagData: {
+    alignSelf: 'flex-start',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1f6f9f',
+    backgroundColor: '#e8f4fd',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
   cardStats: {
     gap: 2,
     marginTop: 4,
@@ -1043,7 +1522,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.success,
     backgroundColor: '#f0faf4',
-    width: '100%'
+    width: '100%',
   },
   doneBtnText: {
     fontSize: 11,
@@ -1122,6 +1601,40 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 6,
   },
+  chooserBody: {
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  chooserOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chooserIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chooserOptionBody: {
+    flex: 1,
+  },
+  chooserOptionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  chooserOptionSub: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   modalBody: {
     padding: spacing.xl,
     gap: 6,
@@ -1188,6 +1701,10 @@ const styles = StyleSheet.create({
     borderColor: '#8e44ad',
     backgroundColor: '#f3e5f5',
   },
+  tipoChipDataActive: {
+    borderColor: '#1f6f9f',
+    backgroundColor: '#e8f4fd',
+  },
   tipoChipText: {
     fontSize: 12,
     fontWeight: '700',
@@ -1195,6 +1712,37 @@ const styles = StyleSheet.create({
   },
   tipoChipTextActive: {
     color: '#8e44ad',
+  },
+  tipoChipDataTextActive: {
+    color: '#1f6f9f',
+  },
+  diasSemanaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  diaChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  diaChipActive: {
+    borderColor: '#1f6f9f',
+    backgroundColor: '#e8f4fd',
+  },
+  diaChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  diaChipTextActive: {
+    color: '#1f6f9f',
   },
   saveBtn: {
     height: 48,
