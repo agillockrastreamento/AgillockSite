@@ -108,7 +108,7 @@ async function _ativarNotificacaoRecorrenciaData(clienteLoginId: string, disposi
       create: { clienteLoginId, dispositivoId, tipoEvento: 'recorrenciaData', web: true, app: true, email: true },
     });
   } catch (err) {
-    console.error('Erro ao ativar notificaÃ§Ã£o de recorrÃªncia por data:', err);
+    console.error('Erro ao ativar notificação de recorrência por data:', err);
   }
 }
 
@@ -478,7 +478,7 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
     }
     if (prefFeita?.app) {
       await ExpoPushService.enviarParaCliente(clienteLoginIdCanonical, {
-        title: 'ManutenÃ§Ã£o Realizada',
+        title: 'Manutenção Realizada',
         body: mensagemFeita,
         data: { tipo: 'manutencaoFeita', dispositivoId: recorrencia.dispositivoId },
       });
@@ -794,7 +794,7 @@ router.post('/clientes/:clienteLoginId/recorrencias-data/:id/feito', async (req:
     }
     if (pref?.app) {
       await ExpoPushService.enviarParaCliente(clienteLoginIdCanonical, {
-        title: 'RecorrÃªncia Realizada',
+        title: 'Recorrência Realizada',
         body: mensagem,
         data: { tipo: 'recorrenciaDataFeita', dispositivoId: recorrencia.dispositivoId },
       });

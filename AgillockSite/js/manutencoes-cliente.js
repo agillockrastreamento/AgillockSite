@@ -70,6 +70,22 @@
     if (el) el.textContent = texto ? ' — ' + texto : '';
   }
 
+  function abrirModalBootstrap(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (window.bootstrap && window.bootstrap.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(el).show();
+      return;
+    }
+    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.modal) {
+      window.jQuery(el).modal('show');
+      return;
+    }
+    el.style.display = 'block';
+    el.classList.add('in');
+    document.body.classList.add('modal-open');
+  }
+
   function normalizarPlacaBusca(valor) {
     return String(valor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
@@ -218,6 +234,10 @@
     document.getElementById('btn-salvar-recorrencia').addEventListener('click', salvarRecorrencia);
     document.getElementById('btn-confirmar-feito').addEventListener('click', confirmarFeito);
     document.getElementById('btn-confirmar-excluir').addEventListener('click', executarExcluir);
+    document.getElementById('btn-nova-rec-data')?.addEventListener('click', function (e) {
+      e.preventDefault();
+      window.abrirModalNovaRecorrenciaData();
+    });
     document.getElementById('cbtn-salvar-recdata').addEventListener('click', _salvarRecDataCliente);
     document.getElementById('cbtn-confirmar-feito-data').addEventListener('click', _confirmarFeitoDataCliente);
 
@@ -786,7 +806,7 @@
             </div>
             <div class="man-rec-actions">
               ${podeMexer ? `<button class="btn btn-sm" onclick="_abrirFeitoData('${r.id}','${_esc(r.titulo)}')" style="background:#8e44ad;color:#fff;font-weight:700;border-radius:7px;"><i class="fa fa-check"></i> Feito</button>` : ''}
-              ${podeEditar ? `<button class="btn btn-info btn-xs" onclick="_editarRecurrenciaData('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
+              ${podeEditar ? `<button class="btn btn-info btn-xs" onclick="_editarRecorrenciaData('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
               ${podeEditar ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluirC('${r.id}','recorrencia-data')" title="Cancelar"><i class="fa fa-times"></i></button>` : ''}
             </div>
           </div>
@@ -804,7 +824,7 @@
     document.getElementById('crecdata-campo-anual').style.display = tipo === 'ANUAL' ? '' : 'none';
   };
 
-  window.abrirModalNovaRecurrenciaData = function () {
+  window.abrirModalNovaRecorrenciaData = function () {
     if (!podeGerenciarManutencao()) { AL_CLIENTE.showAlert('Apenas o responsável pelo faturamento pode criar recorrências.', 'warning'); return; }
     editandoRecDataId = null;
     document.getElementById('cmodalRecData-title').textContent = 'Nova Recorrência por Data';
@@ -815,10 +835,11 @@
     _carregarCanaisRecorrenciaData();
     document.querySelectorAll('.crecdata-dia-semana').forEach(cb => { cb.checked = false; });
     cAtualizarCamposRecData();
-    $('#modalRecorrenciaData').modal('show');
+    abrirModalBootstrap('modalRecorrenciaData');
   };
+  window.abrirModalNovaRecurrenciaData = window.abrirModalNovaRecorrenciaData;
 
-  window._editarRecurrenciaData = function (id) {
+  window._editarRecorrenciaData = function (id) {
     const r = recorrenciasData.find(x => x.id === id);
     if (!r) return;
     editandoRecDataId = id;
@@ -836,8 +857,9 @@
       document.querySelectorAll('.crecdata-dia-semana').forEach(cb => { cb.checked = r.diasSemana.includes(parseInt(cb.value)); });
     }
     cAtualizarCamposRecData();
-    $('#modalRecorrenciaData').modal('show');
+    abrirModalBootstrap('modalRecorrenciaData');
   };
+  window._editarRecurrenciaData = window._editarRecorrenciaData;
 
   window._abrirFeitoData = function (id, titulo) {
     recorrenciaDataFeitoId = id;

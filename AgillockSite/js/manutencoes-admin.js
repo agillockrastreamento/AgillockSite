@@ -68,6 +68,22 @@
     if (el) el.textContent = texto ? ' — ' + texto : '';
   }
 
+  function abrirModalBootstrap(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (window.bootstrap && window.bootstrap.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(el).show();
+      return;
+    }
+    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.modal) {
+      window.jQuery(el).modal('show');
+      return;
+    }
+    el.style.display = 'block';
+    el.classList.add('in');
+    document.body.classList.add('modal-open');
+  }
+
   function normalizarPlacaBusca(valor) {
     return String(valor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
@@ -327,6 +343,10 @@
     document.getElementById('btn-confirmar-feito').addEventListener('click', confirmarFeito);
     document.getElementById('btn-salvar-bulk').addEventListener('click', salvarBulk);
     document.getElementById('btn-confirmar-excluir').addEventListener('click', executarExcluir);
+    document.getElementById('btn-nova-rec-data')?.addEventListener('click', function (e) {
+      e.preventDefault();
+      window.abrirModalNovaRecorrenciaData();
+    });
     document.getElementById('btn-salvar-recdata').addEventListener('click', salvarRecorrenciaData);
     document.getElementById('btn-confirmar-feito-data').addEventListener('click', confirmarFeitoData);
 
@@ -999,7 +1019,7 @@
     _carregarCanaisRecorrenciaData();
     document.querySelectorAll('.recdata-dia-semana').forEach(cb => { cb.checked = false; });
     atualizarCamposRecData();
-    $('#modalRecorrenciaData').modal('show');
+    abrirModalBootstrap('modalRecorrenciaData');
   };
 
   window._editarRecorrenciaData = function (id) {
@@ -1023,7 +1043,7 @@
       document.querySelectorAll('.recdata-dia-semana').forEach(cb => { cb.checked = r.diasSemana.includes(parseInt(cb.value)); });
     }
     atualizarCamposRecData();
-    $('#modalRecorrenciaData').modal('show');
+    abrirModalBootstrap('modalRecorrenciaData');
   };
 
   window._abrirFeitoData = function (id, titulo) {
