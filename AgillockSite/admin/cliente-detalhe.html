@@ -1154,7 +1154,6 @@
       var div = document.getElementById('tab-login');
 
       if (!loginData) {
-        // Sem login cadastrado
         div.innerHTML = '<div class="card-section">' +
           '<h5 style="margin:0 0 16px;font-weight:700;"><i class="fa fa-key"></i> Login do Cliente no Portal</h5>' +
           '<p class="text-muted" style="margin-bottom:20px;">Este cliente não possui acesso ao portal. Crie um login para que ele possa acessar o rastreamento e pagamentos.</p>' +
@@ -1196,7 +1195,10 @@
         return;
       }
 
-      // Login existente
+      var logoHtml = loginData.logoUrl
+        ? '<img id="logo-preview" src="' + (window.API_URL || '') + loginData.logoUrl + '" alt="Logo" style="max-height:80px;max-width:200px;object-fit:contain;border-radius:6px;border:1px solid #e2e8f0;" />'
+        : '<div id="logo-preview" style="width:120px;height:60px;border:2px dashed #ddd;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;text-align:center;"><i class="fa fa-image" style="font-size:20px;display:block;margin-bottom:4px;"></i>Sem logo</div>';
+
       div.innerHTML = '<div class="card-section">' +
         '<h5 style="margin:0 0 16px;font-weight:700;"><i class="fa fa-key"></i> Login do Cliente no Portal</h5>' +
         '<div id="login-alert"></div>' +
@@ -1209,13 +1211,13 @@
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
           '<button class="btn btn-sm btn-default" id="btn-login-editar"><i class="fa fa-pencil"></i> Editar</button>' +
           '<button class="btn btn-sm btn-' + (loginData.ativo ? 'warning' : 'success') + '" id="btn-login-toggle">' +
             '<i class="fa fa-power-off"></i> ' + (loginData.ativo ? 'Inativar' : 'Ativar') + '</button>' +
           '<button class="btn btn-sm btn-danger" id="btn-login-excluir"><i class="fa fa-trash"></i> Excluir</button>' +
         '</div>' +
-        '<div id="form-editar-wrap" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px;">' +
+        '<div id="form-editar-wrap" style="display:none;margin-bottom:16px;border-top:1px solid #eee;padding-top:16px;">' +
           '<form id="form-editar-login" autocomplete="off">' +
             '<div class="row">' +
               '<div class="col-sm-6"><div class="form-group"><label>Novo E-mail</label><input type="email" class="form-control" id="edit-login-email" value="' + esc(loginData.email) + '" autocomplete="new-password" /></div></div>' +
@@ -1225,6 +1227,17 @@
             '<button type="submit" class="btn btn-primary-al btn-sm"><i class="fa fa-save"></i> Salvar</button>' +
             '<button type="button" class="btn btn-default btn-sm" id="btn-cancelar-editar" style="margin-left:6px;">Cancelar</button>' +
           '</form>' +
+        '</div>' +
+        '<div style="border-top:1px solid #eee;padding-top:16px;">' +
+          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:10px;">Logo do Cliente no Portal</div>' +
+          '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
+            logoHtml +
+            '<div style="display:flex;flex-direction:column;gap:6px;">' +
+              '<label class="btn btn-sm btn-default" style="margin:0;cursor:pointer;"><i class="fa fa-upload"></i> ' + (loginData.logoUrl ? 'Trocar Logo' : 'Upload de Logo') + '<input type="file" id="input-logo" accept="image/*" style="display:none;" /></label>' +
+              (loginData.logoUrl ? '<button class="btn btn-sm btn-danger" id="btn-remover-logo"><i class="fa fa-trash"></i> Remover</button>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div id="logo-alert" style="margin-top:10px;"></div>' +
         '</div>' +
         '</div>';
 
@@ -1278,6 +1291,35 @@
             .catch(function (err) { AL.showAlert(err.message); });
         });
       });
+
+      document.getElementById('input-logo').addEventListener('change', function () {
+        var file = this.files[0];
+        if (!file) return;
+        var alertDiv = document.getElementById('logo-alert');
+        alertDiv.innerHTML = '<span style="color:#888;font-size:12px;"><i class="fa fa-spinner fa-spin"></i> Enviando…</span>';
+        var form = new FormData();
+        form.append('logo', file);
+        fetch((window.API_URL || '') + '/api/clientes/' + clienteId + '/login/logo', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + AL.getToken() },
+          body: form,
+        }).then(function (r) { return r.json().then(function (d) { return r.ok ? d : Promise.reject(new Error(d.error)); }); })
+          .then(function () { AL.showAlert('Logo atualizada com sucesso!', 'success'); carregarLogin(); })
+          .catch(function (err) { alertDiv.innerHTML = '<div class="alert alert-danger" style="font-size:12px;">' + err.message + '</div>'; });
+      });
+
+      var btnRm = document.getElementById('btn-remover-logo');
+      if (btnRm) {
+        btnRm.addEventListener('click', function () {
+          AL.confirmar({ titulo: 'Remover Logo', mensagem: 'Deseja remover a logo do cliente?' })
+            .then(function (ok) {
+              if (!ok) return;
+              AL.apiDelete('/api/clientes/' + clienteId + '/login/logo')
+                .then(function () { AL.showAlert('Logo removida.', 'success'); carregarLogin(); })
+                .catch(function (err) { AL.showAlert(err.message); });
+            });
+        });
+      }
     }
 
     function esc(s) {

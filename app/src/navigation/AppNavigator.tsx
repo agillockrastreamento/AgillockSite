@@ -6,13 +6,14 @@ import {
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useEffect, useState, useRef } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { Image, Pressable, StyleSheet, Text, View, Alert } from 'react-native';
 import { ActivityIndicator, Avatar, Icon, IconButton } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
 
 import { useAuth } from '../auth/AuthProvider';
 import { ProfileModal } from '../profile/ProfileModal';
-import { getClientePerfil, resolveUploadUrl } from '../profile/profileService';
+import { getClientePerfil, resolveUploadUrl, uploadClienteLogo, deleteClienteLogo } from '../profile/profileService';
 import type { ClientePerfil } from '../profile/profileTypes';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -61,7 +62,9 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [profile, setProfile] = useState<ClientePerfil | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isLogoLoading, setIsLogoLoading] = useState(false);
   const avatarUri = resolveUploadUrl(profile?.avatarUrl);
+  const logoUri = resolveUploadUrl(profile?.logoUrl);
 
   useEffect(() => {
     let mounted = true;
@@ -79,6 +82,67 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  const handleLogoPress = useCallback(async () => {
+    if (isLogoLoading) return;
+
+    if (profile?.logoUrl) {
+      Alert.alert('Logo da empresa', 'O que deseja fazer?', [
+        {
+          text: 'Trocar logo',
+          onPress: () => pickAndUploadLogo(),
+        },
+        {
+          text: 'Remover logo',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLogoLoading(true);
+            try {
+              await deleteClienteLogo();
+              setProfile((prev) => prev ? { ...prev, logoUrl: null } : prev);
+            } catch {
+              toast.show({ message: 'Erro ao remover logo.', type: 'error' });
+            } finally {
+              setIsLogoLoading(false);
+            }
+          },
+        },
+        { text: 'Cancelar', style: 'cancel' },
+      ]);
+    } else {
+      pickAndUploadLogo();
+    }
+  }, [profile?.logoUrl, isLogoLoading]);
+
+  const pickAndUploadLogo = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      toast.show({ message: 'Permissão para acessar fotos negada.', type: 'error' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    setIsLogoLoading(true);
+    try {
+      const response = await uploadClienteLogo({
+        uri: asset.uri,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+      });
+      setProfile((prev) => prev ? { ...prev, logoUrl: response.logoUrl } : prev);
+      toast.show({ message: 'Logo atualizada!', type: 'success' });
+    } catch {
+      toast.show({ message: 'Erro ao enviar logo.', type: 'error' });
+    } finally {
+      setIsLogoLoading(false);
+    }
   }, []);
 
   return (
@@ -99,6 +163,23 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
         <Text style={styles.navLabel}>Menu</Text>
         <DrawerItemList {...props} />
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        style={styles.logoArea}
+        onPress={handleLogoPress}
+      >
+        {isLogoLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : logoUri ? (
+          <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
+        ) : (
+          <View style={styles.logoPlaceholder}>
+            <Icon source="image-outline" size={22} color={colors.textMuted} />
+            <Text style={styles.logoPlaceholderText}>Adicionar logo da empresa</Text>
+          </View>
+        )}
+      </Pressable>
 
       <View style={styles.profileArea}>
         <Pressable
@@ -328,6 +409,35 @@ const styles = StyleSheet.create({
     marginLeft: 0,
     fontSize: 14,
     fontWeight: '800',
+  },
+  logoArea: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    minHeight: 56,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+  },
+  logoImage: {
+    width: '100%',
+    height: 56,
+  },
+  logoPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  logoPlaceholderText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
   },
   profileArea: {
     marginTop: 'auto',

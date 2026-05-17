@@ -373,6 +373,7 @@ model ClienteLogin {
   ativo     Boolean  @default(true)
   prefs     Json     @default("{}")
   avatarUrl String?
+  logoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -164,6 +164,65 @@ html.al-sb-collapsed .admin-sidebar { width: 64px !important; }
 }
 .btn-logout:hover { color: #e74c3c; }
 
+/* ─── Logo do cliente no sidebar ──────────────────────────────────────── */
+.sidebar-cliente-logo {
+    padding: 10px 20px 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: padding 0.3s, opacity 0.2s;
+}
+.sidebar-cliente-logo img {
+    max-width: 160px;
+    max-height: 52px;
+    width: 100%;
+    object-fit: contain;
+    border-radius: 5px;
+    transition: max-width 0.3s, max-height 0.3s, opacity 0.2s;
+}
+.sidebar-cliente-logo-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: #4a5568;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 10px;
+    border: 1.5px dashed #3a4555;
+    border-radius: 6px;
+    width: 100%;
+    text-align: center;
+    transition: border-color 0.2s, color 0.2s;
+    background: transparent;
+}
+.sidebar-cliente-logo-placeholder:hover { border-color: #fab32c; color: #fab32c; }
+.sidebar-cliente-logo-placeholder .fa { font-size: 16px; }
+
+/* Recolhido: esconde texto, mostra ícone pequeno */
+.admin-sidebar.collapsed .sidebar-cliente-logo {
+    padding: 8px 0;
+    justify-content: center;
+}
+.admin-sidebar.collapsed .sidebar-cliente-logo img {
+    max-width: 36px;
+    max-height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.admin-sidebar.collapsed .sidebar-cliente-logo-placeholder {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0;
+    gap: 0;
+}
+.admin-sidebar.collapsed .sidebar-cliente-logo-placeholder .fa { font-size: 14px; }
+
 /* ─── Usuário no sidebar ───────────────────────────────────────────────── */
 .sidebar-user {
     margin-bottom: 30px;

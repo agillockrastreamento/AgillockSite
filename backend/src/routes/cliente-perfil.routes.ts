@@ -5,7 +5,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import prisma from '../utils/prisma';
 import { ClienteRequest, clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
-import { CLIENTE_AVATAR_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
+import { CLIENTE_AVATAR_UPLOADS_DIR, CLIENTE_LOGO_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
@@ -13,6 +13,9 @@ router.use(clienteAuthMiddleware);
 const uploadDir = CLIENTE_AVATAR_UPLOADS_DIR;
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+}
+if (!fs.existsSync(CLIENTE_LOGO_UPLOADS_DIR)) {
+  fs.mkdirSync(CLIENTE_LOGO_UPLOADS_DIR, { recursive: true });
 }
 
 const storage = multer.diskStorage({
@@ -25,7 +28,26 @@ const storage = multer.diskStorage({
 
 const uploadAvatar = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Apenas imagens são permitidas'));
+    }
+    cb(null, true);
+  },
+});
+
+const logoStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, CLIENTE_LOGO_UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${crypto.randomUUID()}${ext}`);
+  },
+});
+
+const uploadLogo = multer({
+  storage: logoStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) {
       return cb(new Error('Apenas imagens são permitidas'));
@@ -87,6 +109,7 @@ router.get('/', async (req: ClienteRequest, res: Response): Promise<void> => {
       telefone: cliente.telefone,
       cpfCnpj: cliente.cpfCnpj,
       avatarUrl: clienteLogin.avatarUrl,
+      logoUrl: clienteLogin.logoUrl,
       veiculosFaturamento: faturamentoDispositivos,
       veiculosVinculados: vinculadoDispositivos,
     });
@@ -148,4 +171,80 @@ router.post('/avatar', uploadAvatar.single('avatar'), async (req: ClienteRequest
   }
 });
 
+// POST /api/cliente/perfil/logo
+router.post('/logo', uploadLogo.single('logo'), async (req: ClienteRequest, res: Response): Promise<void> => {
+  try {
+    const clienteLoginId = req.cliente!.sub;
+
+    if (!req.file) {
+      res.status(400).json({ error: 'Nenhum arquivo enviado' });
+      return;
+    }
+
+    const clienteLogin = await prisma.clienteLogin.findUnique({
+      where: { id: clienteLoginId },
+      select: { logoUrl: true },
+    });
+
+    if (!clienteLogin) {
+      fs.unlinkSync(req.file.path);
+      res.status(404).json({ error: 'Login não encontrado' });
+      return;
+    }
+
+    const novaLogoUrl = `/uploads/cliente-logo/${req.file.filename}`;
+
+    await prisma.clienteLogin.update({
+      where: { id: clienteLoginId },
+      data: { logoUrl: novaLogoUrl },
+    });
+
+    if (clienteLogin.logoUrl) {
+      try {
+        const oldPath = path.join(UPLOADS_DIR, clienteLogin.logoUrl.replace(/^\/uploads\//, ''));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      } catch (_) {}
+    }
+
+    res.json({ logoUrl: novaLogoUrl });
+  } catch (error: any) {
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    res.status(400).json({ error: error.message || 'Erro ao processar o upload' });
+  }
+});
+
+// DELETE /api/cliente/perfil/logo
+router.delete('/logo', async (req: ClienteRequest, res: Response): Promise<void> => {
+  try {
+    const clienteLoginId = req.cliente!.sub;
+
+    const clienteLogin = await prisma.clienteLogin.findUnique({
+      where: { id: clienteLoginId },
+      select: { logoUrl: true },
+    });
+
+    if (!clienteLogin) {
+      res.status(404).json({ error: 'Login não encontrado' });
+      return;
+    }
+
+    if (clienteLogin.logoUrl) {
+      try {
+        const oldPath = path.join(UPLOADS_DIR, clienteLogin.logoUrl.replace(/^\/uploads\//, ''));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      } catch (_) {}
+    }
+
+    await prisma.clienteLogin.update({
+      where: { id: clienteLoginId },
+      data: { logoUrl: null },
+    });
+
+    res.status(204).send();
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Erro ao remover logo' });
+  }
+});
+
 export default router;
+

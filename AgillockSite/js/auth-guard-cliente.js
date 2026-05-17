@@ -108,6 +108,92 @@
     });
   }
 
+  function uploadLogo(file) {
+    var token = getToken();
+    var form = new FormData();
+    form.append('logo', file);
+    return fetch(BASE + '/api/cliente/perfil/logo', {
+      method: 'POST',
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+      body: form,
+    }).then(function (res) {
+      if (res.status === 204) return null;
+      return res.json().then(function (data) {
+        if (!res.ok) return Promise.reject(new Error(data.error || ('Erro ' + res.status)));
+        return data;
+      });
+    });
+  }
+
+  function deleteLogo() {
+    return apiRequest('DELETE', '/api/cliente/perfil/logo', null);
+  }
+
+  // ─── Logo do cliente no sidebar ───────────────────────────────────────────
+
+  var _logoInputEl = null;
+
+  function _buildLogoSection(logoUrl) {
+    var wrap = document.createElement('div');
+    wrap.id = 'sidebar-logo-wrap';
+    wrap.className = 'sidebar-cliente-logo';
+
+    if (logoUrl) {
+      var img = document.createElement('img');
+      img.src = BASE.replace(/\/api\/?$/i, '') + logoUrl;
+      img.alt = 'Logo';
+      img.title = 'Clique para trocar a logo';
+      img.style.cursor = 'pointer';
+      img.addEventListener('click', function () { if (_logoInputEl) _logoInputEl.click(); });
+      wrap.appendChild(img);
+    } else {
+      var btn = document.createElement('button');
+      btn.className = 'sidebar-cliente-logo-placeholder';
+      btn.title = 'Adicionar logo da empresa';
+      btn.type = 'button';
+      btn.innerHTML = '<i class="fa fa-image"></i><span>Adicionar logo</span>';
+      btn.addEventListener('click', function () { if (_logoInputEl) _logoInputEl.click(); });
+      wrap.appendChild(btn);
+    }
+
+    // Input de arquivo oculto para upload
+    _logoInputEl = document.createElement('input');
+    _logoInputEl.type = 'file';
+    _logoInputEl.accept = 'image/*';
+    _logoInputEl.style.display = 'none';
+    _logoInputEl.addEventListener('change', function () {
+      var file = this.files[0];
+      if (!file) return;
+      uploadLogo(file)
+        .then(function () { _reloadLogoSection(); })
+        .catch(function (err) { showAlert('Erro ao enviar logo: ' + err.message); });
+      this.value = '';
+    });
+    wrap.appendChild(_logoInputEl);
+
+    return wrap;
+  }
+
+  function _reloadLogoSection() {
+    apiGet('/api/cliente/perfil').then(function (perfil) {
+      var existing = document.getElementById('sidebar-logo-wrap');
+      if (!existing) return;
+      var novo = _buildLogoSection(perfil.logoUrl || null);
+      existing.parentNode.replaceChild(novo, existing);
+    }).catch(function () {});
+  }
+
+  function initClienteLogo() {
+    apiGet('/api/cliente/perfil').then(function (perfil) {
+      var sidebar = document.getElementById('sidebar');
+      if (!sidebar) return;
+      var footer = sidebar.querySelector('.sidebar-footer');
+      if (!footer) return;
+      var logoSection = _buildLogoSection(perfil.logoUrl || null);
+      sidebar.insertBefore(logoSection, footer);
+    }).catch(function () {});
+  }
+
   // ─── Toast ────────────────────────────────────────────────────────────────
 
   function showAlert(msg, type) {
@@ -256,6 +342,11 @@
       applyCollapsed(now, true);
       hideTooltip();
     });
+
+    // Injeta logo automaticamente em páginas autenticadas
+    if (isAuthenticated()) {
+      initClienteLogo();
+    }
   });
 
   // ─── Exportação global ────────────────────────────────────────────────────
@@ -273,6 +364,8 @@
     apiPatch: apiPatch,
     apiDelete: apiDelete,
     uploadFoto: uploadFoto,
+    uploadLogo: uploadLogo,
+    deleteLogo: deleteLogo,
     showAlert: showAlert,
     initThemeToggle: initThemeToggle,
     fmtDate: fmtDate,

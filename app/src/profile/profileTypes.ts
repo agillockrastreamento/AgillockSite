@@ -11,6 +11,7 @@ export type ClientePerfil = {
   telefone: string | null;
   cpfCnpj: string | null;
   avatarUrl: string | null;
+  logoUrl: string | null;
   veiculosFaturamento: ClientePerfilVeiculo[];
   veiculosVinculados: ClientePerfilVeiculo[];
 };
