@@ -2845,7 +2845,7 @@ function _buildManutencoesDataAdminHtml(dispositivoId) {
   if (!visibles.length) return '';
   return `
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
-      <div class="dcard-section-title">Manutenções por Data</div>
+      <div class="dcard-section-title">Recorrências por Data</div>
       ${visibles.map(r => {
         const dataRec = new Date(r.dataReferencia);
         dataRec.setHours(0, 0, 0, 0);
