@@ -240,7 +240,7 @@ export function MainVehicleCard({
           data.filter(r => {
             const dp = String(r.dataReferencia).slice(0, 10).split('-');
             const dataRec = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
-            return r.ativa !== false && dataRec <= new Date(hoje.getTime() + 24 * 60 * 60 * 1000);
+            return r.ativa !== false && dataRec <= hoje;
           })
         );
       }
@@ -430,6 +430,7 @@ export function MainVehicleCard({
     if (confirmed) {
       try {
         await apiRequest(`/cliente/manutencoes/recorrencias-data/${id}/feito`, { method: 'POST', body: {} });
+        setRecorrenciasData(prev => prev.filter(r => r.id !== id));
         toast.show({ message: 'Confirmado!', type: 'success' });
         fetchRecorrenciasData();
       } catch {
