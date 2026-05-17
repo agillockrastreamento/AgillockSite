@@ -167,7 +167,8 @@ function fmtDate(iso: string | null | undefined) {
 
 function diffDias(dataStr: string): number {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  const data = new Date(dataStr + 'T12:00:00'); data.setHours(0, 0, 0, 0);
+  const datePart = String(dataStr).slice(0, 10);
+  const data = new Date(datePart + 'T12:00:00'); data.setHours(0, 0, 0, 0);
   return Math.ceil((data.getTime() - hoje.getTime()) / 86400000);
 }
 

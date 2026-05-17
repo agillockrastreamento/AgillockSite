@@ -698,7 +698,8 @@
 
   function _diffDiasC(dataStr) {
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const data = new Date(dataStr + 'T12:00:00'); data.setHours(0,0,0,0);
+    const datePart = String(dataStr).slice(0, 10);
+    const data = new Date(datePart + 'T12:00:00'); data.setHours(0,0,0,0);
     return Math.ceil((data - hoje) / 86400000);
   }
 
@@ -718,7 +719,7 @@
 
     list.innerHTML = recorrenciasData.map(r => {
       const diff = _diffDiasC(r.dataReferencia);
-      const dataStr = new Date(r.dataReferencia + 'T12:00:00').toLocaleDateString('pt-BR');
+      const dataStr = new Date(String(r.dataReferencia).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR');
       const isAdmin = r.origem === 'ADMIN';
 
       let statusClass, statusLabel, statusIcon, borderColor;
@@ -878,7 +879,7 @@
       const result = await AL_CLIENTE.apiPost('/api/cliente/manutencoes/recorrencias-data/' + recorrenciaDataFeitoId + '/feito', {
         notas: document.getElementById('cfeito-data-notas').value.trim() || null,
       });
-      AL_CLIENTE.showAlert('Confirmado!' + (result.proximaData ? ' Próxima: ' + new Date(result.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''), 'success');
+      AL_CLIENTE.showAlert('Confirmado!' + (result.proximaData ? ' Próxima: ' + new Date(String(result.proximaData).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR') : ''), 'success');
       $('#modalFeitoData').modal('hide');
       carregarDados(dispositivoIdAtivo);
     } catch (err) {
