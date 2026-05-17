@@ -918,10 +918,11 @@
           document.querySelectorAll('.man-subtab-btn').forEach(function (b) { b.classList.remove('active'); });
           this.classList.add('active');
           var target = this.dataset.subtab;
-          document.getElementById('subtab-historico').style.display    = target === 'subtab-historico' ? 'block' : 'none';
-          document.getElementById('subtab-recorrencias').style.display = target === 'subtab-recorrencias' ? 'block' : 'none';
-          document.getElementById('btn-novo-registro').style.display   = target === 'subtab-historico' ? '' : 'none';
-          document.getElementById('btn-nova-recorrencia').style.display = target === 'subtab-recorrencias' ? '' : 'none';
+          document.getElementById('subtab-historico').style.display         = target === 'subtab-historico'         ? 'block' : 'none';
+          document.getElementById('subtab-recorrencias').style.display      = target === 'subtab-recorrencias'      ? 'block' : 'none';
+          document.getElementById('subtab-recorrencias-data').style.display = target === 'subtab-recorrencias-data' ? 'block' : 'none';
+          document.getElementById('btn-novo-registro').style.display        = target === 'subtab-historico'         ? '' : 'none';
+          document.getElementById('btn-nova-recorrencia').style.display     = target === 'subtab-recorrencias'      ? '' : 'none';
         });
       });
       document.getElementById('btn-nova-recorrencia').style.display = 'none';

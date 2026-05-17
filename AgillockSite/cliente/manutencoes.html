@@ -762,11 +762,12 @@
           document.querySelectorAll('.man-tab-btn').forEach(function (b) { b.classList.remove('active'); });
           this.classList.add('active');
           var target = this.dataset.tab;
-          document.getElementById('tab-historico').style.display = target === 'tab-historico' ? 'block' : 'none';
-          document.getElementById('tab-recorrencias').style.display = target === 'tab-recorrencias' ? 'block' : 'none';
+          document.getElementById('tab-historico').style.display         = target === 'tab-historico'         ? 'block' : 'none';
+          document.getElementById('tab-recorrencias').style.display      = target === 'tab-recorrencias'      ? 'block' : 'none';
+          document.getElementById('tab-recorrencias-data').style.display = target === 'tab-recorrencias-data' ? 'block' : 'none';
           // sync buttons visibility
-          document.getElementById('btn-novo-registro').style.display = target === 'tab-historico' ? '' : 'none';
-          document.getElementById('btn-nova-recorrencia').style.display = target === 'tab-recorrencias' ? '' : 'none';
+          document.getElementById('btn-novo-registro').style.display     = target === 'tab-historico'         ? '' : 'none';
+          document.getElementById('btn-nova-recorrencia').style.display  = target === 'tab-recorrencias'      ? '' : 'none';
         });
       });
       document.getElementById('btn-nova-recorrencia').style.display = 'none';
