@@ -138,21 +138,6 @@
     wrap.id = 'sidebar-logo-wrap';
     wrap.className = 'sidebar-cliente-logo';
 
-    // Input de arquivo oculto para upload
-    _logoInputEl = document.createElement('input');
-    _logoInputEl.type = 'file';
-    _logoInputEl.accept = 'image/*';
-    _logoInputEl.style.display = 'none';
-    _logoInputEl.addEventListener('change', function () {
-      var file = this.files[0];
-      if (!file) return;
-      uploadLogo(file)
-        .then(function () { _reloadLogoSection(); })
-        .catch(function (err) { showAlert('Erro ao enviar logo: ' + err.message); });
-      this.value = '';
-    });
-    wrap.appendChild(_logoInputEl);
-
     var imgWrap = document.createElement('div');
     imgWrap.className = 'sidebar-cliente-logo-img-wrap';
 
