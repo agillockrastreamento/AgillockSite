@@ -430,7 +430,7 @@ export function ManutencaoScreen() {
         <View style={styles.manutencaoBanner}>
           <Icon source="alert-outline" size={18} color="#856404" />
           <Text style={styles.manutencaoBannerText}>
-            Manutenções desativadas para este dispositivo.
+            Manutenções desativadas para este dispositivo. Você não poderá registrar manutenções ou configurar recorrências.
           </Text>
         </View>
       ) : (
