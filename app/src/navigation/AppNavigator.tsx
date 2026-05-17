@@ -104,7 +104,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
       <View style={styles.logoSpacer} />
       {logoUri ? (
         <View style={styles.logoContainer}>
-          <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
+          <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="cover" />
         </View>
       ) : null}
       <View style={styles.logoSpacer} />
@@ -348,8 +348,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   logoImage: {
-    width: '50%',
-    height: 115,
+    width: '45%',
+    height: 120,
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
