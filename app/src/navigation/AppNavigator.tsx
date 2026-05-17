@@ -90,7 +90,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
     if (isLogoLoading) return;
     const confirmed = await confirmDialog.show({
       title: 'Remover logo',
-      message: 'Deseja remover a logo da empresa?',
+      message: 'Deseja remover a logo?',
       confirmLabel: 'Remover',
       destructive: true,
     });
@@ -176,7 +176,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
           ) : (
             <Pressable accessibilityRole="button" style={styles.logoPlaceholder} onPress={pickAndUploadLogo}>
               <Icon source="image-outline" size={22} color={colors.textMuted} />
-              <Text style={styles.logoPlaceholderText}>Adicionar logo da empresa</Text>
+              <Text style={styles.logoPlaceholderText}>Adicionar Logo</Text>
             </Pressable>
           )}
         </View>
@@ -417,18 +417,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
   },
   logoContainer: {
     width: '100%',
     alignItems: 'center',
     gap: spacing.xs,
+    backgroundColor: colors.surface,
   },
   logoImageBox: {
     width: '100%',
-    height: 76,
+    height: 110,
     borderRadius: radius.lg,
     overflow: 'hidden',
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
@@ -468,6 +470,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     backgroundColor: colors.background,
     width: '100%',
+    height: 70
   },
   logoPlaceholderText: {
     color: colors.textMuted,
