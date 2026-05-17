@@ -161,9 +161,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
           <ActivityIndicator size="small" color={colors.primary} />
         ) : logoUri ? (
           <>
-            <View style={styles.logoImageWrap}>
-              <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
-            </View>
+            <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
             <View style={styles.logoActionsRow}>
               <Pressable accessibilityRole="button" style={styles.logoActionBtn} onPress={pickAndUploadLogo}>
                 <Icon source="pencil-outline" size={15} color={colors.textMuted} />
@@ -420,17 +418,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingHorizontal: spacing.lg,
   },
-  logoImageWrap: {
+  logoImage: {
     width: '100%',
     height: 80,
     borderRadius: radius.lg,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  logoImage: {
-    width: '100%',
-    height: '100%',
   },
   logoActionsRow: {
     flexDirection: 'row',
