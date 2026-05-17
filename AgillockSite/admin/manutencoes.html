@@ -337,17 +337,7 @@
               <option value="">Selecione um dispositivo...</option>
             </select>
           </div>
-          <div id="wrap-acoes-cliente" style="display:none;display:flex;gap:8px;margin-left:auto;">
-            <button class="btn btn-success" id="btn-novo-registro" style="height:36px;padding:0 14px;font-size:13px;font-weight:700;border-radius:7px;" disabled>
-              <i class="fa fa-plus"></i> Registrar
-            </button>
-            <button class="btn btn-warning" id="btn-nova-recorrencia" style="height:36px;padding:0 14px;font-size:13px;font-weight:700;border-radius:7px;color:#fff;" disabled>
-              <i class="fa fa-repeat"></i> Recorrência
-            </button>
-            <button class="btn btn-info" id="btn-bulk-recorrencia" style="height:36px;padding:0 14px;font-size:13px;font-weight:700;border-radius:7px;">
-              <i class="fa fa-users"></i> Múltiplos Clientes
-            </button>
-          </div>
+          <div id="wrap-acoes-cliente"></div>
         </div>
 
         <!-- Banner: manutenções desativadas -->
@@ -392,6 +382,9 @@
                   <small>Registros do cliente e do admin para este dispositivo</small>
                 </div>
               </div>
+              <button class="btn btn-success btn-sm" id="btn-novo-registro" style="background:#27ae60;color:#fff;border-radius:8px;font-weight:700;" disabled onclick="abrirModalRegistro()">
+                <i class="fa fa-plus"></i> Registrar
+              </button>
             </div>
             <div id="c-list-registros" class="man-list"></div>
             <div id="c-empty-registros" class="man-empty" style="display:none;">
@@ -403,6 +396,23 @@
 
           <!-- Sub-tab: Recorrências de Manutenção (KM) -->
           <div id="subtab-recorrencias" style="display:none;">
+            <div class="man-section-header">
+              <div class="man-section-title">
+                <div class="man-section-icon" style="background:rgba(230,126,34,.12);color:#e67e22;"><i class="fa fa-tachometer"></i></div>
+                <div>
+                  <h5>Recorrências de Manutenção</h5>
+                  <small>Alertas automáticos baseados em quilometragem</small>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-warning btn-sm" id="btn-nova-recorrencia" style="color:#fff;border-radius:8px;font-weight:700;" disabled onclick="abrirModalRecorrencia()">
+                  <i class="fa fa-plus"></i> Nova Recorrência
+                </button>
+                <button class="btn btn-info btn-sm" id="btn-bulk-recorrencia" style="border-radius:8px;font-weight:700;" onclick="$('#modalBulk').modal('show')">
+                  <i class="fa fa-users"></i> Múltiplos Clientes
+                </button>
+              </div>
+            </div>
             <div class="man-info-box">
               <i class="fa fa-info-circle"></i>
               <span>Recorrências criadas por você (admin) ou pelo cliente aparecem aqui. Ao clicar em <strong>"Marcar como Feito"</strong> o contador é zerado e um registro de manutenção é gerado automaticamente — visível também para o cliente.</span>
@@ -830,12 +840,19 @@
             <textarea id="recdata-descricao" class="form-control" rows="2" placeholder="Detalhes ou instruções para o cliente..."></textarea>
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="man-modal-label"><i class="fa fa-bell" style="margin-right:4px;color:#8e44ad;"></i>Canal de notificação</label>
-            <select id="recdata-canal" class="form-control" style="max-width:200px;margin-top:6px;">
-              <option value="todos">App + E-mail</option>
-              <option value="app">Somente App</option>
-              <option value="email">Somente E-mail</option>
-            </select>
+            <label class="man-modal-label"><i class="fa fa-bell" style="margin-right:4px;color:#8e44ad;"></i>Notificar cliente via</label>
+            <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="recdata-canal-web" /> <i class="fa fa-desktop" style="color:#2980b9;"></i> Web
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="recdata-canal-app" checked /> <i class="fa fa-mobile" style="color:#27ae60;"></i> App
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="recdata-canal-email" checked /> <i class="fa fa-envelope-o" style="color:#8e44ad;"></i> E-mail
+              </label>
+            </div>
+            <p style="font-size:11px;color:#8a9ab0;margin:6px 0 0;">Canal usado para enviar alertas desta recorrência ao cliente.</p>
           </div>
         </div>
         <div class="modal-footer">

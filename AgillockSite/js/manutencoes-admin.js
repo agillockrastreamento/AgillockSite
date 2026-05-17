@@ -2,6 +2,27 @@
 
 (function () {
 
+  // ── Helpers de canal (checkboxes ↔ canalNotificacao) ─────────────────────────
+  function canalParaCheckboxes(canal, prefix) {
+    const web   = document.getElementById(prefix + 'canal-web');
+    const app   = document.getElementById(prefix + 'canal-app');
+    const email = document.getElementById(prefix + 'canal-email');
+    if (!web || !app || !email) return;
+    if (canal === 'app') { web.checked = false; app.checked = true; email.checked = false; }
+    else if (canal === 'email') { web.checked = false; app.checked = false; email.checked = true; }
+    else { web.checked = true; app.checked = true; email.checked = true; }
+  }
+
+  function checkboxesParaCanal(prefix) {
+    const app   = document.getElementById(prefix + 'canal-app');
+    const email = document.getElementById(prefix + 'canal-email');
+    if (!app || !email) return 'todos';
+    if (app.checked && email.checked) return 'todos';
+    if (app.checked) return 'app';
+    if (email.checked) return 'email';
+    return 'todos';
+  }
+
   // ── Estado ────────────────────────────────────────────────────────────────────
   let clientes = [];
   let dispositivos = [];
@@ -258,7 +279,6 @@
       dispositivos = [];
       document.getElementById('cliente-man-container').style.display = 'none';
       document.getElementById('cliente-man-vazio').style.display = 'flex';
-      document.getElementById('wrap-acoes-cliente').style.display = id ? 'flex' : 'none';
       document.getElementById('btn-novo-registro').disabled = true;
       document.getElementById('btn-nova-recorrencia').disabled = true;
       const banner = document.getElementById('man-banner-desativado');
@@ -293,9 +313,6 @@
       renderPickerDispositivo(document.getElementById('man-busca-placa-dispositivo')?.value || '');
     });
 
-    document.getElementById('btn-novo-registro').addEventListener('click', abrirModalRegistro);
-    document.getElementById('btn-nova-recorrencia').addEventListener('click', abrirModalRecorrencia);
-    document.getElementById('btn-bulk-recorrencia').addEventListener('click', function () { $('#modalBulk').modal('show'); });
     document.getElementById('btn-salvar-registro').addEventListener('click', salvarRegistro);
     document.getElementById('btn-salvar-recorrencia').addEventListener('click', salvarRecorrencia);
     document.getElementById('btn-confirmar-feito').addEventListener('click', confirmarFeito);
@@ -937,7 +954,7 @@
     ['recdata-titulo','recdata-descricao'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('recdata-tipo').value = 'AVULSA';
     document.getElementById('recdata-data').value = '';
-    document.getElementById('recdata-canal').value = 'todos';
+    canalParaCheckboxes('todos', 'recdata-');
     document.querySelectorAll('.recdata-dia-semana').forEach(cb => { cb.checked = false; });
     atualizarCamposRecData();
     $('#modalRecorrenciaData').modal('show');
@@ -955,7 +972,7 @@
     document.getElementById('recdata-descricao').value = r.descricao || '';
     document.getElementById('recdata-tipo').value = r.tipoRecorrencia || 'AVULSA';
     document.getElementById('recdata-data').value = r.dataReferencia ? new Date(r.dataReferencia).toISOString().slice(0,10) : '';
-    document.getElementById('recdata-canal').value = r.canalNotificacao || 'todos';
+    canalParaCheckboxes(r.canalNotificacao || 'todos', 'recdata-');
     if (r.intervaloDias) document.getElementById('recdata-intervalo-dias').value = r.intervaloDias;
     if (r.diaDoMes) document.getElementById('recdata-dia-mes').value = r.diaDoMes;
     if (r.diaDoMes) document.getElementById('recdata-dia-anual').value = r.diaDoMes;
@@ -1019,7 +1036,7 @@
       diasSemana,
       diaDoMes,
       mesDoAno,
-      canalNotificacao: document.getElementById('recdata-canal').value,
+      canalNotificacao: checkboxesParaCanal('recdata-'),
     };
 
     const btn = document.getElementById('btn-salvar-recdata');

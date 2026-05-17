@@ -2150,6 +2150,35 @@ function buildOleoStatusHtml(p, v) {
   }).join('<br>');
 }
 
+function buildDataRecorrenciasHtml(v) {
+  const recs = v?._recorrenciasData;
+  if (!recs || !recs.length) return '';
+  const podeGerenciar = !!v?.podeGerenciarManutencao;
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  const btnBg = isDark ? '#2d3748' : '#e9ecef';
+  const btnBd = isDark ? '#4a5568' : '#ccc';
+  const btnClr = isDark ? '#cbd5e0' : '#555';
+  const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const visibles = recs.filter(function(r) {
+    return r.ativa !== false && new Date(r.dataReferencia) <= new Date(hoje.getTime() + 24 * 60 * 60 * 1000);
+  });
+  if (!visibles.length) return '';
+  return visibles.map(function(r) {
+    const dataRec = new Date(r.dataReferencia);
+    dataRec.setHours(0, 0, 0, 0);
+    const atrasada = dataRec < hoje;
+    const cor = atrasada ? '#e74c3c' : '#8e44ad';
+    const fmtData = new Date(r.dataReferencia).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const texto = atrasada
+      ? 'Atrasada: ' + r.titulo + ' (' + fmtData + ')'
+      : 'Hoje: ' + r.titulo;
+    const btn = podeGerenciar ? '<button onclick="abrirModalFeitoCardData(\'' + r.id + '\',\'' + String(r.titulo || '').replace(/'/g, "\\'") + '\')" style="' + btnStyle + ';margin-left:4px;" title="Marcar como feito"><i class="fa fa-check"></i></button>' : '';
+    return '<span style="color:' + cor + ';display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-calendar" style="flex-shrink:0;"></i>' + texto + btn + '</span>';
+  }).join('<br>');
+}
+
 function _fmtResumoDurCliente(min) {
   if (!min) return '—';
   const h = Math.floor(min / 60), m = min % 60;
@@ -2216,6 +2245,17 @@ function _carregarKmConfig(id) {
   }).catch(function () { v._recorrenciasCarregadas = false; });
 }
 
+function _carregarRecorrenciasData(id) {
+  const v = veiculosMap[id]; if (!v) return;
+  if (v._recorrenciasDataCarregadas) return;
+  v._recorrenciasDataCarregadas = true;
+  AL_CLIENTE.apiGet('/api/cliente/manutencoes/recorrencias-data?dispositivoId=' + id).then(function (data) {
+    v._recorrenciasData = (data || []).filter(function(r) { return r.ativa !== false; });
+    const elData = document.getElementById('dcard-data-status');
+    if (elData && ativoId === id) elData.innerHTML = buildDataRecorrenciasHtml(v);
+  }).catch(function () { v._recorrenciasDataCarregadas = false; });
+}
+
 window.abrirModalFeitoCard = function(recId, titulo) {
   const el = document.getElementById('modal-feito-card-titulo');
   if (el) el.textContent = titulo || 'esta manutenção';
@@ -2237,12 +2277,33 @@ window._executarFeitoCard = function(recId) {
     .catch(function(err) { AL_CLIENTE.showAlert('Erro: ' + (err.message || 'tente novamente.')); });
 };
 
+window.abrirModalFeitoCardData = function(recId, titulo) {
+  const el = document.getElementById('modal-feito-card-titulo');
+  if (el) el.textContent = titulo || 'esta manutenção';
+  const btn = document.getElementById('btn-modal-feito-card-confirmar');
+  if (btn) btn.onclick = function() { window._executarFeitoCardData(recId); };
+  $('#modalFeitoCard').modal('show');
+};
+
+window._executarFeitoCardData = function(recId) {
+  $('#modalFeitoCard').modal('hide');
+  AL_CLIENTE.apiPost('/api/cliente/manutencoes/recorrencias-data/' + recId + '/feito', {})
+    .then(function() {
+      AL_CLIENTE.showAlert('Manutenção por data confirmada!', 'success');
+      if (ativoId) {
+        const v = veiculosMap[ativoId];
+        if (v) { v._recorrenciasDataCarregadas = false; _carregarRecorrenciasData(ativoId); }
+      }
+    })
+    .catch(function(err) { AL_CLIENTE.showAlert('Erro: ' + (err.message || 'tente novamente.')); });
+};
 
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id]; if (!v) return;
   ativoId = id;
   _salvarFocoCliente(id);
   _carregarKmConfig(id);
+  _carregarRecorrenciasData(id);
   const p = v.posicao;
   const isOnline = v.status === 'online', isMoving = isOnline && p?.emMovimento;
   const corStatus = isMoving ? '#2980b9' : isOnline ? '#27ae60' : '#e67e22';
@@ -2293,6 +2354,7 @@ function mostrarCardDispositivo(id) {
         <div id="dcard-velocimetro" style="flex-shrink:0;margin-top:-4px">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
       </div>
       <div id="dcard-oleo-status" style="margin-bottom:6px">${buildOleoStatusHtml(p, v)}</div>
+      <div id="dcard-data-status" style="margin-bottom:6px">${buildDataRecorrenciasHtml(v)}</div>
       <div id="dcard-horas">${horasHtml}</div>
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <div class="dcard-section-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -2425,6 +2487,8 @@ function atualizarCardAtivo(did) {
     elStatusItems.innerHTML = buildStatusHtmlCliente(p, bat2, batFa2, batCor2, v);
     const elOleo = document.getElementById('dcard-oleo-status');
     if (elOleo) elOleo.innerHTML = buildOleoStatusHtml(p, v);
+    const elData = document.getElementById('dcard-data-status');
+    if (elData) elData.innerHTML = buildDataRecorrenciasHtml(v);
   }
   const tsSrv = document.getElementById('dcard-ts-srv'), tsDev = document.getElementById('dcard-ts-dev'), tsGps = document.getElementById('dcard-ts-gps');
   if (tsSrv && p) tsSrv.textContent = fmtGPSTimeSec(p.serverTime);

@@ -743,9 +743,15 @@ class NotificationService {
         });
 
     for (const c of candidatos) {
-      const pref = await prisma.preferenciaNotificacao.findUnique({
-        where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId: c.id, dispositivoId: rec.dispositivoId, tipoEvento: 'manutencao' } },
+      // Tenta primeiro preferência específica 'recorrenciaData', depois fallback para 'manutencao'
+      let pref = await prisma.preferenciaNotificacao.findUnique({
+        where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId: c.id, dispositivoId: rec.dispositivoId, tipoEvento: 'recorrenciaData' } },
       });
+      if (!pref || (!pref.web && !pref.app && !pref.email)) {
+        pref = await prisma.preferenciaNotificacao.findUnique({
+          where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId: c.id, dispositivoId: rec.dispositivoId, tipoEvento: 'manutencao' } },
+        });
+      }
       const canal = rec.canalNotificacao || 'todos';
       const webOn = canal === 'todos' || canal === 'app';
       const emailOn = canal === 'todos' || canal === 'email';

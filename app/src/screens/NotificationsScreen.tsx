@@ -36,6 +36,7 @@ const TIPOS_NOTIF = [
   { id: 'kmReduzida', label: 'Km Reduzida (Período)', icon: 'chart-line-variant' },
   { id: 'trocaOleo', label: 'Troca de Óleo', icon: 'oil' },
   { id: 'manutencao', label: 'Manutenções (Recorrências)', icon: 'wrench' },
+  { id: 'recorrenciaData', label: 'Recorrência por Data', icon: 'calendar-check' },
 ];
 
 const CANAIS = [

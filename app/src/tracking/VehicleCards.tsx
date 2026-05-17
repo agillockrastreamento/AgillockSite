@@ -185,6 +185,7 @@ export function MainVehicleCard({
   const [address, setAddress] = useState<string | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [recurrences, setRecurrences] = useState<any[]>(device._recorrencias || []);
+  const [recorrenciasData, setRecorrenciasData] = useState<any[]>([]);
   const [deviceGeofences, setDeviceGeofences] = useState<DeviceGeofence[]>([]);
   const [isCreatingGeofence, setIsCreatingGeofence] = useState(false);
   const [isSendingCommand, setIsSendingCommand] = useState(false);
@@ -229,6 +230,19 @@ export function MainVehicleCard({
     } catch {}
   }, [device.dispositivoId]);
 
+  const fetchRecorrenciasData = useCallback(async () => {
+    try {
+      const data = await apiRequest<any[]>(`/cliente/manutencoes/recorrencias-data?dispositivoId=${device.dispositivoId}`);
+      if (data) {
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        setRecorrenciasData(
+          data.filter(r => r.ativa !== false && new Date(r.dataReferencia) <= new Date(hoje.getTime() + 24 * 60 * 60 * 1000))
+        );
+      }
+    } catch {}
+  }, [device.dispositivoId]);
+
   const loadGeofences = useCallback(async () => {
     const geofences = await getDeviceGeofences(device.dispositivoId);
     setDeviceGeofences(geofences);
@@ -237,7 +251,8 @@ export function MainVehicleCard({
   useEffect(() => {
     fetchSummary();
     fetchRecurrences();
-  }, [fetchSummary, fetchRecurrences]);
+    fetchRecorrenciasData();
+  }, [fetchSummary, fetchRecurrences, fetchRecorrenciasData]);
 
   useEffect(() => {
     if (!device.dispositivoId) return;
@@ -402,6 +417,23 @@ export function MainVehicleCard({
     }
   };
 
+  const markDateRecurrenceDone = async (id: string, title: string) => {
+    const confirmed = await confirm.show({
+      title: 'Confirmar Realizado',
+      message: `Confirmar que "${title}" foi realizado?`,
+      confirmLabel: 'Confirmar',
+    });
+    if (confirmed) {
+      try {
+        await apiRequest(`/cliente/manutencoes/recorrencias-data/${id}/feito`, { method: 'POST', body: {} });
+        toast.show({ message: 'Confirmado!', type: 'success' });
+        fetchRecorrenciasData();
+      } catch {
+        toast.show({ message: 'Erro ao confirmar.', type: 'error' });
+      }
+    }
+  };
+
   const maintenanceAlerts = recurrences.filter(r => {
     const odometroM = r.dispositivo?.odometroSistemaMetros ?? p?.odometro ?? null;
     if (odometroM == null) return false;
@@ -499,6 +531,30 @@ export function MainVehicleCard({
               </View>
               {device.podeGerenciarManutencao ? (
                 <Pressable style={styles.alertBtn} onPress={() => markMaintenanceDone(r.id, r.titulo)}>
+                  <Icon source="check" size={12} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
+            </View>
+          );
+        })}
+
+        {recorrenciasData.map(r => {
+          const data = new Date(r.dataReferencia);
+          const hoje = new Date();
+          hoje.setHours(0, 0, 0, 0);
+          const atrasada = data < hoje;
+          return (
+            <View key={r.id} style={styles.alertRow}>
+              <View style={styles.alertTextWrap}>
+                <Icon source="calendar-clock" size={14} color={atrasada ? colors.danger : '#8e44ad'} />
+                <Text style={[styles.alertText, { color: atrasada ? colors.danger : '#8e44ad' }]}>
+                  {atrasada
+                    ? `Pendente: ${r.titulo} (${data.toLocaleDateString('pt-BR')})`
+                    : `Hoje: ${r.titulo}`}
+                </Text>
+              </View>
+              {device.podeGerenciarManutencao ? (
+                <Pressable style={styles.alertBtn} onPress={() => markDateRecurrenceDone(r.id, r.titulo)}>
                   <Icon source="check" size={12} color={colors.textMuted} />
                 </Pressable>
               ) : null}

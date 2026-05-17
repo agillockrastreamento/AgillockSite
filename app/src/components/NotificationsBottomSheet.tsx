@@ -26,6 +26,9 @@ const EVENTO_TYPES = [
   { tipo: 'manutencaoAlerta', label: 'Alerta de Manutenção', color: '#e74c3c', icon: 'wrench' },
   { tipo: 'manutencaoAtrasada', label: 'Manutenção Atrasada', color: '#e74c3c', icon: 'wrench' },
   { tipo: 'manutencaoFeita', label: 'Manutenção Realizada', color: '#27ae60', icon: 'wrench' },
+  { tipo: 'recorrenciaDataAlerta', label: 'Alerta de Recorrência por Data', color: '#8e44ad', icon: 'calendar-clock' },
+  { tipo: 'recorrenciaDataNaoFeita', label: 'Recorrência por Data Atrasada', color: '#e74c3c', icon: 'calendar-remove' },
+  { tipo: 'recorrenciaDataFeita', label: 'Recorrência por Data Realizada', color: '#27ae60', icon: 'calendar-check' },
 ];
 
 type PeriodFilter = 'hoje' | 'ontem' | '7dias' | 'custom';

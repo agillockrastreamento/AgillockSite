@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Icon, IconButton } from 'react-native-paper';
 
@@ -221,6 +223,7 @@ export function ManutencaoScreen() {
   const [formRecData, setFormRecData] = useState<AddRecorrenciaDataPayload>(EMPTY_REC_DATA);
   const [editingRecDataId, setEditingRecDataId] = useState<string | null>(null);
   const [isSavingRecData, setIsSavingRecData] = useState(false);
+  const [showDatePickerRef, setShowDatePickerRef] = useState(false);
 
   const loadDispositivos = useCallback(async () => {
     try {
@@ -1064,16 +1067,53 @@ export function ManutencaoScreen() {
             ))}
           </ScrollView>
 
-          <Text style={styles.formLabel}>
-            {formRecData.tipoRecorrencia === 'AVULSA' ? 'Data da ocorrência *' : 'Próxima ocorrência *'}
-          </Text>
-          <TextInput
-            style={styles.formInput}
-            value={formRecData.dataReferencia}
-            onChangeText={v => setFormRecData(f => ({ ...f, dataReferencia: v }))}
-            placeholder="AAAA-MM-DD"
-            placeholderTextColor={colors.textMuted}
-          />
+          <View style={styles.infoBox}>
+            <Icon source="information-outline" size={16} color="#8e44ad" />
+            <Text style={styles.infoBoxText}>
+              {formRecData.tipoRecorrencia === 'AVULSA' && 'Ocorre uma única vez na data escolhida.'}
+              {formRecData.tipoRecorrencia === 'INTERVALO' && 'Repete a cada X dias após a conclusão. Ex: a cada 30 dias.'}
+              {formRecData.tipoRecorrencia === 'SEMANAL' && 'Repete toda semana nos dias marcados.'}
+              {formRecData.tipoRecorrencia === 'MENSAL' && 'Repete todo mês no dia informado. Ex: todo dia 15.'}
+              {formRecData.tipoRecorrencia === 'ANUAL' && 'Repete todo ano na data informada. Ex: 05 de Janeiro.'}
+            </Text>
+          </View>
+
+          {['AVULSA', 'INTERVALO', 'SEMANAL'].includes(formRecData.tipoRecorrencia) && (
+            <>
+              <Text style={styles.formLabel}>
+                {formRecData.tipoRecorrencia === 'AVULSA'
+                  ? 'Data da ocorrência *'
+                  : formRecData.tipoRecorrencia === 'INTERVALO'
+                  ? 'Primeira ocorrência *'
+                  : 'Próxima ocorrência *'}
+              </Text>
+              <Pressable
+                style={[styles.formInput, { justifyContent: 'center' }]}
+                onPress={() => setShowDatePickerRef(true)}
+              >
+                <Text style={{ color: formRecData.dataReferencia ? colors.text : colors.textMuted }}>
+                  {formRecData.dataReferencia
+                    ? new Date(formRecData.dataReferencia + 'T12:00:00').toLocaleDateString('pt-BR')
+                    : 'Selecionar data'}
+                </Text>
+              </Pressable>
+              {showDatePickerRef && (
+                <DateTimePicker
+                  value={formRecData.dataReferencia ? new Date(formRecData.dataReferencia + 'T12:00:00') : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(_event: any, selectedDate?: Date) => {
+                    setShowDatePickerRef(false);
+                    if (selectedDate) {
+                      setFormRecData(f => ({ ...f, dataReferencia: selectedDate.toISOString().slice(0, 10) }));
+                    }
+                  }}
+                  minimumDate={new Date()}
+                  locale="pt-BR"
+                />
+              )}
+            </>
+          )}
 
           {formRecData.tipoRecorrencia === 'INTERVALO' && (
             <>
@@ -1118,7 +1158,7 @@ export function ManutencaoScreen() {
 
           {(formRecData.tipoRecorrencia === 'MENSAL' || formRecData.tipoRecorrencia === 'ANUAL') && (
             <>
-              <Text style={styles.formLabel}>Dia do mês *</Text>
+              <Text style={styles.formLabel}>Dia do mês (1-31) *</Text>
               <TextInput
                 style={styles.formInput}
                 value={formRecData.diaDoMes}
@@ -1132,7 +1172,7 @@ export function ManutencaoScreen() {
 
           {formRecData.tipoRecorrencia === 'ANUAL' && (
             <>
-              <Text style={styles.formLabel}>Mês (1-12) *</Text>
+              <Text style={styles.formLabel}>Mês *</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
                 {MESES_ABREV.map((mes, idx) => {
                   const num = idx + 1;
@@ -1762,5 +1802,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: colors.primaryText,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(142,68,173,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(142,68,173,0.2)',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 14,
+  },
+  infoBoxText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#8e44ad',
+    lineHeight: 17,
   },
 });

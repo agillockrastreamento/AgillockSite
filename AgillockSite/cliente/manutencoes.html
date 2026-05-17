@@ -685,12 +685,19 @@
             <textarea id="crecdata-descricao" class="form-control" rows="2" placeholder="Observações..."></textarea>
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="man-modal-label"><i class="fa fa-bell" style="margin-right:4px;color:#8e44ad;"></i>Canal de notificação</label>
-            <select id="crecdata-canal" class="form-control" style="max-width:200px;margin-top:6px;">
-              <option value="todos">App + E-mail</option>
-              <option value="app">Somente App</option>
-              <option value="email">Somente E-mail</option>
-            </select>
+            <label class="man-modal-label"><i class="fa fa-bell" style="margin-right:4px;color:#8e44ad;"></i>Notificar via</label>
+            <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="crecdata-canal-web" /> <i class="fa fa-desktop" style="color:#2980b9;"></i> Web
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="crecdata-canal-app" checked /> <i class="fa fa-mobile" style="color:#27ae60;"></i> App
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;font-size:13px;margin:0;">
+                <input type="checkbox" id="crecdata-canal-email" checked /> <i class="fa fa-envelope-o" style="color:#8e44ad;"></i> E-mail
+              </label>
+            </div>
+            <p style="font-size:11px;color:#8a9ab0;margin:6px 0 0;">Canais para receber alertas desta recorrência.</p>
           </div>
         </div>
         <div class="modal-footer">

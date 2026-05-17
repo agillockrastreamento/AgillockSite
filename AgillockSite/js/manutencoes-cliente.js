@@ -2,6 +2,27 @@
 
 (function () {
 
+  // ── Helpers de canal (checkboxes ↔ canalNotificacao) ─────────────────────────
+  function canalParaCheckboxes(canal, prefix) {
+    const web   = document.getElementById(prefix + 'canal-web');
+    const app   = document.getElementById(prefix + 'canal-app');
+    const email = document.getElementById(prefix + 'canal-email');
+    if (!web || !app || !email) return;
+    if (canal === 'app') { web.checked = false; app.checked = true; email.checked = false; }
+    else if (canal === 'email') { web.checked = false; app.checked = false; email.checked = true; }
+    else { web.checked = true; app.checked = true; email.checked = true; }
+  }
+
+  function checkboxesParaCanal(prefix) {
+    const app   = document.getElementById(prefix + 'canal-app');
+    const email = document.getElementById(prefix + 'canal-email');
+    if (!app || !email) return 'todos';
+    if (app.checked && email.checked) return 'todos';
+    if (app.checked) return 'app';
+    if (email.checked) return 'email';
+    return 'todos';
+  }
+
   // ── Estado ────────────────────────────────────────────────────────────────────
   let veiculos = [];
   let dispositivoIdAtivo = null;
@@ -749,7 +770,7 @@
     document.getElementById('cbtn-salvar-recdata-label').textContent = 'Criar Recorrência';
     ['crecdata-titulo','crecdata-descricao'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('crecdata-tipo').value = 'AVULSA';
-    document.getElementById('crecdata-canal').value = 'todos';
+    canalParaCheckboxes('todos', 'crecdata-');
     document.querySelectorAll('.crecdata-dia-semana').forEach(cb => { cb.checked = false; });
     cAtualizarCamposRecData();
     $('#modalRecorrenciaData').modal('show');
@@ -765,7 +786,7 @@
     document.getElementById('crecdata-descricao').value = r.descricao || '';
     document.getElementById('crecdata-tipo').value = r.tipoRecorrencia || 'AVULSA';
     document.getElementById('crecdata-data').value = r.dataReferencia ? new Date(r.dataReferencia).toISOString().slice(0,10) : '';
-    document.getElementById('crecdata-canal').value = r.canalNotificacao || 'todos';
+    canalParaCheckboxes(r.canalNotificacao || 'todos', 'crecdata-');
     if (r.intervaloDias) document.getElementById('crecdata-intervalo-dias').value = r.intervaloDias;
     if (r.diaDoMes) { document.getElementById('crecdata-dia-mes').value = r.diaDoMes; document.getElementById('crecdata-dia-anual').value = r.diaDoMes; }
     if (r.mesDoAno) document.getElementById('crecdata-mes-ano').value = r.mesDoAno;
@@ -817,7 +838,7 @@
       dataReferencia = new Date(ano, mesDoAno - 1, diaDoMes).toISOString().slice(0,10);
     }
 
-    const payload = { dispositivoId: dispositivoIdAtivo, titulo, descricao: document.getElementById('crecdata-descricao').value.trim() || null, tipoRecorrencia: tipo, dataReferencia, intervaloDias, diasSemana, diaDoMes, mesDoAno, canalNotificacao: document.getElementById('crecdata-canal').value };
+    const payload = { dispositivoId: dispositivoIdAtivo, titulo, descricao: document.getElementById('crecdata-descricao').value.trim() || null, tipoRecorrencia: tipo, dataReferencia, intervaloDias, diasSemana, diaDoMes, mesDoAno, canalNotificacao: checkboxesParaCanal('crecdata-') };
 
     const btn = document.getElementById('cbtn-salvar-recdata');
     btn.disabled = true;

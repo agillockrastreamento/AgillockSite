@@ -62,6 +62,8 @@ const _resumoHojeCache = {};
 const _resumoHojePendentes = {};
 const _manutencoesAdminCache = {};
 const _manutencoesAdminPendentes = {};
+const _manutencoesDataAdminCache = {};
+const _manutencoesDataAdminPendentes = {};
 const ADMIN_FOCUS_STORAGE_KEY = 'rastreamento_admin_foco';
 let _attrsTrayOpen = false;
 let _googleMapLayers = {};
@@ -2824,6 +2826,86 @@ window._executarFeitoCardAdmin = function(recId) {
     .catch(function(err) { window.AL.showAlert('Erro: ' + (err.message || 'tente novamente.')); });
 };
 
+function _buildManutencoesDataAdminHtml(dispositivoId) {
+  const recs = _manutencoesDataAdminCache[dispositivoId] || [];
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  const btnBg = isDark ? '#2d3748' : '#e9ecef';
+  const btnBd = isDark ? '#4a5568' : '#ccc';
+  const btnClr = isDark ? '#cbd5e0' : '#555';
+  const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const visibles = recs.filter(r => r.ativa !== false && new Date(r.dataReferencia) <= new Date(hoje.getTime() + 24 * 60 * 60 * 1000));
+  if (!visibles.length) return '';
+  return `
+    <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
+      <div class="dcard-section-title">Manutenções por Data</div>
+      ${visibles.map(r => {
+        const dataRec = new Date(r.dataReferencia);
+        dataRec.setHours(0, 0, 0, 0);
+        const atrasada = dataRec < hoje;
+        const cor = atrasada ? '#e74c3c' : '#8e44ad';
+        const fmtData = new Date(r.dataReferencia).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const texto = atrasada
+          ? `Atrasada: ${esc(r.titulo)} (${fmtData})`
+          : `Hoje: ${esc(r.titulo)}`;
+        return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-calendar" style="flex-shrink:0;"></i>${texto}<button onclick="abrirModalFeitoCardDataAdmin('${r.id}','${String(r.titulo || '').replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Confirmar manutenção"><i class="fa fa-check"></i></button></span>`;
+      }).join('<br>')}
+    </div>`;
+}
+
+function _renderManutencoesDataCardAdmin(dispositivoId) {
+  const alvo = document.getElementById(`dcard-manutencoes-data-wrap-${dispositivoId}`);
+  if (!alvo) return;
+  alvo.innerHTML = _buildManutencoesDataAdminHtml(dispositivoId);
+  _posicionarBotaoTrayAtributos();
+}
+
+function _carregarManutencoesDataCardAdmin(dispositivoId) {
+  const v = veiculosMap[dispositivoId];
+  if (!v?.clienteLoginId) return;
+  if (_manutencoesDataAdminCache[dispositivoId]) {
+    _renderManutencoesDataCardAdmin(dispositivoId);
+    return;
+  }
+  if (_manutencoesDataAdminPendentes[dispositivoId]) return;
+  _manutencoesDataAdminPendentes[dispositivoId] = true;
+  window.AL.apiGet(`/api/manutencoes-admin/clientes/${encodeURIComponent(v.clienteLoginId)}/recorrencias-data?dispositivoId=${encodeURIComponent(dispositivoId)}`)
+    .then(data => {
+      _manutencoesDataAdminCache[dispositivoId] = (data || []).filter(r => r.ativa !== false);
+      _renderManutencoesDataCardAdmin(dispositivoId);
+    })
+    .catch(() => {
+      _manutencoesDataAdminCache[dispositivoId] = [];
+      _renderManutencoesDataCardAdmin(dispositivoId);
+    })
+    .finally(() => {
+      delete _manutencoesDataAdminPendentes[dispositivoId];
+    });
+}
+
+window.abrirModalFeitoCardDataAdmin = function(recId, titulo) {
+  const el = document.getElementById('modal-feito-card-titulo');
+  if (el) el.textContent = titulo || 'esta manutenção';
+  const btn = document.getElementById('btn-modal-feito-card-confirmar');
+  if (btn) btn.onclick = function() { window._executarFeitoCardDataAdmin(recId); };
+  $('#modalFeitoCard').modal('show');
+};
+
+window._executarFeitoCardDataAdmin = function(recId) {
+  const dispositivoId = ativoId;
+  const v = dispositivoId ? veiculosMap[dispositivoId] : null;
+  if (!v?.clienteLoginId) return;
+  $('#modalFeitoCard').modal('hide');
+  window.AL.apiPost(`/api/manutencoes-admin/clientes/${encodeURIComponent(v.clienteLoginId)}/recorrencias-data/${encodeURIComponent(recId)}/feito`, {})
+    .then(function() {
+      window.AL.showAlert('Manutenção por data confirmada!', 'success');
+      delete _manutencoesDataAdminCache[dispositivoId];
+      _carregarManutencoesDataCardAdmin(dispositivoId);
+    })
+    .catch(function(err) { window.AL.showAlert('Erro: ' + (err.message || 'tente novamente.')); });
+};
+
 function mostrarCardDispositivo(id) {
   const v = veiculosMap[id];
   if (!v) return;
@@ -2918,6 +3000,7 @@ function mostrarCardDispositivo(id) {
       <div id="dcard-status-items" style="font-size:12px;display:flex;flex-direction:column;gap:3px;margin-bottom:8px">${si.join('')}</div>
       ${horasHtml}
       ${v.clienteLoginId ? `<div id="dcard-manutencoes-wrap-${id}"></div>` : ''}
+      ${v.clienteLoginId ? `<div id="dcard-manutencoes-data-wrap-${id}"></div>` : ''}
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
             <div class="dcard-section-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
               Endereço
@@ -2972,6 +3055,7 @@ function mostrarCardDispositivo(id) {
   _posicionarBotaoTrayAtributos();
   _carregarResumoHojeAdmin(id);
   _carregarManutencoesCardAdmin(id);
+  _carregarManutencoesDataCardAdmin(id);
 
   if (p && !hasCached) {
     geocodificarCoordenadas(p.latitude, p.longitude, addrId);

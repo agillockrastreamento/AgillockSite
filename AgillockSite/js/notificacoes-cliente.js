@@ -17,6 +17,10 @@
     { id: 'manutencaoAlerta',   label: 'Alerta de Manutenção',       icon: 'fa-wrench',               iconClass: 'ic-manutencao-alerta', hidden: true },
     { id: 'manutencaoAtrasada', label: 'Manutenção Atrasada',        icon: 'fa-exclamation-triangle', iconClass: 'ic-manutencao-atrasada', hidden: true },
     { id: 'manutencaoFeita',    label: 'Manutenção Realizada',       icon: 'fa-check-circle',         iconClass: 'ic-manutencao-feita', hidden: true },
+    { id: 'recorrenciaData',         label: 'Recorrência por Data',       icon: 'fa-calendar-check-o', iconClass: 'ic-manutencao' },
+    { id: 'recorrenciaDataAlerta',   label: 'Alerta de Recorrência Data', icon: 'fa-calendar',         iconClass: 'ic-manutencao-alerta', hidden: true },
+    { id: 'recorrenciaDataNaoFeita', label: 'Recorrência Data Atrasada',  icon: 'fa-calendar-times-o', iconClass: 'ic-manutencao-atrasada', hidden: true },
+    { id: 'recorrenciaDataFeita',    label: 'Recorrência Data Realizada', icon: 'fa-calendar-check-o', iconClass: 'ic-manutencao-feita', hidden: true },
   ];
 
   const CANAIS = [
