@@ -4,6 +4,7 @@
 
   // ── Estado ────────────────────────────────────────────────────────────────────
   let clientes = [];
+  let dispositivos = [];
   let clienteLoginIdAtivo = null;
   let dispositivoIdAtivo = null;
   let registros = [];
@@ -197,14 +198,27 @@
     }
   }
 
+  function manutencaoAtiva() {
+    const d = dispositivos.find(d => d.id === dispositivoIdAtivo);
+    return !d || d.manutencaoAtiva !== false;
+  }
+
+  function atualizarBannerManutencao() {
+    const banner = document.getElementById('man-banner-desativado');
+    if (!banner) return;
+    if (dispositivoIdAtivo && !manutencaoAtiva()) banner.classList.add('visivel');
+    else banner.classList.remove('visivel');
+  }
+
   async function carregarDispositivosCliente(loginId) {
     const sel = document.getElementById('filtro-dispositivo');
     sel.innerHTML = '<option value="">Carregando...</option>';
     document.getElementById('wrap-filtro-dispositivo').style.display = 'block';
     try {
       const data = await AL.apiGet('/api/manutencoes-admin/clientes/' + loginId + '/dispositivos');
+      dispositivos = data || [];
       sel.innerHTML = '<option value="">Selecione um dispositivo...</option>' +
-        (data || []).map(d => `<option value="${d.id}">${d.nome}${d.placa ? ' (' + d.placa + ')' : ''}</option>`).join('');
+        dispositivos.map(d => `<option value="${d.id}">${d.nome}${d.placa ? ' (' + d.placa + ')' : ''}</option>`).join('');
       renderPickerDispositivo('');
     } catch (err) {
       AL.showAlert('Erro ao carregar dispositivos: ' + err.message);
@@ -232,11 +246,14 @@
       const id = this.value;
       clienteLoginIdAtivo = id || null;
       dispositivoIdAtivo = null;
+      dispositivos = [];
       document.getElementById('cliente-man-container').style.display = 'none';
       document.getElementById('cliente-man-vazio').style.display = 'flex';
       document.getElementById('wrap-acoes-cliente').style.display = id ? 'flex' : 'none';
       document.getElementById('btn-novo-registro').disabled = true;
       document.getElementById('btn-nova-recorrencia').disabled = true;
+      const banner = document.getElementById('man-banner-desativado');
+      if (banner) banner.classList.remove('visivel');
       if (!id) { document.getElementById('wrap-filtro-dispositivo').style.display = 'none'; renderPickerDispositivo(''); return; }
       const c = clientes.find(c => c.id === id);
       document.getElementById('c-nome-cliente').textContent = c ? c.nome : '—';
@@ -248,9 +265,18 @@
       dispositivoIdAtivo = id || null;
       document.getElementById('cliente-man-container').style.display = 'none';
       document.getElementById('cliente-man-vazio').style.display = id ? 'none' : 'flex';
-      document.getElementById('btn-novo-registro').disabled = !id;
-      document.getElementById('btn-nova-recorrencia').disabled = !id;
-      if (!id) { renderPickerDispositivo(document.getElementById('man-busca-placa-dispositivo')?.value || ''); return; }
+      if (!id) {
+        document.getElementById('btn-novo-registro').disabled = true;
+        document.getElementById('btn-nova-recorrencia').disabled = true;
+        const banner = document.getElementById('man-banner-desativado');
+        if (banner) banner.classList.remove('visivel');
+        renderPickerDispositivo(document.getElementById('man-busca-placa-dispositivo')?.value || '');
+        return;
+      }
+      const ativa = manutencaoAtiva();
+      atualizarBannerManutencao();
+      document.getElementById('btn-novo-registro').disabled = !ativa;
+      document.getElementById('btn-nova-recorrencia').disabled = !ativa;
       const opt = this.options[this.selectedIndex];
       document.getElementById('c-nome-dispositivo').textContent = opt ? opt.text : '—';
       document.getElementById('cliente-man-container').style.display = 'block';

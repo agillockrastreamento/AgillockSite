@@ -237,6 +237,16 @@
     #man-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
     #man-lightbox-close { position: absolute; top: 18px; right: 24px; color: #fff;
       font-size: 28px; cursor: pointer; background: none; border: none; line-height: 1; }
+
+    /* ── Banner manutenção desativada ── */
+    #man-banner-desativado {
+      display: none; align-items: center; gap: 12px;
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 10px;
+      padding: 14px 18px; margin-bottom: 20px;
+      font-size: 13px; color: #856404; font-weight: 600;
+    }
+    html.dark-theme #man-banner-desativado { background: rgba(255,193,7,.12); border-color: rgba(255,193,7,.4); color: #d4a107; }
+    #man-banner-desativado.visivel { display: flex; }
   </style>
 </head>
 <body>
@@ -338,6 +348,12 @@
               <i class="fa fa-users"></i> Múltiplos Clientes
             </button>
           </div>
+        </div>
+
+        <!-- Banner: manutenções desativadas -->
+        <div id="man-banner-desativado">
+          <i class="fa fa-exclamation-triangle"></i>
+          <span>Manutenções desativadas para este dispositivo. Você pode visualizar o histórico, mas não poderá registrar novas manutenções ou configurar recorrências.</span>
         </div>
 
         <!-- Loaded state -->

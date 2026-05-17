@@ -137,7 +137,7 @@ router.get('/clientes/:clienteLoginId/dispositivos', async (req, res) => {
 
     const dispositivos = await prisma.dispositivo.findMany({
       where: { id: { in: ids } },
-      select: { id: true, nome: true, placa: true, odometroSistemaMetros: true },
+      select: { id: true, nome: true, placa: true, odometroSistemaMetros: true, manutencaoAtiva: true },
       orderBy: { nome: 'asc' },
     });
 
@@ -196,6 +196,11 @@ router.post('/clientes/:clienteLoginId/registros', async (req: any, res) => {
       return res.status(403).json({ message: 'Dispositivo não pertence a este cliente.' });
     }
     const clienteLoginIdCanonical = ctx.loginCanonicalPorDispositivo.get(dispositivoId) || clienteLoginId;
+
+    const dispCheck = await prisma.dispositivo.findUnique({ where: { id: dispositivoId }, select: { manutencaoAtiva: true } });
+    if (!dispCheck?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
 
     const registro = await prisma.manutencaoRegistro.create({
       data: {
@@ -288,8 +293,11 @@ router.post('/clientes/:clienteLoginId/recorrencias', async (req: any, res) => {
 
     const dispositivo = await prisma.dispositivo.findUnique({
       where: { id: dispositivoId },
-      select: { odometroSistemaMetros: true },
+      select: { odometroSistemaMetros: true, manutencaoAtiva: true },
     });
+    if (!dispositivo?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
     const kmBase = (dispositivo?.odometroSistemaMetros ?? 0) / 1000;
 
     const recorrencia = await prisma.manutencaoRecorrencia.create({
@@ -322,6 +330,10 @@ router.put('/registros/:id', async (req: any, res) => {
     const { titulo, tipo, dataRealizacao, kmRealizacao, custo, oficina, notas, fotos } = req.body;
     const existing = await prisma.manutencaoRegistro.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ message: 'Registro não encontrado.' });
+    const dispCheckReg = await prisma.dispositivo.findUnique({ where: { id: existing.dispositivoId }, select: { manutencaoAtiva: true } });
+    if (!dispCheckReg?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
     const updated = await prisma.manutencaoRegistro.update({
       where: { id },
       data: {
@@ -350,6 +362,10 @@ router.put('/clientes/:clienteLoginId/recorrencias/:id', async (req, res) => {
     const { titulo, descricao, intervaloKm } = req.body;
     const existing = await prisma.manutencaoRecorrencia.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ message: 'Recorrência não encontrada.' });
+    const dispCheckRec = await prisma.dispositivo.findUnique({ where: { id: existing.dispositivoId }, select: { manutencaoAtiva: true } });
+    if (!dispCheckRec?.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
     const updated = await prisma.manutencaoRecorrencia.update({
       where: { id },
       data: {
@@ -375,9 +391,12 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
 
     const recorrencia = await prisma.manutencaoRecorrencia.findFirst({
       where: { id },
-      include: { dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true } } },
+      include: { dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true, manutencaoAtiva: true } } },
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
+    if (!recorrencia.dispositivo.manutencaoAtiva) {
+      return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
+    }
 
     const clienteLoginIdCanonical = recorrencia.clienteLoginId || clienteLoginId;
     const kmAtual = (recorrencia.dispositivo.odometroSistemaMetros ?? 0) / 1000;
