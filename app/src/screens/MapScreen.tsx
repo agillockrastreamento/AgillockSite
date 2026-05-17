@@ -553,7 +553,12 @@ export function MapScreen() {
     [],
   );
 
-  useTrackingWebSocket(devices, traccarDeviceIndex, handleWebSocketMessage);
+  const handleWebSocketEvent = useCallback(() => {
+    if (notificationsSheetVisible) return;
+    setUnreadCount((current) => current + 1);
+  }, [notificationsSheetVisible]);
+
+  useTrackingWebSocket(devices, traccarDeviceIndex, handleWebSocketMessage, handleWebSocketEvent);
 
   const focusUserLocation = useCallback(async () => {
     try {

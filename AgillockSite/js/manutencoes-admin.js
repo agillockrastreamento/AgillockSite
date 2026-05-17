@@ -8,16 +8,25 @@
     const app   = document.getElementById(prefix + 'canal-app');
     const email = document.getElementById(prefix + 'canal-email');
     if (!web || !app || !email) return;
-    if (canal === 'app') { web.checked = false; app.checked = true; email.checked = false; }
+    if (canal === 'web') { web.checked = true; app.checked = false; email.checked = false; }
+    else if (canal === 'app') { web.checked = false; app.checked = true; email.checked = false; }
     else if (canal === 'email') { web.checked = false; app.checked = false; email.checked = true; }
+    else if (canal === 'web_app') { web.checked = true; app.checked = true; email.checked = false; }
+    else if (canal === 'web_email') { web.checked = true; app.checked = false; email.checked = true; }
+    else if (canal === 'app_email') { web.checked = false; app.checked = true; email.checked = true; }
     else { web.checked = true; app.checked = true; email.checked = true; }
   }
 
   function checkboxesParaCanal(prefix) {
+    const web   = document.getElementById(prefix + 'canal-web');
     const app   = document.getElementById(prefix + 'canal-app');
     const email = document.getElementById(prefix + 'canal-email');
-    if (!app || !email) return 'todos';
-    if (app.checked && email.checked) return 'todos';
+    if (!web || !app || !email) return 'todos';
+    if (web.checked && app.checked && email.checked) return 'todos';
+    if (web.checked && app.checked) return 'web_app';
+    if (web.checked && email.checked) return 'web_email';
+    if (app.checked && email.checked) return 'app_email';
+    if (web.checked) return 'web';
     if (app.checked) return 'app';
     if (email.checked) return 'email';
     return 'todos';
@@ -503,6 +512,28 @@
     } catch { /* mantém desmarcado */ }
   }
 
+  async function _carregarCanaisRecorrenciaData() {
+    if (!clienteLoginIdAtivo || !dispositivoIdAtivo) return;
+    try {
+      const data = await AL.apiGet('/api/notificacoes-admin/clientes/' + clienteLoginIdAtivo + '/preferencias/' + dispositivoIdAtivo);
+      const pref = data?.preferencias?.recorrenciaData || {};
+      if (pref.web === undefined && pref.app === undefined && pref.email === undefined) return;
+      document.getElementById('recdata-canal-web').checked = pref.web || false;
+      document.getElementById('recdata-canal-app').checked = pref.app || false;
+      document.getElementById('recdata-canal-email').checked = pref.email || false;
+    } catch { /* mantem padrao do modal */ }
+  }
+
+  async function _salvarPreferenciaRecorrenciaData() {
+    const web = document.getElementById('recdata-canal-web').checked;
+    const app = document.getElementById('recdata-canal-app').checked;
+    const email = document.getElementById('recdata-canal-email').checked;
+    await AL.apiPost('/api/notificacoes-admin/clientes/' + clienteLoginIdAtivo + '/preferencias', {
+      dispositivoId: dispositivoIdAtivo,
+      preferencias: { recorrenciaData: { web, app, email } },
+    }).catch(function() {});
+  }
+
   function abrirModalRecorrencia() {
     editandoRecorrenciaId = null;
     atualizarVeiculoModal('recorrencia');
@@ -965,6 +996,7 @@
     document.getElementById('recdata-tipo').value = 'AVULSA';
     document.getElementById('recdata-data').value = '';
     canalParaCheckboxes('todos', 'recdata-');
+    _carregarCanaisRecorrenciaData();
     document.querySelectorAll('.recdata-dia-semana').forEach(cb => { cb.checked = false; });
     atualizarCamposRecData();
     $('#modalRecorrenciaData').modal('show');
@@ -1061,6 +1093,7 @@
         await AL.apiPost('/api/manutencoes-admin/clientes/' + clienteLoginIdAtivo + '/recorrencias-data', payload);
         AL.showAlert('Recorrência por data criada!', 'success');
       }
+      await _salvarPreferenciaRecorrenciaData();
       $('#modalRecorrenciaData').modal('hide');
       carregarDados(clienteLoginIdAtivo, dispositivoIdAtivo);
     } catch (err) {

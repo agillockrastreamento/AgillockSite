@@ -5,6 +5,7 @@ import prisma from '../utils/prisma';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
 import { broadcastTrackingEvents } from '../services/traccar.ws';
+import ExpoPushService from '../services/expo-push.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -94,6 +95,20 @@ async function _ativarNotificacaoManutencao(clienteLoginId: string, dispositivoI
     });
   } catch (err) {
     console.error('Erro ao ativar notificação de manutenção:', err);
+  }
+}
+
+async function _ativarNotificacaoRecorrenciaData(clienteLoginId: string, dispositivoId: string) {
+  try {
+    await prisma.preferenciaNotificacao.upsert({
+      where: {
+        clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'recorrenciaData' },
+      },
+      update: { web: true, app: true, email: true },
+      create: { clienteLoginId, dispositivoId, tipoEvento: 'recorrenciaData', web: true, app: true, email: true },
+    });
+  } catch (err) {
+    console.error('Erro ao ativar notificaÃ§Ã£o de recorrÃªncia por data:', err);
   }
 }
 
@@ -461,6 +476,13 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
         },
       });
     }
+    if (prefFeita?.app) {
+      await ExpoPushService.enviarParaCliente(clienteLoginIdCanonical, {
+        title: 'ManutenÃ§Ã£o Realizada',
+        body: mensagemFeita,
+        data: { tipo: 'manutencaoFeita', dispositivoId: recorrencia.dispositivoId },
+      });
+    }
 
     // Broadcast único — evita que o frontend exiba a notificação em duplicata
     broadcastTrackingEvents([{
@@ -666,7 +688,7 @@ router.post('/clientes/:clienteLoginId/recorrencias-data', async (req: any, res)
       include: { dispositivo: { select: { nome: true, placa: true } } },
     });
 
-    await _ativarNotificacaoManutencao(clienteLoginIdCanonical, dispositivoId);
+    await _ativarNotificacaoRecorrenciaData(clienteLoginIdCanonical, dispositivoId);
     res.json(recorrencia);
   } catch (err) {
     console.error(err);
@@ -756,6 +778,27 @@ router.post('/clientes/:clienteLoginId/recorrencias-data/:id/feito', async (req:
     await prisma.eventoNotificacao.create({
       data: { clienteLoginId: clienteLoginIdCanonical, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'recorrenciaDataFeita', origemTipo: 'ADMIN', origemId: recorrencia.id, adminEvento: true, mensagem, latitude: null, longitude: null, velocidade: null },
     });
+
+    let pref = await prisma.preferenciaNotificacao.findUnique({
+      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId: clienteLoginIdCanonical, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'recorrenciaData' } },
+    });
+    if (!pref) {
+      pref = await prisma.preferenciaNotificacao.findUnique({
+        where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId: clienteLoginIdCanonical, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
+      });
+    }
+    if (pref && (pref.web || pref.app)) {
+      await prisma.eventoNotificacao.create({
+        data: { clienteLoginId: clienteLoginIdCanonical, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'recorrenciaDataFeita', origemTipo: 'ADMIN', origemId: recorrencia.id, adminEvento: false, mensagem, latitude: null, longitude: null, velocidade: null },
+      });
+    }
+    if (pref?.app) {
+      await ExpoPushService.enviarParaCliente(clienteLoginIdCanonical, {
+        title: 'RecorrÃªncia Realizada',
+        body: mensagem,
+        data: { tipo: 'recorrenciaDataFeita', dispositivoId: recorrencia.dispositivoId },
+      });
+    }
 
     broadcastTrackingEvents([{
       deviceId: recorrencia.dispositivo.traccarId,

@@ -5,6 +5,7 @@ import prisma from '../utils/prisma';
 import { clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
 import { broadcastTrackingEvents } from '../services/traccar.ws';
 import { traccarGetDeviceByImei, traccarGetPositions } from '../services/traccar.service';
+import ExpoPushService from '../services/expo-push.service';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
@@ -78,6 +79,20 @@ async function _ativarNotificacaoManutencao(clienteLoginId: string, dispositivoI
     });
   } catch (err) {
     console.error('Erro ao ativar notificação de manutenção:', err);
+  }
+}
+
+async function _ativarNotificacaoRecorrenciaData(clienteLoginId: string, dispositivoId: string) {
+  try {
+    await prisma.preferenciaNotificacao.upsert({
+      where: {
+        clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'recorrenciaData' },
+      },
+      update: { web: true, app: true, email: true },
+      create: { clienteLoginId, dispositivoId, tipoEvento: 'recorrenciaData', web: true, app: true, email: true },
+    });
+  } catch (err) {
+    console.error('Erro ao ativar notificaÃ§Ã£o de recorrÃªncia por data:', err);
   }
 }
 
@@ -388,6 +403,13 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
         },
       });
     }
+    if (prefFeita?.app) {
+      await ExpoPushService.enviarParaCliente(clienteLoginId, {
+        title: 'ManutenÃ§Ã£o Realizada',
+        body: mensagemFeita,
+        data: { tipo: 'manutencaoFeita', dispositivoId: recorrencia.dispositivoId },
+      });
+    }
 
     // Broadcast único — evita que o frontend exiba a notificação em duplicata
     broadcastTrackingEvents([{
@@ -581,7 +603,7 @@ router.post('/recorrencias-data', async (req: any, res) => {
       include: { dispositivo: { select: { nome: true, placa: true } } },
     });
 
-    await _ativarNotificacaoManutencao(clienteLoginId, dispositivoId);
+    await _ativarNotificacaoRecorrenciaData(clienteLoginId, dispositivoId);
 
     res.json(recorrencia);
   } catch (err: any) {
@@ -713,9 +735,14 @@ router.post('/recorrencias-data/:id/feito', async (req: any, res) => {
     const pl = recorrencia.dispositivo.placa ? ` (${recorrencia.dispositivo.placa})` : '';
     const mensagem = `Recorrência "${recorrencia.titulo}" no veículo ${nome}${pl} marcada como realizada!${novaData ? ` Próxima ocorrência: ${novaData.toLocaleDateString('pt-BR')}.` : ''}`;
 
-    const pref = await prisma.preferenciaNotificacao.findUnique({
-      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
+    let pref = await prisma.preferenciaNotificacao.findUnique({
+      where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'recorrenciaData' } },
     });
+    if (!pref) {
+      pref = await prisma.preferenciaNotificacao.findUnique({
+        where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'manutencao' } },
+      });
+    }
 
     await prisma.eventoNotificacao.create({
       data: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'recorrenciaDataFeita', origemTipo: recorrencia.origem, origemId: recorrencia.id, adminEvento: true, mensagem, latitude: null, longitude: null, velocidade: null },
@@ -724,6 +751,13 @@ router.post('/recorrencias-data/:id/feito', async (req: any, res) => {
     if (pref && (pref.web || pref.app)) {
       await prisma.eventoNotificacao.create({
         data: { clienteLoginId, dispositivoId: recorrencia.dispositivoId, tipoEvento: 'recorrenciaDataFeita', origemTipo: recorrencia.origem, origemId: recorrencia.id, adminEvento: false, mensagem, latitude: null, longitude: null, velocidade: null },
+      });
+    }
+    if (pref?.app) {
+      await ExpoPushService.enviarParaCliente(clienteLoginId, {
+        title: 'RecorrÃªncia Realizada',
+        body: mensagem,
+        data: { tipo: 'recorrenciaDataFeita', dispositivoId: recorrencia.dispositivoId },
       });
     }
 

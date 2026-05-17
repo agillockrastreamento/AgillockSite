@@ -753,9 +753,9 @@ class NotificationService {
         });
       }
       const canal = rec.canalNotificacao || 'todos';
-      const webOn = canal === 'todos' || canal === 'app';
-      const emailOn = canal === 'todos' || canal === 'email';
-      const appOn = canal === 'todos' || canal === 'app';
+      const webOn = canal === 'todos' || canal === 'web' || canal === 'web_app' || canal === 'web_email';
+      const appOn = canal === 'todos' || canal === 'app' || canal === 'web_app' || canal === 'app_email';
+      const emailOn = canal === 'todos' || canal === 'email' || canal === 'web_email' || canal === 'app_email';
       if (pref && (pref.web || pref.app || pref.email)) {
         targets.push({ clienteLoginId: c.id, pref: { web: pref.web && webOn, app: pref.app && appOn, email: pref.email && emailOn } });
       }

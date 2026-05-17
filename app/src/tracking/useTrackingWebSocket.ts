@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { trackingWs, type TrackingMessage, type WsPosition } from './trackingWebSocket';
+import { trackingWs, type TrackingMessage, type WsEvent, type WsPosition } from './trackingWebSocket';
 import type { TrackingDevice, TraccarDeviceIndex } from './trackingTypes';
 
 export function useTrackingWebSocket(
   _devices: TrackingDevice[],
   traccarIndex: TraccarDeviceIndex,
   onMessage: (position: WsPosition, dispositivoId: string) => void,
+  onEvent?: (event: WsEvent, dispositivoId: string) => void,
 ) {
   // Refs keep the latest values without triggering effect re-runs
   const traccarIndexRef = useRef(traccarIndex);
@@ -14,6 +15,12 @@ export function useTrackingWebSocket(
 
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
+
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
+
+  const deviceIdsRef = useRef(new Set(_devices.map(device => device.dispositivoId)));
+  deviceIdsRef.current = new Set(_devices.map(device => device.dispositivoId));
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -23,6 +30,12 @@ export function useTrackingWebSocket(
         const dispositivoId = traccarIndexRef.current[pos.deviceId];
         if (dispositivoId) {
           onMessageRef.current(pos, dispositivoId);
+        }
+      }
+      for (const event of message.events ?? []) {
+        const dispositivoId = event.dispositivoId ?? (event.deviceId != null ? traccarIndexRef.current[event.deviceId] : undefined);
+        if (dispositivoId && deviceIdsRef.current.has(dispositivoId)) {
+          onEventRef.current?.(event, dispositivoId);
         }
       }
     };

@@ -2132,12 +2132,7 @@ function buildOleoStatusHtml(p, v) {
   const btnBd = isDark ? '#4a5568' : '#ccc';
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
-  const visibles = recs.filter(r => {
-    const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? null);
-    if (odometroM == null) return false;
-    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
-    return kmRestante <= 1000;
-  });
+  const visibles = recs.filter(r => r.ativa !== false);
   if (!visibles.length) return '';
   return visibles.map(r => {
     const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? 0);
@@ -2165,7 +2160,7 @@ function buildDataRecorrenciasHtml(v) {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const visibles = recs.filter(function(r) {
-    return r.ativa !== false && new Date(r.dataReferencia) <= new Date(hoje.getTime() + 24 * 60 * 60 * 1000);
+    return r.ativa !== false;
   });
   if (!visibles.length) return '';
   return visibles.map(function(r) {
@@ -2176,7 +2171,7 @@ function buildDataRecorrenciasHtml(v) {
     const fmtData = _dpR[2] + '/' + _dpR[1];
     const texto = atrasada
       ? 'Atrasada: ' + r.titulo + ' (' + fmtData + ')'
-      : 'Hoje: ' + r.titulo;
+      : 'Agendada: ' + r.titulo + ' (' + fmtData + ')';
     const btn = podeGerenciar ? '<button onclick="abrirModalFeitoCardData(\'' + r.id + '\',\'' + String(r.titulo || '').replace(/'/g, "\\'") + '\')" style="' + btnStyle + ';margin-left:4px;" title="Marcar como feito"><i class="fa fa-check"></i></button>' : '';
     return '<span style="color:' + cor + ';display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-calendar" style="flex-shrink:0;"></i>' + texto + btn + '</span>';
   }).join('<br>');

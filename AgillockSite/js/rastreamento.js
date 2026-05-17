@@ -2753,12 +2753,7 @@ function _buildManutencoesAdminHtml(dispositivoId) {
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
   const p = v?.posicao;
-  const visiveis = recs.filter(r => {
-    const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? null);
-    if (odometroM == null) return false;
-    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
-    return kmRestante <= 1000;
-  });
+  const visiveis = recs.filter(r => r.ativa !== false);
   if (!visiveis.length) return '';
 
   return `
@@ -2845,7 +2840,7 @@ function _buildManutencoesDataAdminHtml(dispositivoId) {
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  const visibles = recs.filter(r => r.ativa !== false && new Date(r.dataReferencia) <= new Date(hoje.getTime() + 24 * 60 * 60 * 1000));
+  const visibles = recs.filter(r => r.ativa !== false);
   if (!visibles.length) return '';
   return `
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
@@ -2858,7 +2853,7 @@ function _buildManutencoesDataAdminHtml(dispositivoId) {
         const fmtData = _dpR[2] + '/' + _dpR[1];
         const texto = atrasada
           ? `Atrasada: ${esc(r.titulo)} (${fmtData})`
-          : `Hoje: ${esc(r.titulo)}`;
+          : `Agendada: ${esc(r.titulo)} (${fmtData})`;
         return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-calendar" style="flex-shrink:0;"></i>${texto}<button onclick="abrirModalFeitoCardDataAdmin('${r.id}','${String(r.titulo || '').replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Confirmar manutenção"><i class="fa fa-check"></i></button></span>`;
       }).join('<br>')}
     </div>`;
