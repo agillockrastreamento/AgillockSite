@@ -425,6 +425,8 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: radius.lg,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   logoImage: {
     width: '100%',

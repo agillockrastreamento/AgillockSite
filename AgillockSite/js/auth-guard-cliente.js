@@ -216,8 +216,20 @@
       if (!sidebar) return;
       var footer = sidebar.querySelector('.sidebar-footer');
       if (!footer) return;
+
+      // Remove nav flex-grow so the two spacers can center the logo
+      var nav = sidebar.querySelector('.sidebar-nav');
+      if (nav) nav.style.flex = 'none';
+
+      var spacer1 = document.createElement('div');
+      spacer1.className = 'sidebar-logo-spacer';
       var logoSection = _buildLogoSection(perfil.logoUrl || null);
+      var spacer2 = document.createElement('div');
+      spacer2.className = 'sidebar-logo-spacer';
+
+      sidebar.insertBefore(spacer1, footer);
       sidebar.insertBefore(logoSection, footer);
+      sidebar.insertBefore(spacer2, footer);
     }).catch(function () {});
   }
 
