@@ -38,6 +38,7 @@ type Recorrencia = {
   kmBase: number;
   ativa: boolean;
   origem?: string | null;
+  dispositivo?: { odometroSistemaMetros?: number | null } | null;
 };
 
 type RecorrenciaData = {
@@ -158,9 +159,16 @@ function todayInput() {
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '--/--/----';
-  const date = new Date(iso);
+  const safe = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + 'T12:00:00' : iso;
+  const date = new Date(safe);
   if (Number.isNaN(date.getTime())) return '--/--/----';
   return date.toLocaleDateString('pt-BR');
+}
+
+function diffDias(dataStr: string): number {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const data = new Date(dataStr + 'T12:00:00'); data.setHours(0, 0, 0, 0);
+  return Math.ceil((data.getTime() - hoje.getTime()) / 86400000);
 }
 
 function fmtMoney(val: number | null) {
@@ -535,11 +543,6 @@ export function ManutencaoScreen() {
       toast.show({ message: 'Informe o título.', type: 'error' });
       return;
     }
-    const dataRef = parseDateInput(formRecData.dataReferencia);
-    if (!dataRef) {
-      toast.show({ message: 'Informe a data no formato AAAA-MM-DD.', type: 'error' });
-      return;
-    }
     if (formRecData.tipoRecorrencia === 'INTERVALO') {
       const n = parseInt(formRecData.intervaloDias);
       if (!formRecData.intervaloDias || isNaN(n) || n < 1) {
@@ -565,6 +568,29 @@ export function ManutencaoScreen() {
         return;
       }
     }
+
+    let dataRef: string | null;
+    if (formRecData.tipoRecorrencia === 'MENSAL') {
+      const dia = parseInt(formRecData.diaDoMes);
+      const hoje = new Date();
+      const d = new Date(hoje.getFullYear(), hoje.getMonth(), dia);
+      if (d <= hoje) d.setMonth(d.getMonth() + 1);
+      dataRef = d.toISOString().slice(0, 10);
+    } else if (formRecData.tipoRecorrencia === 'ANUAL') {
+      const dia = parseInt(formRecData.diaDoMes);
+      const mes = parseInt(formRecData.mesDoAno);
+      const hoje = new Date();
+      const passado = hoje.getMonth() + 1 > mes || (hoje.getMonth() + 1 === mes && hoje.getDate() >= dia);
+      const ano = passado ? hoje.getFullYear() + 1 : hoje.getFullYear();
+      dataRef = new Date(ano, mes - 1, dia).toISOString().slice(0, 10);
+    } else {
+      dataRef = parseDateInput(formRecData.dataReferencia);
+      if (!dataRef) {
+        toast.show({ message: 'Informe a data no formato AAAA-MM-DD.', type: 'error' });
+        return;
+      }
+    }
+
     if (!selectedId) return;
     setIsSavingRecData(true);
     try {
@@ -701,10 +727,25 @@ export function ManutencaoScreen() {
               </View>
             ) : (
               <>
-                {recorrencias.map(r => (
+                {recorrencias.map(r => {
+                  const kmAtual = (r.dispositivo?.odometroSistemaMetros ?? 0) / 1000;
+                  const kmPercorrido = kmAtual - r.kmBase;
+                  const kmRestante = r.intervaloKm - kmPercorrido;
+                  const pct = Math.min(100, Math.max(0, (kmPercorrido / r.intervaloKm) * 100));
+                  let stColor: string, stBg: string, stLabel: string;
+                  if (kmRestante > 50) {
+                    stColor = colors.success; stBg = 'rgba(39,174,96,.1)'; stLabel = 'Em dia';
+                  } else if (kmRestante > 25) {
+                    stColor = '#e67e22'; stBg = 'rgba(230,126,34,.1)'; stLabel = `Atenção — ${Math.round(kmRestante).toLocaleString('pt-BR')} km restantes`;
+                  } else if (kmRestante > 0) {
+                    stColor = colors.danger; stBg = 'rgba(231,76,60,.1)'; stLabel = `Urgente — ${Math.round(kmRestante).toLocaleString('pt-BR')} km restantes`;
+                  } else {
+                    stColor = colors.danger; stBg = 'rgba(231,76,60,.1)'; stLabel = `Vencido — ${Math.round(Math.abs(kmRestante)).toLocaleString('pt-BR')} km além`;
+                  }
+                  return (
                   <View key={r.id} style={styles.card}>
                     <View style={styles.cardHeader}>
-                      <View style={styles.cardIconWrap}>
+                      <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(250,179,44,.12)' }]}>
                         <Icon source="wrench-clock" size={20} color={colors.primary} />
                       </View>
                       <View style={styles.cardBody}>
@@ -718,6 +759,15 @@ export function ManutencaoScreen() {
                         <Text style={styles.cardMeta}>
                           A cada {r.intervaloKm.toLocaleString('pt-BR')} km
                         </Text>
+                        <View style={styles.progressWrap}>
+                          <View style={styles.progressBg}>
+                            <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: stColor }]} />
+                          </View>
+                          <Text style={[styles.progressPct, { color: stColor }]}>{Math.round(pct)}%</Text>
+                        </View>
+                        <View style={[styles.recStatusBadge, { backgroundColor: stBg }]}>
+                          <Text style={[styles.recStatusText, { color: stColor }]}>{stLabel}</Text>
+                        </View>
                       </View>
                       {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
                         <View style={styles.cardActions}>
@@ -753,12 +803,25 @@ export function ManutencaoScreen() {
                       )}
                     </View>
                   </View>
-                ))}
+                  );
+                })}
 
-                {recorrenciasData.map(r => (
-                  <View key={r.id} style={styles.card}>
+                {recorrenciasData.map(r => {
+                  const dias = diffDias(r.dataReferencia);
+                  let dtColor: string, dtBg: string, dtLabel: string;
+                  if (dias > 4) {
+                    dtColor = colors.success; dtBg = 'rgba(39,174,96,.1)'; dtLabel = `Em dia — ${dias} dias`;
+                  } else if (dias > 0) {
+                    dtColor = '#e67e22'; dtBg = 'rgba(230,126,34,.1)'; dtLabel = `Atenção — ${dias} dia${dias > 1 ? 's' : ''}`;
+                  } else if (dias === 0) {
+                    dtColor = '#8e44ad'; dtBg = 'rgba(142,68,173,.1)'; dtLabel = 'Hoje!';
+                  } else {
+                    dtColor = colors.danger; dtBg = 'rgba(231,76,60,.1)'; dtLabel = `Atrasada — ${Math.abs(dias)} dia${Math.abs(dias) > 1 ? 's' : ''}`;
+                  }
+                  return (
+                  <View key={r.id} style={[styles.card, dias <= 0 ? { borderLeftWidth: 3, borderLeftColor: dtColor } : null]}>
                     <View style={styles.cardHeader}>
-                      <View style={styles.cardIconWrap}>
+                      <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(31,111,159,.1)' }]}>
                         <Icon source="calendar-clock" size={20} color="#1f6f9f" />
                       </View>
                       <View style={styles.cardBody}>
@@ -771,8 +834,11 @@ export function ManutencaoScreen() {
                         ) : null}
                         <Text style={styles.cardMeta}>{descRecData(r)}</Text>
                         <Text style={styles.cardMeta}>
-                          Próxima: <Text style={{ fontWeight: '700', color: colors.text }}>{fmtDate(r.dataReferencia)}</Text>
+                          Próxima: <Text style={{ fontWeight: '700', color: dtColor }}>{fmtDate(r.dataReferencia)}</Text>
                         </Text>
+                        <View style={[styles.recStatusBadge, { backgroundColor: dtBg }]}>
+                          <Text style={[styles.recStatusText, { color: dtColor }]}>{dtLabel}</Text>
+                        </View>
                       </View>
                       {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
                         <View style={styles.cardActions}>
@@ -808,7 +874,8 @@ export function ManutencaoScreen() {
                       )}
                     </View>
                   </View>
-                ))}
+                  );
+                })}
               </>
             )
           )}
@@ -1551,6 +1618,40 @@ const styles = StyleSheet.create({
   cardStatLabel: {
     fontWeight: '700',
     color: colors.textMuted,
+  },
+  progressWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  progressBg: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  progressPct: {
+    fontSize: 10,
+    fontWeight: '700',
+    minWidth: 30,
+    textAlign: 'right',
+  },
+  recStatusBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
+  recStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   doneBtn: {
     flexDirection: 'row',

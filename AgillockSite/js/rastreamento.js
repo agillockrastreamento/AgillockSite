@@ -2806,7 +2806,13 @@ function _carregarManutencoesCardAdmin(dispositivoId) {
 
 window.abrirModalFeitoCardAdmin = function(recId, titulo) {
   const el = document.getElementById('modal-feito-card-titulo');
-  if (el) el.textContent = titulo || 'esta manutencao';
+  if (el) el.textContent = titulo || 'esta manutenção';
+  const header = document.querySelector('#modalFeitoCard .modal-header');
+  if (header) header.style.background = '#27ae60';
+  const titleEl = document.querySelector('#modalFeitoCard .modal-title');
+  if (titleEl) titleEl.innerHTML = '<i class="fa fa-check-circle"></i> Confirmar Manutenção';
+  const warnP = document.querySelector('#modalFeitoCard .modal-body p:nth-child(2)');
+  if (warnP) warnP.innerHTML = '<i class="fa fa-exclamation-triangle"></i> O contador será reiniciado a partir do odômetro atual.';
   const btn = document.getElementById('btn-modal-feito-card-confirmar');
   if (btn) btn.onclick = function() { window._executarFeitoCardAdmin(recId); };
   $('#modalFeitoCard').modal('show');
@@ -2886,7 +2892,13 @@ function _carregarManutencoesDataCardAdmin(dispositivoId) {
 
 window.abrirModalFeitoCardDataAdmin = function(recId, titulo) {
   const el = document.getElementById('modal-feito-card-titulo');
-  if (el) el.textContent = titulo || 'esta manutenção';
+  if (el) el.textContent = titulo || 'esta recorrência';
+  const header = document.querySelector('#modalFeitoCard .modal-header');
+  if (header) header.style.background = '#8e44ad';
+  const titleEl = document.querySelector('#modalFeitoCard .modal-title');
+  if (titleEl) titleEl.innerHTML = '<i class="fa fa-calendar-check-o"></i> Confirmar Recorrência por Data';
+  const warnP = document.querySelector('#modalFeitoCard .modal-body p:nth-child(2)');
+  if (warnP) warnP.innerHTML = '<i class="fa fa-calendar"></i> A próxima ocorrência será agendada automaticamente.';
   const btn = document.getElementById('btn-modal-feito-card-confirmar');
   if (btn) btn.onclick = function() { window._executarFeitoCardDataAdmin(recId); };
   $('#modalFeitoCard').modal('show');
