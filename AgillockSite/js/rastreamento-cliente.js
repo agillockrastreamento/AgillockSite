@@ -81,9 +81,12 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'deviceUnlocked',label: 'Veículo Desbloqueado',        css: 'tipo-ignition' },
   { tipo: 'kmExcedida',    label: 'Km Excedida (Período)',       css: 'tipo-overspeed' },
   { tipo: 'kmReduzida',    label: 'Km Reduzida (Período)',       css: 'tipo-geofence' },
-  { tipo: 'manutencaoAlerta',  label: 'Alerta de Manutenção',     css: 'tipo-manutencao-alerta' },
-  { tipo: 'manutencaoAtrasada',label: 'Manutenção Atrasada',      css: 'tipo-manutencao-atrasada' },
-  { tipo: 'manutencaoFeita',   label: 'Manutenção Realizada',     css: 'tipo-ignition' },
+  { tipo: 'manutencaoAlerta',        label: 'Alerta de Manutenção',        css: 'tipo-manutencao-alerta'   },
+  { tipo: 'manutencaoAtrasada',      label: 'Manutenção Atrasada',         css: 'tipo-manutencao-atrasada' },
+  { tipo: 'manutencaoFeita',         label: 'Manutenção Realizada',        css: 'tipo-ignition'            },
+  { tipo: 'recorrenciaDataAlerta',   label: 'Alerta de Recorrência Data',  css: 'tipo-manutencao-alerta'   },
+  { tipo: 'recorrenciaDataNaoFeita', label: 'Recorrência Data Atrasada',   css: 'tipo-manutencao-atrasada' },
+  { tipo: 'recorrenciaDataFeita',    label: 'Recorrência Data Realizada',  css: 'tipo-ignition'            },
 ];
 const TIPOS_EVENTO_CLIENTE_FILTRO = TIPOS_EVENTO_CLIENTE.filter(t => t.tipo !== 'manutencao');
 

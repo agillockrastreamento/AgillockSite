@@ -330,11 +330,14 @@ const TIPOS_EVENTO_ADMIN = [
   { tipo: 'alarm',          label: 'Alarme',                     css: 'tipo-alarm'    },
   { tipo: 'textMessage',    label: 'Mensagem de Texto Recebida', css: 'tipo-text'     },
   { tipo: 'driverChanged',  label: 'Condutor Alterado',          css: 'tipo-driver'   },
-  { tipo: 'manutencaoAlerta', label: 'Alerta de Manutencao',    css: 'tipo-fuel' },
-  { tipo: 'manutencaoAtrasada', label: 'Manutencao Atrasada',   css: 'tipo-overspeed' },
-  { tipo: 'kmExcedida',      label: 'Km Excedida (Período)',     css: 'tipo-overspeed' },
-  { tipo: 'kmReduzida',      label: 'Km Reduzida (Período)',     css: 'tipo-geofence' },
-  { tipo: 'manutencaoFeita', label: 'Manutenção Realizada',     css: 'tipo-ignition' },
+  { tipo: 'manutencaoAlerta',       label: 'Alerta de Manutenção',        css: 'tipo-fuel'      },
+  { tipo: 'manutencaoAtrasada',     label: 'Manutenção Atrasada',         css: 'tipo-overspeed' },
+  { tipo: 'kmExcedida',             label: 'Km Excedida (Período)',       css: 'tipo-overspeed' },
+  { tipo: 'kmReduzida',             label: 'Km Reduzida (Período)',       css: 'tipo-geofence'  },
+  { tipo: 'manutencaoFeita',        label: 'Manutenção Realizada',        css: 'tipo-ignition'  },
+  { tipo: 'recorrenciaDataAlerta',   label: 'Alerta de Recorrência Data',  css: 'tipo-fuel'      },
+  { tipo: 'recorrenciaDataNaoFeita', label: 'Recorrência Data Atrasada',   css: 'tipo-overspeed' },
+  { tipo: 'recorrenciaDataFeita',    label: 'Recorrência Data Realizada',  css: 'tipo-ignition'  },
 ];
 const TIPOS_EVENTO_ADMIN_FILTRO = TIPOS_EVENTO_ADMIN
   .filter(t => t.tipo !== 'manutencao')
@@ -453,6 +456,7 @@ function _normalizarEventoAdmin(evt) {
 
 function _tipoPreferenciaAdmin(tipo) {
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
+  if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'recorrenciaData';
   return tipo;
 }
 

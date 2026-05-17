@@ -8,7 +8,7 @@ type DispositivoBasico = { id: string; nome: string; placa: string | null; ident
 // Normaliza subtipos de manutenção para a chave de preferência do admin
 function _tipoPreferenciaAdmin(tipo: string): string {
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
-  if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'manutencao';
+  if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'recorrenciaData';
   return tipo;
 }
 

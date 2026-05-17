@@ -237,7 +237,11 @@ export function MainVehicleCard({
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
         setRecorrenciasData(
-          data.filter(r => r.ativa !== false && new Date(r.dataReferencia) <= new Date(hoje.getTime() + 24 * 60 * 60 * 1000))
+          data.filter(r => {
+            const dp = String(r.dataReferencia).slice(0, 10).split('-');
+            const dataRec = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
+            return r.ativa !== false && dataRec <= new Date(hoje.getTime() + 24 * 60 * 60 * 1000);
+          })
         );
       }
     } catch {}
@@ -539,17 +543,19 @@ export function MainVehicleCard({
         })}
 
         {recorrenciasData.map(r => {
-          const data = new Date(r.dataReferencia);
+          const dp = String(r.dataReferencia).slice(0, 10).split('-');
+          const data = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
           const hoje = new Date();
           hoje.setHours(0, 0, 0, 0);
           const atrasada = data < hoje;
+          const fmtData = `${dp[2]}/${dp[1]}/${dp[0]}`;
           return (
             <View key={r.id} style={styles.alertRow}>
               <View style={styles.alertTextWrap}>
                 <Icon source="calendar-clock" size={14} color={atrasada ? colors.danger : '#8e44ad'} />
                 <Text style={[styles.alertText, { color: atrasada ? colors.danger : '#8e44ad' }]}>
                   {atrasada
-                    ? `Pendente: ${r.titulo} (${data.toLocaleDateString('pt-BR')})`
+                    ? `Pendente: ${r.titulo} (${fmtData})`
                     : `Hoje: ${r.titulo}`}
                 </Text>
               </View>

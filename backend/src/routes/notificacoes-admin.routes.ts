@@ -5,6 +5,7 @@ import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
 
 function tipoPreferenciaAdmin(tipoEvento: string) {
   if (tipoEvento === 'manutencaoAlerta' || tipoEvento === 'manutencaoAtrasada' || tipoEvento === 'manutencaoFeita') return 'manutencao';
+  if (tipoEvento === 'recorrenciaDataAlerta' || tipoEvento === 'recorrenciaDataNaoFeita' || tipoEvento === 'recorrenciaDataFeita') return 'recorrenciaData';
   return tipoEvento;
 }
 
