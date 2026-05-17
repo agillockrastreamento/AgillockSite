@@ -294,14 +294,6 @@
             <option value="">Selecione um veículo...</option>
           </select>
         </div>
-        <div style="display:flex;gap:8px;margin-left:auto;">
-          <button class="btn btn-success" id="btn-novo-registro" style="height:36px;padding:0 16px;font-size:13px;font-weight:700;border-radius:7px;" disabled>
-            <i class="fa fa-plus"></i> Registrar Manutenção
-          </button>
-          <button class="btn btn-warning" id="btn-nova-recorrencia" style="height:36px;padding:0 16px;font-size:13px;font-weight:700;border-radius:7px;color:#fff;" disabled>
-            <i class="fa fa-repeat"></i> Nova Recorrência
-          </button>
-        </div>
       </div>
 
       <!-- Banner: manutenções desativadas -->
@@ -338,6 +330,9 @@
                 <small>Registros de serviços e reparos realizados neste veículo</small>
               </div>
             </div>
+            <button class="btn btn-success btn-sm" id="btn-novo-registro" style="background:#27ae60;color:#fff;border-radius:8px;font-weight:700;" disabled>
+              <i class="fa fa-plus"></i> Registrar Manutenção
+            </button>
           </div>
           <div id="list-registros" class="man-list"></div>
           <div id="empty-registros" class="man-empty" style="display:none;">
@@ -357,6 +352,9 @@
                 <small>Alertas automáticos por quilometragem para serviços periódicos</small>
               </div>
             </div>
+            <button class="btn btn-warning btn-sm" id="btn-nova-recorrencia" style="color:#fff;border-radius:8px;font-weight:700;" disabled>
+              <i class="fa fa-plus"></i> Nova Recorrência
+            </button>
           </div>
 
           <div class="man-info-box">
@@ -772,12 +770,8 @@
           document.getElementById('tab-historico').style.display         = target === 'tab-historico'         ? 'block' : 'none';
           document.getElementById('tab-recorrencias').style.display      = target === 'tab-recorrencias'      ? 'block' : 'none';
           document.getElementById('tab-recorrencias-data').style.display = target === 'tab-recorrencias-data' ? 'block' : 'none';
-          // sync buttons visibility
-          document.getElementById('btn-novo-registro').style.display     = target === 'tab-historico'         ? '' : 'none';
-          document.getElementById('btn-nova-recorrencia').style.display  = target === 'tab-recorrencias'      ? '' : 'none';
         });
       });
-      document.getElementById('btn-nova-recorrencia').style.display = 'none';
     })();
   </script>
   <script src="../js/manutencoes-cliente.js"></script>
