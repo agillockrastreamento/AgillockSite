@@ -188,6 +188,13 @@
     revisao:'Revisão', personalizado:'Personalizado', recorrencia:'Recorrência KM', recorrenciaData:'Recorrência Data',
   };
 
+  function normalizarTipoRegistro(r) {
+    const tipo = r.tipo || 'preventiva';
+    const texto = ((r.titulo || '') + ' ' + (r.descricao || '') + ' ' + (r.notas || '')).toLowerCase();
+    if (tipo === 'recorrencia' && (r.kmRealizacao == null || texto.indexOf('por data') >= 0)) return 'recorrenciaData';
+    return tipo;
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────────────
   async function init() {
     await carregarVeiculos();
@@ -299,7 +306,7 @@
     if (!registros.length) { list.innerHTML = ''; empty.style.display = 'flex'; return; }
     empty.style.display = 'none';
     list.innerHTML = registros.map(r => {
-      const tipo = r.tipo || 'preventiva';
+      const tipo = normalizarTipoRegistro(r);
       const icon = TIPO_ICON[tipo] || 'fa-wrench';
       const tipoLabel = TIPO_LABEL[tipo] || tipo;
       const dataStr = new Date(r.dataRealizacao).toLocaleDateString('pt-BR');
