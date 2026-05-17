@@ -282,7 +282,7 @@
       document.getElementById('btn-nova-recorrencia').disabled = !ativa;
       const opt = this.options[this.selectedIndex];
       document.getElementById('c-nome-dispositivo').textContent = opt ? opt.text : '—';
-      document.getElementById('cliente-man-container').style.display = 'block';
+      // atualizarBannerManutencao já cuida de mostrar/ocultar o container
       carregarDados(clienteLoginIdAtivo, id);
       renderPickerDispositivo(document.getElementById('man-busca-placa-dispositivo')?.value || '');
     });
