@@ -10,6 +10,12 @@ import ExpoPushService from '../services/expo-push.service';
 const router = Router();
 router.use(clienteAuthMiddleware);
 
+function _parseFloatNullable(valor: any): number | null {
+  if (valor === undefined || valor === null || valor === '') return null;
+  const parsed = parseFloat(String(valor).replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 type DispositivoAcessivel = {
@@ -174,8 +180,8 @@ router.post('/registros', async (req: any, res) => {
         tipo: tipo || 'preventiva',
         descricao: descricao || null,
         dataRealizacao: new Date(dataRealizacao),
-        kmRealizacao: kmRealizacao != null ? parseFloat(kmRealizacao) : null,
-        custo: custo != null ? parseFloat(custo) : null,
+        kmRealizacao: _parseFloatNullable(kmRealizacao),
+        custo: _parseFloatNullable(custo),
         oficina: oficina || null,
         notas: notas || null,
         fotos: fotos || [],
@@ -459,8 +465,8 @@ router.put('/registros/:id', async (req: any, res) => {
         titulo:        titulo        || existing.titulo,
         tipo:          tipo          || existing.tipo,
         dataRealizacao: dataRealizacao ? new Date(dataRealizacao) : existing.dataRealizacao,
-        kmRealizacao:  kmRealizacao  !== undefined ? (kmRealizacao  != null ? parseFloat(kmRealizacao)  : null) : existing.kmRealizacao,
-        custo:         custo         !== undefined ? (custo         != null ? parseFloat(custo)         : null) : existing.custo,
+        kmRealizacao:  kmRealizacao  !== undefined ? _parseFloatNullable(kmRealizacao) : existing.kmRealizacao,
+        custo:         custo         !== undefined ? _parseFloatNullable(custo) : existing.custo,
         oficina:       oficina       !== undefined ? (oficina       || null) : existing.oficina,
         notas:         notas         !== undefined ? (notas         || null) : existing.notas,
         fotos:         fotos         !== undefined ? fotos : (existing.fotos as any),

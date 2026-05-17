@@ -234,6 +234,7 @@
     document.getElementById('btn-salvar-recorrencia').addEventListener('click', salvarRecorrencia);
     document.getElementById('btn-confirmar-feito').addEventListener('click', confirmarFeito);
     document.getElementById('btn-confirmar-excluir').addEventListener('click', executarExcluir);
+    document.getElementById('reg-base')?.addEventListener('change', atualizarBaseRegistro);
     document.getElementById('btn-nova-rec-data')?.addEventListener('click', function (e) {
       e.preventDefault();
       window.abrirModalNovaRecorrenciaData();
@@ -451,11 +452,14 @@
     document.getElementById('modalRegistro-title').textContent = 'Registrar Manutenção';
     document.getElementById('btn-salvar-registro').innerHTML = '<i class="fa fa-save"></i> Salvar Registro';
     const hoje = new Date().toISOString().slice(0, 10);
+    document.getElementById('reg-base').value = 'data';
     document.getElementById('reg-data').value = hoje;
+    document.getElementById('reg-km').value = '';
     const v = veiculos.find(v => v.dispositivoId === dispositivoIdAtivo);
     if (v && v.odometroSistemaMetros != null) {
-      document.getElementById('reg-km').value = Math.round(v.odometroSistemaMetros / 1000);
+      document.getElementById('reg-km').dataset.sugestao = String(Math.round(v.odometroSistemaMetros / 1000));
     }
+    atualizarBaseRegistro();
     $('#modalRegistro').modal('show');
   }
 
@@ -512,6 +516,7 @@
     document.getElementById('btn-salvar-registro').innerHTML = '<i class="fa fa-save"></i> Salvar Alterações';
     document.getElementById('reg-titulo').value = r.titulo || '';
     document.getElementById('reg-tipo').value = r.tipo || 'preventiva';
+    document.getElementById('reg-base').value = r.kmRealizacao != null ? 'ambos' : 'data';
     document.getElementById('reg-data').value = r.dataRealizacao ? new Date(r.dataRealizacao).toISOString().slice(0, 10) : '';
     document.getElementById('reg-km').value = r.kmRealizacao != null ? Math.round(r.kmRealizacao) : '';
     document.getElementById('reg-custo').value = r.custo != null ? parseFloat(r.custo).toFixed(2) : '';
@@ -519,6 +524,7 @@
     document.getElementById('reg-notas').value = r.notas || '';
     fotosPendentes = Array.isArray(r.fotos) ? [...r.fotos] : [];
     renderFotoPreview(fotosPendentes, 'reg-fotos-preview');
+    atualizarBaseRegistro();
     $('#modalRegistro').modal('show');
   };
 
@@ -590,9 +596,25 @@
     ['reg-titulo', 'reg-data', 'reg-km', 'reg-custo', 'reg-oficina', 'reg-notas'].forEach(id => {
       document.getElementById(id).value = '';
     });
+    document.getElementById('reg-base').value = 'data';
     document.getElementById('reg-tipo').value = 'preventiva';
     fotosPendentes = [];
     document.getElementById('reg-fotos-preview').innerHTML = '';
+    atualizarBaseRegistro();
+  }
+
+  function atualizarBaseRegistro() {
+    const base = document.getElementById('reg-base')?.value || 'data';
+    const km = document.getElementById('reg-km');
+    if (!km) return;
+    const exigeKm = base !== 'data';
+    km.disabled = !exigeKm;
+    km.placeholder = exigeKm ? 'Ex: 52300' : 'Não se aplica';
+    if (!exigeKm) {
+      km.value = '';
+    } else if (!km.value && km.dataset.sugestao) {
+      km.value = km.dataset.sugestao;
+    }
   }
 
   function resetModalRecorrencia() {
@@ -617,6 +639,12 @@
     const titulo = document.getElementById('reg-titulo').value.trim();
     const dataRealizacao = document.getElementById('reg-data').value;
     if (!titulo || !dataRealizacao) { AL_CLIENTE.showAlert('Preencha o título e a data.'); return; }
+    const baseHistorico = document.getElementById('reg-base')?.value || 'data';
+    const kmInformado = parseFloat(document.getElementById('reg-km').value);
+    if (baseHistorico !== 'data' && (!kmInformado || kmInformado <= 0)) {
+      AL_CLIENTE.showAlert('Informe o KM da realização.');
+      return;
+    }
     const btn = document.getElementById('btn-salvar-registro');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
@@ -624,7 +652,7 @@
       titulo,
       tipo: document.getElementById('reg-tipo').value,
       dataRealizacao,
-      kmRealizacao: parseFloat(document.getElementById('reg-km').value) || null,
+      kmRealizacao: baseHistorico === 'data' ? null : kmInformado,
       custo: parseFloat(document.getElementById('reg-custo').value) || null,
       oficina: document.getElementById('reg-oficina').value.trim() || null,
       notas: document.getElementById('reg-notas').value.trim() || null,

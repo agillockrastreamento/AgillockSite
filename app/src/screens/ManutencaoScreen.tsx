@@ -79,6 +79,7 @@ type Registro = {
 type AddRegistroPayload = {
   titulo: string;
   tipo: string;
+  historicoBase: 'data' | 'km' | 'ambos';
   descricao: string;
   kmRealizacao: string;
   custo: string;
@@ -112,6 +113,12 @@ const TIPOS_MANUTENCAO = [
   { value: 'personalizado', label: 'Personalizado' },
 ];
 
+const BASES_HISTORICO = [
+  { value: 'data' as const, label: 'Por data' },
+  { value: 'km' as const, label: 'Por KM' },
+  { value: 'ambos' as const, label: 'Data + KM' },
+];
+
 const TIPOS_REC_DATA = [
   { value: 'AVULSA', label: 'Avulsa' },
   { value: 'INTERVALO', label: 'Intervalo' },
@@ -127,6 +134,7 @@ const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Se
 const EMPTY_FORM: AddRegistroPayload = {
   titulo: '',
   tipo: 'preventiva',
+  historicoBase: 'data',
   descricao: '',
   kmRealizacao: '',
   custo: '',
@@ -261,6 +269,7 @@ export function ManutencaoScreen() {
   const [editingRecDataId, setEditingRecDataId] = useState<string | null>(null);
   const [isSavingRecData, setIsSavingRecData] = useState(false);
   const [showDatePickerRef, setShowDatePickerRef] = useState(false);
+  const [showDatePickerRegistro, setShowDatePickerRegistro] = useState(false);
 
   const loadDispositivos = useCallback(async () => {
     try {
@@ -365,6 +374,7 @@ export function ManutencaoScreen() {
     setForm({
       titulo: r.titulo,
       tipo: r.tipo || 'preventiva',
+      historicoBase: r.kmRealizacao != null ? 'ambos' : 'data',
       descricao: r.descricao || '',
       kmRealizacao: r.kmRealizacao != null ? String(Math.round(r.kmRealizacao)) : '',
       custo: r.custo != null ? String(r.custo).replace('.', ',') : '',
@@ -494,7 +504,13 @@ export function ManutencaoScreen() {
     }
     const dataRealizacao = parseDateInput(form.dataRealizacao);
     if (!dataRealizacao) {
-      toast.show({ message: 'Informe a data no formato AAAA-MM-DD.', type: 'error' });
+      toast.show({ message: 'Informe a data da realização.', type: 'error' });
+      return;
+    }
+    const exigeKm = form.historicoBase === 'km' || form.historicoBase === 'ambos';
+    const kmRealizacao = form.kmRealizacao ? parseInt(form.kmRealizacao) : null;
+    if (exigeKm && (!kmRealizacao || kmRealizacao <= 0)) {
+      toast.show({ message: 'Informe o KM da realização.', type: 'error' });
       return;
     }
     if (!selectedId) return;
@@ -507,7 +523,7 @@ export function ManutencaoScreen() {
           titulo: form.titulo.trim(),
           tipo: form.tipo,
           descricao: form.descricao.trim() || null,
-          kmRealizacao: form.kmRealizacao ? parseInt(form.kmRealizacao) : null,
+          kmRealizacao: form.historicoBase === 'data' ? null : kmRealizacao,
           custo: form.custo ? parseFloat(form.custo.replace(',', '.')) : null,
           oficina: form.oficina.trim() || null,
           dataRealizacao,
@@ -1365,24 +1381,63 @@ export function ManutencaoScreen() {
             ))}
           </ScrollView>
 
-          <Text style={styles.formLabel}>Data da realização</Text>
-          <TextInput
-            style={styles.formInput}
-            value={form.dataRealizacao}
-            onChangeText={v => setForm(f => ({ ...f, dataRealizacao: v }))}
-            placeholder="AAAA-MM-DD"
-            placeholderTextColor={colors.textMuted}
-          />
+          <Text style={styles.formLabel}>Base do histórico</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
+            {BASES_HISTORICO.map(t => (
+              <Pressable
+                key={t.value}
+                style={[styles.tipoChip, form.historicoBase === t.value && styles.tipoChipActive]}
+                onPress={() => setForm(f => ({
+                  ...f,
+                  historicoBase: t.value,
+                  kmRealizacao: t.value === 'data' ? '' : f.kmRealizacao,
+                }))}
+              >
+                <Text style={[styles.tipoChipText, form.historicoBase === t.value && styles.tipoChipTextActive]}>{t.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
 
-          <Text style={styles.formLabel}>KM na realização</Text>
-          <TextInput
-            style={styles.formInput}
-            value={form.kmRealizacao}
-            onChangeText={v => setForm(f => ({ ...f, kmRealizacao: v.replace(/\D/g, '') }))}
-            placeholder="Ex: 45000"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="numeric"
-          />
+          <Text style={styles.formLabel}>Data da realização</Text>
+          <Pressable
+            style={[styles.formInput, { justifyContent: 'center' }]}
+            onPress={() => setShowDatePickerRegistro(true)}
+          >
+            <Text style={{ color: form.dataRealizacao ? colors.text : colors.textMuted }}>
+              {form.dataRealizacao
+                ? new Date(form.dataRealizacao + 'T12:00:00').toLocaleDateString('pt-BR')
+                : 'Selecionar data'}
+            </Text>
+          </Pressable>
+          {showDatePickerRegistro && (
+            <DateTimePicker
+              value={form.dataRealizacao ? new Date(form.dataRealizacao + 'T12:00:00') : new Date()}
+              mode="date"
+              display="default"
+              onChange={(_event: any, selectedDate?: Date) => {
+                setShowDatePickerRegistro(false);
+                if (selectedDate) {
+                  setForm(f => ({ ...f, dataRealizacao: selectedDate.toISOString().slice(0, 10) }));
+                }
+              }}
+              maximumDate={new Date()}
+              locale="pt-BR"
+            />
+          )}
+
+          {form.historicoBase !== 'data' && (
+            <>
+              <Text style={styles.formLabel}>KM na realização *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={form.kmRealizacao}
+                onChangeText={v => setForm(f => ({ ...f, kmRealizacao: v.replace(/\D/g, '') }))}
+                placeholder="Ex: 45000"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+              />
+            </>
+          )}
 
           <Text style={styles.formLabel}>Custo (R$)</Text>
           <TextInput
