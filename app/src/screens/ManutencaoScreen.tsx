@@ -194,6 +194,12 @@ export function ManutencaoScreen() {
     if (selectedId) loadData();
   }, [selectedId, loadData]);
 
+  // Quando manutenção está desativada, força aba de histórico
+  useEffect(() => {
+    const dev = dispositivos.find(d => d.id === selectedId);
+    if (dev && !dev.manutencaoAtiva) setActiveTab('registros');
+  }, [selectedId, dispositivos]);
+
   const resetRegistroForm = () => {
     setEditingRegistroId(null);
     setForm({ ...EMPTY_FORM, dataRealizacao: todayInput(), fotos: [] });
@@ -420,48 +426,51 @@ export function ManutencaoScreen() {
         </ScrollView>
       )}
 
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.tab, activeTab === 'recorrencias' && styles.tabActive]}
-          onPress={() => setActiveTab('recorrencias')}
-        >
-          <Text style={[styles.tabText, activeTab === 'recorrencias' && styles.tabTextActive]}>
-            Programadas
-          </Text>
-          {recorrencias.length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{recorrencias.length}</Text>
-            </View>
-          )}
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.tab, activeTab === 'registros' && styles.tabActive]}
-          onPress={() => setActiveTab('registros')}
-        >
-          <Text style={[styles.tabText, activeTab === 'registros' && styles.tabTextActive]}>
-            Histórico
-          </Text>
-          {registros.length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{registros.length}</Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
-
-      {selectedDevice && !selectedDevice.manutencaoAtiva && (
+      {selectedDevice && !selectedDevice.manutencaoAtiva ? (
         <View style={styles.manutencaoBanner}>
-          <Icon source="wrench-off" size={18} color="#856404" />
+          <Icon source="alert-outline" size={18} color="#856404" />
           <Text style={styles.manutencaoBannerText}>
             Manutenções desativadas para este dispositivo.
           </Text>
         </View>
+      ) : (
+        <>
+          {/* Tabs */}
+          <View style={styles.tabs}>
+            <Pressable
+              accessibilityRole="button"
+              style={[styles.tab, activeTab === 'recorrencias' && styles.tabActive]}
+              onPress={() => setActiveTab('recorrencias')}
+            >
+              <Text style={[styles.tabText, activeTab === 'recorrencias' && styles.tabTextActive]}>
+                Programadas
+              </Text>
+              {recorrencias.length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{recorrencias.length}</Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              style={[styles.tab, activeTab === 'registros' && styles.tabActive]}
+              onPress={() => setActiveTab('registros')}
+            >
+              <Text style={[styles.tabText, activeTab === 'registros' && styles.tabTextActive]}>
+                Histórico
+              </Text>
+              {registros.length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{registros.length}</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        </>
       )}
 
-      {isLoading ? (
+      {(!selectedDevice || selectedDevice.manutencaoAtiva) && (
+        isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -632,7 +641,7 @@ export function ManutencaoScreen() {
             )
           )}
         </ScrollView>
-      )}
+      ))}
 
       {/* FAB — only show if user can manage this device and maintenance is enabled */}
       {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (

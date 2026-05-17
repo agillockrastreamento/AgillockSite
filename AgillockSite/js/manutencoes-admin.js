@@ -204,10 +204,13 @@
   }
 
   function atualizarBannerManutencao() {
+    const ativa = manutencaoAtiva();
     const banner = document.getElementById('man-banner-desativado');
-    if (!banner) return;
-    if (dispositivoIdAtivo && !manutencaoAtiva()) banner.classList.add('visivel');
-    else banner.classList.remove('visivel');
+    if (banner) banner.classList.toggle('visivel', !!dispositivoIdAtivo && !ativa);
+
+    // Se desativado: esconde todo o conteúdo, mostra só o banner
+    const container = document.getElementById('cliente-man-container');
+    if (container) container.style.display = (dispositivoIdAtivo && !ativa) ? 'none' : (dispositivoIdAtivo ? 'block' : 'none');
   }
 
   async function carregarDispositivosCliente(loginId) {

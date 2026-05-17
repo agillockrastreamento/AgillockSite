@@ -366,6 +366,14 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     },
   });
 
+  // Se manutencaoAtiva foi desativado, cancela todas as recorrências ativas do dispositivo
+  if (manutencaoAtiva !== undefined && !(manutencaoAtiva === 'true' || manutencaoAtiva === true)) {
+    await prisma.manutencaoRecorrencia.updateMany({
+      where: { dispositivoId: id, ativa: true },
+      data: { ativa: false },
+    });
+  }
+
   // Desativa recorrências CLIENTE do responsável antigo ao trocar a titularidade via PUT
   if (clienteId !== undefined) {
     const novoClienteIdPut = clienteId || null;

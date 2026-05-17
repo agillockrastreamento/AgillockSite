@@ -124,6 +124,10 @@
     }
     const banner = document.getElementById('man-banner-desativado');
     if (banner) banner.classList.toggle('visivel', !!dispositivoIdAtivo && !ativa);
+
+    // Se desativado: esconde todo o conteúdo, mostra só o banner
+    const container = document.getElementById('man-container');
+    if (container) container.style.display = (dispositivoIdAtivo && !ativa) ? 'none' : 'block';
   }
 
   const TIPO_ICON = {
@@ -171,7 +175,6 @@
       }
       aplicarPermissaoManutencao();
       document.getElementById('man-vazio').style.display = 'none';
-      document.getElementById('man-container').style.display = 'block';
       carregarDados(id);
       renderPickerDispositivo(document.getElementById('man-busca-placa-dispositivo')?.value || '');
     });
