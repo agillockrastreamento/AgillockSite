@@ -895,7 +895,8 @@
 
     list.innerHTML = recorrenciasData.map(r => {
       const diff = _diffDias(r.dataReferencia);
-      const dataStr = new Date(String(r.dataReferencia).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR');
+      const _dp = String(r.dataReferencia).slice(0, 10).split('-');
+      const dataStr = _dp[2] + '/' + _dp[1] + '/' + _dp[0];
       const isAdmin = r.origem === 'ADMIN';
 
       let statusClass, statusLabel, statusIcon, borderColor;
@@ -1023,7 +1024,7 @@
       if (!diaDoMes || diaDoMes < 1 || diaDoMes > 31) { AL.showAlert('Informe um dia válido (1-31).'); return; }
       const hoje = new Date();
       const proximoMes = diaDoMes <= hoje.getDate() ? new Date(hoje.getFullYear(), hoje.getMonth() + 1, diaDoMes) : new Date(hoje.getFullYear(), hoje.getMonth(), diaDoMes);
-      dataReferencia = proximoMes.toISOString().slice(0,10);
+      dataReferencia = proximoMes.getFullYear() + '-' + String(proximoMes.getMonth() + 1).padStart(2, '0') + '-' + String(proximoMes.getDate()).padStart(2, '0');
     } else if (tipo === 'ANUAL') {
       diaDoMes = parseInt(document.getElementById('recdata-dia-anual').value);
       mesDoAno = parseInt(document.getElementById('recdata-mes-ano').value);
@@ -1032,7 +1033,8 @@
       let ano = hoje.getFullYear();
       const candidata = new Date(ano, mesDoAno - 1, diaDoMes);
       if (candidata <= hoje) ano++;
-      dataReferencia = new Date(ano, mesDoAno - 1, diaDoMes).toISOString().slice(0,10);
+      const da = new Date(ano, mesDoAno - 1, diaDoMes);
+      dataReferencia = da.getFullYear() + '-' + String(da.getMonth() + 1).padStart(2, '0') + '-' + String(da.getDate()).padStart(2, '0');
     }
 
     const payload = {

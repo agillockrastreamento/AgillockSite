@@ -2166,11 +2166,11 @@ function buildDataRecorrenciasHtml(v) {
   });
   if (!visibles.length) return '';
   return visibles.map(function(r) {
-    const dataRec = new Date(r.dataReferencia);
-    dataRec.setHours(0, 0, 0, 0);
+    const _dpR = String(r.dataReferencia).slice(0, 10).split('-');
+    const dataRec = new Date(Number(_dpR[0]), Number(_dpR[1]) - 1, Number(_dpR[2]));
     const atrasada = dataRec < hoje;
     const cor = atrasada ? '#e74c3c' : '#8e44ad';
-    const fmtData = new Date(r.dataReferencia).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const fmtData = _dpR[2] + '/' + _dpR[1];
     const texto = atrasada
       ? 'Atrasada: ' + r.titulo + ' (' + fmtData + ')'
       : 'Hoje: ' + r.titulo;

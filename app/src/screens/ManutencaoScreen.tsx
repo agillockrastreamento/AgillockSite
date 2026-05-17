@@ -159,8 +159,8 @@ function todayInput() {
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '--/--/----';
-  const safe = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + 'T12:00:00' : iso;
-  const date = new Date(safe);
+  const datePart = String(iso).slice(0, 10);
+  const date = new Date(datePart + 'T12:00:00');
   if (Number.isNaN(date.getTime())) return '--/--/----';
   return date.toLocaleDateString('pt-BR');
 }

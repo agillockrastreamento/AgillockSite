@@ -419,8 +419,8 @@ export function MainVehicleCard({
 
   const markDateRecurrenceDone = async (id: string, title: string) => {
     const confirmed = await confirm.show({
-      title: 'Confirmar Realizado',
-      message: `Confirmar que "${title}" foi realizado?`,
+      title: 'Confirmar Recorrência Por Data',
+      message: `Confirmar que a recorrência por data "${title}" foi realizada?`,
       confirmLabel: 'Confirmar',
     });
     if (confirmed) {

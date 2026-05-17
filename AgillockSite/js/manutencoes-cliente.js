@@ -719,7 +719,8 @@
 
     list.innerHTML = recorrenciasData.map(r => {
       const diff = _diffDiasC(r.dataReferencia);
-      const dataStr = new Date(String(r.dataReferencia).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR');
+      const _dp = String(r.dataReferencia).slice(0, 10).split('-');
+      const dataStr = _dp[2] + '/' + _dp[1] + '/' + _dp[0];
       const isAdmin = r.origem === 'ADMIN';
 
       let statusClass, statusLabel, statusIcon, borderColor;
@@ -836,7 +837,7 @@
       if (!diaDoMes || diaDoMes < 1 || diaDoMes > 31) { AL_CLIENTE.showAlert('Informe um dia válido.'); return; }
       const hoje = new Date();
       const d = diaDoMes <= hoje.getDate() ? new Date(hoje.getFullYear(), hoje.getMonth() + 1, diaDoMes) : new Date(hoje.getFullYear(), hoje.getMonth(), diaDoMes);
-      dataReferencia = d.toISOString().slice(0,10);
+      dataReferencia = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     } else if (tipo === 'ANUAL') {
       diaDoMes = parseInt(document.getElementById('crecdata-dia-anual').value);
       mesDoAno = parseInt(document.getElementById('crecdata-mes-ano').value);
@@ -844,7 +845,8 @@
       const hoje = new Date();
       let ano = hoje.getFullYear();
       if (new Date(ano, mesDoAno - 1, diaDoMes) <= hoje) ano++;
-      dataReferencia = new Date(ano, mesDoAno - 1, diaDoMes).toISOString().slice(0,10);
+      const da = new Date(ano, mesDoAno - 1, diaDoMes);
+      dataReferencia = da.getFullYear() + '-' + String(da.getMonth() + 1).padStart(2, '0') + '-' + String(da.getDate()).padStart(2, '0');
     }
 
     const payload = { dispositivoId: dispositivoIdAtivo, titulo, descricao: document.getElementById('crecdata-descricao').value.trim() || null, tipoRecorrencia: tipo, dataReferencia, intervaloDias, diasSemana, diaDoMes, mesDoAno, canalNotificacao: checkboxesParaCanal('crecdata-') };
