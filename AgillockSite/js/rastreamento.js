@@ -2753,7 +2753,13 @@ function _buildManutencoesAdminHtml(dispositivoId) {
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
   const p = v?.posicao;
-  const visiveis = recs.filter(r => r.ativa !== false);
+  const visiveis = recs.filter(r => {
+    if (r.ativa === false) return false;
+    const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? null);
+    if (odometroM == null) return false;
+    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+    return kmRestante <= 1000;
+  });
   if (!visiveis.length) return '';
 
   return `

@@ -2132,7 +2132,13 @@ function buildOleoStatusHtml(p, v) {
   const btnBd = isDark ? '#4a5568' : '#ccc';
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
-  const visibles = recs.filter(r => r.ativa !== false);
+  const visibles = recs.filter(r => {
+    if (r.ativa === false) return false;
+    const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? null);
+    if (odometroM == null) return false;
+    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+    return kmRestante <= 1000;
+  });
   if (!visibles.length) return '';
   return visibles.map(r => {
     const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? 0);

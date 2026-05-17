@@ -733,6 +733,8 @@ export function ManutencaoScreen() {
                   const kmPercorrido = kmAtual - r.kmBase;
                   const kmRestante = r.intervaloKm - kmPercorrido;
                   const pct = Math.min(100, Math.max(0, (kmPercorrido / r.intervaloKm) * 100));
+                  const kmPercorridoLabel = Math.max(0, Math.round(kmPercorrido)).toLocaleString('pt-BR');
+                  const kmTotalLabel = r.intervaloKm.toLocaleString('pt-BR');
                   let stColor: string, stBg: string, stLabel: string;
                   if (kmRestante > 50) {
                     stColor = colors.success; stBg = 'rgba(39,174,96,.1)'; stLabel = 'Em dia';
@@ -744,7 +746,7 @@ export function ManutencaoScreen() {
                     stColor = colors.danger; stBg = 'rgba(231,76,60,.1)'; stLabel = `Vencido — ${Math.round(Math.abs(kmRestante)).toLocaleString('pt-BR')} km além`;
                   }
                   return (
-                  <View key={r.id} style={styles.card}>
+                  <View key={r.id} style={[styles.card, { borderLeftWidth: 2, borderLeftColor: stColor }]}>
                     <View style={styles.cardHeader}>
                       <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(250,179,44,.12)' }]}>
                         <Icon source="wrench-clock" size={20} color={colors.primary} />
@@ -764,7 +766,10 @@ export function ManutencaoScreen() {
                           <View style={styles.progressBg}>
                             <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: stColor }]} />
                           </View>
-                          <Text style={[styles.progressPct, { color: stColor }]}>{Math.round(pct)}%</Text>
+                          <View style={styles.progressInfo}>
+                            <Text style={styles.progressInfoText}>{kmPercorridoLabel} km percorridos</Text>
+                            <Text style={styles.progressInfoText}>{kmTotalLabel} km total</Text>
+                          </View>
                         </View>
                         <View style={[styles.recStatusBadge, { backgroundColor: stBg }]}>
                           <Text style={[styles.recStatusText, { color: stColor }]}>{stLabel}</Text>
@@ -820,7 +825,7 @@ export function ManutencaoScreen() {
                     dtColor = colors.danger; dtBg = 'rgba(231,76,60,.1)'; dtLabel = `Atrasada — ${Math.abs(dias)} dia${Math.abs(dias) > 1 ? 's' : ''}`;
                   }
                   return (
-                  <View key={r.id} style={[styles.card, dias <= 0 ? { borderLeftWidth: 3, borderLeftColor: dtColor } : null]}>
+                  <View key={r.id} style={[styles.card, { borderLeftWidth: 2, borderLeftColor: dtColor }]}>
                     <View style={styles.cardHeader}>
                       <View style={[styles.cardIconWrap, { backgroundColor: 'rgba(31,111,159,.1)' }]}>
                         <Icon source="calendar-clock" size={20} color="#1f6f9f" />
@@ -1621,13 +1626,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   progressWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    gap: 4,
     marginTop: 6,
   },
   progressBg: {
-    flex: 1,
     height: 6,
     borderRadius: 3,
     backgroundColor: colors.border,
@@ -1637,11 +1639,15 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  progressPct: {
+  progressInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  progressInfoText: {
     fontSize: 10,
-    fontWeight: '700',
-    minWidth: 30,
-    textAlign: 'right',
+    color: colors.textMuted,
+    fontWeight: '600',
   },
   recStatusBadge: {
     alignSelf: 'flex-start',
