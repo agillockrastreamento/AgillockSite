@@ -153,50 +153,14 @@
     });
     wrap.appendChild(_logoInputEl);
 
-    if (logoUrl) {
-      var imgWrap = document.createElement('div');
-      imgWrap.className = 'sidebar-cliente-logo-img-wrap';
+    var imgWrap = document.createElement('div');
+    imgWrap.className = 'sidebar-cliente-logo-img-wrap';
 
-      var img = document.createElement('img');
-      img.src = BASE.replace(/\/api\/?$/i, '') + logoUrl;
-      img.alt = 'Logo';
-      imgWrap.appendChild(img);
-      wrap.appendChild(imgWrap);
-
-      var actions = document.createElement('div');
-      actions.className = 'sidebar-cliente-logo-actions';
-
-      var editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'sidebar-cliente-logo-action-btn';
-      editBtn.title = 'Trocar logo';
-      editBtn.innerHTML = '<i class="fa fa-pencil"></i>';
-      editBtn.addEventListener('click', function () { if (_logoInputEl) _logoInputEl.click(); });
-      actions.appendChild(editBtn);
-
-      var delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'sidebar-cliente-logo-action-btn sidebar-cliente-logo-delete-btn';
-      delBtn.title = 'Remover logo';
-      delBtn.innerHTML = '<i class="fa fa-times"></i>';
-      delBtn.addEventListener('click', function () {
-        if (!window.confirm('Deseja remover a logo da empresa?')) return;
-        deleteLogo()
-          .then(function () { _reloadLogoSection(); })
-          .catch(function (err) { showAlert('Erro ao remover logo: ' + err.message); });
-      });
-      actions.appendChild(delBtn);
-
-      wrap.appendChild(actions);
-    } else {
-      var btn = document.createElement('button');
-      btn.className = 'sidebar-cliente-logo-placeholder';
-      btn.title = 'Adicionar logo da empresa';
-      btn.type = 'button';
-      btn.innerHTML = '<i class="fa fa-image"></i><span>Adicionar logo</span>';
-      btn.addEventListener('click', function () { if (_logoInputEl) _logoInputEl.click(); });
-      wrap.appendChild(btn);
-    }
+    var img = document.createElement('img');
+    img.src = BASE.replace(/\/api\/?$/i, '') + logoUrl;
+    img.alt = 'Logo';
+    imgWrap.appendChild(img);
+    wrap.appendChild(imgWrap);
 
     return wrap;
   }
@@ -207,7 +171,7 @@
       if (!existing) return;
       var novo = _buildLogoSection(perfil.logoUrl || null);
       existing.parentNode.replaceChild(novo, existing);
-    }).catch(function () {});
+    }).catch(function () { });
   }
 
   function initClienteLogo() {
@@ -230,7 +194,7 @@
       sidebar.insertBefore(spacer1, footer);
       sidebar.insertBefore(logoSection, footer);
       sidebar.insertBefore(spacer2, footer);
-    }).catch(function () {});
+    }).catch(function () { });
   }
 
   // ─── Toast ────────────────────────────────────────────────────────────────
@@ -308,13 +272,13 @@
 
     var LOGO_FULL = '../img/logo_agillock_white_new.png';
     var LOGO_ICON = '../favicon.ico';
-    var logoImg   = sidebar.querySelector('.sidebar-brand img');
-    var brand     = sidebar.querySelector('.sidebar-brand');
+    var logoImg = sidebar.querySelector('.sidebar-brand img');
+    var brand = sidebar.querySelector('.sidebar-brand');
 
     var collapseBtn = document.createElement('button');
-    collapseBtn.id        = 'btn-sidebar-collapse';
+    collapseBtn.id = 'btn-sidebar-collapse';
     collapseBtn.className = 'btn-sidebar-collapse';
-    collapseBtn.title     = 'Recolher/Expandir';
+    collapseBtn.title = 'Recolher/Expandir';
     collapseBtn.innerHTML = '<i id="icon-sidebar-collapse" class="fa fa-chevron-left"></i>';
     if (brand) brand.appendChild(collapseBtn);
 
@@ -338,7 +302,7 @@
       var rect = el.getBoundingClientRect();
       sidebarTooltip.textContent = label;
       sidebarTooltip.style.display = 'block';
-      sidebarTooltip.style.top  = Math.round(rect.top + rect.height / 2) + 'px';
+      sidebarTooltip.style.top = Math.round(rect.top + rect.height / 2) + 'px';
       sidebarTooltip.style.left = Math.round(rect.right + 12) + 'px';
     }
     function hideTooltip() { sidebarTooltip.style.display = 'none'; }
@@ -359,10 +323,10 @@
       if (logoImg) logoImg.src = c ? LOGO_ICON : LOGO_FULL;
       var icon = document.getElementById('icon-sidebar-collapse');
       if (icon) icon.className = c ? 'fa fa-chevron-right' : 'fa fa-chevron-left';
-      var topbar  = document.querySelector('.admin-topbar');
+      var topbar = document.querySelector('.admin-topbar');
       var content = document.querySelector('.admin-content');
       var px = c ? '64px' : '';
-      if (topbar)  topbar.style.left        = px;
+      if (topbar) topbar.style.left = px;
       if (content) content.style.marginLeft = px;
       if (!animate) {
         requestAnimationFrame(function () {
