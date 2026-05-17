@@ -917,9 +917,9 @@
     const badge = document.getElementById('c-badge-rec-data');
     if (!list) return;
 
-    const urgentes = recorrenciasData.filter(r => _diffDias(r.dataReferencia) <= 2).length;
-    badge.textContent = urgentes;
-    badge.style.display = urgentes > 0 ? '' : 'none';
+    const total = recorrenciasData.length;
+    badge.textContent = total;
+    badge.style.display = total > 0 ? '' : 'none';
 
     if (!recorrenciasData.length) { list.innerHTML = ''; if (empty) empty.style.display = 'flex'; return; }
     if (empty) empty.style.display = 'none';

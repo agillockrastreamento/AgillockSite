@@ -740,8 +740,8 @@
     const badge = document.getElementById('badge-rec-data');
     if (!list) return;
 
-    const urgentes = recorrenciasData.filter(r => _diffDiasC(r.dataReferencia) <= 2).length;
-    if (badge) { badge.textContent = urgentes; badge.style.display = urgentes > 0 ? '' : 'none'; }
+    const total = recorrenciasData.length;
+    if (badge) { badge.textContent = total; badge.style.display = total > 0 ? '' : 'none'; }
 
     if (!recorrenciasData.length) { list.innerHTML = ''; if (empty) empty.style.display = 'flex'; return; }
     if (empty) empty.style.display = 'none';

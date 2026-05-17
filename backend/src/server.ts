@@ -14,18 +14,28 @@ initTraccarWebSocket(httpServer);
 FinanceiroNotificationService.iniciarAgendador();
 ContratoClicksignSyncService.iniciarAgendador();
 
-// Verifica recorrências por data a cada hora
-setInterval(() => {
-  NotificationService.verificarRecorrenciasDataTodas().catch(err =>
-    console.error('[Scheduler] Erro ao verificar recorrências por data:', err)
-  );
-}, 60 * 60 * 1000);
-// Executa imediatamente ao iniciar
-setTimeout(() => {
-  NotificationService.verificarRecorrenciasDataTodas().catch(err =>
-    console.error('[Scheduler] Erro ao verificar recorrências por data:', err)
-  );
-}, 5000);
+function proximaExecucaoRecorrenciasData(): Date {
+  const agora = new Date();
+  const dataSp = agora.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  let alvo = new Date(`${dataSp}T08:00:00-03:00`);
+  if (alvo <= agora) {
+    alvo = new Date(alvo.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return alvo;
+}
+
+function agendarRecorrenciasData() {
+  const proxima = proximaExecucaoRecorrenciasData();
+  const delay = Math.max(1000, proxima.getTime() - Date.now());
+  console.log(`[Scheduler] Recorrencias por data agendadas para ${proxima.toISOString()} (08:00 America/Sao_Paulo).`);
+  setTimeout(() => {
+    NotificationService.verificarRecorrenciasDataTodas()
+      .catch(err => console.error('[Scheduler] Erro ao verificar recorrencias por data:', err))
+      .finally(agendarRecorrenciasData);
+  }, delay);
+}
+
+agendarRecorrenciasData();
 
 httpServer.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);

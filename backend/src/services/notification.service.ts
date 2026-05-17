@@ -5,6 +5,13 @@ import ExpoPushService from './expo-push.service';
 
 type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null; clienteId?: string | null };
 
+function _inicioDiaSaoPaulo(offsetDias = 0): Date {
+  const dataSp = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const inicio = new Date(`${dataSp}T00:00:00-03:00`);
+  inicio.setDate(inicio.getDate() + offsetDias);
+  return inicio;
+}
+
 // Normaliza subtipos de manutenção para a chave de preferência do admin
 function _tipoPreferenciaAdmin(tipo: string): string {
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
@@ -622,8 +629,7 @@ class NotificationService {
 
   async verificarRecorrenciasDataTodas() {
     try {
-      const agora = new Date();
-      agora.setHours(0, 0, 0, 0);
+      const agora = _inicioDiaSaoPaulo();
 
       // Busca todas as recorrências ativas cujo dataReferencia já é relevante (até 7 dias à frente)
       const limite7d = new Date(agora);

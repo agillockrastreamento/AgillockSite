@@ -2840,7 +2840,12 @@ function _buildManutencoesDataAdminHtml(dispositivoId) {
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  const visibles = recs.filter(r => r.ativa !== false);
+  const visibles = recs.filter(r => {
+    if (r.ativa === false) return false;
+    const dp = String(r.dataReferencia).slice(0, 10).split('-');
+    const dataRec = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
+    return dataRec <= hoje;
+  });
   if (!visibles.length) return '';
   return `
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
@@ -2853,7 +2858,7 @@ function _buildManutencoesDataAdminHtml(dispositivoId) {
         const fmtData = _dpR[2] + '/' + _dpR[1];
         const texto = atrasada
           ? `Atrasada: ${esc(r.titulo)} (${fmtData})`
-          : `Agendada: ${esc(r.titulo)} (${fmtData})`;
+          : `Hoje: ${esc(r.titulo)}`;
         return `<span style="color:${cor};display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-calendar" style="flex-shrink:0;"></i>${texto}<button onclick="abrirModalFeitoCardDataAdmin('${r.id}','${String(r.titulo || '').replace(/'/g, "\\'")}')" style="${btnStyle};margin-left:4px;" title="Confirmar manutenção"><i class="fa fa-check"></i></button></span>`;
       }).join('<br>')}
     </div>`;

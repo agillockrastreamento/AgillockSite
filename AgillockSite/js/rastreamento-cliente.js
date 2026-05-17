@@ -2160,7 +2160,10 @@ function buildDataRecorrenciasHtml(v) {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const visibles = recs.filter(function(r) {
-    return r.ativa !== false;
+    if (r.ativa === false) return false;
+    const dp = String(r.dataReferencia).slice(0, 10).split('-');
+    const dataRec = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
+    return dataRec <= hoje;
   });
   if (!visibles.length) return '';
   return visibles.map(function(r) {
@@ -2171,7 +2174,7 @@ function buildDataRecorrenciasHtml(v) {
     const fmtData = _dpR[2] + '/' + _dpR[1];
     const texto = atrasada
       ? 'Atrasada: ' + r.titulo + ' (' + fmtData + ')'
-      : 'Agendada: ' + r.titulo + ' (' + fmtData + ')';
+      : 'Hoje: ' + r.titulo;
     const btn = podeGerenciar ? '<button onclick="abrirModalFeitoCardData(\'' + r.id + '\',\'' + String(r.titulo || '').replace(/'/g, "\\'") + '\')" style="' + btnStyle + ';margin-left:4px;" title="Marcar como feito"><i class="fa fa-check"></i></button>' : '';
     return '<span style="color:' + cor + ';display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;"><i class="fa fa-calendar" style="flex-shrink:0;"></i>' + texto + btn + '</span>';
   }).join('<br>');
