@@ -138,24 +138,6 @@
     wrap.id = 'sidebar-logo-wrap';
     wrap.className = 'sidebar-cliente-logo';
 
-    if (logoUrl) {
-      var img = document.createElement('img');
-      img.src = BASE.replace(/\/api\/?$/i, '') + logoUrl;
-      img.alt = 'Logo';
-      img.title = 'Clique para trocar a logo';
-      img.style.cursor = 'pointer';
-      img.addEventListener('click', function () { if (_logoInputEl) _logoInputEl.click(); });
-      wrap.appendChild(img);
-    } else {
-      var btn = document.createElement('button');
-      btn.className = 'sidebar-cliente-logo-placeholder';
-      btn.title = 'Adicionar logo da empresa';
-      btn.type = 'button';
-      btn.innerHTML = '<i class="fa fa-image"></i><span>Adicionar logo</span>';
-      btn.addEventListener('click', function () { if (_logoInputEl) _logoInputEl.click(); });
-      wrap.appendChild(btn);
-    }
-
     // Input de arquivo oculto para upload
     _logoInputEl = document.createElement('input');
     _logoInputEl.type = 'file';
@@ -170,6 +152,51 @@
       this.value = '';
     });
     wrap.appendChild(_logoInputEl);
+
+    if (logoUrl) {
+      var imgWrap = document.createElement('div');
+      imgWrap.className = 'sidebar-cliente-logo-img-wrap';
+
+      var img = document.createElement('img');
+      img.src = BASE.replace(/\/api\/?$/i, '') + logoUrl;
+      img.alt = 'Logo';
+      imgWrap.appendChild(img);
+      wrap.appendChild(imgWrap);
+
+      var actions = document.createElement('div');
+      actions.className = 'sidebar-cliente-logo-actions';
+
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'sidebar-cliente-logo-action-btn';
+      editBtn.title = 'Trocar logo';
+      editBtn.innerHTML = '<i class="fa fa-pencil"></i>';
+      editBtn.addEventListener('click', function () { if (_logoInputEl) _logoInputEl.click(); });
+      actions.appendChild(editBtn);
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'sidebar-cliente-logo-action-btn sidebar-cliente-logo-delete-btn';
+      delBtn.title = 'Remover logo';
+      delBtn.innerHTML = '<i class="fa fa-times"></i>';
+      delBtn.addEventListener('click', function () {
+        if (!window.confirm('Deseja remover a logo da empresa?')) return;
+        deleteLogo()
+          .then(function () { _reloadLogoSection(); })
+          .catch(function (err) { showAlert('Erro ao remover logo: ' + err.message); });
+      });
+      actions.appendChild(delBtn);
+
+      wrap.appendChild(actions);
+    } else {
+      var btn = document.createElement('button');
+      btn.className = 'sidebar-cliente-logo-placeholder';
+      btn.title = 'Adicionar logo da empresa';
+      btn.type = 'button';
+      btn.innerHTML = '<i class="fa fa-image"></i><span>Adicionar logo</span>';
+      btn.addEventListener('click', function () { if (_logoInputEl) _logoInputEl.click(); });
+      wrap.appendChild(btn);
+    }
 
     return wrap;
   }
