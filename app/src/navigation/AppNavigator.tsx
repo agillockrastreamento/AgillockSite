@@ -155,32 +155,32 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
         <DrawerItemList {...props} />
       </View>
 
-      <View style={styles.logoWrapper}>
-        <View style={styles.logoContainer}>
-          {isLogoLoading ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : logoUri ? (
-            <>
-              <View style={styles.logoImageBox}>
-                <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
-              </View>
-              <View style={styles.logoActionsRow}>
-                <Pressable accessibilityRole="button" style={styles.logoActionBtn} onPress={pickAndUploadLogo}>
-                  <Icon source="pencil-outline" size={15} color={colors.textMuted} />
-                </Pressable>
-                <Pressable accessibilityRole="button" style={[styles.logoActionBtn, styles.logoDeleteBtn]} onPress={handleDeleteLogo}>
-                  <Icon source="close" size={15} color={colors.danger} />
-                </Pressable>
-              </View>
-            </>
-          ) : (
-            <Pressable accessibilityRole="button" style={styles.logoPlaceholder} onPress={pickAndUploadLogo}>
-              <Icon source="image-outline" size={22} color={colors.textMuted} />
-              <Text style={styles.logoPlaceholderText}>Adicionar Logo</Text>
-            </Pressable>
-          )}
-        </View>
+      <View style={styles.logoSpacer} />
+      <View style={styles.logoContainer}>
+        {isLogoLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : logoUri ? (
+          <>
+            <View style={styles.logoImageWrap}>
+              <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
+            </View>
+            <View style={styles.logoActionsRow}>
+              <Pressable accessibilityRole="button" style={styles.logoActionBtn} onPress={pickAndUploadLogo}>
+                <Icon source="pencil-outline" size={15} color={colors.textMuted} />
+              </Pressable>
+              <Pressable accessibilityRole="button" style={[styles.logoActionBtn, styles.logoDeleteBtn]} onPress={handleDeleteLogo}>
+                <Icon source="close" size={15} color={colors.danger} />
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <Pressable accessibilityRole="button" style={styles.logoPlaceholder} onPress={pickAndUploadLogo}>
+            <Icon source="image-outline" size={22} color={colors.textMuted} />
+            <Text style={styles.logoPlaceholderText}>Adicionar logo da empresa</Text>
+          </Pressable>
+        )}
       </View>
+      <View style={styles.logoSpacer} />
 
       <View style={styles.profileArea}>
         <Pressable
@@ -411,28 +411,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  logoWrapper: {
+  logoSpacer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
   },
   logoContainer: {
     width: '100%',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
   },
-  logoImageBox: {
+  logoImageWrap: {
     width: '100%',
-    height: 110,
+    height: 80,
     borderRadius: radius.lg,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
   },
   logoImage: {
     width: '100%',
@@ -470,7 +462,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     backgroundColor: colors.background,
     width: '100%',
-    height: 70
+    height: 70,
   },
   logoPlaceholderText: {
     color: colors.textMuted,
