@@ -22,8 +22,10 @@
     body { overflow: hidden !important; height: 100vh; }
     .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
     #form-scroll {
-      flex: 1; overflow-y: auto; overflow-x: hidden;
-      padding: 20px 24px 24px; scrollbar-gutter: stable;
+      flex: 1;
+      overflow-y: scroll; /* scrollbar fixo encostado à direita */
+      overflow-x: hidden;
+      padding: 20px 24px 24px;
     }
     #form-scroll::-webkit-scrollbar { width: 7px; }
     #form-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
@@ -97,6 +99,28 @@
 
     .uf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     @media (max-width: 720px) { .uf-row { grid-template-columns: 1fr; } }
+
+    /* ── Input com toggle de senha ────────────────────────────────────── */
+    .uf-input-wrap { position: relative; }
+    .uf-input-wrap .uf-input { padding-right: 42px; }
+    .uf-eye {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+    }
+    .uf-eye:hover { color: var(--uf-primary-hover); background: var(--uf-primary-soft); }
+    html.dark-theme .uf-eye { color: #aab; }
 
     /* ── Switch toggle ────────────────────────────────────────────────── */
     .uf-switch {
@@ -223,6 +247,9 @@
       justify-content: flex-end;
       gap: 10px;
       box-shadow: 0 -2px 8px rgba(0,0,0,.04);
+      border-top-left-radius: 14px;
+      border-top-right-radius: 14px;
+      margin: 0 16px;
     }
     html.dark-theme .uf-footer { background: #1e2530; border-color: #2d3748; }
     .uf-btn {
@@ -320,7 +347,7 @@
 
           <div class="uf-field">
             <label class="uf-label">Nome <span class="req">*</span></label>
-            <input type="text" id="campo-nome" class="uf-input" maxlength="80" required placeholder="Nome do usuário" />
+            <input type="text" id="campo-nome" class="uf-input" maxlength="80" required autofocus placeholder="Nome do usuário" />
           </div>
 
           <div class="uf-row">
@@ -330,7 +357,12 @@
             </div>
             <div class="uf-field">
               <label class="uf-label">Senha <span id="senha-obrigatoria" class="req">*</span></label>
-              <input type="password" id="campo-senha" class="uf-input" minlength="6" placeholder="Mínimo 6 caracteres" />
+              <div class="uf-input-wrap">
+                <input type="password" id="campo-senha" class="uf-input" minlength="6" placeholder="Mínimo 6 caracteres" />
+                <button type="button" id="toggle-senha" class="uf-eye" tabindex="-1" aria-label="Mostrar/Ocultar senha">
+                  <i id="icon-senha" class="fa fa-eye"></i>
+                </button>
+              </div>
               <div id="senha-hint" class="uf-hint" style="display:none;">Deixe em branco para manter a senha atual.</div>
             </div>
           </div>
@@ -347,15 +379,15 @@
           <h3 class="uf-card-title"><i class="fa fa-car"></i> Veículos com acesso</h3>
           <p class="uf-hint" style="margin: -8px 0 12px;">Selecione quais veículos esse usuário poderá visualizar e operar conforme as permissões abaixo.</p>
 
+          <div class="uf-actions-mini" style="margin: 0 0 10px;">
+            <button type="button" id="btn-marcar-todos" class="uf-link">Selecionar todos</button>
+            <button type="button" id="btn-desmarcar-todos" class="uf-link">Limpar seleção</button>
+          </div>
+
           <div id="veiculos-grid" class="uf-veiculos-list">
             <div style="color:#999; text-align:center; padding: 18px;">
               <i class="fa fa-spinner fa-spin"></i> Carregando veículos...
             </div>
-          </div>
-
-          <div class="uf-actions-mini">
-            <button type="button" id="btn-marcar-todos" class="uf-link">Selecionar todos</button>
-            <button type="button" id="btn-desmarcar-todos" class="uf-link">Limpar seleção</button>
           </div>
         </div>
 
@@ -512,6 +544,21 @@
         document.getElementById('senha-hint').style.display = 'block';
         document.getElementById('campo-senha').removeAttribute('required');
       }
+
+      // Toggle visibilidade da senha
+      document.getElementById('toggle-senha').addEventListener('click', function () {
+        var input = document.getElementById('campo-senha');
+        var icon = document.getElementById('icon-senha');
+        var mostrar = input.type === 'password';
+        input.type = mostrar ? 'text' : 'password';
+        icon.className = mostrar ? 'fa fa-eye-slash' : 'fa fa-eye';
+      });
+
+      // Foco automático no campo Nome
+      setTimeout(function () {
+        var nomeInput = document.getElementById('campo-nome');
+        if (nomeInput) nomeInput.focus();
+      }, 50);
 
       // Toggle "ver" da tela mostra/esconde permissões filhas
       document.querySelectorAll('input[type=checkbox][data-acao="ver"]').forEach(function (chk) {

@@ -63,9 +63,11 @@
         if (u && u.role === 'COLABORADOR') { window.location.href = 'colaborador/clientes.html'; return; }
         if (u)                             { window.location.href = 'admin/dashboard.html'; return; }
       }
-      // Já autenticado como cliente → redireciona
+      // Já autenticado como cliente → carrega permissões e redireciona para a primeira tela acessível
       if (AL_CLIENTE.isAuthenticated()) {
-        window.location.href = 'cliente/rastreamento.html';
+        AL_CLIENTE.refreshPermissoes().finally(function () {
+          window.location.href = 'cliente/' + AL_CLIENTE.telaInicialHtml();
+        });
         return;
       }
 
@@ -104,7 +106,10 @@
           .then(function (data) {
             if (data.user && data.user.role === 'CLIENTE') {
               AL_CLIENTE.setToken(data.token);
-              window.location.href = 'cliente/rastreamento.html';
+              // Carrega permissões antes de redirecionar para escolher a primeira tela acessível
+              return AL_CLIENTE.refreshPermissoes().finally(function () {
+                window.location.href = 'cliente/' + AL_CLIENTE.telaInicialHtml();
+              });
             } else {
               AL.setToken(data.token);
               var user = AL.getUser();

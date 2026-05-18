@@ -98,6 +98,7 @@ export function UsuarioFormScreen() {
   const [saving, setSaving] = useState(false);
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [nome, setNome] = useState('');
   const [perfil, setPerfil] = useState('');
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
@@ -248,6 +249,7 @@ export function UsuarioFormScreen() {
             onChangeText={setNome}
             style={styles.input}
             maxLength={80}
+            autoFocus={!modoEdicao}
             placeholder="Nome do usuário"
             placeholderTextColor={colors.textMuted}
           />
@@ -265,14 +267,23 @@ export function UsuarioFormScreen() {
           <Text style={styles.label}>
             Senha {modoEdicao ? '(deixe em branco para manter)' : '*'}
           </Text>
-          <TextInput
-            value={senha}
-            onChangeText={setSenha}
-            style={styles.input}
-            secureTextEntry
-            placeholder={modoEdicao ? '••••••' : 'Mínimo 6 caracteres'}
-            placeholderTextColor={colors.textMuted}
-          />
+          <View style={styles.passwordWrap}>
+            <TextInput
+              value={senha}
+              onChangeText={setSenha}
+              style={[styles.input, styles.inputWithIcon]}
+              secureTextEntry={!mostrarSenha}
+              placeholder={modoEdicao ? '••••••' : 'Mínimo 6 caracteres'}
+              placeholderTextColor={colors.textMuted}
+            />
+            <Pressable
+              accessibilityRole="button"
+              style={styles.eyeBtn}
+              onPress={() => setMostrarSenha((v) => !v)}
+            >
+              <Icon source={mostrarSenha ? 'eye-off' : 'eye'} size={20} color={colors.textMuted} />
+            </Pressable>
+          </View>
           <Text style={styles.label}>Perfil</Text>
           <TextInput
             value={perfil}
@@ -413,6 +424,21 @@ const styles = StyleSheet.create({
     color: colors.text,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+  },
+  inputWithIcon: {
+    paddingRight: 44,
+  },
+  passwordWrap: {
+    position: 'relative',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: spacing.sm,
+    top: 0,
+    bottom: 0,
+    width: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   row: {
     flexDirection: 'row',

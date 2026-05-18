@@ -112,6 +112,17 @@
       .catch(function () { return null; });
   }
 
+  // Retorna o arquivo HTML da primeira tela acessível para o cliente atual.
+  // Responsável sempre cai em rastreamento.html. Vinculado segue ordem das permissões 'ver'.
+  function telaInicialHtml() {
+    if (isResponsavel()) return 'rastreamento.html';
+    if (can('rastreamento.ver')) return 'rastreamento.html';
+    if (can('relatorio.ver'))    return 'relatorio.html';
+    if (can('manutencao.ver'))   return 'manutencoes.html';
+    // Sub-usuário sem nenhuma tela liberada: mantém em rastreamento (mostrará bloqueio amigável)
+    return 'rastreamento.html';
+  }
+
   // Aplica visibilidade aos itens da sidebar conforme tipo/permissões do cliente.
   // Sub-usuários não veem: Pagamentos, Usuários, Notificações (a aba dedicada — eventos
   // continuam acessíveis dentro do Mapa). Telas restritas pelas permissões 'ver' caem juntas.
@@ -455,5 +466,6 @@
     can: can,
     podeVerTela: podeVerTela,
     podeAcessarDispositivo: podeAcessarDispositivo,
+    telaInicialHtml: telaInicialHtml,
   };
 })();
