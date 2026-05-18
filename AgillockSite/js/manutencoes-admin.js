@@ -507,7 +507,7 @@
               </div>
             </div>
             <div class="man-rec-actions">
-              <button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}', ${JSON.stringify(_esc(r.titulo))})">
+              <button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}','${_esc(r.titulo).replace(/'/g, "\\'")}')">
                 <i class="fa fa-check"></i> Feito
               </button>
               <button class="btn btn-info btn-xs" onclick="_editarRecorrencia('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>
@@ -1013,7 +1013,7 @@
               ${r.ciclosCompletos > 0 ? `<small style="color:#8a9ab0;margin-top:4px;display:block;"><i class="fa fa-check"></i> ${r.ciclosCompletos} ciclo(s) concluído(s)</small>` : ''}
             </div>
             <div class="man-rec-actions">
-              <button class="btn btn-sm" onclick="_abrirFeitoData('${r.id}', ${JSON.stringify(_esc(r.titulo))})" style="background:#8e44ad;color:#fff;font-weight:700;border-radius:7px;">
+              <button class="btn btn-sm" onclick="_abrirFeitoData('${r.id}','${_esc(r.titulo).replace(/'/g, "\\'")}')" style="background:#8e44ad;color:#fff;font-weight:700;border-radius:7px;">
                 <i class="fa fa-check"></i> Feito
               </button>
               <button class="btn btn-info btn-xs" onclick="_editarRecorrenciaData('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>
@@ -1151,7 +1151,8 @@
       AL.showAlert('Erro ao salvar: ' + err.message);
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fa fa-calendar-check-o"></i> ' + document.getElementById('btn-salvar-recdata-label').textContent;
+      const labelText = editandoRecDataId ? 'Salvar Alterações' : 'Criar Recorrência';
+      btn.innerHTML = '<i class="fa fa-calendar-check-o"></i> <span id="btn-salvar-recdata-label">' + labelText + '</span>';
     }
   }
 

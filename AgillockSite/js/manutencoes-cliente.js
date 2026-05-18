@@ -407,7 +407,7 @@
               </div>
             </div>
             <div class="man-rec-actions">
-              ${podeGerenciar ? `<button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}', ${JSON.stringify(_esc(r.titulo))})">
+              ${podeGerenciar ? `<button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}','${_esc(r.titulo).replace(/'/g, "\\'")}')">
                 <i class="fa fa-check"></i> Feito
               </button>` : ''}
               ${podeGerenciar && !isAdmin ? `<button class="btn btn-info btn-xs" onclick="_editarRecorrencia('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
@@ -962,7 +962,8 @@
       AL_CLIENTE.showAlert('Erro: ' + err.message);
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fa fa-calendar-check-o"></i> ' + document.getElementById('cbtn-salvar-recdata-label').textContent;
+      const labelText = editandoRecDataId ? 'Salvar Alterações' : 'Criar Recorrência';
+      btn.innerHTML = '<i class="fa fa-calendar-check-o"></i> <span id="cbtn-salvar-recdata-label">' + labelText + '</span>';
     }
   }
 
