@@ -66,6 +66,75 @@ export async function getResumo(id: string, from: Date, to: Date): Promise<Resum
   return apiRequest<Resumo | null>(`${BASE}/${id}/resumo?${buildQs(from, to)}`);
 }
 
+// ─── Reverse geocoding helpers (espelha relatorio-cliente.js) ────────────────
+
+const _reverseGeocodeCache: Record<string, string> = {};
+
+function enderecoPareceCoordenada(valor: string): boolean {
+  const texto = valor.trim();
+  if (!texto || texto === '0.00000, 0.00000') return true;
+  return !!extrairCoords(texto);
+}
+
+function enderecoValido(valor: unknown): valor is string {
+  return typeof valor === 'string' && !!valor.trim() && !enderecoPareceCoordenada(valor);
+}
+
+function extrairCoords(valor: string): { lat: number; lng: number } | null {
+  const texto = valor.trim();
+  const padroes = [
+    /^\(?\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*\)?$/,
+    /^\(?\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)?$/,
+    /^lat(?:itude)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)\D+lon(?:gitude)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)$/i,
+  ];
+  for (const padrao of padroes) {
+    const m = texto.match(padrao);
+    if (!m) continue;
+    const lat = Number(m[1]);
+    const lng = Number(m[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+  return null;
+}
+
+function coordsValidas(lat?: number | null, lng?: number | null): boolean {
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  return Number.isFinite(nLat) && Number.isFinite(nLng) && (Math.abs(nLat) > 0.00001 || Math.abs(nLng) > 0.00001);
+}
+
+function fmtCoordsFallback(lat: number, lng: number): string {
+  return `(${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+}
+
+export async function resolverEndereco(
+  valor: unknown,
+  lat?: number | null,
+  lng?: number | null,
+): Promise<string> {
+  if (enderecoValido(valor)) return valor.trim();
+  const coordsTexto = typeof valor === 'string' ? extrairCoords(valor) : null;
+  const finalLat = coordsValidas(lat, lng) ? Number(lat) : coordsTexto?.lat;
+  const finalLng = coordsValidas(lat, lng) ? Number(lng) : coordsTexto?.lng;
+  if (finalLat == null || finalLng == null || !coordsValidas(finalLat, finalLng)) {
+    return 'Endereço não identificado';
+  }
+  const chave = `${finalLat.toFixed(5)},${finalLng.toFixed(5)}`;
+  if (_reverseGeocodeCache[chave]) return _reverseGeocodeCache[chave];
+  try {
+    const data = await apiRequest<{ endereco?: string }>(
+      `/cliente/rastreamento/geocode/reverse?lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLng)}`,
+    );
+    const end = (data?.endereco && data.endereco.trim()) || fmtCoordsFallback(finalLat, finalLng);
+    _reverseGeocodeCache[chave] = end;
+    return end;
+  } catch {
+    return fmtCoordsFallback(finalLat, finalLng);
+  }
+}
+
 export async function getExportUrl(
   id: string,
   from: Date,

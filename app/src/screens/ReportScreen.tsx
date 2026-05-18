@@ -32,6 +32,7 @@ import {
   getResumo,
   getViagens,
   isoComFuso,
+  resolverEndereco,
 } from '../reporting/reportService';
 import type {
   Evento,
@@ -398,35 +399,39 @@ function RouteTab({
           rotateEnabled={false}
         >
           <Polyline coordinates={coords} strokeColor={colors.accent} strokeWidth={3} geodesic />
-          {vehicleBitmap ? (
-            <Marker
-              coordinate={{ latitude: first.latitude, longitude: first.longitude }}
-              title="Início"
-              description={fmtHora(first.fixTime)}
-              image={{ uri: vehicleBitmap }}
-            />
-          ) : (
-            <Marker
-              coordinate={{ latitude: first.latitude, longitude: first.longitude }}
-              title="Início"
-              description={fmtHora(first.fixTime)}
-              pinColor={colors.success}
-            />
+          {!playerActive && (
+            vehicleBitmap ? (
+              <Marker
+                coordinate={{ latitude: first.latitude, longitude: first.longitude }}
+                title="Início"
+                description={fmtHora(first.fixTime)}
+                image={{ uri: vehicleBitmap }}
+              />
+            ) : (
+              <Marker
+                coordinate={{ latitude: first.latitude, longitude: first.longitude }}
+                title="Início"
+                description={fmtHora(first.fixTime)}
+                pinColor={colors.success}
+              />
+            )
           )}
-          {vehicleBitmap ? (
-            <Marker
-              coordinate={{ latitude: last.latitude, longitude: last.longitude }}
-              title="Fim"
-              description={fmtHora(last.fixTime)}
-              image={{ uri: vehicleBitmap }}
-            />
-          ) : (
-            <Marker
-              coordinate={{ latitude: last.latitude, longitude: last.longitude }}
-              title="Fim"
-              description={fmtHora(last.fixTime)}
-              pinColor={colors.danger}
-            />
+          {!playerActive && (
+            vehicleBitmap ? (
+              <Marker
+                coordinate={{ latitude: last.latitude, longitude: last.longitude }}
+                title="Fim"
+                description={fmtHora(last.fixTime)}
+                image={{ uri: vehicleBitmap }}
+              />
+            ) : (
+              <Marker
+                coordinate={{ latitude: last.latitude, longitude: last.longitude }}
+                title="Fim"
+                description={fmtHora(last.fixTime)}
+                pinColor={colors.danger}
+              />
+            )
           )}
           {stopMarkers.map((s, i) =>
             stopBitmap ? (
@@ -558,6 +563,33 @@ function EventosTab({ eventos }: { eventos: Evento[] }) {
 // ─── Viagens Tab ──────────────────────────────────────────────────────────────
 
 function ViagensTab({ viagens }: { viagens: Viagem[] }) {
+  const [addresses, setAddresses] = useState<Record<number, { origem: string; destino: string }>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    setAddresses({});
+    viagens.forEach((v, i) => {
+      Promise.all([
+        resolverEndereco(
+          v.startAddress ?? v.origem,
+          v.startLat ?? v.origemLat,
+          v.startLon ?? v.origemLng,
+        ),
+        resolverEndereco(
+          v.endAddress ?? v.destino,
+          v.endLat ?? v.destinoLat,
+          v.endLon ?? v.destinoLng,
+        ),
+      ]).then(([origem, destino]) => {
+        if (cancelled) return;
+        setAddresses((prev) => ({ ...prev, [i]: { origem, destino } }));
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [viagens]);
+
   if (viagens.length === 0) return <EmptyState message="Nenhuma viagem encontrada para o período." />;
 
   const totalKm = viagens.reduce((acc, v) => acc + getViagemDist(v), 0);
@@ -578,8 +610,9 @@ function ViagensTab({ viagens }: { viagens: Viagem[] }) {
       }
       contentContainerStyle={styles.listContent}
       renderItem={({ item, index }) => {
-        const origem = getViagemOrigem(item);
-        const destino = getViagemDestino(item);
+        const resolved = addresses[index];
+        const origem = resolved?.origem ?? getViagemOrigem(item) ?? '';
+        const destino = resolved?.destino ?? getViagemDestino(item) ?? '';
         return (
           <View style={styles.tripCard}>
             <View style={styles.tripHeader}>
@@ -609,14 +642,31 @@ function ViagensTab({ viagens }: { viagens: Viagem[] }) {
 // ─── Paradas Tab ──────────────────────────────────────────────────────────────
 
 function ParadasTab({ paradas }: { paradas: Parada[] }) {
+  const [addresses, setAddresses] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    setAddresses({});
+    paradas.forEach((p, i) => {
+      resolverEndereco(getParadaEndereco(p), getParadaLat(p), getParadaLon(p)).then((end) => {
+        if (cancelled) return;
+        setAddresses((prev) => ({ ...prev, [i]: end }));
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [paradas]);
+
   if (paradas.length === 0) return <EmptyState message="Nenhuma parada encontrada para o período." />;
+
   return (
     <FlatList
       data={paradas}
       keyExtractor={(_, i) => String(i)}
       contentContainerStyle={styles.listContent}
       renderItem={({ item, index }) => {
-        const endereco = getParadaEndereco(item);
+        const endereco = addresses[index] ?? getParadaEndereco(item);
         return (
           <View style={styles.stopCard}>
             <View style={styles.stopHeader}>
