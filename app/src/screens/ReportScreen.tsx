@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import MapView, { AnimatedRegion, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -46,6 +46,7 @@ import type {
 import { getTrackingSnapshot } from '../tracking/trackingService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
+import { SearchBottomSheet } from '../components/SearchBottomSheet';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
@@ -768,58 +769,6 @@ function GraficoTab({ historico }: { historico: HistoricoResponse | null }) {
   );
 }
 
-// ─── Device Selector Modal ────────────────────────────────────────────────────
-
-function DeviceSelectorModal({
-  visible,
-  devices,
-  selected,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  devices: TrackingDevice[];
-  selected: TrackingDevice | null;
-  onSelect(d: TrackingDevice): void;
-  onClose(): void;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <View style={styles.deviceSheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Selecionar veículo</Text>
-          <FlatList
-            data={devices}
-            keyExtractor={d => d.dispositivoId}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            renderItem={({ item }) => {
-              const isSelected = selected?.dispositivoId === item.dispositivoId;
-              return (
-                <Pressable
-                  style={[styles.deviceRow, isSelected && styles.deviceRowSelected]}
-                  onPress={() => { onSelect(item); onClose(); }}
-                >
-                  <View style={styles.deviceRowContent}>
-                    <Text style={[styles.deviceName, isSelected && styles.deviceNameSelected]}>
-                      {item.nome}
-                    </Text>
-                    {item.placa ? (
-                      <Text style={styles.devicePlate}>{item.placa}</Text>
-                    ) : null}
-                  </View>
-                  {isSelected ? (
-                    <Icon source="check-circle" size={20} color={colors.primary} />
-                  ) : null}
-                </Pressable>
-              );
-            }}
-          />
-        </View>
-      </Pressable>
-    </Modal>
-  );
-}
 
 // ─── Export Modal ─────────────────────────────────────────────────────────────
 
@@ -909,11 +858,36 @@ export function ReportScreen() {
         if (snapshot === 'blocked') return;
         const sorted = [...snapshot].sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? ''));
         setDevices(sorted);
-        if (sorted.length > 0) setSelectedDevice(sorted[0]);
+        if (sorted.length === 1) {
+          setSelectedDevice(sorted[0]);
+        } else if (sorted.length > 1) {
+          setShowDeviceSelector(true);
+        }
       })
       .catch(() => {})
       .finally(() => setDevicesLoading(false));
   }, []);
+
+  // Refs para acessar valores correntes dentro do useFocusEffect sem disparar
+  // re-render do effect (que viraria loop).
+  const selectedDeviceRef = useRef(selectedDevice);
+  selectedDeviceRef.current = selectedDevice;
+  const devicesCountRef = useRef(devices.length);
+  devicesCountRef.current = devices.length;
+
+  // Ao sair da tela limpa a seleção; ao voltar, se houver mais de 1 veículo,
+  // reabre o SearchBottomSheet para escolha.
+  useFocusEffect(
+    useCallback(() => {
+      if (devicesCountRef.current > 1 && !selectedDeviceRef.current) {
+        setShowDeviceSelector(true);
+      }
+      return () => {
+        setSelectedDevice(null);
+        setShowDeviceSelector(false);
+      };
+    }, []),
+  );
 
   const loadReport = useCallback(async (device: TrackingDevice, p: ReportPeriodo, from: Date, to: Date) => {
     setIsLoading(true);
@@ -1027,19 +1001,57 @@ export function ReportScreen() {
     );
   }
 
+  if (!selectedDevice && devices.length > 1) {
+    return (
+      <View style={styles.root}>
+        <View style={styles.selectEmpty}>
+          <Icon source="car-multiple" size={48} color={colors.textMuted} />
+          <Text style={styles.selectEmptyTitle}>Selecione um veículo</Text>
+          <Text style={styles.selectEmptySubtitle}>
+            Escolha um veículo para visualizar o relatório.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.selectEmptyBtn}
+            onPress={() => setShowDeviceSelector(true)}
+          >
+            <Icon source="magnify" size={16} color={colors.primaryText} />
+            <Text style={styles.selectEmptyBtnText}>Selecionar veículo</Text>
+          </Pressable>
+        </View>
+        <SearchBottomSheet
+          visible={showDeviceSelector}
+          devices={devices}
+          title="Selecione o veículo"
+          onClose={() => setShowDeviceSelector(false)}
+          onSelectDevice={(device) => {
+            setSelectedDevice(device);
+            setShowDeviceSelector(false);
+          }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       {/* ── Toolbar ── */}
       <View style={styles.toolbar}>
-        <Pressable style={styles.deviceBtn} onPress={() => setShowDeviceSelector(true)}>
-          <Icon source="car-outline" size={18} color={colors.textMuted} />
-          <Text style={styles.deviceBtnText} numberOfLines={1}>
-            {selectedDevice
-              ? selectedDevice.nome + (selectedDevice.placa ? ` (${selectedDevice.placa})` : '')
-              : 'Selecionar veículo'}
-          </Text>
-          <Icon source="chevron-down" size={18} color={colors.textMuted} />
-        </Pressable>
+        {devices.length > 1 && (
+          <Pressable style={styles.deviceBtn} onPress={() => setShowDeviceSelector(true)}>
+            <View style={styles.deviceBtnInfo}>
+              <Text style={styles.deviceBtnText} numberOfLines={1}>
+                {selectedDevice
+                  ? selectedDevice.nome + (selectedDevice.placa ? ` (${selectedDevice.placa})` : '')
+                  : 'Selecionar veículo'}
+              </Text>
+            </View>
+            <View style={styles.deviceBtnSwap}>
+              <Icon source="swap-horizontal" size={16} color={colors.primary} />
+              <Text style={styles.deviceBtnSwapText}>Trocar</Text>
+            </View>
+          </Pressable>
+        )}
         <View style={styles.periodRow}>
           {(Object.keys(PERIODO_LABELS) as ReportPeriodo[]).map(p => (
             <Pressable
@@ -1112,12 +1124,15 @@ export function ReportScreen() {
       )}
 
       {/* ── Modals ── */}
-      <DeviceSelectorModal
+      <SearchBottomSheet
         visible={showDeviceSelector}
         devices={devices}
-        selected={selectedDevice}
-        onSelect={d => { setSelectedDevice(d); }}
+        title="Selecione o veículo"
         onClose={() => setShowDeviceSelector(false)}
+        onSelectDevice={(device) => {
+          setSelectedDevice(device);
+          setShowDeviceSelector(false);
+        }}
       />
       <ExportModal
         visible={showExportModal}
@@ -1202,11 +1217,64 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.background,
   },
-  deviceBtnText: {
+  deviceBtnInfo: {
     flex: 1,
+    minWidth: 0,
+  },
+  deviceBtnText: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.text,
+  },
+  deviceBtnSwap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: '#fff7e3',
+  },
+  deviceBtnSwapText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  selectEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.sm,
+  },
+  selectEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.text,
+    marginTop: spacing.xs,
+  },
+  selectEmptySubtitle: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  selectEmptyBtn: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  selectEmptyBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primaryText,
   },
   periodRow: {
     flexDirection: 'row',
