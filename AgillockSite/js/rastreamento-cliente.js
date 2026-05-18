@@ -2386,12 +2386,12 @@ function mostrarCardDispositivo(id) {
       ${p ? `<div class="dcard-section dcard-val" style="line-height:1.4">
         <div class="dcard-section-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           Endereço
-          <div style="display:flex;gap:4px">
+          <div id="dcard-addr-actions-${id}" style="display:flex;gap:4px">
             ${_htmlBotaoGoogleMaps(p.latitude, p.longitude, hasCached ? cachedAddr : null)}
             ${_htmlBotaoStreetView(p.latitude, p.longitude)}
           </div>
         </div>
-        <div id="${addrId}" style="font-size:11px">${addrTxt}</div>
+        <div id="${addrId}" data-cache-key="${cacheKey || ''}" style="font-size:11px">${addrTxt}</div>
       </div>` : ''}
       <div id="dcard-comandos-${id}" class="dcard-section" style="display:none;padding-top:12px;border-top:1px solid rgba(128,128,128,0.1)">
         <div id="dcard-comandos-grid-${id}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
@@ -2522,12 +2522,42 @@ function atualizarCardAtivo(did) {
   if (tsDev && p) tsDev.textContent = fmtGPSTimeSec(p.deviceTime);
   if (tsGps && p) tsGps.textContent = fmtGPSTimeSec(p.fixTime);
 
+  _atualizarEnderecoCardAtivoCliente(did, p);
+
   if (modoFoco && v?.posicao) {
     const trackOff = _eventoPopupAtualIdx !== null ? _eventPopupOffsetPx : 0;
     const barraWrap = document.getElementById('barra-veiculos-wrap');
     const barraExpandida = !!document.getElementById('barra-veiculos')?.classList.contains('expandida');
     const trackOffY = (_eventoPopupAtualIdx !== null && barraExpandida) ? Math.round((barraWrap?.offsetHeight || 80) / 2) : 0;
     map.panTo(_latLngComOffset(v.posicao, trackOff, 16, trackOffY), { animate: true, duration: 0.5 });
+  }
+}
+
+function _atualizarEnderecoCardAtivoCliente(dispositivoId, p) {
+  if (!p) return;
+  const addrEl = document.getElementById(`dcard-addr-${dispositivoId}`);
+  if (!addrEl) return;
+  const cacheKey = `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}`;
+  if (addrEl.dataset.cacheKey === cacheKey && !p.endereco) return;
+
+  addrEl.dataset.cacheKey = cacheKey;
+
+  const actionsEl = document.getElementById(`dcard-addr-actions-${dispositivoId}`);
+  if (actionsEl) {
+    const cachedNow = p.endereco || _geocodeCache[cacheKey] || null;
+    actionsEl.innerHTML = _htmlBotaoGoogleMaps(p.latitude, p.longitude, cachedNow)
+      + _htmlBotaoStreetView(p.latitude, p.longitude);
+  }
+
+  if (p.endereco) {
+    _geocodeCache[cacheKey] = p.endereco;
+    addrEl.innerHTML = `<i class="fa fa-map-marker"></i> ${p.endereco}`;
+  } else if (cacheKey in _geocodeCache) {
+    const cached = _geocodeCache[cacheKey];
+    const coords = `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})`;
+    addrEl.innerHTML = `<i class="fa fa-map-marker"></i> ${cached || coords}`;
+  } else {
+    geocodificarCoordenadas(p.latitude, p.longitude, `dcard-addr-${dispositivoId}`);
   }
 }
 
