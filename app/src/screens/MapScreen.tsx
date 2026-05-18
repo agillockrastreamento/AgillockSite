@@ -199,6 +199,8 @@ export function MapScreen() {
   }>(DEFAULT_REGION);
   const [spiderClusterKey, setSpiderClusterKey] = useState<string | null>(null);
   const lastSpiderInteractionRef = useRef(0);
+  const quickSheetModeBeforeFocusRef = useRef<QuickSheetMode | null>(null);
+  const moveQuickSheetRef = useRef<((mode: QuickSheetMode) => void) | null>(null);
   const mapPreferencesHydrated = useRef(false);
 
   // Main card animation
@@ -508,6 +510,11 @@ export function MapScreen() {
       setMainCardPeeked(false);
       setSelectedDeviceId(null);
       lastCenteredKey.current = '';
+      const previousMode = quickSheetModeBeforeFocusRef.current;
+      quickSheetModeBeforeFocusRef.current = null;
+      if (previousMode && previousMode !== 'closed') {
+        moveQuickSheetRef.current?.(previousMode);
+      }
     });
   }, [mainCardAnim]);
 
@@ -569,6 +576,7 @@ export function MapScreen() {
     },
     [quickSheetHeight, quickSheetHeights],
   );
+  moveQuickSheetRef.current = moveQuickSheet;
 
   const toggleQuickSheet = useCallback(() => {
     if (quickSheetMode === 'closed') { moveQuickSheet('peek'); return; }
@@ -620,6 +628,12 @@ export function MapScreen() {
     }
     setSelectedDeviceId(device.dispositivoId);
     if (openCard) {
+      // Guarda o modo do quick sheet antes de fechar para restaurar ao desfocar.
+      // Só sobrescreve quando ainda não há foco ativo (evita perder o valor original
+      // ao trocar de veículo enquanto o main card já está aberto).
+      if (quickSheetModeBeforeFocusRef.current == null) {
+        quickSheetModeBeforeFocusRef.current = quickSheetMode;
+      }
       moveQuickSheet('closed');
       lastCenteredKey.current = `${coordinate.latitude.toFixed(5)},${coordinate.longitude.toFixed(5)}`;
       animateToDevice(device, MAIN_CARD_HEIGHT);
@@ -627,7 +641,7 @@ export function MapScreen() {
     } else {
       animateToDevice(device, 0);
     }
-  }, [moveQuickSheet, animateToDevice, openMainCard, toast]);
+  }, [moveQuickSheet, animateToDevice, openMainCard, toast, quickSheetMode]);
 
   const fitAllDevices = useCallback((nextDevices: TrackingDevice[]) => {
     const coordinates = nextDevices
