@@ -144,8 +144,8 @@ class NotificationService {
           ]
         },
         include: {
-          cliente: { include: { login: true } },
-          clientesVinculados: { include: { cliente: { include: { login: true } } } },
+          cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } },
+          clientesVinculados: { include: { cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } } } },
         },
       });
 
@@ -172,9 +172,12 @@ class NotificationService {
       }
 
       const clientesMap = new Map<string, { id: string; nome: string; login: { id: string; email: string; ativo: boolean } | null }>();
-      if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, dispositivo.cliente as any);
+      // Após o schema virar 1:N, `cliente.logins[0]` é o responsável (filtrado no query).
+      // Mapeia para o campo singular `login` esperado por todo o serviço legado.
+      const _liftLogin = (c: any) => ({ ...c, login: Array.isArray(c.logins) && c.logins[0] ? c.logins[0] : null });
+      if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, _liftLogin(dispositivo.cliente));
       for (const vinculo of dispositivo.clientesVinculados) {
-        if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, vinculo.cliente as any);
+        if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, _liftLogin(vinculo.cliente));
       }
 
       if (clientesMap.size === 0) {
@@ -183,7 +186,7 @@ class NotificationService {
       }
 
       // Filtra apenas o cliente alvo, se especificado (vindo da verificação proativa)
-      const clientesParaProcessar = targetClienteLoginId 
+      const clientesParaProcessar = targetClienteLoginId
         ? Array.from(clientesMap.values()).filter(c => c.login?.id === targetClienteLoginId)
         : Array.from(clientesMap.values());
 
@@ -372,16 +375,17 @@ class NotificationService {
       const dispositivo = await prisma.dispositivo.findFirst({
         where: { identificador },
         include: {
-          cliente: { include: { login: true } },
-          clientesVinculados: { include: { cliente: { include: { login: true } } } },
+          cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } },
+          clientesVinculados: { include: { cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } } } },
         },
       });
       if (!dispositivo) return eventosDetectados;
 
       const clientesMap = new Map<string, { nome: string; login: { id: string; email: string; ativo: boolean } | null }>();
-      if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, dispositivo.cliente);
+      const _liftLoginKm = (c: any) => ({ ...c, login: Array.isArray(c.logins) && c.logins[0] ? c.logins[0] : null });
+      if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, _liftLoginKm(dispositivo.cliente));
       for (const vinculo of dispositivo.clientesVinculados) {
-        if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, vinculo.cliente);
+        if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, _liftLoginKm(vinculo.cliente));
       }
 
       const clientes = Array.from(clientesMap.values());

@@ -9,6 +9,7 @@ export type RootStackParamList = {
   Manutencao: undefined;
   Pagamentos: undefined;
   Historico: { dispositivoId: string; nome: string; placa?: string | null };
+  UsuarioForm: { id?: string } | undefined;
 };
 
 export type ClienteDrawerParamList = {
@@ -17,4 +18,5 @@ export type ClienteDrawerParamList = {
   Notificacoes: undefined;
   Manutencao: undefined;
   Pagamentos: undefined;
+  Usuarios: undefined;
 };

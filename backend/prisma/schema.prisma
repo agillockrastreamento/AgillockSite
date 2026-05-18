@@ -41,43 +41,43 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Permissões granulares para COLABORADOR (ignoradas para outros roles)
-  podeExcluirCliente      Boolean @default(true)
-  podeEditarCliente       Boolean @default(true)
-  podeInativarCliente     Boolean @default(true)
-  podeExcluirPlaca        Boolean @default(true)
-  podeInativarPlaca       Boolean @default(true)
-  podeExcluirDispositivo      Boolean @default(true)
-  podeInativarDispositivo     Boolean @default(true)
-  podeCriarDispositivo        Boolean @default(true)
-  podeEditarDispositivo       Boolean @default(true)
-  podeDesvincularDispositivo  Boolean @default(true)
-  podeBaixaManual         Boolean @default(true)
-  podeCancelarCarne       Boolean @default(true)
-  podeAlterarVencimento   Boolean @default(true)
-  podeCriarContrato   Boolean @default(true)
-  podeEditarContrato  Boolean @default(true)
-  podeExcluirContrato Boolean @default(true)
-  podeAcessarMonitoramento Boolean @default(false)
+  podeExcluirCliente         Boolean @default(true)
+  podeEditarCliente          Boolean @default(true)
+  podeInativarCliente        Boolean @default(true)
+  podeExcluirPlaca           Boolean @default(true)
+  podeInativarPlaca          Boolean @default(true)
+  podeExcluirDispositivo     Boolean @default(true)
+  podeInativarDispositivo    Boolean @default(true)
+  podeCriarDispositivo       Boolean @default(true)
+  podeEditarDispositivo      Boolean @default(true)
+  podeDesvincularDispositivo Boolean @default(true)
+  podeBaixaManual            Boolean @default(true)
+  podeCancelarCarne          Boolean @default(true)
+  podeAlterarVencimento      Boolean @default(true)
+  podeCriarContrato          Boolean @default(true)
+  podeEditarContrato         Boolean @default(true)
+  podeExcluirContrato        Boolean @default(true)
+  podeAcessarMonitoramento   Boolean @default(false)
   // Permissões de login do cliente (padrão conservador para inativar/excluir)
-  podeCriarLoginCliente    Boolean @default(true)
-  podeEditarLoginCliente   Boolean @default(true)
-  podeInativarLoginCliente Boolean @default(false)
-  podeExcluirLoginCliente  Boolean @default(false)
+  podeCriarLoginCliente      Boolean @default(true)
+  podeEditarLoginCliente     Boolean @default(true)
+  podeInativarLoginCliente   Boolean @default(false)
+  podeExcluirLoginCliente    Boolean @default(false)
 
-  manutencoesAdmin     ManutencaoRegistro[]    @relation("ManutencaoAdmin")
-  recorrenciasAdmin    ManutencaoRecorrencia[] @relation("RecorrenciaAdmin")
+  manutencoesAdmin      ManutencaoRegistro[]        @relation("ManutencaoAdmin")
+  recorrenciasAdmin     ManutencaoRecorrencia[]     @relation("RecorrenciaAdmin")
   recorrenciasDataAdmin ManutencaoRecorrenciaData[] @relation("RecorrenciaDataAdmin")
-  clientesCriados      Cliente[]          @relation("ClienteCriador")
-  clientesVendidos     Cliente[]          @relation("ClienteVendedor")
-  carnesGerados        Carne[]            @relation("CarneGeradoPor")
-  carnesVendidos       Carne[]            @relation("CarneVendedor")
-  placasVendidas       Placa[]            @relation("PlacaVendedor")
-  dispositivosCriados  Dispositivo[]      @relation("DispositivoCriador")
-  dispositivosVendidos Dispositivo[]      @relation("DispositivoVendedor")
-  comissoes            ComissaoVendedor[]
-  pagamentos           PagamentoComissao[]
-  contratosCriados     Contrato[]          @relation("ContratoCriador")
-  adminPreferencia     AdminPreferencia?
+  clientesCriados       Cliente[]                   @relation("ClienteCriador")
+  clientesVendidos      Cliente[]                   @relation("ClienteVendedor")
+  carnesGerados         Carne[]                     @relation("CarneGeradoPor")
+  carnesVendidos        Carne[]                     @relation("CarneVendedor")
+  placasVendidas        Placa[]                     @relation("PlacaVendedor")
+  dispositivosCriados   Dispositivo[]               @relation("DispositivoCriador")
+  dispositivosVendidos  Dispositivo[]               @relation("DispositivoVendedor")
+  comissoes             ComissaoVendedor[]
+  pagamentos            PagamentoComissao[]
+  contratosCriados      Contrato[]                  @relation("ContratoCriador")
+  adminPreferencia      AdminPreferencia?
 }
 
 model AdminPreferencia {
@@ -91,43 +91,43 @@ model AdminPreferencia {
 }
 
 model Cliente {
-  id          String        @id @default(uuid())
-  nome        String
-  cpfCnpj     String?
-  telefone    String?
-  email       String?
+  id             String        @id @default(uuid())
+  nome           String
+  cpfCnpj        String?
+  telefone       String?
+  email          String?
   notas          String?
   dataNascimento String?
   rg             String?
   profissao      String?
   estadoCivil    String?
-  tipoPessoa     String  @default("PF")
+  tipoPessoa     String        @default("PF")
   nirc           String?
   emailCobranca  String?
   origemCliente  String?
   socios         Json?
-  status      StatusCliente @default(ATIVO)
-  cep         String?
-  logradouro  String?
-  numero      String?
-  complemento String?
-  bairro      String?
-  cidade      String?
-  estado      String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  status         StatusCliente @default(ATIVO)
+  cep            String?
+  logradouro     String?
+  numero         String?
+  complemento    String?
+  bairro         String?
+  cidade         String?
+  estado         String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   criadoPorId String
-  criadoPor   User   @relation("ClienteCriador", fields: [criadoPorId], references: [id])
+  criadoPor   User    @relation("ClienteCriador", fields: [criadoPorId], references: [id])
   vendedorId  String?
-  vendedor    User?  @relation("ClienteVendedor", fields: [vendedorId], references: [id])
+  vendedor    User?   @relation("ClienteVendedor", fields: [vendedorId], references: [id])
 
   placas                 Placa[]
   dispositivos           Dispositivo[]
   dispositivosVinculados DispositivoCliente[]
   carnes                 Carne[]
   contratos              Contrato[]
-  login                  ClienteLogin?
+  logins                 ClienteLogin[]
   geocercas              Geocerca[]
 }
 
@@ -182,17 +182,17 @@ model Boleto {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  carneId String
-  carne   Carne  @relation(fields: [carneId], references: [id])
-  placaId String?
-  placa   Placa? @relation(fields: [placaId], references: [id])
+  carneId       String
+  carne         Carne        @relation(fields: [carneId], references: [id])
+  placaId       String?
+  placa         Placa?       @relation(fields: [placaId], references: [id])
   dispositivoId String?
   dispositivo   Dispositivo? @relation(fields: [dispositivoId], references: [id])
 
-  placasUnificadas       BoletoPlaca[]
-  dispositivosUnificados BoletoDispositivo[]
-  comissoes              ComissaoVendedor[]
-  eventosNotificacoes    EventoNotificacao[]
+  placasUnificadas        BoletoPlaca[]
+  dispositivosUnificados  BoletoDispositivo[]
+  comissoes               ComissaoVendedor[]
+  eventosNotificacoes     EventoNotificacao[]
   notificacoesFinanceiras NotificacaoFinanceiraEnvio[]
 }
 
@@ -219,20 +219,20 @@ model BoletoDispositivo {
 }
 
 model Dispositivo {
-  id               String   @id @default(uuid())
-  traccarId        Int?     @unique
-  nome             String
-  identificador    String   @unique
-  categoria        String?
-  grupo            String?
-  contato          String?
-  ativo            Boolean  @default(true)
+  id            String  @id @default(uuid())
+  traccarId     Int?    @unique
+  nome          String
+  identificador String  @unique
+  categoria     String?
+  grupo         String?
+  contato       String?
+  ativo         Boolean @default(true)
 
   // Rastreador
-  modeloRastreador    String?
-  telefoneRastreador  String?
-  iccid               String?
-  operadora           String?
+  modeloRastreador   String?
+  telefoneRastreador String?
+  iccid              String?
+  operadora          String?
 
   // Veículo
   placa           String?
@@ -247,13 +247,13 @@ model Dispositivo {
   instalador      String?
 
   // Configurações
-  consumo          String?
-  limiteVelocidade Float?
-  senha            String?
-  ignorarOdometro  Boolean  @default(false)
-  manutencaoAtiva  Boolean  @default(true)
-  odometroSistemaMetros    Float?
-  horimetroSistemaSegundos Int      @default(0)
+  consumo                   String?
+  limiteVelocidade          Float?
+  senha                     String?
+  ignorarOdometro           Boolean   @default(false)
+  manutencaoAtiva           Boolean   @default(true)
+  odometroSistemaMetros     Float?
+  horimetroSistemaSegundos  Int       @default(0)
   telemetriaUltimaPosicaoEm DateTime?
   telemetriaUltimaLatitude  Float?
   telemetriaUltimaLongitude Float?
@@ -268,16 +268,16 @@ model Dispositivo {
   valorPadrao Decimal? @db.Decimal(10, 2)
 
   clienteId   String?
-  cliente     Cliente?  @relation(fields: [clienteId], references: [id])
+  cliente     Cliente? @relation(fields: [clienteId], references: [id])
   vendedorId  String?
-  vendedor    User?     @relation("DispositivoVendedor", fields: [vendedorId], references: [id])
+  vendedor    User?    @relation("DispositivoVendedor", fields: [vendedorId], references: [id])
   criadoPorId String
-  criadoPor   User      @relation("DispositivoCriador", fields: [criadoPorId], references: [id])
+  criadoPor   User     @relation("DispositivoCriador", fields: [criadoPorId], references: [id])
 
-  boletos            Boleto[]
-  boletosUnificados  BoletoDispositivo[]
-  clientesVinculados DispositivoCliente[]
-  motoristasVinculados MotoristaDispositivo[]
+  boletos                  Boleto[]
+  boletosUnificados        BoletoDispositivo[]
+  clientesVinculados       DispositivoCliente[]
+  motoristasVinculados     MotoristaDispositivo[]
   preferenciasNotificacoes PreferenciaNotificacao[]
   eventosNotificacoes      EventoNotificacao[]
   estadosKmNotificacao     EstadoKmNotificacao[]
@@ -285,6 +285,7 @@ model Dispositivo {
   manutencoesRecorrencias  ManutencaoRecorrencia[]
   recorrenciasData         ManutencaoRecorrenciaData[]
   geocercas                GeocercaDispositivo[]
+  loginsPermitidos         ClienteLoginPlaca[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -297,9 +298,9 @@ model Motorista {
   traccarId     Int?
   cnh           String?
   telefone      String?
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   dispositivosVinculados MotoristaDispositivo[]
 }
@@ -309,15 +310,16 @@ model MotoristaDispositivo {
   dispositivoId String
   motorista     Motorista   @relation(fields: [motoristaId], references: [id], onDelete: Cascade)
   dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+
   @@id([motoristaId, dispositivoId])
 }
-
 
 model DispositivoCliente {
   dispositivoId String
   clienteId     String
   dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
   cliente       Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
   @@id([dispositivoId, clienteId])
 }
 
@@ -337,47 +339,60 @@ model ComissaoVendedor {
 }
 
 model PagamentoComissao {
-  id               String   @id @default(uuid())
-  vendedorId       String
-  vendedor         User     @relation(fields: [vendedorId], references: [id])
-  mes              String   // formato YYYY-MM
-  valor            Decimal  @db.Decimal(10, 2)
-  pago             Boolean  @default(false)
-  comprovante      String?  // caminho relativo do arquivo (ex: "uploads/comprovantes/uuid.pdf")
-  comprovanteMime  String?  // MIME type do arquivo
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(uuid())
+  vendedorId      String
+  vendedor        User     @relation(fields: [vendedorId], references: [id])
+  mes             String // formato YYYY-MM
+  valor           Decimal  @db.Decimal(10, 2)
+  pago            Boolean  @default(false)
+  comprovante     String? // caminho relativo do arquivo (ex: "uploads/comprovantes/uuid.pdf")
+  comprovanteMime String? // MIME type do arquivo
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([vendedorId, mes])
 }
 
 model Configuracoes {
-  id              String   @id @default("1")
-  percentualMenor Decimal  @default(12.50) @db.Decimal(5, 2)
-  percentualMaior Decimal  @default(18.00) @db.Decimal(5, 2)
-  valorReferencia Decimal  @default(50.00) @db.Decimal(10, 2)
-  multaPercentual Decimal  @default(5.00)  @db.Decimal(5, 2)
-  jurosDiarios    Decimal  @default(0.33)  @db.Decimal(5, 2)
+  id                    String   @id @default("1")
+  percentualMenor       Decimal  @default(12.50) @db.Decimal(5, 2)
+  percentualMaior       Decimal  @default(18.00) @db.Decimal(5, 2)
+  valorReferencia       Decimal  @default(50.00) @db.Decimal(10, 2)
+  multaPercentual       Decimal  @default(5.00) @db.Decimal(5, 2)
+  jurosDiarios          Decimal  @default(0.33) @db.Decimal(5, 2)
   representanteNome     String?
   representanteEmail    String?
   representanteTelefone String?
   representanteCpf      String?
-  updatedAt       DateTime @updatedAt
+  updatedAt             DateTime @updatedAt
 }
 
 model ClienteLogin {
-  id        String   @id @default(cuid())
-  clienteId String   @unique
-  email     String   @unique
-  senhaHash String
-  ativo     Boolean  @default(true)
-  prefs     Json     @default("{}")
-  avatarUrl String?
-  logoUrl   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  clienteId        String
+  email            String   @unique
+  senhaHash        String
+  ativo            Boolean  @default(true)
+  prefs            Json     @default("{}")
+  avatarUrl        String?
+  logoUrl          String?
+  // Tipo de login: 'responsavel' = login original do cliente (acesso total),
+  // 'vinculado' = sub-usuário criado pelo responsável (acesso limitado por permissões/placas)
+  tipo             String   @default("responsavel")
+  // Rótulo livre para o perfil do sub-usuário (ex: "Locatário", "Mecânico", "Motorista")
+  perfil           String?
+  // Permissões granulares (JSON). Vazio para responsável (acesso total implícito).
+  // Estrutura: { rastreamento: {...}, manutencao: {...}, relatorio: {...} }
+  permissoes       Json     @default("{}")
+  // Quem criou esse login (null para responsável criado pelo admin)
+  criadoPorLoginId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente                  Cliente                      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  criadoPorLogin           ClienteLogin?                @relation("ClienteLoginCriador", fields: [criadoPorLoginId], references: [id], onDelete: SetNull)
+  loginsCriados            ClienteLogin[]               @relation("ClienteLoginCriador")
+  placasPermitidas         ClienteLoginPlaca[]
   preferenciasNotificacoes PreferenciaNotificacao[]
   eventosNotificacoes      EventoNotificacao[]
   estadosKmNotificacao     EstadoKmNotificacao[]
@@ -386,6 +401,21 @@ model ClienteLogin {
   recorrenciasData         ManutencaoRecorrenciaData[]
   appPushTokens            AppPushToken[]
   notificacoesFinanceiras  NotificacaoFinanceiraEnvio[]
+
+  @@index([clienteId, tipo])
+}
+
+// Tabela junção: quais dispositivos um sub-usuário ('vinculado') pode acessar.
+// Para 'responsavel' a lista é ignorada (acesso a todos do cliente).
+model ClienteLoginPlaca {
+  clienteLoginId String
+  dispositivoId  String
+
+  clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
+  dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+
+  @@id([clienteLoginId, dispositivoId])
+  @@index([dispositivoId])
 }
 
 model AppPushToken {
@@ -406,21 +436,21 @@ model AppPushToken {
 }
 
 model PreferenciaNotificacao {
-  id             String   @id @default(uuid())
-  clienteLoginId String
-  dispositivoId  String
-  tipoEvento     String   // ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut, kmExcedida, kmReduzida, trocaOleo
-  web            Boolean  @default(false)
-  app            Boolean  @default(false)
-  email          Boolean  @default(false)
+  id                 String   @id @default(uuid())
+  clienteLoginId     String
+  dispositivoId      String
+  tipoEvento         String // ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut, kmExcedida, kmReduzida, trocaOleo
+  web                Boolean  @default(false)
+  app                Boolean  @default(false)
+  email              Boolean  @default(false)
   overspeedLimit     Int?     @default(100)
   kmMaximo30Dias     Int?
   diaRenovacaoMes    Int?
   kmMinimo7Dias      Int?
   diaSemanaRenovacao Int?
   kmTrocaOleo        Int?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
   dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
@@ -429,16 +459,16 @@ model PreferenciaNotificacao {
 }
 
 model EstadoKmNotificacao {
-  id                 String   @id @default(uuid())
-  clienteLoginId     String
-  dispositivoId      String
-  tipoEvento         String   // kmExcedida, kmReduzida, trocaOleo
-  kmBaseMetros         Float    @default(0)
-  dataBase             DateTime @default(now())
-  notificacaoEnviada   Boolean  @default(false)
-  ultimaNotificacaoKm  Float    @default(-9999)
-  createdAt            DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  clienteLoginId      String
+  dispositivoId       String
+  tipoEvento          String // kmExcedida, kmReduzida, trocaOleo
+  kmBaseMetros        Float    @default(0)
+  dataBase            DateTime @default(now())
+  notificacaoEnviada  Boolean  @default(false)
+  ultimaNotificacaoKm Float    @default(-9999)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
   dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
@@ -512,22 +542,22 @@ model ManutencaoRegistro {
 }
 
 model ManutencaoRecorrencia {
-  id               String   @id @default(uuid())
-  dispositivoId    String
-  clienteLoginId   String?
-  criadoPorAdminId String?
-  titulo           String
-  descricao        String?
-  intervaloKm      Int
-  kmBase           Float    @default(0)
-  alerta50Enviado        Boolean  @default(false)
-  alerta25Enviado        Boolean  @default(false)
-  alerta0Enviado         Boolean  @default(false)
-  ultimaAlertaPostDueKm  Float    @default(-1)
-  ativa                  Boolean  @default(true)
-  origem           String   @default("CLIENTE")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  dispositivoId         String
+  clienteLoginId        String?
+  criadoPorAdminId      String?
+  titulo                String
+  descricao             String?
+  intervaloKm           Int
+  kmBase                Float    @default(0)
+  alerta50Enviado       Boolean  @default(false)
+  alerta25Enviado       Boolean  @default(false)
+  alerta0Enviado        Boolean  @default(false)
+  ultimaAlertaPostDueKm Float    @default(-1)
+  ativa                 Boolean  @default(true)
+  origem                String   @default("CLIENTE")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   dispositivo    Dispositivo   @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
   clienteLogin   ClienteLogin? @relation(fields: [clienteLoginId], references: [id], onDelete: SetNull)
@@ -535,36 +565,36 @@ model ManutencaoRecorrencia {
 }
 
 model ManutencaoRecorrenciaData {
-  id               String    @id @default(uuid())
+  id               String  @id @default(uuid())
   dispositivoId    String
   clienteLoginId   String?
   criadoPorAdminId String?
   titulo           String
-  descricao        String?   @db.Text
+  descricao        String? @db.Text
 
   // AVULSA | INTERVALO | SEMANAL | MENSAL | ANUAL
-  tipoRecorrencia  String    @default("AVULSA")
-  dataReferencia   DateTime  // próxima ocorrência
+  tipoRecorrencia String   @default("AVULSA")
+  dataReferencia  DateTime // próxima ocorrência
 
-  intervaloDias    Int?      // INTERVALO: a cada N dias
-  diasSemana       Json?     // SEMANAL: [0-6] (0=dom)
-  diaDoMes         Int?      // MENSAL/ANUAL: dia (1-31)
-  mesDoAno         Int?      // ANUAL: mês (1-12)
+  intervaloDias Int? // INTERVALO: a cada N dias
+  diasSemana    Json? // SEMANAL: [0-6] (0=dom)
+  diaDoMes      Int? // MENSAL/ANUAL: dia (1-31)
+  mesDoAno      Int? // ANUAL: mês (1-12)
 
-  alerta7dEnviado  Boolean   @default(false)
-  alerta4dEnviado  Boolean   @default(false)
-  alerta2dEnviado  Boolean   @default(false)
-  alerta1dEnviado  Boolean   @default(false)
-  alertaDiaEnviado Boolean   @default(false)
+  alerta7dEnviado    Boolean   @default(false)
+  alerta4dEnviado    Boolean   @default(false)
+  alerta2dEnviado    Boolean   @default(false)
+  alerta1dEnviado    Boolean   @default(false)
+  alertaDiaEnviado   Boolean   @default(false)
   ultimoAlertaPosDue DateTime?
 
-  ciclosCompletos  Int       @default(0)
-  ativa            Boolean   @default(true)
-  origem           String    @default("CLIENTE")
-  canalNotificacao String    @default("todos")   // app | email | todos
+  ciclosCompletos  Int     @default(0)
+  ativa            Boolean @default(true)
+  origem           String  @default("CLIENTE")
+  canalNotificacao String  @default("todos") // app | email | todos
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   dispositivo    Dispositivo   @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
   clienteLogin   ClienteLogin? @relation(fields: [clienteLoginId], references: [id], onDelete: SetNull)
@@ -578,7 +608,7 @@ model Geocerca {
   descricao        String?
   area             String    @db.Text
   tipo             String    @default("circulo")
-  origemTipo       String    // "ADMIN" | "CLIENTE"
+  origemTipo       String // "ADMIN" | "CLIENTE"
   clienteId        String?
   visivelCliente   Boolean   @default(false)
   notificarCliente Boolean   @default(false)
@@ -588,33 +618,33 @@ model Geocerca {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  dispositivos     GeocercaDispositivo[]
-  cliente          Cliente?  @relation(fields: [clienteId], references: [id])
+  dispositivos GeocercaDispositivo[]
+  cliente      Cliente?              @relation(fields: [clienteId], references: [id])
 }
 
 model GeocercaDispositivo {
   geocercaId    String
   dispositivoId String
 
-  geocerca      Geocerca    @relation(fields: [geocercaId], references: [id], onDelete: Cascade)
-  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id])
+  geocerca    Geocerca    @relation(fields: [geocercaId], references: [id], onDelete: Cascade)
+  dispositivo Dispositivo @relation(fields: [dispositivoId], references: [id])
 
   @@id([geocercaId, dispositivoId])
 }
 
 model Contrato {
   id                   String    @id @default(uuid())
-  tipo                 String    // "PF_COM_ASSISTENCIA" | "PF_SEM_ASSISTENCIA" | "PJ_COM_ASSISTENCIA" | "PJ_SEM_ASSISTENCIA"
+  tipo                 String // "PF_COM_ASSISTENCIA" | "PF_SEM_ASSISTENCIA" | "PJ_COM_ASSISTENCIA" | "PJ_SEM_ASSISTENCIA"
   clienteId            String
   cliente              Cliente   @relation(fields: [clienteId], references: [id])
-  fiadores             Json?     // [{nome, cpf, rg, nacionalidade, profissao, estadoCivil, dataNascimento, email, telefone, cep, logradouro, numero, complemento, bairro, cidade, estado}]
-  testemunhas          Json      // [{nome, cpf, email, telefone, assinarDigital: bool}]
+  fiadores             Json? // [{nome, cpf, rg, nacionalidade, profissao, estadoCivil, dataNascimento, email, telefone, cep, logradouro, numero, complemento, bairro, cidade, estado}]
+  testemunhas          Json // [{nome, cpf, email, telefone, assinarDigital: bool}]
   htmlConteudo         String    @db.Text
-  metodoAutenticacao   String    // "token_email" | "token_whatsapp" | "token_sms" | "handwritten"
+  metodoAutenticacao   String // "token_email" | "token_whatsapp" | "token_sms" | "handwritten"
   status               String    @default("RASCUNHO")
   clicksignEnvelopeId  String?
   clicksignDocumentoId String?
-  signatarios          Json?     // [{nome, signerId, link, tipo: "cliente"|"socio"|"fiador"|"testemunha"|"agillock"}]
+  signatarios          Json? // [{nome, signerId, link, tipo: "cliente"|"socio"|"fiador"|"testemunha"|"agillock"}]
   criadoPorId          String
   criadoPor            User      @relation("ContratoCriador", fields: [criadoPorId], references: [id])
   assinadoEm           DateTime?

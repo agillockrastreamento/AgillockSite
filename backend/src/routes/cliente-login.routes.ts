@@ -38,11 +38,13 @@ const uploadLogo = multer({
 });
 
 // ── GET /api/clientes/:id/login ───────────────────────────────────────────────
+// Retorna o login 'responsavel' do cliente (login primário cadastrado pelo admin).
+// Sub-usuários ('vinculado') são gerenciados pelo próprio cliente via portal.
 router.get('/:id/login', async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
 
-  const login = await prisma.clienteLogin.findUnique({
-    where: { clienteId: id },
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
     select: { id: true, email: true, ativo: true, logoUrl: true, createdAt: true, updatedAt: true },
   });
 
@@ -74,7 +76,9 @@ router.post('/:id/login', async (req: AuthRequest, res: Response): Promise<void>
     return;
   }
 
-  const existente = await prisma.clienteLogin.findUnique({ where: { clienteId: id } });
+  const existente = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
+  });
   if (existente) {
     res.status(409).json({ error: 'Este cliente já possui login cadastrado.' });
     return;
@@ -89,7 +93,7 @@ router.post('/:id/login', async (req: AuthRequest, res: Response): Promise<void>
 
   const senhaHash = await bcrypt.hash(senha, 10);
   const login = await prisma.clienteLogin.create({
-    data: { clienteId: id, email, senhaHash },
+    data: { clienteId: id, email, senhaHash, tipo: 'responsavel' },
     select: { id: true, email: true, ativo: true, logoUrl: true, createdAt: true },
   });
 
@@ -106,7 +110,9 @@ router.put('/:id/login', async (req: AuthRequest, res: Response): Promise<void> 
   const id = param(req, 'id');
   const { email, senha } = req.body as { email?: string; senha?: string };
 
-  const login = await prisma.clienteLogin.findUnique({ where: { clienteId: id } });
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
+  });
   if (!login) {
     res.status(404).json({ error: 'Login não encontrado para este cliente.' });
     return;
@@ -114,7 +120,7 @@ router.put('/:id/login', async (req: AuthRequest, res: Response): Promise<void> 
 
   if (email && email !== login.email) {
     const emailEmUsoCliente = await prisma.clienteLogin.findFirst({
-      where: { email, clienteId: { not: id } },
+      where: { email, id: { not: login.id } },
     });
     const emailEmUsoUser = await prisma.user.findUnique({ where: { email } });
     if (emailEmUsoCliente || emailEmUsoUser) {
@@ -132,7 +138,7 @@ router.put('/:id/login', async (req: AuthRequest, res: Response): Promise<void> 
   if (senha) data.senhaHash = await bcrypt.hash(senha, 10);
 
   const updated = await prisma.clienteLogin.update({
-    where: { clienteId: id },
+    where: { id: login.id },
     data,
     select: { id: true, email: true, ativo: true, logoUrl: true, updatedAt: true },
   });
@@ -155,9 +161,9 @@ router.post('/:id/login/logo', uploadLogo.single('logo'), async (req: AuthReques
     return;
   }
 
-  const login = await prisma.clienteLogin.findUnique({
-    where: { clienteId: id },
-    select: { logoUrl: true },
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
+    select: { id: true, logoUrl: true },
   });
 
   if (!login) {
@@ -169,7 +175,7 @@ router.post('/:id/login/logo', uploadLogo.single('logo'), async (req: AuthReques
   const novaLogoUrl = `/uploads/cliente-logo/${req.file.filename}`;
 
   await prisma.clienteLogin.update({
-    where: { clienteId: id },
+    where: { id: login.id },
     data: { logoUrl: novaLogoUrl },
   });
 
@@ -191,9 +197,9 @@ router.delete('/:id/login/logo', async (req: AuthRequest, res: Response): Promis
   }
 
   const id = param(req, 'id');
-  const login = await prisma.clienteLogin.findUnique({
-    where: { clienteId: id },
-    select: { logoUrl: true },
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
+    select: { id: true, logoUrl: true },
   });
 
   if (!login) {
@@ -209,7 +215,7 @@ router.delete('/:id/login/logo', async (req: AuthRequest, res: Response): Promis
   }
 
   await prisma.clienteLogin.update({
-    where: { clienteId: id },
+    where: { id: login.id },
     data: { logoUrl: null },
   });
 
@@ -224,14 +230,16 @@ router.patch('/:id/login/status', async (req: AuthRequest, res: Response): Promi
   }
 
   const id = param(req, 'id');
-  const login = await prisma.clienteLogin.findUnique({ where: { clienteId: id } });
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
+  });
   if (!login) {
     res.status(404).json({ error: 'Login não encontrado.' });
     return;
   }
 
   const updated = await prisma.clienteLogin.update({
-    where: { clienteId: id },
+    where: { id: login.id },
     data: { ativo: !login.ativo },
     select: { id: true, email: true, ativo: true },
   });
@@ -247,7 +255,9 @@ router.delete('/:id/login', async (req: AuthRequest, res: Response): Promise<voi
   }
 
   const id = param(req, 'id');
-  const login = await prisma.clienteLogin.findUnique({ where: { clienteId: id } });
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
+  });
   if (!login) {
     res.status(404).json({ error: 'Login não encontrado.' });
     return;
@@ -260,7 +270,9 @@ router.delete('/:id/login', async (req: AuthRequest, res: Response): Promise<voi
     } catch (_) {}
   }
 
-  await prisma.clienteLogin.delete({ where: { clienteId: id } });
+  // Apaga todos os logins (responsável + sub-usuários) deste cliente.
+  // Sem o responsável, sub-usuários ficam sem gestor — preferimos remover juntos.
+  await prisma.clienteLogin.deleteMany({ where: { clienteId: id } });
   res.status(204).send();
 });
 

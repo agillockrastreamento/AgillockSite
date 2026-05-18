@@ -19,13 +19,109 @@
   })();
 
   var TOKEN_KEY = 'al_cliente_token';
+  var PERMS_KEY = 'al_cliente_permissoes';
   var BASE = window.API_URL || 'http://localhost:3000';
+
+  // Permissões totais (responsável). Mantido em sincronia com backend/utils/cliente-permissoes.ts.
+  var PERMS_TOTAIS = {
+    rastreamento: {
+      ver: true, bloquear: true, desbloquear: true,
+      criarCerca: true, verCerca: true, verEventos: true,
+      marcarManutencaoRecorrenteFeita: true,
+      marcarRecorrenciaDataFeita: true,
+      uploadFoto: true, editarIdentificacao: true
+    },
+    manutencao: {
+      ver: true, criar: true, editar: true, excluir: true,
+      criarRecorrencia: true, editarRecorrencia: true, marcarFeita: true
+    },
+    relatorio: { ver: true, exportar: true }
+  };
 
   // ─── Token ────────────────────────────────────────────────────────────────
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
   function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
-  function removeToken() { localStorage.removeItem(TOKEN_KEY); }
+  function removeToken() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(PERMS_KEY); }
+
+  // ─── Permissões e placas acessíveis ───────────────────────────────────────
+  // Cache em localStorage: { tipo, permissoes, dispositivoIdsPermitidos }.
+  // Carregadas em getMe() logo após login; nas telas, usadas via can(), placas().
+  function _cachedMe() {
+    try { return JSON.parse(localStorage.getItem(PERMS_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function _setCachedMe(me) {
+    try { localStorage.setItem(PERMS_KEY, JSON.stringify(me)); } catch (e) {}
+  }
+  function getPermissoes() {
+    var me = _cachedMe();
+    if (me && me.permissoes) return me.permissoes;
+    // Sem cache (acesso ainda não inicializado): assume total (responsável) — refinará após /me/permissoes resolver.
+    return PERMS_TOTAIS;
+  }
+  function isResponsavel() {
+    var me = _cachedMe();
+    if (me && me.tipo) return me.tipo === 'responsavel';
+    var u = getUser();
+    return !u || u.tipo !== 'vinculado';
+  }
+  function placasIds() {
+    var me = _cachedMe();
+    if (!me) return null;
+    return me.dispositivoIdsPermitidos; // null = sem restrição
+  }
+  function can(key) {
+    // key formato 'tela.acao' — ex: 'rastreamento.bloquear'
+    var parts = String(key || '').split('.');
+    if (parts.length !== 2) return false;
+    var grupo = (getPermissoes() || {})[parts[0]];
+    return !!(grupo && grupo[parts[1]] === true);
+  }
+  function podeVerTela(tela) {
+    return can(tela + '.ver');
+  }
+  function podeAcessarDispositivo(dispositivoId) {
+    var ids = placasIds();
+    if (ids === null || ids === undefined) return true;
+    return ids.indexOf(dispositivoId) !== -1;
+  }
+  // Carrega ou recarrega /me/permissoes. Chame após login e em DOMContentLoaded.
+  function refreshPermissoes() {
+    if (!isAuthenticated()) return Promise.resolve(null);
+    return apiGet('/api/cliente/me/permissoes')
+      .then(function (me) { _setCachedMe(me); aplicarPermissoesSidebar(); return me; })
+      .catch(function () { return null; });
+  }
+
+  // Aplica visibilidade aos itens da sidebar conforme tipo/permissões do cliente.
+  // Sub-usuários não veem: Pagamentos, Usuários, Notificações (a aba dedicada — eventos
+  // continuam acessíveis dentro do Mapa). Telas restritas pelas permissões 'ver' caem juntas.
+  function aplicarPermissoesSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    var nav = sidebar.querySelector('.sidebar-nav');
+    if (!nav) return;
+
+    var responsavel = isResponsavel();
+    var permRules = {
+      'rastreamento.html': function () { return responsavel || can('rastreamento.ver'); },
+      'manutencoes.html':  function () { return responsavel || can('manutencao.ver'); },
+      'relatorio.html':    function () { return responsavel || can('relatorio.ver'); },
+      'geocercas.html':    function () { return responsavel || can('rastreamento.verCerca'); },
+      'notificacoes.html': function () { return responsavel; },
+      'pagamentos.html':   function () { return responsavel; },
+      'usuarios.html':     function () { return responsavel; },
+    };
+    nav.querySelectorAll('li').forEach(function (li) {
+      var link = li.querySelector('a');
+      if (!link) return;
+      var href = (link.getAttribute('href') || '').split('?')[0];
+      var key = href.split('/').pop();
+      var rule = permRules[key];
+      if (!rule) return;
+      li.style.display = rule() ? '' : 'none';
+    });
+  }
 
   function parseJWT(token) {
     try {
@@ -306,6 +402,9 @@
     // Injeta logo automaticamente em páginas autenticadas
     if (isAuthenticated()) {
       initClienteLogo();
+      // Aplica permissões da sidebar usando cache imediato e re-aplica após refresh
+      aplicarPermissoesSidebar();
+      refreshPermissoes();
     }
   });
 
@@ -329,5 +428,13 @@
     fmtDate: fmtDate,
     fmtMoney: fmtMoney,
     badgeStatus: badgeStatus,
+    // Permissões / sub-usuários
+    refreshPermissoes: refreshPermissoes,
+    getPermissoes: getPermissoes,
+    isResponsavel: isResponsavel,
+    placasIds: placasIds,
+    can: can,
+    podeVerTela: podeVerTela,
+    podeAcessarDispositivo: podeAcessarDispositivo,
   };
 })();

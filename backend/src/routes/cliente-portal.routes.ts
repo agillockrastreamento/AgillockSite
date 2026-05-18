@@ -2,7 +2,14 @@ import { Router, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
-import { clienteAuthMiddleware, requireResponsavel, ClienteRequest } from '../middleware/cliente-auth.middleware';
+import {
+  clienteAuthMiddleware,
+  requireResponsavel,
+  requirePermission,
+  podeAcessarDispositivo,
+  whereDispositivosDoCliente,
+  ClienteRequest,
+} from '../middleware/cliente-auth.middleware';
 import { query, param } from '../utils/params';
 import prisma from '../utils/prisma';
 import { Prisma } from '@prisma/client';
@@ -163,14 +170,14 @@ async function responderReverseGeocode(req: ClienteRequest, res: Response): Prom
   }
 }
 
-async function resolverDispositivosCliente(clienteId: string, idsParam: string[] | string) {
+async function resolverDispositivosCliente(req: ClienteRequest, idsParam: string[] | string) {
   const ids = parseDeviceIdsParam(idsParam);
   if (!ids.length) return { dispositivos: [], traccarDevices: [], traccarIds: [] as number[] };
   const dispositivos = await prisma.dispositivo.findMany({
     where: {
       id: { in: ids },
       ativo: true,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, nome: true, placa: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
@@ -445,7 +452,7 @@ router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest,
     where: {
       id: dispositivoId,
       ativo: true,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
@@ -503,7 +510,7 @@ router.get('/rastreamento/dispositivos/:id/paradas', async (req: ClienteRequest,
     where: {
       id: dispositivoId,
       ativo: true,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
@@ -541,7 +548,7 @@ router.get('/rastreamento/dispositivos/:id/paradas', async (req: ClienteRequest,
 });
 
 // ── GET /api/cliente/rastreamento/dispositivos/:id/eventos ───────────────────
-router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/rastreamento/dispositivos/:id/eventos', requirePermission('rastreamento.verEventos'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const dispositivoId = param(req, 'id');
   const from = query(req.query.from);
@@ -556,7 +563,7 @@ router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest,
     where: {
       id: dispositivoId,
       ativo: true,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
@@ -617,7 +624,7 @@ router.get('/rastreamento/dispositivos/:id/resumo', async (req: ClienteRequest, 
     where: {
       id: dispositivoId,
       ativo: true,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
@@ -665,7 +672,7 @@ router.get('/rastreamento/relatorios/batch/historico', async (req: ClienteReques
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
   try {
-    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(req, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
     const localPorIdentificador = new Map(dispositivos.map(d => [d.identificador, d]));
     const identificadorPorTraccarId = new Map(traccarDevices.map(d => [d.id, d.uniqueId]));
@@ -693,7 +700,7 @@ router.get('/rastreamento/relatorios/batch/viagens', async (req: ClienteRequest,
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
   try {
-    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(req, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
     const localPorTraccarId = new Map(traccarDevices.map(device => [device.id, dispositivos.find(local => local.identificador === device.uniqueId)]));
     const [viagens, historico] = await Promise.all([
@@ -725,7 +732,7 @@ router.get('/rastreamento/relatorios/batch/paradas', async (req: ClienteRequest,
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
   try {
-    const { traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    const { traccarIds } = await resolverDispositivosCliente(req, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
     const [paradas, historico] = await Promise.all([
       traccarGetStops(traccarIds, new Date(from), new Date(to)),
@@ -746,14 +753,14 @@ router.get('/rastreamento/relatorios/batch/paradas', async (req: ClienteRequest,
   } catch { res.status(502).json({ error: 'Erro ao buscar paradas.' }); }
 });
 
-router.get('/rastreamento/relatorios/batch/eventos', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/rastreamento/relatorios/batch/eventos', requirePermission('rastreamento.verEventos'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const { from, to } = req.query as { from?: string; to?: string };
   const deviceIds = req.query.deviceId as string[] | string;
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
   try {
-    const { traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    const { traccarIds } = await resolverDispositivosCliente(req, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
     const eventos = await traccarGetEvents(traccarIds, new Date(from), new Date(to));
     res.json(eventos.map(e => ({ id: e.id, deviceId: e.deviceId, tipo: e.type, tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type, hora: e.eventTime, atributos: e.attributes })));
@@ -767,7 +774,7 @@ router.get('/rastreamento/relatorios/batch/resumo', async (req: ClienteRequest, 
   if (!from || !to || !deviceIds) { res.status(400).json({ error: 'Parâmetros incompletos.' }); return; }
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
   try {
-    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    const { dispositivos, traccarDevices, traccarIds } = await resolverDispositivosCliente(req, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
     const localPorTraccarId = new Map(traccarDevices.map(device => [device.id, dispositivos.find(local => local.identificador === device.uniqueId)]));
     const [resumo, historico] = await Promise.all([
@@ -802,7 +809,7 @@ router.get('/rastreamento/dispositivos/:id/exportar', async (req: ClienteRequest
     where: {
       id: dispositivoId,
       ativo: true,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, identificador: true },
   });
@@ -844,7 +851,7 @@ router.get('/rastreamento/relatorios/exportar', async (req: ClienteRequest, res:
     return;
   }
   try {
-    const { traccarIds } = await resolverDispositivosCliente(clienteId, deviceIds);
+    const { traccarIds } = await resolverDispositivosCliente(req, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
     const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', traccarIds, from, to);
     const buffer = await response.arrayBuffer();
@@ -906,6 +913,7 @@ router.get('/boletos', requireResponsavel, async (req: ClienteRequest, res: Resp
 // ── POST /api/cliente/dispositivos/:id/foto ───────────────────────────────────
 router.post(
   '/dispositivos/:dispositivoId/foto',
+  requirePermission('rastreamento.uploadFoto'),
   uploadCliente.single('foto'),
   async (req: ClienteRequest, res: Response): Promise<void> => {
     const clienteId = req.cliente!.clienteId;
@@ -920,7 +928,7 @@ router.post(
       where: {
         id: dispositivoId,
         ativo: true,
-        OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+        ...whereDispositivosDoCliente(req),
       },
       select: { id: true, imagemUrlCliente: true },
     });
@@ -946,7 +954,7 @@ router.post(
 );
 
 // ── PATCH /api/cliente/dispositivos/:id/apelido ───────────────────────────────
-router.patch('/dispositivos/:dispositivoId/apelido', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.patch('/dispositivos/:dispositivoId/apelido', requirePermission('rastreamento.editarIdentificacao'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const dispositivoId = param(req, 'dispositivoId');
   const apelidoCliente = String(req.body?.apelidoCliente || '').trim().slice(0, 40);
@@ -955,7 +963,7 @@ router.patch('/dispositivos/:dispositivoId/apelido', async (req: ClienteRequest,
     where: {
       id: dispositivoId,
       ativo: true,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true },
   });
@@ -973,14 +981,14 @@ router.patch('/dispositivos/:dispositivoId/apelido', async (req: ClienteRequest,
 });
 
 // ── DELETE /api/cliente/dispositivos/:id/foto ─────────────────────────────────
-router.delete('/dispositivos/:dispositivoId/foto', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.delete('/dispositivos/:dispositivoId/foto', requirePermission('rastreamento.uploadFoto'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const dispositivoId = param(req, 'dispositivoId');
 
   const dispositivo = await prisma.dispositivo.findFirst({
     where: {
       id: dispositivoId,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, imagemUrlCliente: true },
   });
@@ -1008,7 +1016,7 @@ router.get('/dispositivos/:dispositivoId/tipos-comandos', async (req: ClienteReq
   const dispositivo = await prisma.dispositivo.findFirst({
     where: {
       id: dispositivoId,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { identificador: true },
   });
@@ -1033,10 +1041,26 @@ router.post('/dispositivos/:dispositivoId/comandos', async (req: ClienteRequest,
 
   if (!tipo) { res.status(400).json({ error: 'Tipo de comando é obrigatório.' }); return; }
 
+  // Permissões: engineStop=bloquear, engineResume=desbloquear.
+  // Outros comandos seguem 'bloquear' como permissão padrão (mesma criticidade).
+  const perms = req.cliente!.permissoes.rastreamento;
+  if (tipo === 'engineStop' && !perms.bloquear) {
+    res.status(403).json({ error: 'Sem permissão para bloquear o veículo.' });
+    return;
+  }
+  if (tipo === 'engineResume' && !perms.desbloquear) {
+    res.status(403).json({ error: 'Sem permissão para desbloquear o veículo.' });
+    return;
+  }
+  if (tipo !== 'engineStop' && tipo !== 'engineResume' && !perms.bloquear) {
+    res.status(403).json({ error: 'Sem permissão para enviar comandos a este dispositivo.' });
+    return;
+  }
+
   const dispositivo = await prisma.dispositivo.findFirst({
     where: {
       id: dispositivoId,
-      OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }],
+      ...whereDispositivosDoCliente(req),
     },
     select: { identificador: true },
   });
@@ -1063,12 +1087,12 @@ router.post('/dispositivos/:dispositivoId/comandos', async (req: ClienteRequest,
 
 // ── GET /api/cliente/rastreamento/cercas ─────────────────────────────────────
 // Returns: client's own geofences + admin geofences marked visivelCliente=true
-router.get('/rastreamento/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/rastreamento/cercas', requirePermission('rastreamento.verCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
   const dispositivosIds = (await prisma.dispositivo.findMany({
-    where: { OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] },
+    where: { ...whereDispositivosDoCliente(req) },
     select: { id: true },
   })).map(d => d.id);
 
@@ -1087,13 +1111,13 @@ router.get('/rastreamento/cercas', async (req: ClienteRequest, res: Response): P
   res.json(geocercas.map(g => ({ id: g.traccarId, name: g.nome, description: g.descricao ?? '', area: g.area })));
 });
 
-router.get('/rastreamento/dispositivos/:dispositivoId/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/rastreamento/dispositivos/:dispositivoId/cercas', requirePermission('rastreamento.verCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const dispositivoId = param(req, 'dispositivoId');
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
   const dispositivo = await prisma.dispositivo.findFirst({
-    where: { id: dispositivoId, OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] },
+    where: { id: dispositivoId, ...whereDispositivosDoCliente(req) },
     select: { id: true },
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
@@ -1113,7 +1137,7 @@ router.get('/rastreamento/dispositivos/:dispositivoId/cercas', async (req: Clien
 });
 
 // ── POST /api/cliente/rastreamento/cercas ─────────────────────────────────────
-router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.post('/rastreamento/cercas', requirePermission('rastreamento.criarCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
@@ -1122,7 +1146,7 @@ router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): 
 
   if (dispositivoId) {
     const dispositivo = await prisma.dispositivo.findFirst({
-      where: { id: dispositivoId, OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] },
+      where: { id: dispositivoId, ...whereDispositivosDoCliente(req) },
       select: { id: true, identificador: true },
     });
     if (!dispositivo) { res.status(403).json({ error: 'Dispositivo não autorizado.' }); return; }
@@ -1167,7 +1191,7 @@ router.post('/rastreamento/cercas', async (req: ClienteRequest, res: Response): 
 });
 
 // ── DELETE /api/cliente/rastreamento/cercas/:id ──────────────────────────────
-router.delete('/rastreamento/cercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.delete('/rastreamento/cercas/:id', requirePermission('rastreamento.criarCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
@@ -1190,17 +1214,14 @@ router.delete('/rastreamento/cercas/:id', async (req: ClienteRequest, res: Respo
 
 // ── GET /api/cliente/rastreamento/geocercas ───────────────────────────────────
 // Full-data list for the geocercas management page (only client's own)
-router.get('/rastreamento/geocercas/dispositivos', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/rastreamento/geocercas/dispositivos', requirePermission('rastreamento.verCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
   const dispositivos = await prisma.dispositivo.findMany({
     where: {
       ativo: true,
-      OR: [
-        { clienteId },
-        { clientesVinculados: { some: { clienteId } } },
-      ],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, nome: true, placa: true, identificador: true },
     orderBy: [{ nome: 'asc' }, { placa: 'asc' }],
@@ -1215,7 +1236,7 @@ router.get('/rastreamento/geocercas/dispositivos', async (req: ClienteRequest, r
   })));
 });
 
-router.get('/rastreamento/geocercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/rastreamento/geocercas', requirePermission('rastreamento.verCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
@@ -1246,7 +1267,7 @@ router.get('/rastreamento/geocercas', async (req: ClienteRequest, res: Response)
 });
 
 // ── GET /api/cliente/rastreamento/geocercas/:id ───────────────────────────────
-router.get('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/rastreamento/geocercas/:id', requirePermission('rastreamento.verCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
@@ -1278,7 +1299,7 @@ router.get('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Respo
 });
 
 // ── POST /api/cliente/rastreamento/geocercas ──────────────────────────────────
-router.post('/rastreamento/geocercas', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.post('/rastreamento/geocercas', requirePermission('rastreamento.criarCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
@@ -1315,7 +1336,7 @@ router.post('/rastreamento/geocercas', async (req: ClienteRequest, res: Response
     if (Array.isArray(dispositivoIds) && dispositivoIds.length) {
       for (const dispositivoId of dispositivoIds) {
         const dispositivo = await prisma.dispositivo.findFirst({
-          where: { id: dispositivoId, OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] },
+          where: { id: dispositivoId, ...whereDispositivosDoCliente(req) },
           select: { id: true, identificador: true },
         });
         if (!dispositivo) continue;
@@ -1333,7 +1354,7 @@ router.post('/rastreamento/geocercas', async (req: ClienteRequest, res: Response
 });
 
 // ── PUT /api/cliente/rastreamento/geocercas/:id ───────────────────────────────
-router.put('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.put('/rastreamento/geocercas/:id', requirePermission('rastreamento.criarCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 
@@ -1385,7 +1406,7 @@ router.put('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Respo
       }
       for (const dispositivoId of idsNovos) {
         if (!idsAtuais.has(dispositivoId)) {
-          const d = await prisma.dispositivo.findFirst({ where: { id: dispositivoId, OR: [{ clienteId }, { clientesVinculados: { some: { clienteId } } }] }, select: { identificador: true } });
+          const d = await prisma.dispositivo.findFirst({ where: { id: dispositivoId, ...whereDispositivosDoCliente(req) }, select: { identificador: true } });
           if (!d) continue;
           const td = await traccarGetDeviceByImei(d.identificador).catch(() => null);
           if (td) await traccarLinkGeofenceToDevice(geocerca.traccarId, td.id).catch(() => {});
@@ -1402,7 +1423,7 @@ router.put('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Respo
 });
 
 // ── DELETE /api/cliente/rastreamento/geocercas/:id ────────────────────────────
-router.delete('/rastreamento/geocercas/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.delete('/rastreamento/geocercas/:id', requirePermission('rastreamento.criarCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
 

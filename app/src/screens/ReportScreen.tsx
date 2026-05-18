@@ -48,6 +48,7 @@ import { getTrackingSnapshot } from '../tracking/trackingService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
 import { SearchBottomSheet } from '../components/SearchBottomSheet';
+import { useAuth } from '../auth/AuthProvider';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
@@ -870,6 +871,8 @@ function ExportModal({
 export function ReportScreen() {
   const navigation = useNavigation();
   const toast = useToast();
+  const { can } = useAuth();
+  const canExport = can('relatorio.exportar');
 
   const [devices, setDevices] = useState<TrackingDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<TrackingDevice | null>(null);
@@ -973,19 +976,21 @@ export function ReportScreen() {
     loadReport(selectedDevice, periodo, from, to);
   }, [selectedDevice, periodo, devicesLoading, loadReport]);
 
-  // Export button in header
+  // Export button in header (escondido para sub-usuários sem permissão)
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <IconButton
-          icon={isExporting ? 'loading' : 'export-variant'}
-          iconColor={colors.surface}
-          size={22}
-          disabled={!selectedDevice || isLoading || isExporting}
-          accessibilityLabel="Exportar relatório"
-          onPress={() => setShowExportModal(true)}
-        />
-      ),
+      headerRight: canExport
+        ? () => (
+            <IconButton
+              icon={isExporting ? 'loading' : 'export-variant'}
+              iconColor={colors.surface}
+              size={22}
+              disabled={!selectedDevice || isLoading || isExporting}
+              accessibilityLabel="Exportar relatório"
+              onPress={() => setShowExportModal(true)}
+            />
+          )
+        : undefined,
     });
   }, [navigation, selectedDevice, isLoading, isExporting]);
 

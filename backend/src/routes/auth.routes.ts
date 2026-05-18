@@ -62,13 +62,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
   const clienteLogin = await prisma.clienteLogin.findUnique({
     where: { email },
     include: {
-      cliente: {
-        select: {
-          id: true, nome: true,
-          status: true,
-          dispositivos: { where: { ativo: true }, select: { id: true }, take: 1 },
-        },
-      },
+      cliente: { select: { id: true, nome: true, status: true } },
     },
   });
 
@@ -88,7 +82,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     const tipo: 'responsavel' | 'vinculado' =
-      clienteLogin.cliente.dispositivos.length > 0 ? 'responsavel' : 'vinculado';
+      clienteLogin.tipo === 'vinculado' ? 'vinculado' : 'responsavel';
 
     const token = signClienteToken({
       sub: clienteLogin.id,
@@ -157,14 +151,7 @@ router.post('/cliente', async (req: Request, res: Response): Promise<void> => {
   const login = await prisma.clienteLogin.findUnique({
     where: { email },
     include: {
-      cliente: {
-        select: {
-          id: true,
-          nome: true,
-          status: true,
-          dispositivos: { where: { ativo: true }, select: { id: true }, take: 1 },
-        },
-      },
+      cliente: { select: { id: true, nome: true, status: true } },
     },
   });
 
@@ -179,9 +166,8 @@ router.post('/cliente', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // Determina o tipo: responsavel se o cliente tem veiculos sob faturamento.
   const tipo: 'responsavel' | 'vinculado' =
-    login.cliente.dispositivos.length > 0 ? 'responsavel' : 'vinculado';
+    login.tipo === 'vinculado' ? 'vinculado' : 'responsavel';
 
   const token = signClienteToken({
     sub: login.id,

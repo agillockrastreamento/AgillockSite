@@ -2,7 +2,12 @@
 
 import { Router } from 'express';
 import prisma from '../utils/prisma';
-import { clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
+import {
+  clienteAuthMiddleware,
+  requirePermission,
+  whereDispositivosDoCliente,
+  ClienteRequest,
+} from '../middleware/cliente-auth.middleware';
 import { broadcastTrackingEvents } from '../services/traccar.ws';
 import { traccarGetDeviceByImei, traccarGetPositions } from '../services/traccar.service';
 import ExpoPushService from '../services/expo-push.service';
@@ -23,36 +28,28 @@ type DispositivoAcessivel = {
   clienteId: string | null;
 };
 
-async function _dispositivosDoCliente(clienteLoginId: string): Promise<{
+async function _dispositivosDoCliente(req: ClienteRequest): Promise<{
   clienteId: string | null;
   dispositivos: DispositivoAcessivel[];
 }> {
-  const login = await prisma.clienteLogin.findUnique({
-    where: { id: clienteLoginId },
-    select: { clienteId: true },
-  });
-  if (!login?.clienteId) return { clienteId: null, dispositivos: [] };
+  const clienteId = req.cliente?.clienteId ?? null;
+  if (!clienteId) return { clienteId: null, dispositivos: [] };
 
   const dispositivos = await prisma.dispositivo.findMany({
-    where: {
-      OR: [
-        { clienteId: login.clienteId },
-        { clientesVinculados: { some: { clienteId: login.clienteId } } },
-      ],
-    },
+    where: { ...whereDispositivosDoCliente(req) },
     select: { id: true, clienteId: true },
   });
 
-  return { clienteId: login.clienteId, dispositivos };
+  return { clienteId, dispositivos };
 }
 
-async function _dispositivoIdsDoCliente(clienteLoginId: string): Promise<string[]> {
-  const dados = await _dispositivosDoCliente(clienteLoginId);
+async function _dispositivoIdsDoCliente(req: ClienteRequest): Promise<string[]> {
+  const dados = await _dispositivosDoCliente(req);
   return dados.dispositivos.map(d => d.id);
 }
 
-async function _podeGerenciarManutencao(clienteLoginId: string, dispositivoId: string): Promise<boolean> {
-  const dados = await _dispositivosDoCliente(clienteLoginId);
+async function _podeGerenciarManutencao(req: ClienteRequest, dispositivoId: string): Promise<boolean> {
+  const dados = await _dispositivosDoCliente(req);
   return dados.dispositivos.some(d => d.id === dispositivoId && d.clienteId === dados.clienteId);
 }
 
@@ -127,12 +124,12 @@ function _deduplicarRecorrencias<T extends { titulo: string; intervaloKm: number
 // ── Registros ─────────────────────────────────────────────────────────────────
 
 // GET /api/cliente/manutencoes/registros?dispositivoId=X
-router.get('/registros', async (req: any, res) => {
+router.get('/registros', requirePermission('manutencao.ver'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { dispositivoId } = req.query as { dispositivoId?: string };
 
-    const { dispositivos } = await _dispositivosDoCliente(clienteLoginId);
+    const { dispositivos } = await _dispositivosDoCliente(req);
     const idsPermitidos = dispositivos.map(d => d.id);
     if (!idsPermitidos.length) return res.json([]);
 
@@ -154,7 +151,7 @@ router.get('/registros', async (req: any, res) => {
 });
 
 // POST /api/cliente/manutencoes/registros
-router.post('/registros', async (req: any, res) => {
+router.post('/registros', requirePermission('manutencao.criar'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { dispositivoId, titulo, tipo, descricao, dataRealizacao, kmRealizacao, custo, oficina, notas, fotos } = req.body;
@@ -163,7 +160,7 @@ router.post('/registros', async (req: any, res) => {
       return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, dataRealizacao.' });
     }
 
-    if (!await _podeGerenciarManutencao(clienteLoginId, dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
 
@@ -198,7 +195,7 @@ router.post('/registros', async (req: any, res) => {
 });
 
 // DELETE /api/cliente/manutencoes/registros/:id
-router.delete('/registros/:id', async (req: any, res) => {
+router.delete('/registros/:id', requirePermission('manutencao.excluir'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { id } = req.params;
@@ -208,7 +205,7 @@ router.delete('/registros/:id', async (req: any, res) => {
     });
     if (!registro) return res.status(404).json({ message: 'Registro não encontrado ou não pode ser excluído.' });
 
-    if (!await _podeGerenciarManutencao(clienteLoginId, registro.dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, registro.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
 
@@ -223,12 +220,12 @@ router.delete('/registros/:id', async (req: any, res) => {
 // ── Recorrências ──────────────────────────────────────────────────────────────
 
 // GET /api/cliente/manutencoes/recorrencias?dispositivoId=X
-router.get('/recorrencias', async (req: any, res) => {
+router.get('/recorrencias', requirePermission('manutencao.ver'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { dispositivoId } = req.query as { dispositivoId?: string };
 
-    const { dispositivos } = await _dispositivosDoCliente(clienteLoginId);
+    const { dispositivos } = await _dispositivosDoCliente(req);
     const idsPermitidos = dispositivos.map(d => d.id);
     if (!idsPermitidos.length) return res.json([]);
 
@@ -266,7 +263,7 @@ router.get('/recorrencias', async (req: any, res) => {
 });
 
 // POST /api/cliente/manutencoes/recorrencias
-router.post('/recorrencias', async (req: any, res) => {
+router.post('/recorrencias', requirePermission('manutencao.criarRecorrencia'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { dispositivoId, titulo, descricao, intervaloKm } = req.body;
@@ -275,7 +272,7 @@ router.post('/recorrencias', async (req: any, res) => {
       return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, intervaloKm.' });
     }
 
-    if (!await _podeGerenciarManutencao(clienteLoginId, dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
 
@@ -316,9 +313,15 @@ router.post('/recorrencias', async (req: any, res) => {
 });
 
 // POST /api/cliente/manutencoes/recorrencias/:id/feito
+// Aceita permissão da tela de manutenção OU da de rastreamento (mesma ação,
+// dois pontos de entrada na UI — card de manutenção e card do veículo no mapa).
 router.post('/recorrencias/:id/feito', async (req: any, res) => {
+  const perms = req.cliente.permissoes;
+  if (!perms.manutencao.marcarFeita && !perms.rastreamento.marcarManutencaoRecorrenteFeita) {
+    return res.status(403).json({ error: 'Sem permissão para marcar manutenção como feita.' });
+  }
   try {
-    const clienteLoginId: string = req.cliente.sub;
+    const clienteLoginId: string = req.cliente!.sub;
     const { id } = req.params;
     const { notas, fotos } = req.body ?? {};
 
@@ -336,7 +339,7 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
 
-    if (!await _podeGerenciarManutencao(clienteLoginId, recorrencia.dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, recorrencia.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode confirmar manutencoes deste dispositivo.' });
     }
 
@@ -443,7 +446,7 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
 });
 
 // PUT /api/cliente/manutencoes/registros/:id
-router.put('/registros/:id', async (req: any, res) => {
+router.put('/registros/:id', requirePermission('manutencao.editar'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { id } = req.params;
@@ -452,7 +455,7 @@ router.put('/registros/:id', async (req: any, res) => {
       where: { id, clienteLoginId, origem: 'CLIENTE' },
     });
     if (!existing) return res.status(404).json({ message: 'Registro não encontrado.' });
-    if (!await _podeGerenciarManutencao(clienteLoginId, existing.dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, existing.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
     const dispCheckReg = await prisma.dispositivo.findUnique({ where: { id: existing.dispositivoId }, select: { manutencaoAtiva: true } });
@@ -481,7 +484,7 @@ router.put('/registros/:id', async (req: any, res) => {
 });
 
 // PUT /api/cliente/manutencoes/recorrencias/:id
-router.put('/recorrencias/:id', async (req: any, res) => {
+router.put('/recorrencias/:id', requirePermission('manutencao.editarRecorrencia'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { id } = req.params;
@@ -490,7 +493,7 @@ router.put('/recorrencias/:id', async (req: any, res) => {
       where: { id, clienteLoginId, origem: 'CLIENTE' },
     });
     if (!existing) return res.status(404).json({ message: 'Recorrência não encontrada.' });
-    if (!await _podeGerenciarManutencao(clienteLoginId, existing.dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, existing.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar manutencoes deste dispositivo.' });
     }
     const dispCheckRec = await prisma.dispositivo.findUnique({ where: { id: existing.dispositivoId }, select: { manutencaoAtiva: true } });
@@ -514,7 +517,7 @@ router.put('/recorrencias/:id', async (req: any, res) => {
 });
 
 // DELETE /api/cliente/manutencoes/recorrencias/:id
-router.delete('/recorrencias/:id', async (req: any, res) => {
+router.delete('/recorrencias/:id', requirePermission('manutencao.editarRecorrencia'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { id } = req.params;
@@ -535,12 +538,12 @@ router.delete('/recorrencias/:id', async (req: any, res) => {
 // ── Recorrências por Data ─────────────────────────────────────────────────────
 
 // GET /api/cliente/manutencoes/recorrencias-data?dispositivoId=X
-router.get('/recorrencias-data', async (req: any, res) => {
+router.get('/recorrencias-data', requirePermission('manutencao.ver'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { dispositivoId } = req.query as { dispositivoId?: string };
 
-    const { dispositivos } = await _dispositivosDoCliente(clienteLoginId);
+    const { dispositivos } = await _dispositivosDoCliente(req);
     const idsPermitidos = dispositivos.map(d => d.id);
     if (!idsPermitidos.length) return res.json([]);
 
@@ -571,7 +574,7 @@ router.get('/recorrencias-data', async (req: any, res) => {
 });
 
 // POST /api/cliente/manutencoes/recorrencias-data
-router.post('/recorrencias-data', async (req: any, res) => {
+router.post('/recorrencias-data', requirePermission('manutencao.criarRecorrencia'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { dispositivoId, titulo, descricao, tipoRecorrencia, dataReferencia, intervaloDias, diasSemana, diaDoMes, mesDoAno, canalNotificacao } = req.body;
@@ -580,7 +583,7 @@ router.post('/recorrencias-data', async (req: any, res) => {
       return res.status(400).json({ message: 'Campos obrigatórios: dispositivoId, titulo, tipoRecorrencia, dataReferencia.' });
     }
 
-    if (!await _podeGerenciarManutencao(clienteLoginId, dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar recorrências deste dispositivo.' });
     }
 
@@ -619,7 +622,7 @@ router.post('/recorrencias-data', async (req: any, res) => {
 });
 
 // PUT /api/cliente/manutencoes/recorrencias-data/:id
-router.put('/recorrencias-data/:id', async (req: any, res) => {
+router.put('/recorrencias-data/:id', requirePermission('manutencao.editarRecorrencia'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { id } = req.params;
@@ -629,7 +632,7 @@ router.put('/recorrencias-data/:id', async (req: any, res) => {
       where: { id, clienteLoginId, origem: 'CLIENTE' },
     });
     if (!existing) return res.status(404).json({ message: 'Recorrência não encontrada.' });
-    if (!await _podeGerenciarManutencao(clienteLoginId, existing.dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, existing.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode gerenciar recorrências deste dispositivo.' });
     }
     const dispCheck = await prisma.dispositivo.findUnique({ where: { id: existing.dispositivoId }, select: { manutencaoAtiva: true } });
@@ -665,9 +668,14 @@ router.put('/recorrencias-data/:id', async (req: any, res) => {
 });
 
 // POST /api/cliente/manutencoes/recorrencias-data/:id/feito
+// Aceita permissão da tela de manutenção OU da de rastreamento.
 router.post('/recorrencias-data/:id/feito', async (req: any, res) => {
+  const perms = req.cliente.permissoes;
+  if (!perms.manutencao.marcarFeita && !perms.rastreamento.marcarRecorrenciaDataFeita) {
+    return res.status(403).json({ error: 'Sem permissão para marcar recorrência como feita.' });
+  }
   try {
-    const clienteLoginId: string = req.cliente.sub;
+    const clienteLoginId: string = req.cliente!.sub;
     const { id } = req.params;
     const { notas } = req.body ?? {};
 
@@ -685,7 +693,7 @@ router.post('/recorrencias-data/:id/feito', async (req: any, res) => {
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
 
-    if (!await _podeGerenciarManutencao(clienteLoginId, recorrencia.dispositivoId)) {
+    if (!await _podeGerenciarManutencao(req, recorrencia.dispositivoId)) {
       return res.status(403).json({ message: 'Apenas o responsavel pelo faturamento pode confirmar recorrências deste dispositivo.' });
     }
     if (!recorrencia.dispositivo.manutencaoAtiva) {
@@ -793,7 +801,7 @@ router.post('/recorrencias-data/:id/feito', async (req: any, res) => {
 });
 
 // DELETE /api/cliente/manutencoes/recorrencias-data/:id
-router.delete('/recorrencias-data/:id', async (req: any, res) => {
+router.delete('/recorrencias-data/:id', requirePermission('manutencao.editarRecorrencia'), async (req: any, res) => {
   try {
     const clienteLoginId: string = req.cliente.sub;
     const { id } = req.params;

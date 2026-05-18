@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Usuários — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
+    .action-bar { flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 16px; }
+    #scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 24px 24px; scrollbar-gutter: stable; }
+    #scroll-area::-webkit-scrollbar { width: 7px; }
+    #scroll-area::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    html.dark-theme #scroll-area::-webkit-scrollbar-thumb { background: #3a4555; }
+
+    #usuarios-lista { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.05); overflow: hidden; }
+    html.dark-theme #usuarios-lista { background: #1e2530; }
+    .usuario-linha { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #f0f0f0; gap: 12px; }
+    html.dark-theme .usuario-linha { border-color: #2d3748; }
+    .usuario-linha:last-child { border-bottom: none; }
+    .usuario-linha:hover { background: #f9f9f9; cursor: pointer; }
+    html.dark-theme .usuario-linha:hover { background: #252d3d; }
+    .usuario-info { flex: 1; min-width: 0; }
+    .usuario-email { font-weight: 700; font-size: 14px; color: #1e2530; }
+    html.dark-theme .usuario-email { color: #e0e6f0; }
+    .usuario-meta { font-size: 12px; color: #888; margin-top: 3px; }
+    .usuario-acoes { display: flex; gap: 6px; flex-shrink: 0; }
+    .usuario-acoes .btn { padding: 5px 10px; font-size: 12px; }
+
+    .badge-status { padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; color: #fff; }
+    .badge-status.ativo    { background: #27ae60; }
+    .badge-status.inativo  { background: #95a5a6; }
+
+    .empty-state { padding: 60px 20px; text-align: center; color: #888; }
+    .empty-state i { font-size: 48px; opacity: 0.4; }
+    .empty-state p { margin-top: 14px; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
+      <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> <span>Relatório</span></a></li>
+      <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> <span>Notificações</span></a></li>
+      <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> <span>Manutenções</span></a></li>
+      <li><a href="geocercas.html"><i class="fa fa-object-group fa-fw"></i> <span>Geocercas</span></a></li>
+      <li><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+      <li class="active"><a href="usuarios.html"><i class="fa fa-users fa-fw"></i> <span>Usuários</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Usuários</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="action-bar">
+      <a href="usuario-form.html" class="btn btn-primary btn-sm">
+        <i class="fa fa-plus"></i> Novo Usuário
+      </a>
+    </div>
+
+    <div id="scroll-area">
+      <div id="loading-state" class="text-center" style="padding:40px;color:#999;">
+        <i class="fa fa-spinner fa-spin fa-2x"></i>
+        <p style="margin-top:12px;">Carregando...</p>
+      </div>
+      <div id="usuarios-lista" style="display:none;"></div>
+      <div id="empty-state" class="empty-state" style="display:none;">
+        <i class="fa fa-users"></i>
+        <p>Nenhum usuário cadastrado.<br>Clique em <strong>Novo Usuário</strong> para liberar acesso a outras pessoas.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var user = AL_CLIENTE.requireAuth(['responsavel']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
+      AL_CLIENTE.initThemeToggle('btn-tema');
+
+      carregar();
+
+      function carregar() {
+        document.getElementById('loading-state').style.display = 'block';
+        document.getElementById('usuarios-lista').style.display = 'none';
+        document.getElementById('empty-state').style.display = 'none';
+
+        AL_CLIENTE.apiGet('/api/cliente/usuarios')
+          .then(function (usuarios) {
+            document.getElementById('loading-state').style.display = 'none';
+            if (!usuarios || !usuarios.length) {
+              document.getElementById('empty-state').style.display = 'block';
+              return;
+            }
+            renderLista(usuarios);
+          })
+          .catch(function (err) {
+            document.getElementById('loading-state').innerHTML =
+              '<div class="text-danger" style="padding:24px;"><i class="fa fa-exclamation-triangle"></i> ' + err.message + '</div>';
+          });
+      }
+
+      function renderLista(usuarios) {
+        var lista = document.getElementById('usuarios-lista');
+        lista.innerHTML = '';
+        usuarios.forEach(function (u) {
+          var linha = document.createElement('div');
+          linha.className = 'usuario-linha';
+          linha.innerHTML =
+            '<div class="usuario-info">' +
+              '<div class="usuario-email">' + escapeHtml(u.email) + '</div>' +
+              '<div class="usuario-meta">' +
+                (u.perfil ? '<i class="fa fa-tag"></i> ' + escapeHtml(u.perfil) + ' &middot; ' : '') +
+                '<i class="fa fa-car"></i> ' + (u.dispositivoIds || []).length + ' veículo(s) &middot; ' +
+                '<span class="badge-status ' + (u.ativo ? 'ativo' : 'inativo') + '">' + (u.ativo ? 'ATIVO' : 'INATIVO') + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="usuario-acoes">' +
+              '<button class="btn btn-default" data-acao="editar" data-id="' + u.id + '" title="Editar"><i class="fa fa-pencil"></i></button>' +
+              '<button class="btn btn-warning" data-acao="status" data-id="' + u.id + '" title="' + (u.ativo ? 'Inativar' : 'Ativar') + '">' +
+                '<i class="fa ' + (u.ativo ? 'fa-ban' : 'fa-check') + '"></i></button>' +
+              '<button class="btn btn-danger" data-acao="excluir" data-id="' + u.id + '" title="Excluir"><i class="fa fa-trash"></i></button>' +
+            '</div>';
+          linha.addEventListener('click', function (e) {
+            // Click na linha = editar; clicks nos botões já são tratados via delegate.
+            if (e.target.closest('.usuario-acoes')) return;
+            window.location.href = 'usuario-form.html?id=' + u.id;
+          });
+          lista.appendChild(linha);
+        });
+        lista.style.display = 'block';
+
+        lista.querySelectorAll('button[data-acao]').forEach(function (btn) {
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var id = btn.getAttribute('data-id');
+            var acao = btn.getAttribute('data-acao');
+            if (acao === 'editar') {
+              window.location.href = 'usuario-form.html?id=' + id;
+            } else if (acao === 'status') {
+              AL_CLIENTE.apiPatch('/api/cliente/usuarios/' + id + '/status')
+                .then(function () { AL_CLIENTE.showAlert('Status atualizado.', 'success'); carregar(); })
+                .catch(function (err) { AL_CLIENTE.showAlert(err.message); });
+            } else if (acao === 'excluir') {
+              if (!confirm('Excluir este usuário? Esta ação não pode ser desfeita.')) return;
+              AL_CLIENTE.apiDelete('/api/cliente/usuarios/' + id)
+                .then(function () { AL_CLIENTE.showAlert('Usuário excluído.', 'success'); carregar(); })
+                .catch(function (err) { AL_CLIENTE.showAlert(err.message); });
+            }
+          });
+        });
+      }
+
+      function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

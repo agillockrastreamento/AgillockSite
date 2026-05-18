@@ -15,12 +15,23 @@ import {
 } from './medidores.service';
 import NotificationService from './notification.service';
 import { reverseGeocode } from '../utils/reverse-geocode';
+import { verifyClienteToken, verifyToken } from '../utils/jwt';
 
 const TRACCAR_URL = process.env.TRACCAR_URL || 'http://traccar:8082';
 const WS_TRACCAR_URL = TRACCAR_URL.replace('http://', 'ws://').replace('https://', 'wss://');
 
-// Clientes frontend conectados ao backend
-const frontendClients = new Set<WebSocket>();
+// Contexto por conexão de cliente frontend. Quando `dispositivoIdsPermitidos === null`,
+// não há filtro (admin/colaborador/vendedor ou cliente sem auth via WS — compat). Quando
+// é um array, filtra mensagens para conter apenas esses ids.
+interface FrontendClientContext {
+  dispositivoIdsPermitidos: Set<string> | null;
+  filtraBoletos: boolean; // vinculados não veem boletos
+}
+const frontendClients = new Map<WebSocket, FrontendClientContext>();
+
+// Cache traccarDeviceId → ClienteLogin.dispositivoId (uuid no DB). Reutilizado para filtrar
+// mensagens de saída sem ir ao DB a cada broadcast.
+const traccarIdToDispositivoId = new Map<number, string>();
 
 let traccarWs: WebSocket | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
@@ -40,12 +51,59 @@ const geofenceMetaCache = new Map<number, {
 const GEOFENCE_CACHE_TTL_MS = 30_000;
 const eventAddressCache = new Map<string, string>();
 
+// Filtra um array de itens (positions/devices/events) pelas permissões do cliente.
+// Recebe um getter de traccarId para suportar ambos formatos.
+function filtrarPorContexto<T>(
+  itens: T[],
+  ctx: FrontendClientContext,
+  getTraccarId: (item: T) => number | null | undefined,
+): T[] {
+  if (ctx.dispositivoIdsPermitidos === null) return itens;
+  return itens.filter((item) => {
+    const traccarId = getTraccarId(item);
+    if (traccarId == null) return false;
+    const dispositivoId = traccarIdToDispositivoId.get(traccarId);
+    return !!dispositivoId && ctx.dispositivoIdsPermitidos!.has(dispositivoId);
+  });
+}
+
+function payloadParaContexto(payload: Record<string, unknown>, ctx: FrontendClientContext): Record<string, unknown> | null {
+  if (ctx.dispositivoIdsPermitidos === null && !ctx.filtraBoletos) return payload;
+  const result: Record<string, unknown> = {};
+  if (Array.isArray(payload.positions)) {
+    const f = filtrarPorContexto(payload.positions as Array<{ deviceId?: number }>, ctx, (p) => p.deviceId ?? null);
+    if (f.length) result.positions = f;
+  }
+  if (Array.isArray(payload.devices)) {
+    const f = filtrarPorContexto(payload.devices as Array<{ traccarId?: number }>, ctx, (d) => d.traccarId ?? null);
+    if (f.length) result.devices = f;
+  }
+  if (Array.isArray(payload.events)) {
+    let evts = payload.events as Array<{ deviceId?: number; type?: string; tipo?: string }>;
+    if (ctx.filtraBoletos) {
+      // Eventos com prefixo 'boleto' (boletoAtrasado, boletoVencendoHoje, etc) não são para vinculados.
+      evts = evts.filter((e) => {
+        const t = (e.type || e.tipo || '').toString().toLowerCase();
+        return !t.includes('boleto') && !t.includes('financeira');
+      });
+    }
+    const f = filtrarPorContexto(evts, ctx, (e) => e.deviceId ?? null);
+    if (f.length) result.events = f;
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+function enviarPayload(payload: Record<string, unknown>): void {
+  frontendClients.forEach((ctx, client) => {
+    if (client.readyState !== WebSocket.OPEN) return;
+    const filtrado = payloadParaContexto(payload, ctx);
+    if (filtrado) client.send(JSON.stringify(filtrado));
+  });
+}
+
 export function broadcastTrackingEvents(events: any[]) {
   if (!events.length) return;
-  const outgoing = JSON.stringify({ events });
-  frontendClients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) client.send(outgoing);
-  });
+  enviarPayload({ events });
 }
 
 async function getGeofenceMeta(traccarId?: number | null) {
@@ -75,11 +133,64 @@ async function getGeofenceMeta(traccarId?: number | null) {
 
 // ── Iniciar o servidor WebSocket para o frontend ──────────────────────────────
 
+async function resolveContexto(token: string | null): Promise<FrontendClientContext> {
+  // Sem token: sem filtro (compat com clientes legados / admin via outras rotas).
+  if (!token) return { dispositivoIdsPermitidos: null, filtraBoletos: false };
+  // Tenta como token de admin/colaborador: passa tudo.
+  try {
+    verifyToken(token);
+    return { dispositivoIdsPermitidos: null, filtraBoletos: false };
+  } catch {}
+  // Tenta como token de cliente
+  try {
+    const decoded = verifyClienteToken(token);
+    const login = await prisma.clienteLogin.findUnique({
+      where: { id: decoded.sub },
+      select: {
+        ativo: true,
+        tipo: true,
+        cliente: { select: { status: true } },
+        placasPermitidas: { select: { dispositivoId: true } },
+      },
+    });
+    if (!login || !login.ativo || login.cliente.status !== 'ATIVO') {
+      return { dispositivoIdsPermitidos: new Set(), filtraBoletos: true };
+    }
+    if (login.tipo === 'responsavel') {
+      // Responsável: vê todos os seus veículos + boletos
+      const dispositivos = await prisma.dispositivo.findMany({
+        where: {
+          OR: [
+            { clienteId: decoded.clienteId },
+            { clientesVinculados: { some: { clienteId: decoded.clienteId } } },
+          ],
+        },
+        select: { id: true },
+      });
+      return {
+        dispositivoIdsPermitidos: new Set(dispositivos.map((d) => d.id)),
+        filtraBoletos: false,
+      };
+    }
+    // Vinculado: lista explícita; nunca recebe eventos de boleto
+    return {
+      dispositivoIdsPermitidos: new Set(login.placasPermitidas.map((p) => p.dispositivoId)),
+      filtraBoletos: true,
+    };
+  } catch {
+    return { dispositivoIdsPermitidos: new Set(), filtraBoletos: true };
+  }
+}
+
 export function initTraccarWebSocket(httpServer: Server): WebSocketServer {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws/rastreamento' });
 
-  wss.on('connection', (ws: WebSocket, _req: IncomingMessage) => {
-    frontendClients.add(ws);
+  wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+    // Token vem via query string: ?token=... (Authorization headers em WS não são portáveis no browser)
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const token = url.searchParams.get('token');
+    const ctx = await resolveContexto(token);
+    frontendClients.set(ws, ctx);
     console.log(`[WS] Frontend conectado. Total: ${frontendClients.size}`);
 
     ws.on('close', () => {
@@ -152,13 +263,7 @@ async function connectToTraccar() {
       return;
     }
     if (!payload) return;
-
-    const outgoing = JSON.stringify(payload);
-    frontendClients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(outgoing);
-      }
-    });
+    enviarPayload(payload as Record<string, unknown>);
   });
 
   traccarWs.on('close', () => {
@@ -198,16 +303,24 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
   const dispositivos = identificadores.length
     ? await prisma.dispositivo.findMany({
       where: { identificador: { in: identificadores } },
-      select: { 
-        identificador: true, 
-        id: true, 
+      select: {
+        identificador: true,
+        id: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
-        cliente: { include: { login: true } },
-        clientesVinculados: { include: { cliente: { include: { login: true } } } },
+        cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } },
+        clientesVinculados: { include: { cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } } } },
       },
     })
     : [];
   const localPorIdentificador = new Map(dispositivos.map(dispositivo => [dispositivo.identificador, dispositivo]));
+
+  // Mantém o cache traccarId → dispositivoId para o filtro do broadcast.
+  for (const dispositivo of dispositivos) {
+    const identificador = dispositivo.identificador;
+    for (const [traccarId, uniqueId] of traccarIdToUniqueId) {
+      if (uniqueId === identificador) traccarIdToDispositivoId.set(traccarId, dispositivo.id);
+    }
+  }
 
   if (msg.positions?.length) {
     const posicaoPorIdentificador = new Map<string, {

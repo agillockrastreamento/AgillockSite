@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Usuário — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
+    #form-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 24px 24px; scrollbar-gutter: stable; }
+    #form-scroll::-webkit-scrollbar { width: 7px; }
+    #form-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    html.dark-theme #form-scroll::-webkit-scrollbar-thumb { background: #3a4555; }
+
+    .form-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.05); padding: 20px; max-width: 900px; margin: 0 auto 16px; }
+    html.dark-theme .form-card { background: #1e2530; }
+    .form-card h3 { font-size: 14px; margin-top: 0; margin-bottom: 12px; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    html.dark-theme .form-card h3 { color: #aab; border-color: #2d3748; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 720px) { .form-row { grid-template-columns: 1fr; } }
+    .form-control[disabled] { opacity: 0.6; }
+
+    .veiculos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 240px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
+    html.dark-theme .veiculos-grid { border-color: #2d3748; background: #161b22; }
+    .veiculos-grid label { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: normal; font-size: 13px; cursor: pointer; }
+    .veiculos-grid label input { margin: 0; }
+
+    .perm-group { margin-bottom: 16px; }
+    .perm-group-titulo { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; user-select: none; font-weight: 700; }
+    .perm-group-titulo input[type=checkbox] { width: 18px; height: 18px; }
+    .perm-children { padding-left: 28px; display: none; flex-direction: column; gap: 6px; }
+    .perm-children.open { display: flex; }
+    .perm-children label { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: normal; font-size: 13px; }
+
+    .action-bar-fixo { flex-shrink: 0; background: #fff; border-top: 1px solid #eee; padding: 12px 24px; display: flex; justify-content: flex-end; gap: 10px; }
+    html.dark-theme .action-bar-fixo { background: #1e2530; border-color: #2d3748; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
+      <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> <span>Relatório</span></a></li>
+      <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> <span>Notificações</span></a></li>
+      <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> <span>Manutenções</span></a></li>
+      <li><a href="geocercas.html"><i class="fa fa-object-group fa-fw"></i> <span>Geocercas</span></a></li>
+      <li><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+      <li class="active"><a href="usuarios.html"><i class="fa fa-users fa-fw"></i> <span>Usuários</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <a href="usuarios.html" class="btn btn-default btn-sm"><i class="fa fa-arrow-left"></i> Voltar</a>
+        <h2 class="topbar-title" id="form-titulo">Novo Usuário</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div id="form-scroll">
+      <form id="form-usuario">
+        <div class="form-card">
+          <h3>Acesso</h3>
+          <div class="form-row">
+            <div>
+              <label>Email <span style="color:#e74c3c;">*</span></label>
+              <input type="email" id="campo-email" class="form-control" required maxlength="120" />
+            </div>
+            <div>
+              <label>Senha <span id="senha-obrigatoria" style="color:#e74c3c;">*</span></label>
+              <input type="password" id="campo-senha" class="form-control" minlength="6" />
+              <small id="senha-hint" class="text-muted" style="display:none;">Deixe em branco para manter a senha atual.</small>
+            </div>
+          </div>
+          <div style="margin-top:14px;">
+            <label>Perfil (ex: Locatário, Mecânico, Motorista)</label>
+            <input type="text" id="campo-perfil" class="form-control" maxlength="60" placeholder="Opcional" />
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3>Veículos com acesso</h3>
+          <p class="text-muted" style="margin: 0 0 10px; font-size: 12px;">Marque quais veículos esse usuário poderá visualizar e operar conforme as permissões abaixo.</p>
+          <div id="veiculos-grid" class="veiculos-grid">
+            <div style="grid-column: 1/-1; color:#999; text-align:center; padding: 16px;">
+              <i class="fa fa-spinner fa-spin"></i> Carregando veículos...
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            <button type="button" id="btn-marcar-todos" class="btn btn-link btn-sm" style="padding:0;">Marcar todos</button>
+            <span style="color:#ccc;">|</span>
+            <button type="button" id="btn-desmarcar-todos" class="btn btn-link btn-sm" style="padding:0;">Desmarcar todos</button>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3>Permissões por tela</h3>
+          <p class="text-muted" style="margin: 0 0 10px; font-size: 12px;">Marque a tela para liberar acesso. Em cada tela, escolha o que esse usuário poderá fazer.</p>
+
+          <!-- Rastreamento -->
+          <div class="perm-group">
+            <div class="perm-group-titulo">
+              <input type="checkbox" id="perm-rastreamento-ver" data-tela="rastreamento" data-acao="ver" />
+              <i class="fa fa-map-marker"></i> Mapa (Rastreamento)
+            </div>
+            <div class="perm-children" data-tela="rastreamento">
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="bloquear" /> Bloquear veículo</label>
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="desbloquear" /> Desbloquear veículo</label>
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="criarCerca" /> Criar/editar/remover cerca</label>
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="verCerca" /> Visualizar cercas</label>
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="verEventos" /> Ver notificações/eventos do veículo</label>
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="marcarManutencaoRecorrenteFeita" /> Marcar manutenção recorrente como feita</label>
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="marcarRecorrenciaDataFeita" /> Marcar recorrência de data como feita</label>
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="uploadFoto" /> Fazer upload / alterar foto do veículo</label>
+              <label><input type="checkbox" data-tela="rastreamento" data-acao="editarIdentificacao" /> Editar identificação do veículo (apelido)</label>
+            </div>
+          </div>
+
+          <!-- Manutenção -->
+          <div class="perm-group">
+            <div class="perm-group-titulo">
+              <input type="checkbox" id="perm-manutencao-ver" data-tela="manutencao" data-acao="ver" />
+              <i class="fa fa-wrench"></i> Manutenção
+            </div>
+            <div class="perm-children" data-tela="manutencao">
+              <label><input type="checkbox" data-tela="manutencao" data-acao="criar" /> Criar registros</label>
+              <label><input type="checkbox" data-tela="manutencao" data-acao="editar" /> Editar registros</label>
+              <label><input type="checkbox" data-tela="manutencao" data-acao="excluir" /> Excluir registros</label>
+              <label><input type="checkbox" data-tela="manutencao" data-acao="criarRecorrencia" /> Criar recorrências (km/data)</label>
+              <label><input type="checkbox" data-tela="manutencao" data-acao="editarRecorrencia" /> Editar/excluir recorrências</label>
+              <label><input type="checkbox" data-tela="manutencao" data-acao="marcarFeita" /> Marcar manutenção como feita</label>
+            </div>
+          </div>
+
+          <!-- Relatório -->
+          <div class="perm-group">
+            <div class="perm-group-titulo">
+              <input type="checkbox" id="perm-relatorio-ver" data-tela="relatorio" data-acao="ver" />
+              <i class="fa fa-bar-chart"></i> Relatório
+            </div>
+            <div class="perm-children" data-tela="relatorio">
+              <label><input type="checkbox" data-tela="relatorio" data-acao="exportar" /> Exportar relatórios</label>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="action-bar-fixo">
+      <a href="usuarios.html" class="btn btn-default">Cancelar</a>
+      <button type="button" id="btn-salvar" class="btn btn-primary">
+        <i class="fa fa-save"></i> Salvar
+      </button>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var user = AL_CLIENTE.requireAuth(['responsavel']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
+      AL_CLIENTE.initThemeToggle('btn-tema');
+
+      var urlParams = new URLSearchParams(window.location.search);
+      var editandoId = urlParams.get('id');
+      var modoEdicao = !!editandoId;
+
+      if (modoEdicao) {
+        document.getElementById('form-titulo').textContent = 'Editar Usuário';
+        document.getElementById('senha-obrigatoria').style.display = 'none';
+        document.getElementById('senha-hint').style.display = 'block';
+        document.getElementById('campo-senha').removeAttribute('required');
+      }
+
+      // Liga "ver" da tela ao show/hide das permissões filhas
+      document.querySelectorAll('.perm-group-titulo input[type=checkbox]').forEach(function (chk) {
+        chk.addEventListener('change', function () {
+          var tela = chk.getAttribute('data-tela');
+          var children = document.querySelector('.perm-children[data-tela="' + tela + '"]');
+          if (children) children.classList.toggle('open', chk.checked);
+          if (!chk.checked) {
+            // desmarcar todas filhas para evitar enviar permissão sem ter acesso à tela
+            children.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+          }
+        });
+      });
+
+      Promise.all([
+        AL_CLIENTE.apiGet('/api/cliente/usuarios-dispositivos'),
+        modoEdicao ? AL_CLIENTE.apiGet('/api/cliente/usuarios/' + editandoId) : Promise.resolve(null),
+      ]).then(function (results) {
+        renderVeiculos(results[0] || []);
+        if (results[1]) preencherForm(results[1]);
+      }).catch(function (err) {
+        AL_CLIENTE.showAlert(err.message);
+      });
+
+      document.getElementById('btn-marcar-todos').addEventListener('click', function () {
+        document.querySelectorAll('#veiculos-grid input[type=checkbox]').forEach(function (c) { c.checked = true; });
+      });
+      document.getElementById('btn-desmarcar-todos').addEventListener('click', function () {
+        document.querySelectorAll('#veiculos-grid input[type=checkbox]').forEach(function (c) { c.checked = false; });
+      });
+
+      document.getElementById('btn-salvar').addEventListener('click', salvar);
+
+      function renderVeiculos(veiculos) {
+        var grid = document.getElementById('veiculos-grid');
+        grid.innerHTML = '';
+        if (!veiculos.length) {
+          grid.innerHTML = '<div style="grid-column:1/-1;color:#999;text-align:center;padding:16px;">Nenhum veículo ativo encontrado.</div>';
+          return;
+        }
+        veiculos.forEach(function (v) {
+          var lbl = document.createElement('label');
+          var nome = v.apelidoCliente || v.nome || '(sem nome)';
+          var placa = v.placa ? ' — ' + v.placa : '';
+          lbl.innerHTML = '<input type="checkbox" value="' + v.id + '" data-disp-id="' + v.id + '" /> ' + escapeHtml(nome + placa);
+          grid.appendChild(lbl);
+        });
+      }
+
+      function preencherForm(u) {
+        document.getElementById('campo-email').value = u.email || '';
+        document.getElementById('campo-perfil').value = u.perfil || '';
+        (u.dispositivoIds || []).forEach(function (id) {
+          var chk = document.querySelector('#veiculos-grid input[data-disp-id="' + id + '"]');
+          if (chk) chk.checked = true;
+        });
+        var perms = u.permissoes || {};
+        document.querySelectorAll('.perm-group-titulo input[type=checkbox]').forEach(function (chk) {
+          var tela = chk.getAttribute('data-tela');
+          var marcado = !!(perms[tela] && perms[tela].ver);
+          chk.checked = marcado;
+          var children = document.querySelector('.perm-children[data-tela="' + tela + '"]');
+          if (children) {
+            children.classList.toggle('open', marcado);
+            children.querySelectorAll('input[type=checkbox]').forEach(function (c) {
+              var acao = c.getAttribute('data-acao');
+              c.checked = !!(perms[tela] && perms[tela][acao]);
+            });
+          }
+        });
+      }
+
+      function coletarPermissoes() {
+        var permissoes = { rastreamento: {}, manutencao: {}, relatorio: {} };
+        document.querySelectorAll('input[type=checkbox][data-tela]').forEach(function (c) {
+          var tela = c.getAttribute('data-tela');
+          var acao = c.getAttribute('data-acao');
+          if (!permissoes[tela]) permissoes[tela] = {};
+          permissoes[tela][acao] = c.checked;
+        });
+        // Se "ver" está desmarcado, força todas as ações filhas a false (já feito ao desligar visual)
+        ['rastreamento', 'manutencao', 'relatorio'].forEach(function (tela) {
+          if (!permissoes[tela].ver) {
+            Object.keys(permissoes[tela]).forEach(function (acao) {
+              if (acao !== 'ver') permissoes[tela][acao] = false;
+            });
+          }
+        });
+        return permissoes;
+      }
+
+      function salvar() {
+        var email = document.getElementById('campo-email').value.trim();
+        var senha = document.getElementById('campo-senha').value;
+        var perfil = document.getElementById('campo-perfil').value.trim();
+        if (!email) return AL_CLIENTE.showAlert('Informe o email.');
+        if (!modoEdicao && !senha) return AL_CLIENTE.showAlert('Informe a senha.');
+        if (senha && senha.length < 6) return AL_CLIENTE.showAlert('A senha deve ter pelo menos 6 caracteres.');
+
+        var dispositivoIds = Array.from(document.querySelectorAll('#veiculos-grid input[type=checkbox]:checked'))
+          .map(function (c) { return c.value; });
+
+        var payload = {
+          email: email,
+          perfil: perfil || null,
+          permissoes: coletarPermissoes(),
+          dispositivoIds: dispositivoIds,
+        };
+        if (senha) payload.senha = senha;
+
+        var p = modoEdicao
+          ? AL_CLIENTE.apiPut('/api/cliente/usuarios/' + editandoId, payload)
+          : AL_CLIENTE.apiPost('/api/cliente/usuarios', payload);
+
+        document.getElementById('btn-salvar').disabled = true;
+        p.then(function () {
+          AL_CLIENTE.showAlert('Usuário salvo com sucesso.', 'success');
+          setTimeout(function () { window.location.href = 'usuarios.html'; }, 600);
+        }).catch(function (err) {
+          AL_CLIENTE.showAlert(err.message);
+          document.getElementById('btn-salvar').disabled = false;
+        });
+      }
+
+      function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

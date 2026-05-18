@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import prisma from '../utils/prisma';
-import { clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
+import {
+  clienteAuthMiddleware,
+  whereDispositivosDoCliente,
+  ClienteRequest,
+} from '../middleware/cliente-auth.middleware';
 import EmailService from '../services/email.service';
 import ExpoPushService from '../services/expo-push.service';
 
@@ -266,9 +270,9 @@ router.get('/km-config/:dispositivoId', clienteAuthMiddleware, async (req: any, 
 });
 
 // Obter histórico de eventos do cliente
-router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
+router.get('/eventos', clienteAuthMiddleware, async (req: ClienteRequest, res) => {
   try {
-    const clienteLoginId = req.cliente.sub;
+    const clienteLoginId = req.cliente!.sub;
     const { periodo } = req.query;
 
     let dateFilter = {};
@@ -294,29 +298,27 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
       }
     }
 
-    const clienteLogin = await prisma.clienteLogin.findUnique({
-      where: { id: clienteLoginId },
-      select: { clienteId: true },
-    });
-    if (!clienteLogin) return res.status(401).json({ message: 'Sessão inválida.' });
+    // Sub-usuários só veem eventos dos dispositivos permitidos e nunca veem notificações
+    // financeiras (boleto). Responsáveis veem tudo do seu cliente.
+    const isResponsavel = req.cliente!.tipo === 'responsavel';
+    const dispositivoFilter = { dispositivo: whereDispositivosDoCliente(req) };
+    const eventosWhere: Record<string, unknown> = {
+      clienteLoginId,
+      adminEvento: false,
+      createdAt: dateFilter,
+    };
+    if (isResponsavel) {
+      // Inclui eventos sem dispositivo (boletos) ou de dispositivos do cliente
+      eventosWhere.OR = [{ dispositivoId: null }, dispositivoFilter];
+    } else {
+      // Sub-usuário: exige dispositivo e que ele esteja na lista permitida; sem boletos.
+      eventosWhere.dispositivoId = { not: null };
+      eventosWhere.boletoId = null;
+      Object.assign(eventosWhere, dispositivoFilter);
+    }
 
     const eventos = await prisma.eventoNotificacao.findMany({
-      where: {
-        clienteLoginId,
-        adminEvento: false,
-        createdAt: dateFilter,
-        OR: [
-          { dispositivoId: null },
-          {
-            dispositivo: {
-              OR: [
-                { clienteId: clienteLogin.clienteId },
-                { clientesVinculados: { some: { clienteId: clienteLogin.clienteId } } },
-              ],
-            },
-          },
-        ],
-      },
+      where: eventosWhere,
       orderBy: { createdAt: 'desc' },
       include: {
         dispositivo: { select: { nome: true, placa: true } },
@@ -352,12 +354,17 @@ router.get('/eventos', clienteAuthMiddleware, async (req: any, res) => {
 });
 
 // Contar notificações não lidas
-router.get('/nao-lidas/count', clienteAuthMiddleware, async (req: any, res) => {
+router.get('/nao-lidas/count', clienteAuthMiddleware, async (req: ClienteRequest, res) => {
   try {
-    const clienteLoginId = req.cliente.sub;
-    const count = await prisma.eventoNotificacao.count({
-      where: { clienteLoginId, lido: false, adminEvento: false },
-    });
+    const clienteLoginId = req.cliente!.sub;
+    const isResponsavel = req.cliente!.tipo === 'responsavel';
+    const where: Record<string, unknown> = { clienteLoginId, lido: false, adminEvento: false };
+    if (!isResponsavel) {
+      // Sub-usuário: só conta eventos dos veículos permitidos e nunca de boletos
+      where.boletoId = null;
+      where.dispositivo = whereDispositivosDoCliente(req);
+    }
+    const count = await prisma.eventoNotificacao.count({ where });
     res.json({ count });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao contar notificações.' });

@@ -23,6 +23,8 @@ import { PagamentosScreen } from '../screens/PagamentosScreen';
 import { ReportScreen } from '../screens/ReportScreen';
 import { HistoricoScreen } from '../screens/HistoricoScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
+import { UsuariosScreen } from '../screens/UsuariosScreen';
+import { UsuarioFormScreen } from '../screens/UsuarioFormScreen';
 import { NotificationBootstrap } from '../notifications/NotificationBootstrap';
 import { NotificationHandlers } from '../notifications/NotificationHandlers';
 import { colors } from '../theme/colors';
@@ -41,6 +43,7 @@ const routeIcons: Record<keyof ClienteDrawerParamList, string> = {
   Notificacoes: 'bell-outline',
   Manutencao: 'wrench-outline',
   Pagamentos: 'credit-card-outline',
+  Usuarios: 'account-group-outline',
 };
 
 const navigationTheme = {
@@ -171,6 +174,7 @@ function HeaderActions() {
 }
 
 function ClienteDrawer() {
+  const { user, me, can } = useAuth();
   const [canAccessPayments, setCanAccessPayments] = useState(false);
 
   useEffect(() => {
@@ -186,6 +190,14 @@ function ClienteDrawer() {
       mounted = false;
     };
   }, []);
+
+  // Tipo do login determina o que aparece no menu. Responsável vê tudo;
+  // vinculado só vê telas com permissão 'ver'. Notificações/Pagamentos/Usuários só responsável.
+  const tipo = me?.tipo ?? user?.tipo ?? 'responsavel';
+  const responsavel = tipo === 'responsavel';
+  const verMapa = responsavel || can('rastreamento.ver');
+  const verRelatorio = responsavel || can('relatorio.ver');
+  const verManutencao = responsavel || can('manutencao.ver');
 
   return (
     <Drawer.Navigator
@@ -214,20 +226,29 @@ function ClienteDrawer() {
         ),
       })}
     >
-      <Drawer.Screen name="Mapa" component={MapScreen} />
-      <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }} component={ReportScreen} />
-      <Drawer.Screen name="Notificacoes" component={NotificationsScreen} options={{ title: 'Notificações' }} />
-      <Drawer.Screen
-        name="Manutencao"
-        component={ManutencaoScreen}
-        options={{ title: 'Manutenção' }}
-      />
-      {canAccessPayments ? (
+      {verMapa ? <Drawer.Screen name="Mapa" component={MapScreen} /> : null}
+      {verRelatorio ? (
+        <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }} component={ReportScreen} />
+      ) : null}
+      {responsavel ? (
+        <Drawer.Screen name="Notificacoes" component={NotificationsScreen} options={{ title: 'Notificações' }} />
+      ) : null}
+      {verManutencao ? (
+        <Drawer.Screen
+          name="Manutencao"
+          component={ManutencaoScreen}
+          options={{ title: 'Manutenção' }}
+        />
+      ) : null}
+      {responsavel && canAccessPayments ? (
         <Drawer.Screen
           name="Pagamentos"
           component={PagamentosScreen}
           options={{ title: 'Pagamentos' }}
         />
+      ) : null}
+      {responsavel ? (
+        <Drawer.Screen name="Usuarios" component={UsuariosScreen} options={{ title: 'Usuários' }} />
       ) : null}
     </Drawer.Navigator>
   );
@@ -260,6 +281,18 @@ export function AppNavigator() {
             options={({ route }) => ({
               headerShown: true,
               headerTitle: `${route.params.nome}${route.params.placa ? ` — ${route.params.placa}` : ''}`,
+              headerTitleAlign: 'center',
+              headerStyle: { backgroundColor: colors.loginBackgroundStart },
+              headerTintColor: colors.surface,
+              headerShadowVisible: false,
+            })}
+          />
+          <Stack.Screen
+            name="UsuarioForm"
+            component={UsuarioFormScreen}
+            options={({ route }) => ({
+              headerShown: true,
+              headerTitle: route.params?.id ? 'Editar Usuário' : 'Novo Usuário',
               headerTitleAlign: 'center',
               headerStyle: { backgroundColor: colors.loginBackgroundStart },
               headerTintColor: colors.surface,

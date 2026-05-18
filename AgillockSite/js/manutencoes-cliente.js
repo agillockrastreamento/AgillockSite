@@ -994,4 +994,35 @@
   }
 
   init();
+
+  // ── Permissões UI (sub-usuários) ────────────────────────────────────────────
+  function _aplicarPermissoesManutencoesUI() {
+    if (!window.AL_CLIENTE || !AL_CLIENTE.can) return;
+    const can = AL_CLIENTE.can;
+
+    const btnNovo = document.getElementById('btn-novo-registro');
+    if (btnNovo) btnNovo.style.display = can('manutencao.criar') ? '' : 'none';
+
+    // Botões nos cards renderizados (editar/excluir/feito) — usam classes/data-attrs no JS
+    document.querySelectorAll('[data-acao="editar"], .btn-edit-registro, .btn-edit-recorrencia').forEach(b => {
+      const eRecorrencia = b.classList.contains('btn-edit-recorrencia') || b.dataset.tipo === 'recorrencia';
+      b.style.display = (eRecorrencia ? can('manutencao.editarRecorrencia') : can('manutencao.editar')) ? '' : 'none';
+    });
+    document.querySelectorAll('[data-acao="excluir"], .btn-del-registro, .btn-del-recorrencia').forEach(b => {
+      const eRecorrencia = b.classList.contains('btn-del-recorrencia') || b.dataset.tipo === 'recorrencia';
+      b.style.display = (eRecorrencia ? can('manutencao.editarRecorrencia') : can('manutencao.excluir')) ? '' : 'none';
+    });
+    document.querySelectorAll('[data-acao="feito"], .btn-feito').forEach(b => {
+      b.style.display = can('manutencao.marcarFeita') ? '' : 'none';
+    });
+    document.querySelectorAll('[data-acao="nova-recorrencia"], .btn-nova-recorrencia').forEach(b => {
+      b.style.display = can('manutencao.criarRecorrencia') ? '' : 'none';
+    });
+  }
+
+  if (window.AL_CLIENTE && AL_CLIENTE.refreshPermissoes) {
+    AL_CLIENTE.refreshPermissoes().then(_aplicarPermissoesManutencoesUI);
+  }
+  const _obsManut = new MutationObserver(_aplicarPermissoesManutencoesUI);
+  _obsManut.observe(document.body, { childList: true, subtree: true });
 })();

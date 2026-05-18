@@ -58,14 +58,14 @@ async function _dispositivosDoClienteLogin(clienteLoginId: string): Promise<Arra
     select: {
       id: true,
       clienteId: true,
-      cliente: { select: { login: { select: { id: true } } } },
+      cliente: { select: { logins: { where: { tipo: 'responsavel', ativo: true }, select: { id: true }, take: 1 } } },
     },
   });
 
   return dispositivos.map(d => ({
     id: d.id,
     clienteId: d.clienteId,
-    responsavelLoginId: d.cliente?.login?.id ?? null,
+    responsavelLoginId: d.cliente?.logins?.[0]?.id ?? null,
   }));
 }
 

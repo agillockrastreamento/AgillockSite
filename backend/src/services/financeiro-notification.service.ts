@@ -79,23 +79,23 @@ class FinanceiroNotificationService {
           where: {
             status: 'PENDENTE',
             vencimento: { gte: hojeInicio, lte: hojeFim },
-            carne: { cliente: { login: { is: { ativo: true } } } },
+            carne: { cliente: { logins: { some: { tipo: 'responsavel', ativo: true } } } },
           },
-          include: { carne: { include: { cliente: { include: { login: true } } } } },
+          include: { carne: { include: { cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } } } } },
         }),
         prisma.boleto.findMany({
           where: {
             status: 'ATRASADO',
             vencimento: { lt: hojeInicio },
-            carne: { cliente: { login: { is: { ativo: true } } } },
+            carne: { cliente: { logins: { some: { tipo: 'responsavel', ativo: true } } } },
           },
-          include: { carne: { include: { cliente: { include: { login: true } } } } },
+          include: { carne: { include: { cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } } } } },
         }),
       ]);
 
       let totalVencendo = 0;
       for (const boleto of vencendoHoje) {
-        const login = boleto.carne.cliente.login;
+        const login = boleto.carne.cliente.logins[0];
         if (!login?.ativo) continue;
         const ok = await this.notificarBoleto(login.id, boleto.id, 'boletoVencendoHoje', hojeInicio, {
           title: 'Boleto vence hoje',
@@ -108,7 +108,7 @@ class FinanceiroNotificationService {
 
       let totalAtrasados = 0;
       for (const boleto of atrasados) {
-        const login = boleto.carne.cliente.login;
+        const login = boleto.carne.cliente.logins[0];
         if (!login?.ativo) continue;
         const dias = diasAtraso(boleto.vencimento, hojeInicio);
         const ok = await this.notificarBoleto(login.id, boleto.id, 'boletoAtrasado', hojeInicio, {
@@ -133,9 +133,9 @@ class FinanceiroNotificationService {
   async notificarPagamentoRecebido(boletoId: string): Promise<boolean> {
     const boleto = await prisma.boleto.findUnique({
       where: { id: boletoId },
-      include: { carne: { include: { cliente: { include: { login: true } } } } },
+      include: { carne: { include: { cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } } } } },
     });
-    const login = boleto?.carne.cliente.login;
+    const login = boleto?.carne.cliente.logins?.[0];
     if (!boleto || !login?.ativo) return false;
 
     const dataReferencia = inicioDiaBrasil(dataBrasilISO());

@@ -1045,3 +1045,21 @@ function fmtDuracao(mins) {
   const h = Math.floor(mins / 60), m = Math.round(mins % 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
+
+// ── Permissões UI (sub-usuários) ───────────────────────────────────────────────
+function _aplicarPermissoesRelatorioUI() {
+  if (!window.AL_CLIENTE || !AL_CLIENTE.can) return;
+  const can = AL_CLIENTE.can;
+  const btnExportar = document.getElementById('btn-abrir-exportar');
+  if (btnExportar) btnExportar.style.display = can('relatorio.exportar') ? '' : 'none';
+  const btnConfirmar = document.getElementById('btn-confirmar-exportar');
+  if (btnConfirmar) btnConfirmar.disabled = !can('relatorio.exportar');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.AL_CLIENTE && AL_CLIENTE.refreshPermissoes) {
+    AL_CLIENTE.refreshPermissoes().then(_aplicarPermissoesRelatorioUI);
+  } else {
+    _aplicarPermissoesRelatorioUI();
+  }
+});

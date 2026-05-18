@@ -3070,3 +3070,56 @@ window.addEventListener('popstate', (e) => {
   }
 });
 
+// ── Permissões UI (sub-usuários) ───────────────────────────────────────────────
+// Esconde botões e seções segundo as permissões carregadas em AL_CLIENTE. Idempotente —
+// pode ser chamado várias vezes (após render dos cards, após refresh de permissões).
+function _aplicarPermissoesRastreamentoUI() {
+  if (!window.AL_CLIENTE || !AL_CLIENTE.can) return;
+  const can = AL_CLIENTE.can;
+
+  // Botões dentro dos cards de veículo
+  document.querySelectorAll('.btn-upload-foto').forEach(b => { b.style.display = can('rastreamento.uploadFoto') ? '' : 'none'; });
+  document.querySelectorAll('.btn-editar-apelido').forEach(b => { b.style.display = can('rastreamento.editarIdentificacao') ? '' : 'none'; });
+
+  // Painel de eventos
+  const painelEventos = document.getElementById('eventos-panel');
+  if (painelEventos) painelEventos.style.display = can('rastreamento.verEventos') ? '' : 'none';
+  const btnPainelEventos = document.querySelector('[data-toggle-eventos], .btn-eventos-toggle');
+  if (btnPainelEventos) btnPainelEventos.style.display = can('rastreamento.verEventos') ? '' : 'none';
+
+  // Camada de cercas (controle do mapa)
+  const ctrlCercas = document.querySelector('.map-layers-ctrl [data-layer="cercas"]');
+  if (ctrlCercas) ctrlCercas.style.display = (can('rastreamento.verCerca') || can('rastreamento.criarCerca')) ? '' : 'none';
+
+  // Botões de criação de cerca no card / diálogo
+  document.querySelectorAll('[data-perm-criarCerca], .btn-criar-cerca, .btn-cerca-criar').forEach(b => {
+    b.style.display = can('rastreamento.criarCerca') ? '' : 'none';
+  });
+
+  // Botões de bloquear/desbloquear (engineStop / engineResume)
+  document.querySelectorAll('[data-cmd="engineStop"], .btn-cmd-engineStop').forEach(b => {
+    b.style.display = can('rastreamento.bloquear') ? '' : 'none';
+  });
+  document.querySelectorAll('[data-cmd="engineResume"], .btn-cmd-engineResume').forEach(b => {
+    b.style.display = can('rastreamento.desbloquear') ? '' : 'none';
+  });
+
+  // Botões de marcar manutenção como feita (a partir do card do veículo)
+  document.querySelectorAll('[data-perm-marcarManutencaoRecorrenteFeita], .btn-marcar-manutencao-feita').forEach(b => {
+    b.style.display = can('rastreamento.marcarManutencaoRecorrenteFeita') ? '' : 'none';
+  });
+  document.querySelectorAll('[data-perm-marcarRecorrenciaDataFeita], .btn-marcar-recorrencia-data-feita').forEach(b => {
+    b.style.display = can('rastreamento.marcarRecorrenciaDataFeita') ? '' : 'none';
+  });
+}
+
+// Reaplica periodicamente — alguns elementos são criados após carga assíncrona dos cards.
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.AL_CLIENTE && AL_CLIENTE.refreshPermissoes) {
+    AL_CLIENTE.refreshPermissoes().then(_aplicarPermissoesRastreamentoUI);
+  }
+  // Observa adições futuras (cards renderizados depois)
+  const obs = new MutationObserver(function () { _aplicarPermissoesRastreamentoUI(); });
+  obs.observe(document.body, { childList: true, subtree: true });
+});
+
