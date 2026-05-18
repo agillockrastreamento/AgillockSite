@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Image,
@@ -16,17 +17,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { Icon, IconButton } from 'react-native-paper';
 
 import { BottomSheet } from '../components/BottomSheet';
+import { SearchBottomSheet } from '../components/SearchBottomSheet';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { apiRequest } from '../services/api/apiClient';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
+import type { TrackingDevice } from '../tracking/trackingTypes';
 
-type Dispositivo = {
-  id: string;
-  nome: string;
-  placa: string | null;
-  podeGerenciarManutencao: boolean;
+type Dispositivo = TrackingDevice & {
   manutencaoAtiva: boolean;
 };
 
@@ -248,6 +247,7 @@ export function ManutencaoScreen() {
   const confirm = useConfirmDialog();
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([]);
   const [recorrenciasData, setRecorrenciasData] = useState<RecorrenciaData[]>([]);
   const [registros, setRegistros] = useState<Registro[]>([]);
@@ -275,14 +275,18 @@ export function ManutencaoScreen() {
     try {
       const data = await apiRequest<any[]>('/cliente/rastreamento/posicoes');
       const devs: Dispositivo[] = (data ?? []).map((d: any) => ({
-        id: d.dispositivoId ?? d.id,
-        nome: d.nome,
-        placa: d.placa ?? null,
-        podeGerenciarManutencao: d.podeGerenciarManutencao ?? false,
+        ...d,
+        dispositivoId: d.dispositivoId ?? d.id,
         manutencaoAtiva: d.manutencaoAtiva !== false,
       }));
       setDispositivos(devs);
-      if (devs.length > 0 && !selectedId) setSelectedId(devs[0].id);
+      if (!selectedId) {
+        if (devs.length === 1) {
+          setSelectedId(devs[0].dispositivoId);
+        } else if (devs.length > 1) {
+          setSearchSheetVisible(true);
+        }
+      }
     } catch {
       toast.show({ message: 'Erro ao carregar dispositivos.', type: 'error' });
     }
@@ -315,9 +319,30 @@ export function ManutencaoScreen() {
     if (selectedId) loadData();
   }, [selectedId, loadData]);
 
+  // Refs com valores correntes para usarmos dentro do useFocusEffect sem
+  // depender de mudanças de estado (que disparariam cleanup em loop).
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+  const dispositivosCountRef = useRef(dispositivos.length);
+  dispositivosCountRef.current = dispositivos.length;
+
+  // Ao sair da tela limpa a seleção; ao voltar, se houver mais de 1 veículo,
+  // reabre o SearchBottomSheet para escolha.
+  useFocusEffect(
+    useCallback(() => {
+      if (dispositivosCountRef.current > 1 && !selectedIdRef.current) {
+        setSearchSheetVisible(true);
+      }
+      return () => {
+        setSelectedId(null);
+        setSearchSheetVisible(false);
+      };
+    }, []),
+  );
+
   // Quando manutenção está desativada, força aba de histórico
   useEffect(() => {
-    const dev = dispositivos.find(d => d.id === selectedId);
+    const dev = dispositivos.find(d => d.dispositivoId === selectedId);
     if (dev && !dev.manutencaoAtiva) setActiveTab('registros');
   }, [selectedId, dispositivos]);
 
@@ -676,33 +701,53 @@ export function ManutencaoScreen() {
     }
   };
 
-  const selectedDevice = dispositivos.find(d => d.id === selectedId);
+  const selectedDevice = dispositivos.find(d => d.dispositivoId === selectedId);
   const totalProgramadas = recorrencias.length + recorrenciasData.length;
 
   return (
     <View style={styles.container}>
-      {/* Device selector */}
-      {dispositivos.length > 1 && (
-        <ScrollView
-          horizontal
-          style={styles.deviceBarScroll}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.deviceBar}
+      {/* Trocar de veículo — só aparece se houver mais de 1 e algum selecionado */}
+      {dispositivos.length > 1 && selectedDevice && (
+        <Pressable
+          accessibilityRole="button"
+          style={styles.switchBar}
+          onPress={() => setSearchSheetVisible(true)}
         >
-          {dispositivos.map(d => (
-            <Pressable
-              key={d.id}
-              accessibilityRole="button"
-              style={[styles.deviceChip, selectedId === d.id && styles.deviceChipActive]}
-              onPress={() => setSelectedId(d.id)}
-            >
-              <Text style={[styles.deviceChipText, selectedId === d.id && styles.deviceChipTextActive]}>
-                {d.placa ?? d.nome}
+          <View style={styles.switchBarInfo}>
+            <Text style={styles.switchBarName} numberOfLines={1}>
+              {selectedDevice.nome}
+            </Text>
+            {selectedDevice.placa ? (
+              <Text style={styles.switchBarPlate} numberOfLines={1}>
+                {selectedDevice.placa}
               </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+            ) : null}
+          </View>
+          <View style={styles.switchBarBtn}>
+            <Icon source="swap-horizontal" size={18} color={colors.primary} />
+            <Text style={styles.switchBarBtnText}>Trocar veículo</Text>
+          </View>
+        </Pressable>
       )}
+
+      {/* Sem dispositivo selecionado — empty state com botão para abrir o seletor */}
+      {!selectedDevice && dispositivos.length > 1 ? (
+        <View style={styles.selectEmpty}>
+          <Icon source="car-multiple" size={48} color={colors.textMuted} />
+          <Text style={styles.selectEmptyTitle}>Selecione um veículo</Text>
+          <Text style={styles.selectEmptySubtitle}>
+            Escolha um veículo para ver as manutenções programadas e o histórico.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.selectEmptyBtn}
+            onPress={() => setSearchSheetVisible(true)}
+          >
+            <Icon source="magnify" size={16} color={colors.primaryText} />
+            <Text style={styles.selectEmptyBtnText}>Selecionar veículo</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {selectedDevice && !selectedDevice.manutencaoAtiva ? (
         <View style={styles.manutencaoBanner}>
@@ -711,7 +756,7 @@ export function ManutencaoScreen() {
             Manutenções desativadas para este dispositivo. Você não poderá registrar manutenções ou configurar recorrências.
           </Text>
         </View>
-      ) : (
+      ) : selectedDevice ? (
         <>
           {/* Tabs */}
           <View style={styles.tabs}>
@@ -745,9 +790,9 @@ export function ManutencaoScreen() {
             </Pressable>
           </View>
         </>
-      )}
+      ) : null}
 
-      {(!selectedDevice || selectedDevice.manutencaoAtiva) && (
+      {selectedDevice && selectedDevice.manutencaoAtiva && (
         isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />
@@ -1514,6 +1559,17 @@ export function ManutencaoScreen() {
           </Pressable>
         </ScrollView>
       </BottomSheet>
+
+      <SearchBottomSheet
+        visible={searchSheetVisible}
+        devices={dispositivos as TrackingDevice[]}
+        title="Selecione o veículo"
+        onClose={() => setSearchSheetVisible(false)}
+        onSelectDevice={(device) => {
+          setSelectedId(device.dispositivoId);
+          setSearchSheetVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -1523,34 +1579,80 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  deviceBarScroll: {
-    flexGrow: 0,
-  },
-  deviceBar: {
+  switchBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-  },
-  deviceChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
     backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  deviceChipActive: {
-    borderColor: colors.primary,
-    backgroundColor: '#fff7e3',
+  switchBarInfo: {
+    flex: 1,
+    minWidth: 0,
   },
-  deviceChipText: {
-    fontSize: 13,
+  switchBarName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  switchBarPlate: {
+    marginTop: 2,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textMuted,
   },
-  deviceChipTextActive: {
+  switchBarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: '#fff7e3',
+  },
+  switchBarBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
     color: colors.primary,
+  },
+  selectEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.sm,
+  },
+  selectEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.text,
+    marginTop: spacing.xs,
+  },
+  selectEmptySubtitle: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  selectEmptyBtn: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  selectEmptyBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primaryText,
   },
   tabs: {
     flexDirection: 'row',

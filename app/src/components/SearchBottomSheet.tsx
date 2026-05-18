@@ -13,6 +13,8 @@ import type { TrackingDevice } from '../tracking/trackingTypes';
 type SearchBottomSheetProps = {
   visible: boolean;
   devices: TrackingDevice[];
+  title?: string;
+  searchPlaceholder?: string;
   onClose(): void;
   onSelectDevice(device: TrackingDevice): void;
 };
@@ -56,6 +58,8 @@ function SearchCard({
 export function SearchBottomSheet({
   visible,
   devices,
+  title = 'Pesquisar veículo',
+  searchPlaceholder = 'Buscar por nome ou placa...',
   onClose,
   onSelectDevice,
 }: SearchBottomSheetProps) {
@@ -83,7 +87,7 @@ export function SearchBottomSheet({
   return (
     <BottomSheet
       visible={visible}
-      title="Pesquisar veículo"
+      title={title}
       heightPercent={0.7}
       onClose={onClose}
     >
@@ -92,7 +96,7 @@ export function SearchBottomSheet({
           <Icon source="magnify" size={20} color={colors.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar por nome ou placa..."
+            placeholder={searchPlaceholder}
             placeholderTextColor={colors.textMuted}
             value={query}
             onChangeText={setQuery}
