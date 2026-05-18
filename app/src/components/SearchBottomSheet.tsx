@@ -35,7 +35,7 @@ function SearchCard({
         ) : (
           <VehicleIcon
             categoria={device.categoria}
-            color={device.cor}
+            color={statusColor}
             course={device.posicao?.curso}
             size={54}
           />

@@ -117,7 +117,7 @@ function VehiclePhoto({ device, size = 62 }: { device: TrackingDevice; size?: nu
       {imageUrl ? (
         <Image source={{ uri: imageUrl }} style={styles.photo} />
       ) : (
-        <VehicleIcon categoria={device.categoria} color={device.cor} course={device.posicao?.curso} size={size - 6} />
+        <VehicleIcon categoria={device.categoria} color={getMarkerColor(device)} course={device.posicao?.curso} size={size - 6} />
       )}
       <View style={styles.cameraBadge}>
         <Icon source="camera" size={13} color={colors.primaryText} />
@@ -163,6 +163,7 @@ export function MainVehicleCard({
   onVerMais,
   onShowRoute,
   onCompartilhar,
+  onFocusDevice,
 }: {
   device: TrackingDevice;
   onUploadPhoto(): void;
@@ -173,6 +174,7 @@ export function MainVehicleCard({
   onVerMais?: () => void;
   onShowRoute?: () => void;
   onCompartilhar?: () => void;
+  onFocusDevice?: () => void;
 }) {
   const toast = useToast();
   const confirm = useConfirmDialog();
@@ -456,18 +458,27 @@ export function MainVehicleCard({
         onConfirm={handleGeofenceConfirm}
       />
 
-      <Pressable onPress={onUploadPhoto} disabled={isUploading} style={styles.mainCoverWrap}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.mainCoverImage} />
-        ) : (
-          <View style={styles.mainCoverFallback}>
-            <VehicleIcon categoria={device.categoria} color={device.cor} course={0} size={96} />
-          </View>
-        )}
-        <View style={styles.coverCameraBadge}>
+      <View style={styles.mainCoverWrap}>
+        <Pressable onPress={onFocusDevice} style={StyleSheet.absoluteFill}>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.mainCoverImage} />
+          ) : (
+            <View style={styles.mainCoverFallback}>
+              <VehicleIcon categoria={device.categoria} color={getMarkerColor(device)} course={0} size={96} />
+            </View>
+          )}
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Alterar foto do veículo"
+          onPress={onUploadPhoto}
+          disabled={isUploading}
+          hitSlop={8}
+          style={styles.coverCameraBadge}
+        >
           <Icon source="camera" size={16} color={colors.primaryText} />
-        </View>
-      </Pressable>
+        </Pressable>
+      </View>
 
       <View style={styles.mainBody}>
         <Text style={styles.sectionTitle}>Informações do Dispositivo</Text>

@@ -72,6 +72,7 @@ const DEFAULT_REGION = {
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'terrain', 'hybrid'];
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const MAIN_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.60);
+const MAIN_CARD_PEEK_HEIGHT = 76; // mostra apenas alça + header (nome/placa + X)
 const MAP_PREFERENCES_KEY = 'agillock_map_preferences_v1';
 
 type QuickSheetMode = 'closed' | 'peek' | 'expanded';
@@ -153,6 +154,10 @@ export function MapScreen() {
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
   const [mainCardVisible, setMainCardVisible] = useState(false);
+  const [mainCardPeeked, setMainCardPeeked] = useState(false);
+  const mainCardPeekedRef = useRef(false);
+  mainCardPeekedRef.current = mainCardPeeked;
+  const selectedDeviceRef = useRef<TrackingDevice | null>(null);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [notificationsSheetVisible, setNotificationsSheetVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -254,6 +259,7 @@ export function MapScreen() {
     () => devices.find((device) => device.dispositivoId === selectedDeviceId) ?? null,
     [devices, selectedDeviceId],
   );
+  selectedDeviceRef.current = selectedDevice;
   const traccarDeviceIndex = useMemo(
     () => buildTraccarDeviceIndex(devices),
     [devices],
@@ -297,6 +303,7 @@ export function MapScreen() {
 
   const openMainCard = useCallback(() => {
     setMainCardVisible(true);
+    setMainCardPeeked(false);
     Animated.spring(mainCardAnim, {
       toValue: 0,
       useNativeDriver: true,
@@ -305,6 +312,54 @@ export function MapScreen() {
     }).start();
   }, [mainCardAnim]);
 
+  const expandMainCard = useCallback(() => {
+    setMainCardPeeked(false);
+    Animated.spring(mainCardAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 90,
+    }).start();
+  }, [mainCardAnim]);
+
+  const peekMainCard = useCallback(() => {
+    setMainCardPeeked(true);
+    Animated.spring(mainCardAnim, {
+      toValue: MAIN_CARD_HEIGHT - MAIN_CARD_PEEK_HEIGHT,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 90,
+    }).start();
+  }, [mainCardAnim]);
+
+  const focusSelectedDevice = useCallback(() => {
+    const device = selectedDeviceRef.current;
+    if (!device) return;
+    const cardHeight = mainCardPeekedRef.current ? MAIN_CARD_PEEK_HEIGHT : MAIN_CARD_HEIGHT;
+    const coordinate = getDeviceCoordinate(device);
+    if (coordinate) {
+      lastCenteredKey.current = `${coordinate.latitude.toFixed(5)},${coordinate.longitude.toFixed(5)}`;
+    }
+    animateToDevice(device, cardHeight);
+  }, [animateToDevice]);
+
+  const expandAndFocusMainCard = useCallback(() => {
+    expandMainCard();
+    const device = selectedDeviceRef.current;
+    if (device) {
+      const coordinate = getDeviceCoordinate(device);
+      if (coordinate) {
+        lastCenteredKey.current = `${coordinate.latitude.toFixed(5)},${coordinate.longitude.toFixed(5)}`;
+      }
+      animateToDevice(device, MAIN_CARD_HEIGHT);
+    }
+  }, [expandMainCard, animateToDevice]);
+
+  const toggleMainCardPeek = useCallback(() => {
+    if (mainCardPeekedRef.current) expandAndFocusMainCard();
+    else peekMainCard();
+  }, [expandAndFocusMainCard, peekMainCard]);
+
   const closeMainCard = useCallback(() => {
     Animated.timing(mainCardAnim, {
       toValue: MAIN_CARD_HEIGHT,
@@ -312,6 +367,7 @@ export function MapScreen() {
       useNativeDriver: true,
     }).start(() => {
       setMainCardVisible(false);
+      setMainCardPeeked(false);
       setSelectedDeviceId(null);
       lastCenteredKey.current = '';
     });
@@ -320,29 +376,39 @@ export function MapScreen() {
   const mainCardPanResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponder: () => true,
         onStartShouldSetPanResponderCapture: () => false,
-        onMoveShouldSetPanResponder: (_, gs) =>
-          gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
-        onMoveShouldSetPanResponderCapture: (_, gs) =>
-          gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+        onMoveShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderMove: (_, gs) => {
-          if (gs.dy > 0) mainCardAnim.setValue(gs.dy);
+          const base = mainCardPeekedRef.current ? MAIN_CARD_HEIGHT - MAIN_CARD_PEEK_HEIGHT : 0;
+          const next = Math.max(0, Math.min(MAIN_CARD_HEIGHT - MAIN_CARD_PEEK_HEIGHT, base + gs.dy));
+          mainCardAnim.setValue(next);
         },
         onPanResponderRelease: (_, gs) => {
-          if (gs.dy > 80 || gs.vy > 0.7) {
-            closeMainCard();
+          const isTap = Math.abs(gs.dy) < 8 && Math.abs(gs.dx) < 8 && Math.abs(gs.vy) < 0.2;
+          if (isTap) {
+            if (mainCardPeekedRef.current) expandAndFocusMainCard();
+            else peekMainCard();
+            return;
+          }
+          if (mainCardPeekedRef.current) {
+            if (gs.dy < -60 || gs.vy < -0.6) {
+              expandAndFocusMainCard();
+            } else {
+              peekMainCard();
+            }
           } else {
-            Animated.spring(mainCardAnim, {
-              toValue: 0,
-              useNativeDriver: true,
-              friction: 8,
-              tension: 90,
-            }).start();
+            if (gs.dy > 80 || gs.vy > 0.7) {
+              peekMainCard();
+            } else {
+              expandMainCard();
+            }
           }
         },
       }),
-    [mainCardAnim, closeMainCard],
+    [mainCardAnim, expandMainCard, expandAndFocusMainCard, peekMainCard],
   );
 
   const updateDevice = useCallback((dispositivoId: string, patch: Partial<TrackingDevice>) => {
@@ -861,16 +927,31 @@ export function MapScreen() {
         <Animated.View
           style={[styles.mainCard, { transform: [{ translateY: mainCardAnim }] }]}
         >
-          <View style={styles.mainCardDragArea} {...mainCardPanResponder.panHandlers}>
+          <View
+            accessibilityRole="button"
+            accessibilityLabel={mainCardPeeked ? 'Expandir detalhes do veículo' : 'Recolher detalhes do veículo'}
+            style={styles.mainCardDragArea}
+            {...mainCardPanResponder.panHandlers}
+          >
             <View style={styles.mainCardHandle} />
           </View>
           <View style={styles.mainCardHeader}>
-            <Text style={styles.mainCardTitle} numberOfLines={1}>
-              {selectedDevice.nome}{selectedDevice.placa ? ` — ${selectedDevice.placa}` : ''}
-            </Text>
+            <Pressable
+              style={styles.mainCardTitleWrap}
+              onPress={focusSelectedDevice}
+              disabled={!mainCardPeeked}
+            >
+              <Text style={styles.mainCardTitle} numberOfLines={1}>
+                {selectedDevice.nome}{selectedDevice.placa ? ` — ${selectedDevice.placa}` : ''}
+              </Text>
+            </Pressable>
             <IconButton icon="close" size={22} onPress={closeMainCard} />
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={!mainCardPeeked}
+          >
             <MainVehicleCard
               device={selectedDevice}
               onUploadPhoto={handleUploadPhoto}
@@ -880,6 +961,7 @@ export function MapScreen() {
               onGeofenceDeleted={() => {
                 if (showFences) getGeofences().then(setGeofences).catch(() => {});
               }}
+              onFocusDevice={() => animateToDevice(selectedDevice, MAIN_CARD_HEIGHT)}
               onVerMais={() => {
                 if (selectedDevice) {
                   closeMainCard();
@@ -1247,8 +1329,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  mainCardTitle: {
+  mainCardTitleWrap: {
     flex: 1,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+  },
+  mainCardTitle: {
     color: colors.text,
     fontSize: 15,
     fontWeight: '800',
