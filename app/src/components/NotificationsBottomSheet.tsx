@@ -4,10 +4,12 @@ import { ActivityIndicator, Icon, Portal } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { BottomSheet } from './BottomSheet';
+import { SearchBottomSheet } from './SearchBottomSheet';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import type { NotificationEvent } from '../notifications/notificationService';
 import { markAllAsRead } from '../notifications/notificationService';
+import type { TrackingDevice } from '../tracking/trackingTypes';
 
 const EVENTO_TYPES = [
   { tipo: 'ignitionOn', label: 'Ignição Ligada', color: '#27ae60', icon: 'key' },
@@ -38,7 +40,7 @@ type PeriodFilter = 'hoje' | 'ontem' | '7dias' | 'custom';
 
 type NotificationsBottomSheetProps = {
   visible: boolean;
-  devices: { dispositivoId: string; nome: string; placa: string | null; posicao?: { latitude?: number | null; longitude?: number; endereco?: string | null } | null; endereco?: string | null }[];
+  devices: TrackingDevice[];
   onClose(): void;
   onSelectEvent(event: NotificationEvent): void;
 };
@@ -110,6 +112,18 @@ export function NotificationsBottomSheet({
   const [customDateTo, setCustomDateTo] = useState(new Date());
 
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set());
+  const [searchSheetVisible, setSearchSheetVisible] = useState(false);
+
+  // Reseta filtro de dispositivos quando o sheet fecha
+  useEffect(() => {
+    if (!visible) {
+      setSelectedDeviceIds(new Set());
+      setSearchSheetVisible(false);
+    }
+  }, [visible]);
+
+  const selectedDevices = devices.filter((d) => selectedDeviceIds.has(d.dispositivoId));
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -199,7 +213,13 @@ export function NotificationsBottomSheet({
     setTypePickerVisible(false);
   }, [selectedTypes.size]);
 
-  const filteredEvents = events.filter((e) => selectedTypes.has(e.tipo));
+  const filteredEvents = events.filter((e) => {
+    if (!selectedTypes.has(e.tipo)) return false;
+    if (selectedDeviceIds.size > 0) {
+      if (!e.dispositivoId || !selectedDeviceIds.has(e.dispositivoId)) return false;
+    }
+    return true;
+  });
 
   const handleSelect = useCallback(
     (event: NotificationEvent) => {
@@ -297,15 +317,58 @@ export function NotificationsBottomSheet({
           </View>
         )}
 
-        <View style={styles.filters}>
+        <View style={styles.filtersRow}>
           <Pressable
-            style={styles.typePickerButton}
+            style={[styles.typePickerButton, styles.flex1]}
             onPress={() => setTypePickerVisible(true)}
           >
             <Text style={styles.typePickerLabel}>{typeFilterLabel}</Text>
             <Icon source="chevron-down" size={20} color={colors.textMuted} />
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Filtrar por dispositivo"
+            style={[
+              styles.searchBtn,
+              selectedDeviceIds.size > 0 && styles.searchBtnActive,
+            ]}
+            onPress={() => setSearchSheetVisible(true)}
+          >
+            <Icon
+              source="magnify"
+              size={20}
+              color={selectedDeviceIds.size > 0 ? colors.primaryText : colors.text}
+            />
+          </Pressable>
         </View>
+
+        {selectedDevices.length > 0 && (
+          <View style={styles.deviceFiltersBar}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.deviceChipsRow}
+              keyboardShouldPersistTaps="handled"
+            >
+              {selectedDevices.map((d) => (
+                <View key={d.dispositivoId} style={styles.deviceChip}>
+                  <Text style={styles.deviceChipText} numberOfLines={1}>
+                    {d.nome}
+                    {d.placa ? ` — ${d.placa}` : ''}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Limpar filtro de dispositivos"
+              style={styles.clearDevicesBtn}
+              onPress={() => setSelectedDeviceIds(new Set())}
+            >
+              <Icon source="close-circle" size={18} color={colors.danger} />
+            </Pressable>
+          </View>
+        )}
 
 {loading ? (
           <View style={styles.loading}>
@@ -386,7 +449,7 @@ export function NotificationsBottomSheet({
                           const devicePos = device?.posicao;
                           const deviceLat = devicePos?.latitude ?? null;
                           const deviceLng = devicePos?.longitude ?? null;
-                          const deviceAddress = devicePos?.endereco ?? device?.endereco ?? null;
+                          const deviceAddress = devicePos?.endereco ?? null;
                           
                           if (item.endereco) {
                             address = item.endereco;
@@ -532,6 +595,21 @@ export function NotificationsBottomSheet({
             </Pressable>
           </Modal>
         </Portal>
+
+        <SearchBottomSheet
+          visible={searchSheetVisible}
+          devices={devices}
+          title="Selecione o dispositivo para filtrar as notificações por ele"
+          onClose={() => setSearchSheetVisible(false)}
+          onSelectDevice={(device) => {
+            setSelectedDeviceIds((prev) => {
+              const next = new Set(prev);
+              next.add(device.dispositivoId);
+              return next;
+            });
+            setSearchSheetVisible(false);
+          }}
+        />
       </View>
     </BottomSheet>
   );
@@ -592,6 +670,15 @@ const styles = StyleSheet.create({
   filters: {
     paddingBottom: spacing.sm,
   },
+  filtersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  flex1: {
+    flex: 1,
+  },
   typePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -606,6 +693,50 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '600',
+  },
+  searchBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  searchBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  deviceFiltersBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingBottom: spacing.sm,
+  },
+  deviceChipsRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  deviceChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: '#fff7e3',
+  },
+  deviceChipText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  clearDevicesBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
   },
   loading: {
     flex: 1,

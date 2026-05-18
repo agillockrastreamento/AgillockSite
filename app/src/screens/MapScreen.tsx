@@ -1208,12 +1208,7 @@ export function MapScreen() {
 
       <NotificationsBottomSheet
         visible={notificationsSheetVisible}
-        devices={devices.map((d): any => ({
-          dispositivoId: d.dispositivoId,
-          nome: d.nome,
-          placa: d.placa,
-          posicao: d.posicao,
-        }))}
+        devices={devices}
         onClose={() => setNotificationsSheetVisible(false)}
         onSelectEvent={(event) => {
           if (event.dispositivoId) {
