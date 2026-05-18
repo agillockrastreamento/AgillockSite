@@ -146,6 +146,11 @@ router.post('/zhencb',
   express.json(),
   async (req: Request, res: Response): Promise<void> => {
   const payload = req.body;
+
+  // [DEBUG] Logging temporário enquanto integração ZHENCB estabiliza — remover depois.
+  console.log('[Webhook ZHENCB] RAW headers:', JSON.stringify(req.headers));
+  console.log('[Webhook ZHENCB] RAW body:', JSON.stringify(payload));
+
   const devices = payload?.data;
 
   if (!Array.isArray(devices)) {
