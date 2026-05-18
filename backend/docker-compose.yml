@@ -26,6 +26,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://agillock_user:${POSTGRES_PASSWORD}@postgres:5432/agillock
+      TZ: America/Sao_Paulo
     volumes:
       - ./cert:/app/cert:ro
       - uploads_data:/app/uploads

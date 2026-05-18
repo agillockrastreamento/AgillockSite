@@ -598,7 +598,7 @@ router.post('/recorrencias-data', async (req: any, res) => {
         titulo,
         descricao: descricao || null,
         tipoRecorrencia,
-        dataReferencia: new Date(dataReferencia),
+        dataReferencia: _parseDataSp(dataReferencia),
         intervaloDias: intervaloDias ? parseInt(intervaloDias) : null,
         diasSemana: diasSemana || null,
         diaDoMes: diaDoMes ? parseInt(diaDoMes) : null,
@@ -638,7 +638,7 @@ router.put('/recorrencias-data/:id', async (req: any, res) => {
     }
 
     const novoTipo = tipoRecorrencia || existing.tipoRecorrencia;
-    const novaData = dataReferencia ? new Date(dataReferencia) : existing.dataReferencia;
+    const novaData = dataReferencia ? _parseDataSp(dataReferencia) : existing.dataReferencia;
 
     const updated = await prisma.manutencaoRecorrenciaData.update({
       where: { id },
@@ -828,40 +828,61 @@ function _validarCamposRecorrenciaData(tipo: string, intervaloDias: any, diasSem
   }
 }
 
+// Retorna um Date representando 00:00 SP (= 03:00 UTC) do dia SP em que `base` cai.
+// Independente do TZ do servidor. SP não observa DST desde 2019, então -03:00 é fixo.
+function _inicioDiaSpBase(base: Date): Date {
+  const dataSp = base.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  return new Date(`${dataSp}T00:00:00-03:00`);
+}
+
+// Aceita "YYYY-MM-DD" (interpretado como dia SP) ou um ISO/datetime (normalizado ao início do dia SP).
+function _parseDataSp(input: any): Date {
+  if (input instanceof Date) return _inicioDiaSpBase(input);
+  if (typeof input === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+      return new Date(`${input}T00:00:00-03:00`);
+    }
+    return _inicioDiaSpBase(new Date(input));
+  }
+  throw new Error('dataReferencia inválido.');
+}
+
+// Calcula a próxima ocorrência sempre ancorada a 00:00 SP (= 03:00 UTC).
+// Usa métodos UTC pois `d` é construído como midnight SP via offset -03:00;
+// como 00:00 SP equivale a 03:00 UTC no mesmo dia calendário, getUTC*/setUTC* preservam o dia SP correto.
 function _calcularProximaData(rec: { tipoRecorrencia: string; dataReferencia: Date; intervaloDias?: number | null; diasSemana?: any; diaDoMes?: number | null; mesDoAno?: number | null }, base: Date): Date {
-  const d = new Date(base);
-  d.setHours(0, 0, 0, 0);
+  const d = _inicioDiaSpBase(base);
 
   switch (rec.tipoRecorrencia) {
     case 'INTERVALO': {
       const n = rec.intervaloDias ?? 7;
-      d.setDate(d.getDate() + n);
+      d.setUTCDate(d.getUTCDate() + n);
       return d;
     }
     case 'SEMANAL': {
       const dias: number[] = Array.isArray(rec.diasSemana) ? rec.diasSemana : [1];
-      const diaAtual = d.getDay();
+      const diaAtual = d.getUTCDay();
       const diasOrdenados = [...dias].sort((a, b) => a - b);
       let proximoDia = diasOrdenados.find(dia => dia > diaAtual);
       if (proximoDia === undefined) proximoDia = diasOrdenados[0];
       const diff = proximoDia > diaAtual ? proximoDia - diaAtual : 7 - diaAtual + proximoDia;
-      d.setDate(d.getDate() + diff);
+      d.setUTCDate(d.getUTCDate() + diff);
       return d;
     }
     case 'MENSAL': {
       const diaAlvo = rec.diaDoMes ?? 1;
-      d.setMonth(d.getMonth() + 1);
-      const diasNoMes = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-      d.setDate(Math.min(diaAlvo, diasNoMes));
+      d.setUTCMonth(d.getUTCMonth() + 1);
+      const diasNoMes = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+      d.setUTCDate(Math.min(diaAlvo, diasNoMes));
       return d;
     }
     case 'ANUAL': {
       const diaAlvo = rec.diaDoMes ?? 1;
       const mesAlvo = (rec.mesDoAno ?? 1) - 1;
-      d.setFullYear(d.getFullYear() + 1);
-      d.setMonth(mesAlvo);
-      const diasNoMes = new Date(d.getFullYear(), mesAlvo + 1, 0).getDate();
-      d.setDate(Math.min(diaAlvo, diasNoMes));
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
+      d.setUTCMonth(mesAlvo);
+      const diasNoMes = new Date(Date.UTC(d.getUTCFullYear(), mesAlvo + 1, 0)).getUTCDate();
+      d.setUTCDate(Math.min(diaAlvo, diasNoMes));
       return d;
     }
     default:
@@ -869,6 +890,6 @@ function _calcularProximaData(rec: { tipoRecorrencia: string; dataReferencia: Da
   }
 }
 
-export { _calcularProximaData };
+export { _calcularProximaData, _parseDataSp };
 
 export default router;

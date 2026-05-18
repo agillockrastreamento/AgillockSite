@@ -621,7 +621,7 @@ router.post('/bulk/recorrencias', async (req: any, res) => {
 
 // ── Recorrências por Data (Admin) ─────────────────────────────────────────────
 
-import { _calcularProximaData } from './manutencoes.routes';
+import { _calcularProximaData, _parseDataSp } from './manutencoes.routes';
 
 // GET /api/manutencoes-admin/clientes/:clienteLoginId/recorrencias-data?dispositivoId=X
 router.get('/clientes/:clienteLoginId/recorrencias-data', async (req, res) => {
@@ -683,7 +683,7 @@ router.post('/clientes/:clienteLoginId/recorrencias-data', async (req: any, res)
         titulo,
         descricao: descricao || null,
         tipoRecorrencia,
-        dataReferencia: new Date(dataReferencia),
+        dataReferencia: _parseDataSp(dataReferencia),
         intervaloDias: intervaloDias ? parseInt(intervaloDias) : null,
         diasSemana: diasSemana || null,
         diaDoMes: diaDoMes ? parseInt(diaDoMes) : null,
@@ -717,7 +717,7 @@ router.put('/recorrencias-data/:id', async (req: any, res) => {
         titulo: titulo || existing.titulo,
         descricao: descricao !== undefined ? (descricao || null) : existing.descricao,
         tipoRecorrencia: tipoRecorrencia || existing.tipoRecorrencia,
-        dataReferencia: dataReferencia ? new Date(dataReferencia) : existing.dataReferencia,
+        dataReferencia: dataReferencia ? _parseDataSp(dataReferencia) : existing.dataReferencia,
         intervaloDias: intervaloDias !== undefined ? (intervaloDias ? parseInt(intervaloDias) : null) : existing.intervaloDias,
         diasSemana: diasSemana !== undefined ? (diasSemana || null) : existing.diasSemana,
         diaDoMes: diaDoMes !== undefined ? (diaDoMes ? parseInt(diaDoMes) : null) : existing.diaDoMes,
