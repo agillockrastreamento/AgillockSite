@@ -217,7 +217,7 @@
 
       // ── Resumo ────────────────────────────────────────────────────────────
       function renderResumo(boletos) {
-        var aberto   = boletos.filter(function (b) { return b.status === 'PENDENTE' || b.status === 'ATRASADO'; });
+        var aberto   = boletos.filter(function (b) { return b.status === 'PENDENTE'; });
         var atraso   = boletos.filter(function (b) { return b.status === 'ATRASADO'; });
         var pago     = boletos.filter(function (b) { return b.status === 'PAGO'; });
 
