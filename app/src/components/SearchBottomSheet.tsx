@@ -91,50 +91,54 @@ export function SearchBottomSheet({
       heightPercent={0.7}
       onClose={onClose}
     >
-      <View style={styles.content}>
-        <View style={styles.searchBox}>
-          <Icon source="magnify" size={20} color={colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={searchPlaceholder}
-            placeholderTextColor={colors.textMuted}
-            value={query}
-            onChangeText={setQuery}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
-          {query.length > 0 ? (
-            <IconButton
-              icon="close-circle"
-              size={18}
-              iconColor={colors.textMuted}
-              onPress={() => setQuery('')}
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
+        stickyHeaderIndices={[0]}
+      >
+        <View style={styles.searchBoxSticky}>
+          <View style={styles.searchBox}>
+            <Icon source="magnify" size={20} color={colors.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={searchPlaceholder}
+              placeholderTextColor={colors.textMuted}
+              value={query}
+              onChangeText={setQuery}
+              autoCapitalize="characters"
+              autoCorrect={false}
             />
-          ) : null}
+            {query.length > 0 ? (
+              <IconButton
+                icon="close-circle"
+                size={18}
+                iconColor={colors.textMuted}
+                onPress={() => setQuery('')}
+              />
+            ) : null}
+          </View>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.grid}>
-            {filteredDevices.map((device) => (
-              <View key={device.dispositivoId} style={styles.gridItem}>
-                <SearchCard
-                  device={device}
-                  onPress={() => handleSelect(device)}
-                />
-              </View>
-            ))}
-          </View>
-          {filteredDevices.length === 0 && (
-            <View style={styles.empty}>
-              <Icon source="car-off" size={40} color={colors.textMuted} />
-              <Text style={styles.emptyText}>Nenhum veículo encontrado</Text>
+        <View style={styles.grid}>
+          {filteredDevices.map((device) => (
+            <View key={device.dispositivoId} style={styles.gridItem}>
+              <SearchCard
+                device={device}
+                onPress={() => handleSelect(device)}
+              />
             </View>
-          )}
-        </ScrollView>
-      </View>
+          ))}
+        </View>
+        {filteredDevices.length === 0 && (
+          <View style={styles.empty}>
+            <Icon source="car-off" size={40} color={colors.textMuted} />
+            <Text style={styles.emptyText}>Nenhum veículo encontrado</Text>
+          </View>
+        )}
+      </ScrollView>
     </BottomSheet>
   );
 }
@@ -159,8 +163,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   list: {
-    paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+  },
+  searchBoxSticky: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.surface,
   },
   grid: {
     flexDirection: 'row',

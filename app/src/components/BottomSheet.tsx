@@ -20,12 +20,16 @@ import {
   View,
 } from 'react-native';
 import { IconButton } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 
 const DISMISS_DRAG_DISTANCE = 90;
 const KEYBOARD_GAP = 8;
+// Folga mínima entre o topo do bottom sheet e a status bar / notch, para
+// que quando o teclado abre o sheet não suba até o topo da tela.
+const SAFE_TOP_EXTRA = 16;
 
 type Props = {
   visible: boolean;
@@ -50,6 +54,7 @@ export function BottomSheet({
   statusBarOverlay = true,
   onClose,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const sheetHeight = Math.round(Dimensions.get('window').height * heightPercent);
   const translateY = useRef(new Animated.Value(sheetHeight)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -177,8 +182,12 @@ export function BottomSheet({
     };
   }, [keyboardOffset]);
 
+  // Limita a altura para que, com o teclado aberto e a translação aplicada,
+  // o topo do sheet fique abaixo da área segura (status bar / notch) ao invés
+  // de subir até o topo da tela.
+  const safeTopOffset = (insets.top || 0) + SAFE_TOP_EXTRA;
   const visibleSheetHeight = Math.max(
-    Math.min(sheetHeight, Dimensions.get('window').height - keyboardHeight - KEYBOARD_GAP),
+    Math.min(sheetHeight, Dimensions.get('window').height - keyboardHeight - safeTopOffset),
     260,
   );
 
