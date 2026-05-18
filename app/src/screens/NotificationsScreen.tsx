@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Button,
@@ -8,6 +8,7 @@ import {
   TextInput,
 } from 'react-native-paper';
 import { Pressable, ScrollView, StyleSheet, View, KeyboardAvoidingView } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../auth/AuthProvider';
 import { getTrackingSnapshot } from '../tracking/trackingService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
@@ -18,9 +19,10 @@ import {
   type SaveNotificationPreferencesPayload,
 } from '../notifications/notificationService';
 import { colors } from '../theme/colors';
-import { spacing } from '../theme/layout';
+import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
 import { BottomSheet } from '../components/BottomSheet';
+import { SearchBottomSheet } from '../components/SearchBottomSheet';
 
 const TIPOS_NOTIF = [
   { id: 'ignitionOn', label: 'Ignição Ligada', icon: 'power-plug' },
@@ -53,9 +55,7 @@ export function NotificationsScreen() {
   const [veiculos, setVeiculos] = useState<TrackingDevice[]>([]);
   const [loadingVeiculos, setLoadingVeiculos] = useState(true);
   const [dispositivoIdAtivo, setDispositivoIdAtivo] = useState<string>('');
-  const [selectedVehicleName, setSelectedVehicleName] = useState('');
   const [vehicleSelectorVisible, setVehicleSelectorVisible] = useState(false);
-  const [vehiclePlateSearch, setVehiclePlateSearch] = useState('');
 
   // Preferences
   const [preferencias, setPreferencias] = useState<NotificationPreferencesResponse | null>(null);
@@ -81,22 +81,18 @@ export function NotificationsScreen() {
     { label: 'Sábado', value: 6 },
   ];
 
-  const normalizePlateSearch = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-  const filteredVeiculos = useMemo(() => {
-    const filtro = normalizePlateSearch(vehiclePlateSearch);
-    if (!filtro) return veiculos;
-    return veiculos.filter(v => normalizePlateSearch(v.placa || '').includes(filtro));
-  }, [veiculos, vehiclePlateSearch]);
-
   const loadVeiculos = useCallback(async () => {
     try {
       setLoadingVeiculos(true);
       const data = await getTrackingSnapshot();
-      if (Array.isArray(data)) {
-        setVeiculos(data);
-      } else {
-        setVeiculos([]);
+      const lista = Array.isArray(data) ? data : [];
+      setVeiculos(lista);
+      if (!dispositivoIdAtivo) {
+        if (lista.length === 1) {
+          setDispositivoIdAtivo(lista[0].dispositivoId);
+        } else if (lista.length > 1) {
+          setVehicleSelectorVisible(true);
+        }
       }
     } catch {
       toast.show({ message: 'Erro ao carregar veículos.', type: 'error' });
@@ -104,7 +100,7 @@ export function NotificationsScreen() {
     } finally {
       setLoadingVeiculos(false);
     }
-  }, [toast]);
+  }, [toast, dispositivoIdAtivo]);
 
   const loadPreferencias = useCallback(async (dispositivoId: string) => {
     try {
@@ -132,9 +128,22 @@ export function NotificationsScreen() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    loadVeiculos();
-  }, [loadVeiculos]);
+  // Ref para acessar loadVeiculos dentro do useFocusEffect sem disparar reexecução
+  const loadVeiculosRef = useRef(loadVeiculos);
+  loadVeiculosRef.current = loadVeiculos;
+
+  // Ao focar a tela recarrega a lista (auto-seleciona se houver 1 veículo
+  // ou abre o seletor para múltiplos). Ao sair, zera a seleção para que o
+  // SearchBottomSheet reabra ao reentrar.
+  useFocusEffect(
+    useCallback(() => {
+      loadVeiculosRef.current();
+      return () => {
+        setDispositivoIdAtivo('');
+        setVehicleSelectorVisible(false);
+      };
+    }, []),
+  );
 
   useEffect(() => {
     if (dispositivoIdAtivo) {
@@ -189,74 +198,71 @@ export function NotificationsScreen() {
     }
   };
 
-  const handleVehicleSelect = (v: TrackingDevice) => {
-    setDispositivoIdAtivo(v.dispositivoId);
-    setSelectedVehicleName(`${v.nome}${v.placa ? ` (${v.placa})` : ''}`);
-    setVehiclePlateSearch('');
-    setVehicleSelectorVisible(false);
-  };
+  const selectedDevice = veiculos.find(v => v.dispositivoId === dispositivoIdAtivo) || null;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Vehicle Selector */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Veículo</Text>
-          {loadingVeiculos ? (
-            <ActivityIndicator />
-          ) : (
-            <>
-              <Pressable
-                style={styles.vehicleSelector}
-                onPress={() => setVehicleSelectorVisible(true)}
-              >
-                <Text style={styles.vehicleSelectorText}>
-                  {selectedVehicleName || 'Selecione um veículo...'}
-                </Text>
-                <Icon source="chevron-down" size={20} color={colors.textMuted} />
-              </Pressable>
+      {/* Trocar de veículo — só aparece se houver mais de 1 e algum selecionado */}
+      {veiculos.length > 1 && selectedDevice && (
+        <Pressable
+          accessibilityRole="button"
+          style={styles.switchBar}
+          onPress={() => setVehicleSelectorVisible(true)}
+        >
+          <View style={styles.switchBarInfo}>
+            <Text style={styles.switchBarName} numberOfLines={1}>
+              {selectedDevice.nome}
+            </Text>
+            {selectedDevice.placa ? (
+              <Text style={styles.switchBarPlate} numberOfLines={1}>
+                {selectedDevice.placa}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.switchBarBtn}>
+            <Icon source="swap-horizontal" size={18} color={colors.primary} />
+            <Text style={styles.switchBarBtnText}>Trocar veículo</Text>
+          </View>
+        </Pressable>
+      )}
 
-              <BottomSheet
-                visible={vehicleSelectorVisible}
-                heightPercent={0.5}
-                onClose={() => setVehicleSelectorVisible(false)}
-                title="Selecionar Veículo"
-              >
-                <TextInput
-                  mode="outlined"
-                  value={vehiclePlateSearch}
-                  onChangeText={setVehiclePlateSearch}
-                  placeholder="Buscar por placa"
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  left={<TextInput.Icon icon="magnify" />}
-                  right={vehiclePlateSearch ? <TextInput.Icon icon="close" onPress={() => setVehiclePlateSearch('')} /> : undefined}
-                  style={styles.vehicleSearchInput}
-                  dense
-                />
-                <ScrollView style={styles.vehicleList}>
-                  {filteredVeiculos.map(v => (
-                    <Pressable
-                      key={v.dispositivoId}
-                      style={styles.vehicleItem}
-                      onPress={() => handleVehicleSelect(v)}
-                    >
-                      <Text style={styles.vehicleItemText}>
-                        {v.nome} {v.placa ? `(${v.placa})` : ''}
-                      </Text>
-                    </Pressable>
-                  ))}
-                  {!filteredVeiculos.length && (
-                    <Text style={styles.vehicleEmptyText}>Nenhum veículo encontrado para esta placa.</Text>
-                  )}
-                </ScrollView>
-              </BottomSheet>
-            </>
-          )}
-        </View>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {loadingVeiculos && (
+          <View style={styles.loading}>
+            <ActivityIndicator />
+          </View>
+        )}
+
+        {/* Sem veículos disponíveis */}
+        {!loadingVeiculos && veiculos.length === 0 && (
+          <View style={styles.emptyState}>
+            <Icon source="bell-outline" size={48} color={colors.textMuted} />
+            <Text style={styles.emptyTitle}>Nenhum veículo disponível</Text>
+            <Text style={styles.emptyText}>Não há veículos para configurar notificações.</Text>
+          </View>
+        )}
+
+        {/* Empty state — múltiplos veículos e nenhum selecionado */}
+        {!loadingVeiculos && veiculos.length > 1 && !selectedDevice && (
+          <View style={styles.selectEmpty}>
+            <Icon source="car-multiple" size={48} color={colors.textMuted} />
+            <Text style={styles.selectEmptyTitle}>Selecione um veículo</Text>
+            <Text style={styles.selectEmptySubtitle}>
+              Escolha um veículo para configurar as notificações.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.selectEmptyBtn}
+              onPress={() => setVehicleSelectorVisible(true)}
+            >
+              <Icon source="magnify" size={16} color={colors.primaryText} />
+              <Text style={styles.selectEmptyBtnText}>Selecionar veículo</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Preferences Section */}
-        {dispositivoIdAtivo && (
+        {selectedDevice && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Preferências de Notificação</Text>
             {loadingPrefs ? (
@@ -425,15 +431,18 @@ export function NotificationsScreen() {
           </View>
         )}
 
-        {/* Empty state when no vehicle selected */}
-        {!dispositivoIdAtivo && !loadingVeiculos && (
-          <View style={styles.emptyState}>
-            <Icon source="bell-outline" size={48} color={colors.textMuted} />
-            <Text style={styles.emptyTitle}>Nenhum veículo selecionado</Text>
-            <Text style={styles.emptyText}>Selecione um veículo acima para configurar as notificações.</Text>
-          </View>
-        )}
       </ScrollView>
+
+      <SearchBottomSheet
+        visible={vehicleSelectorVisible}
+        devices={veiculos}
+        title="Selecione o veículo"
+        onClose={() => setVehicleSelectorVisible(false)}
+        onSelectDevice={(device) => {
+          setDispositivoIdAtivo(device.dispositivoId);
+          setVehicleSelectorVisible(false);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -444,6 +453,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
+    flexGrow: 1,
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
@@ -455,6 +465,87 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.text,
     marginBottom: spacing.md,
+  },
+  switchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  switchBarInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  switchBarName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  switchBarPlate: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  switchBarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: '#fff7e3',
+  },
+  switchBarBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  selectEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  selectEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.text,
+    marginTop: spacing.xs,
+  },
+  selectEmptySubtitle: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  selectEmptyBtn: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  selectEmptyBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primaryText,
+  },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   vehicleSelector: {
     flexDirection: 'row',
@@ -475,18 +566,6 @@ const styles = StyleSheet.create({
   },
   vehicleList: {
     maxHeight: 300,
-  },
-  vehicleSearchInput: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.surface,
-  },
-  vehicleEmptyText: {
-    fontSize: 13,
-    color: colors.textMuted,
-    textAlign: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
   },
   vehicleItem: {
     paddingVertical: spacing.md,
@@ -642,9 +721,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   emptyState: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   emptyTitle: {
     fontSize: 15,
