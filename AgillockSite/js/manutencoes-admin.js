@@ -76,6 +76,10 @@
       return;
     }
     if (window.jQuery && window.jQuery.fn && window.jQuery.fn.modal) {
+      if (!$('.modal.in').length) {
+        $('body').removeClass('modal-open');
+        $('.modal-backdrop').remove();
+      }
       window.jQuery(el).modal('show');
       return;
     }
@@ -385,15 +389,11 @@
     $('#modalFeito').on('hidden.bs.modal', function () { recorrenciaFeitoId = null; document.getElementById('feito-notas').value = ''; });
     $('#modalRecorrenciaData').on('hidden.bs.modal', function () {
       editandoRecDataId = null;
-      $('body').removeClass('modal-open');
-      $('.modal-backdrop').remove();
     });
     $('#modalFeitoData').on('hidden.bs.modal', function () {
       recorrenciaDataFeitoId = null;
       var el = document.getElementById('feito-data-notas');
       if (el) el.value = '';
-      $('body').removeClass('modal-open');
-      $('.modal-backdrop').remove();
     });
   }
 
@@ -577,7 +577,7 @@
   window._abrirFeito = function (id, titulo) {
     recorrenciaFeitoId = id;
     document.getElementById('feito-titulo-label').textContent = titulo;
-    $('#modalFeito').modal('show');
+    abrirModalBootstrap('modalFeito');
   };
 
   window._editarRegistro = function (id) {
@@ -1081,7 +1081,7 @@
     recorrenciaDataFeitoId = id;
     document.getElementById('feito-data-msg').textContent = 'Confirmar que "' + titulo + '" foi realizado? Um registro será criado automaticamente.';
     document.getElementById('feito-data-notas').value = '';
-    $('#modalFeitoData').modal('show');
+    abrirModalBootstrap('modalFeitoData');
   };
 
   async function salvarRecorrenciaData() {

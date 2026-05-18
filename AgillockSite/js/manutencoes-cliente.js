@@ -78,6 +78,10 @@
       return;
     }
     if (window.jQuery && window.jQuery.fn && window.jQuery.fn.modal) {
+      if (!$('.modal.in').length) {
+        $('body').removeClass('modal-open');
+        $('.modal-backdrop').remove();
+      }
       window.jQuery(el).modal('show');
       return;
     }
@@ -268,15 +272,11 @@
     $('#modalFeito').on('hidden.bs.modal', resetModalFeito);
     $('#modalRecorrenciaData').on('hidden.bs.modal', function () {
       editandoRecDataId = null;
-      $('body').removeClass('modal-open');
-      $('.modal-backdrop').remove();
     });
     $('#modalFeitoData').on('hidden.bs.modal', function () {
       recorrenciaDataFeitoId = null;
       var el = document.getElementById('cfeito-data-notas');
       if (el) el.value = '';
-      $('body').removeClass('modal-open');
-      $('.modal-backdrop').remove();
     });
   }
 
@@ -554,7 +554,7 @@
     if (!podeGerenciarManutencao()) return;
     recorrenciaFeitoId = id;
     document.getElementById('feito-titulo-label').textContent = titulo;
-    $('#modalFeito').modal('show');
+    abrirModalBootstrap('modalFeito');
   };
 
   window._confirmarExcluir = function (id, tipo) {
@@ -864,6 +864,8 @@
     editandoRecDataId = null;
     document.getElementById('cmodalRecData-title').textContent = 'Nova Recorrência por Data';
     document.getElementById('cbtn-salvar-recdata-label').textContent = 'Criar Recorrência';
+    const veiculoEl = document.getElementById('cmodalRecData-veiculo');
+    if (veiculoEl) { const txt = textoVeiculoModal(); veiculoEl.textContent = txt ? ' — ' + txt : ''; }
     ['crecdata-titulo','crecdata-descricao'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('crecdata-tipo').value = 'AVULSA';
     canalParaCheckboxes('todos', 'crecdata-');
@@ -880,6 +882,8 @@
     editandoRecDataId = id;
     document.getElementById('cmodalRecData-title').textContent = 'Editar Recorrência por Data';
     document.getElementById('cbtn-salvar-recdata-label').textContent = 'Salvar Alterações';
+    const veiculoEl = document.getElementById('cmodalRecData-veiculo');
+    if (veiculoEl) { const txt = textoVeiculoModal(); veiculoEl.textContent = txt ? ' — ' + txt : ''; }
     document.getElementById('crecdata-titulo').value = r.titulo || '';
     document.getElementById('crecdata-descricao').value = r.descricao || '';
     document.getElementById('crecdata-tipo').value = r.tipoRecorrencia || 'AVULSA';
@@ -900,7 +904,7 @@
     recorrenciaDataFeitoId = id;
     document.getElementById('cfeito-data-msg').textContent = 'Confirmar que "' + titulo + '" foi realizado?';
     document.getElementById('cfeito-data-notas').value = '';
-    $('#modalFeitoData').modal('show');
+    abrirModalBootstrap('modalFeitoData');
   };
 
   async function _salvarRecDataCliente() {

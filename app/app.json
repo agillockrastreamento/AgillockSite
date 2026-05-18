@@ -65,7 +65,8 @@
         {
           "locationWhenInUsePermission": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "apiUrl": "https://api.agillock.com.br/api",
