@@ -71,9 +71,12 @@ const DEFAULT_REGION = {
 
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'terrain', 'hybrid'];
 const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SCREEN_WIDTH = Dimensions.get('window').width;
 const MAIN_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.60);
 const MAIN_CARD_PEEK_HEIGHT = 76; // mostra apenas alça + header (nome/placa + X)
 const MAP_PREFERENCES_KEY = 'agillock_map_preferences_v1';
+const CLUSTER_PX = 40;
+const SPIDER_RADIUS_PX = 55;
 
 type QuickSheetMode = 'closed' | 'peek' | 'expanded';
 
@@ -103,6 +106,40 @@ function getDeviceCoordinate(device: TrackingDevice): LatLng | null {
   if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return { latitude, longitude };
+}
+
+function ClusterMarker({
+  lat,
+  lng,
+  count,
+  onPress,
+}: {
+  lat: number;
+  lng: number;
+  count: number;
+  onPress(): void;
+}) {
+  const [tracks, setTracks] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setTracks(false), 800);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <Marker
+      coordinate={{ latitude: lat, longitude: lng }}
+      anchor={{ x: 0.5, y: 0.5 }}
+      tracksViewChanges={tracks}
+      zIndex={500}
+      onPress={onPress}
+    >
+      <View style={styles.clusterBadgeWrap}>
+        <View style={styles.clusterShadow} />
+        <View style={styles.clusterBadge}>
+          <Text style={styles.clusterBadgeText}>{count}</Text>
+        </View>
+      </View>
+    </Marker>
+  );
 }
 
 function MapFloatingButton({ icon, active, onPress }: { icon: string; active?: boolean; onPress(): void }) {
@@ -162,6 +199,14 @@ export function MapScreen() {
   const [notificationsSheetVisible, setNotificationsSheetVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [layersDrawerVisible, setLayersDrawerVisible] = useState(false);
+  const [currentRegion, setCurrentRegion] = useState<{
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  }>(DEFAULT_REGION);
+  const [spiderClusterKey, setSpiderClusterKey] = useState<string | null>(null);
+  const lastSpiderInteractionRef = useRef(0);
   const mapPreferencesHydrated = useRef(false);
 
   // Main card animation
@@ -264,6 +309,97 @@ export function MapScreen() {
     () => buildTraccarDeviceIndex(devices),
     [devices],
   );
+
+  const pxToLatDeg = currentRegion.latitudeDelta / SCREEN_HEIGHT;
+  const pxToLngDeg = currentRegion.longitudeDelta / SCREEN_WIDTH;
+
+  const clusterGroups = useMemo(() => {
+    if (!locatedDevices.length) return [] as Array<{
+      key: string;
+      devices: TrackingDevice[];
+      lat: number;
+      lng: number;
+    }>;
+
+    const visited = new Set<string>();
+    const groups: Array<{
+      key: string;
+      devices: TrackingDevice[];
+      lat: number;
+      lng: number;
+    }> = [];
+
+    locatedDevices.forEach((device) => {
+      if (visited.has(device.dispositivoId)) return;
+      const baseCoord = getDeviceCoordinate(device);
+      if (!baseCoord) return;
+      const group: TrackingDevice[] = [device];
+      visited.add(device.dispositivoId);
+      locatedDevices.forEach((other) => {
+        if (visited.has(other.dispositivoId)) return;
+        const otherCoord = getDeviceCoordinate(other);
+        if (!otherCoord) return;
+        const dxPx = (otherCoord.longitude - baseCoord.longitude) / (pxToLngDeg || 1);
+        const dyPx = (otherCoord.latitude - baseCoord.latitude) / (pxToLatDeg || 1);
+        if (Math.hypot(dxPx, dyPx) <= CLUSTER_PX) {
+          group.push(other);
+          visited.add(other.dispositivoId);
+        }
+      });
+      const lat = group.reduce((s, d) => s + (d.posicao?.latitude ?? 0), 0) / group.length;
+      const lng = group.reduce((s, d) => s + (d.posicao?.longitude ?? 0), 0) / group.length;
+      const key = group.map((d) => d.dispositivoId).sort().join('|');
+      groups.push({ key, devices: group, lat, lng });
+    });
+
+    return groups;
+  }, [locatedDevices, pxToLatDeg, pxToLngDeg]);
+
+  const spiderPositions = useMemo(() => {
+    if (!spiderClusterKey) return null;
+    const cluster = clusterGroups.find((g) => g.key === spiderClusterKey);
+    if (!cluster || cluster.devices.length < 2) return null;
+    return cluster.devices.map((device, index) => {
+      const angle = (2 * Math.PI * index) / cluster.devices.length - Math.PI / 2;
+      const offsetLng = SPIDER_RADIUS_PX * Math.cos(angle) * pxToLngDeg;
+      const offsetLat = -SPIDER_RADIUS_PX * Math.sin(angle) * pxToLatDeg;
+      return {
+        device,
+        latitude: cluster.lat + offsetLat,
+        longitude: cluster.lng + offsetLng,
+        centerLat: cluster.lat,
+        centerLng: cluster.lng,
+      };
+    });
+  }, [spiderClusterKey, clusterGroups, pxToLatDeg, pxToLngDeg]);
+
+  const handleRegionChangeComplete = useCallback(
+    (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => {
+      setCurrentRegion(region);
+      // onRegionChangeComplete às vezes dispara logo depois de re-renderizar
+      // os marcadores. Não fechamos o spider nessa janela.
+      if (Date.now() - lastSpiderInteractionRef.current < 1200) return;
+      setSpiderClusterKey(null);
+    },
+    [],
+  );
+
+  const handleMapPress = useCallback(() => {
+    // No Android, o onPress do MapView dispara em sequência ao onPress do
+    // Marker; ignoramos qualquer toque que chegue logo após abrir o spider.
+    if (Date.now() - lastSpiderInteractionRef.current < 1200) return;
+    setSpiderClusterKey(null);
+  }, []);
+
+  const openSpider = useCallback((key: string) => {
+    lastSpiderInteractionRef.current = Date.now();
+    setSpiderClusterKey(key);
+  }, []);
+
+  const closeSpiderFromMarker = useCallback(() => {
+    lastSpiderInteractionRef.current = Date.now();
+    setSpiderClusterKey(null);
+  }, []);
 
   const animateToDevice = useCallback((device: TrackingDevice, cardHeight: number) => {
     const coordinate = getDeviceCoordinate(device);
@@ -700,45 +836,103 @@ export function MapScreen() {
         initialRegion={DEFAULT_REGION}
         showsUserLocation
         showsMyLocationButton={false}
+        onRegionChangeComplete={handleRegionChangeComplete}
+        onPress={handleMapPress}
       >
-        {locatedDevices.map((device) => {
-          const coordinate = getDeviceCoordinate(device);
-          if (!coordinate) return null;
-          const bitmapUri = getBitmap(device);
-          return (
-            <Marker
-              key={device.dispositivoId}
-              coordinate={coordinate}
-              image={bitmapUri ? { uri: bitmapUri } : undefined}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={!bitmapUri}
-              onPress={() => focusDevice(device, true)}
-            >
-              {!bitmapUri ? (
-                <View style={styles.markerContainer}>
-                  <View style={styles.markerWrap}>
-                    <VehicleIcon
-                      categoria={device.categoria}
-                      color={getMarkerColor(device)}
-                      course={device.posicao?.curso}
-                      size={58}
-                    />
-                  </View>
-                  {showLabels ? (
-                    <View style={styles.markerLabelWrap}>
-                      <View style={styles.markerLabelPointer} />
-                      <View style={styles.markerLabel}>
-                        <Text style={styles.markerLabelText} numberOfLines={1}>
-                          {device.placa ?? device.nome}
-                        </Text>
-                      </View>
+        {(() => {
+          const renderDeviceMarker = (
+            device: TrackingDevice,
+            coord: LatLng,
+            isSpiderMarker: boolean,
+          ) => {
+            const bitmapUri = getBitmap(device);
+            return (
+              <Marker
+                key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}`}
+                coordinate={coord}
+                image={bitmapUri ? { uri: bitmapUri } : undefined}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={!bitmapUri}
+                zIndex={isSpiderMarker ? 1000 : 100}
+                onPress={() => {
+                  if (isSpiderMarker) closeSpiderFromMarker();
+                  focusDevice(device, true);
+                }}
+              >
+                {!bitmapUri ? (
+                  <View style={styles.markerContainer}>
+                    <View style={styles.markerWrap}>
+                      <VehicleIcon
+                        categoria={device.categoria}
+                        color={getMarkerColor(device)}
+                        course={device.posicao?.curso}
+                        size={58}
+                      />
                     </View>
-                  ) : null}
-                </View>
-              ) : null}
-            </Marker>
-          );
-        })}
+                    {showLabels ? (
+                      <View style={styles.markerLabelWrap}>
+                        <View style={styles.markerLabelPointer} />
+                        <View style={styles.markerLabel}>
+                          <Text style={styles.markerLabelText} numberOfLines={1}>
+                            {device.placa ?? device.nome}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+              </Marker>
+            );
+          };
+
+          if (mainCardVisible && selectedDevice) {
+            const coord = getDeviceCoordinate(selectedDevice);
+            return coord ? renderDeviceMarker(selectedDevice, coord, false) : null;
+          }
+
+          return clusterGroups.flatMap((group) => {
+            const isCluster = group.devices.length > 1;
+            const isSpider = isCluster && spiderClusterKey === group.key;
+
+            if (isCluster && !isSpider) {
+              return [
+                <ClusterMarker
+                  key={`cluster-${group.key}`}
+                  lat={group.lat}
+                  lng={group.lng}
+                  count={group.devices.length}
+                  onPress={() => openSpider(group.key)}
+                />,
+              ];
+            }
+
+            if (isCluster && isSpider && spiderPositions) {
+              return spiderPositions.map((sp) =>
+                renderDeviceMarker(sp.device, { latitude: sp.latitude, longitude: sp.longitude }, true),
+              );
+            }
+
+            const device = group.devices[0];
+            const coord = getDeviceCoordinate(device);
+            return coord ? [renderDeviceMarker(device, coord, false)] : [];
+          });
+        })()}
+
+        {!mainCardVisible && spiderPositions
+          ? spiderPositions.map((sp) => (
+              <Polyline
+                key={`spider-line-${sp.device.dispositivoId}`}
+                coordinates={[
+                  { latitude: sp.centerLat, longitude: sp.centerLng },
+                  { latitude: sp.latitude, longitude: sp.longitude },
+                ]}
+                strokeColor="rgba(102,102,102,0.65)"
+                strokeWidth={1.5}
+                lineDashPattern={[4, 4]}
+                zIndex={400}
+              />
+            ))
+          : null}
 
         {showFences && geofences.map((geofence) => {
           const parsed = parseCircleArea(geofence.area);
@@ -1113,6 +1307,37 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 11,
     fontWeight: '800',
+  },
+  clusterBadgeWrap: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  clusterShadow: {
+    position: 'absolute',
+    top: 8,
+    left: 4,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+  },
+  clusterBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
+    borderColor: '#fff',
+    backgroundColor: '#8e44ad',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clusterBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   geofenceTapTarget: {
     width: 28,
