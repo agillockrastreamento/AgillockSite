@@ -35,6 +35,7 @@ type Props = {
   visible: boolean;
   title?: string;
   titleMainVehicleCard?: string;
+  subtitle?: string;
   children: ReactNode;
   heightPercent?: number;
   dimBackdrop?: boolean;
@@ -47,6 +48,7 @@ export function BottomSheet({
   visible,
   title,
   titleMainVehicleCard,
+  subtitle,
   children,
   heightPercent = 0.8,
   dimBackdrop = true,
@@ -99,12 +101,15 @@ export function BottomSheet({
   const panResponder = useMemo(
     () =>
       PanResponder.create({
+        // Claim normal no touch start (preserva drag-to-dismiss desde o início
+        // do toque), mas SEM capturar de filhos/irmãos — assim toques no X e
+        // outros botões adjacentes não são roubados pelo PanResponder.
         onStartShouldSetPanResponder: () => true,
-        onStartShouldSetPanResponderCapture: () => true,
+        onStartShouldSetPanResponderCapture: () => false,
         onMoveShouldSetPanResponder: (_event, gestureState) =>
           gestureState.dy > 6 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onMoveShouldSetPanResponderCapture: (_event, gestureState) =>
-          gestureState.dy > 3 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+          gestureState.dy > 6 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderTerminationRequest: () => false,
         onPanResponderMove: (_event, gestureState) => {
           translateY.setValue(Math.max(gestureState.dy, 0));
@@ -234,6 +239,11 @@ export function BottomSheet({
               ) : (
                 <Text style={styles.titleMainVehicleCard}>{titleMainVehicleCard}</Text>
               )}
+              {subtitle ? (
+                <Text style={styles.subtitle} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              ) : null}
             </View>
             <IconButton icon="close" size={22} onPress={close} />
           </View>
@@ -299,5 +309,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     marginLeft: -10,
+  },
+  subtitle: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

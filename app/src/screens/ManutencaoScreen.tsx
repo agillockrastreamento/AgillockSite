@@ -702,6 +702,9 @@ export function ManutencaoScreen() {
   };
 
   const selectedDevice = dispositivos.find(d => d.dispositivoId === selectedId);
+  const deviceSubtitle = selectedDevice
+    ? `(${selectedDevice.nome}${selectedDevice.placa ? ` — ${selectedDevice.placa}` : ''})`
+    : undefined;
   const totalProgramadas = recorrencias.length + recorrenciasData.length;
 
   return (
@@ -1160,9 +1163,10 @@ export function ManutencaoScreen() {
           resetRecorrenciaForm();
         }}
         title={editingRecorrenciaId ? 'Editar Manutenção Programada' : 'Nova Manutenção por KM'}
+        subtitle={deviceSubtitle}
         heightPercent={0.72}
       >
-        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
             style={styles.formInput}
@@ -1216,9 +1220,10 @@ export function ManutencaoScreen() {
           resetRecDataForm();
         }}
         title={editingRecDataId ? 'Editar Recorrência por Data' : 'Nova Recorrência por Data'}
+        subtitle={deviceSubtitle}
         heightPercent={0.88}
       >
-        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
             style={styles.formInput}
@@ -1229,7 +1234,7 @@ export function ManutencaoScreen() {
           />
 
           <Text style={styles.formLabel}>Tipo de Recorrência *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
             {TIPOS_REC_DATA.map(t => (
               <Pressable
                 key={t.value}
@@ -1349,7 +1354,7 @@ export function ManutencaoScreen() {
           {formRecData.tipoRecorrencia === 'ANUAL' && (
             <>
               <Text style={styles.formLabel}>Mês *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
                 {MESES_ABREV.map((mes, idx) => {
                   const num = idx + 1;
                   const ativo = formRecData.mesDoAno === String(num);
@@ -1401,9 +1406,10 @@ export function ManutencaoScreen() {
           resetRegistroForm();
         }}
         title={editingRegistroId ? 'Editar Registro de Manutenção' : 'Novo Registro de Manutenção'}
+        subtitle={deviceSubtitle}
         heightPercent={0.88}
       >
-        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
           <Text style={styles.formLabel}>Título *</Text>
           <TextInput
             style={styles.formInput}
@@ -1414,7 +1420,7 @@ export function ManutencaoScreen() {
           />
 
           <Text style={styles.formLabel}>Tipo</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
             {TIPOS_MANUTENCAO.map(t => (
               <Pressable
                 key={t.value}
@@ -1427,7 +1433,7 @@ export function ManutencaoScreen() {
           </ScrollView>
 
           <Text style={styles.formLabel}>Base do histórico</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tiposScroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
             {BASES_HISTORICO.map(t => (
               <Pressable
                 key={t.value}
