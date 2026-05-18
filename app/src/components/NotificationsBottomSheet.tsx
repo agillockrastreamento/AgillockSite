@@ -115,11 +115,13 @@ export function NotificationsBottomSheet({
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(new Set());
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
 
-  // Reseta filtro de dispositivos quando o sheet fecha
+  // Reseta filtros quando o sheet fecha — ao reabrir volta para "Hoje" e sem
+  // dispositivos selecionados.
   useEffect(() => {
     if (!visible) {
       setSelectedDeviceIds(new Set());
       setSearchSheetVisible(false);
+      setPeriod('hoje');
     }
   }, [visible]);
 
