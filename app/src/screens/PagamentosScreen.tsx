@@ -73,10 +73,24 @@ function getDueDate(boleto: Boleto) {
   return boleto.dataVencimento ?? boleto.vencimento;
 }
 
-function isOverdue(venc: string | null | undefined) {
-  if (!venc) return false;
+function startOfTodayBrasil(): Date {
+  const isoToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  return new Date(`${isoToday}T00:00:00-03:00`);
+}
+
+function dueDateAsBrasilDate(venc: string | null | undefined): Date | null {
+  if (!venc) return null;
   const date = new Date(venc);
-  return !Number.isNaN(date.getTime()) && date < new Date();
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function isDueToday(venc: string | null | undefined) {
+  const date = dueDateAsBrasilDate(venc);
+  if (!date) return false;
+  const dateIso = date.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  return dateIso === todayIso;
 }
 
 export function PagamentosScreen() {
@@ -226,8 +240,9 @@ function BoletoCard({ boleto }: { boleto: Boleto }) {
   const statusColor = STATUS_COLORS[boleto.status] ?? '#95a5a6';
   const statusLabel = STATUS_LABELS[boleto.status] ?? boleto.status;
   const dueDate = getDueDate(boleto);
-  const overdue = boleto.status === 'PENDENTE' && isOverdue(dueDate);
-  const displayColor = overdue ? '#e74c3c' : statusColor;
+  const dueToday = boleto.status === 'PENDENTE' && isDueToday(dueDate);
+  const displayColor = dueToday ? '#f1c40f' : statusColor;
+  const displayLabel = dueToday ? 'Hoje' : statusLabel;
 
   const placaDisplay =
     (boleto.dispositivo?.placa || boleto.dispositivo?.nome) ??
@@ -250,7 +265,7 @@ function BoletoCard({ boleto }: { boleto: Boleto }) {
             </View>
           ) : null}
           <View style={[styles.statusBadge, { backgroundColor: displayColor }]}>
-            <Text style={styles.statusBadgeText}>{overdue ? 'Atrasado' : statusLabel}</Text>
+            <Text style={styles.statusBadgeText}>{displayLabel}</Text>
           </View>
         </View>
         <View style={styles.boletoRight}>

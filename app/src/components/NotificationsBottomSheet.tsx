@@ -29,6 +29,9 @@ const EVENTO_TYPES = [
   { tipo: 'recorrenciaDataAlerta', label: 'Alerta de Recorrência por Data', color: '#8e44ad', icon: 'calendar-clock' },
   { tipo: 'recorrenciaDataNaoFeita', label: 'Recorrência por Data Atrasada', color: '#e74c3c', icon: 'calendar-remove' },
   { tipo: 'recorrenciaDataFeita', label: 'Recorrência por Data Realizada', color: '#27ae60', icon: 'calendar-check' },
+  { tipo: 'boletoVencendoHoje', label: 'Boleto Vence Hoje', color: '#f1c40f', icon: 'cash-clock' },
+  { tipo: 'boletoAtrasado', label: 'Boleto em Atraso', color: '#e74c3c', icon: 'cash-remove' },
+  { tipo: 'pagamentoRecebido', label: 'Pagamento Recebido', color: '#27ae60', icon: 'cash-check' },
 ];
 
 type PeriodFilter = 'hoje' | 'ontem' | '7dias' | 'custom';
@@ -418,7 +421,7 @@ export function NotificationsBottomSheet({
                           }
                           
                           if (!address) {
-                            return <Text style={styles.noCoords}>Localização indisponível</Text>;
+                            return null;
                           }
                           
                           const finalLat = eventLat ?? deviceLatLng?.lat ?? null;

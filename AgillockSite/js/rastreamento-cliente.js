@@ -87,6 +87,9 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'recorrenciaDataAlerta',   label: 'Alerta de Recorrência Data',  css: 'tipo-manutencao-alerta'   },
   { tipo: 'recorrenciaDataNaoFeita', label: 'Recorrência Data Atrasada',   css: 'tipo-manutencao-atrasada' },
   { tipo: 'recorrenciaDataFeita',    label: 'Recorrência Data Realizada',  css: 'tipo-ignition'            },
+  { tipo: 'boletoVencendoHoje',      label: 'Boleto Vence Hoje',           css: 'tipo-manutencao-alerta'   },
+  { tipo: 'boletoAtrasado',          label: 'Boleto em Atraso',            css: 'tipo-manutencao-atrasada' },
+  { tipo: 'pagamentoRecebido',       label: 'Pagamento Recebido',          css: 'tipo-ignition'            },
 ];
 const TIPOS_EVENTO_CLIENTE_FILTRO = TIPOS_EVENTO_CLIENTE.filter(t => t.tipo !== 'manutencao');
 
@@ -749,6 +752,9 @@ function renderEventosLista() {
       case 'manutencao': case 'manutencaoAlerta': return { cls: 'warning', color: '#e67e22', icon: 'fa-wrench' };
       case 'manutencaoAtrasada': return { cls: 'danger', color: '#e74c3c', icon: 'fa-wrench' };
       case 'manutencaoFeita': return { cls: 'success', color: '#27ae60', icon: 'fa-check-circle' };
+      case 'boletoVencendoHoje': return { cls: 'warning', color: '#f1c40f', icon: 'fa-clock-o' };
+      case 'boletoAtrasado': return { cls: 'danger', color: '#e74c3c', icon: 'fa-exclamation-triangle' };
+      case 'pagamentoRecebido': return { cls: 'success', color: '#27ae60', icon: 'fa-check-circle' };
       default: return { cls: 'info', color: '#2980b9', icon: 'fa-bell' };
     }
   };
@@ -764,7 +770,8 @@ function renderEventosLista() {
     const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
     const v = veiculosMap[e.dispositivoId];
-    const nomeDev = v ? v.nome : (e.dispositivoNome || '—');
+    const semDispositivo = !e.dispositivoId;
+    const nomeDev = v ? v.nome : (e.dispositivoNome || (semDispositivo ? (e.tipoLabel || _rotuloTipoEventoCliente(e.tipo)) : '—'));
     const placaDev = v?.placa ? `(${v.placa})` : (e.dispositivoPlaca ? `(${e.dispositivoPlaca})` : '');
     const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
 
@@ -825,11 +832,12 @@ window.clicarEvento = function (idx) {
 
   const style = (() => {
     switch (e.tipo) {
-      case 'ignitionOn': case 'deviceUnlocked': return { color: '#27ae60' };
+      case 'ignitionOn': case 'deviceUnlocked': case 'pagamentoRecebido': return { color: '#27ae60' };
       case 'ignitionOff': return { color: '#e67e22' };
-      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': case 'manutencaoAtrasada': return { color: '#e74c3c' };
+      case 'overspeed': case 'powerCut': case 'alarm': case 'deviceLocked': case 'kmExcedida': case 'manutencaoAtrasada': case 'boletoAtrasado': return { color: '#e74c3c' };
       case 'manutencaoAlerta': return { color: '#e67e22' };
       case 'manutencaoFeita': return { color: '#27ae60' };
+      case 'boletoVencendoHoje': return { color: '#f1c40f' };
       default: return { color: '#2980b9' };
     }
   })();
