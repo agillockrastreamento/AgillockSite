@@ -2134,7 +2134,8 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
 function buildOleoStatusHtml(p, v) {
   const recs = v?._recorrencias;
   if (!recs || !recs.length) return '';
-  const podeGerenciar = !!v?.podeGerenciarManutencao;
+  const podeGerenciar = !!v?.podeGerenciarManutencao
+    && (window.AL_CLIENTE?.can ? window.AL_CLIENTE.can('rastreamento.marcarManutencaoRecorrenteFeita') : true);
   const isDark = document.documentElement.classList.contains('dark-theme');
   const btnBg = isDark ? '#2d3748' : '#e9ecef';
   const btnBd = isDark ? '#4a5568' : '#ccc';
@@ -2165,7 +2166,8 @@ function buildOleoStatusHtml(p, v) {
 function buildDataRecorrenciasHtml(v) {
   const recs = v?._recorrenciasData;
   if (!recs || !recs.length) return '';
-  const podeGerenciar = !!v?.podeGerenciarManutencao;
+  const podeGerenciar = !!v?.podeGerenciarManutencao
+    && (window.AL_CLIENTE?.can ? window.AL_CLIENTE.can('rastreamento.marcarRecorrenciaDataFeita') : true);
   const isDark = document.documentElement.classList.contains('dark-theme');
   const btnBg = isDark ? '#2d3748' : '#e9ecef';
   const btnBd = isDark ? '#4a5568' : '#ccc';
@@ -3087,11 +3089,19 @@ function _aplicarPermissoesRastreamentoUI() {
   const btnPainelEventos = document.querySelector('[data-toggle-eventos], .btn-eventos-toggle');
   if (btnPainelEventos) btnPainelEventos.style.display = can('rastreamento.verEventos') ? '' : 'none';
 
-  // Camada de cercas (controle do mapa)
-  const ctrlCercas = document.querySelector('.map-layers-ctrl [data-layer="cercas"]');
-  if (ctrlCercas) ctrlCercas.style.display = (can('rastreamento.verCerca') || can('rastreamento.criarCerca')) ? '' : 'none';
+  // Camada de cercas (controle do mapa) — seletor real `#ml-cercas`
+  const mlCercas = document.getElementById('ml-cercas');
+  if (mlCercas) {
+    const mostrarCamadaCerca = can('rastreamento.verCerca') || can('rastreamento.criarCerca');
+    mlCercas.style.display = mostrarCamadaCerca ? '' : 'none';
+  }
 
-  // Botões de criação de cerca no card / diálogo
+  // Botão de criar/gerenciar cerca no card do veículo focado (.dcard-acao[data-acao="cerca"])
+  document.querySelectorAll('.dcard-acao[data-acao="cerca"]').forEach(b => {
+    b.style.display = can('rastreamento.criarCerca') ? '' : 'none';
+  });
+
+  // Outras variações de botão de criar cerca
   document.querySelectorAll('[data-perm-criarCerca], .btn-criar-cerca, .btn-cerca-criar').forEach(b => {
     b.style.display = can('rastreamento.criarCerca') ? '' : 'none';
   });

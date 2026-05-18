@@ -5,6 +5,7 @@ import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
 import { GeofenceCreateModal } from '../components/GeofenceCreateModal';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
+import { useAuth } from '../auth/AuthProvider';
 import { resolveUploadUrl } from '../profile/profileService';
 import { apiRequest } from '../services/api/apiClient';
 import { environment } from '../config/environment';
@@ -178,6 +179,13 @@ export function MainVehicleCard({
 }) {
   const toast = useToast();
   const confirm = useConfirmDialog();
+  const { can } = useAuth();
+  const canBloquear = can('rastreamento.bloquear');
+  const canDesbloquear = can('rastreamento.desbloquear');
+  const canCriarCerca = can('rastreamento.criarCerca');
+  const canUploadFoto = can('rastreamento.uploadFoto');
+  const canMarcarManutFeita = can('rastreamento.marcarManutencaoRecorrenteFeita');
+  const canMarcarRecDataFeita = can('rastreamento.marcarRecorrenciaDataFeita');
   const [summary, setSummary] = useState<{
     km: string;
     velMax: string;
@@ -468,16 +476,18 @@ export function MainVehicleCard({
             </View>
           )}
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Alterar foto do veículo"
-          onPress={onUploadPhoto}
-          disabled={isUploading}
-          hitSlop={8}
-          style={styles.coverCameraBadge}
-        >
-          <Icon source="camera" size={16} color={colors.primaryText} />
-        </Pressable>
+        {canUploadFoto ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Alterar foto do veículo"
+            onPress={onUploadPhoto}
+            disabled={isUploading}
+            hitSlop={8}
+            style={styles.coverCameraBadge}
+          >
+            <Icon source="camera" size={16} color={colors.primaryText} />
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.mainBody}>
@@ -545,7 +555,7 @@ export function MainVehicleCard({
                     : `Faltam ${kmRestante.toLocaleString('pt-BR')} km para ${r.titulo}`}
                 </Text>
               </View>
-              {device.podeGerenciarManutencao ? (
+              {device.podeGerenciarManutencao && canMarcarManutFeita ? (
                 <Pressable style={styles.alertBtn} onPress={() => markMaintenanceDone(r.id, r.titulo)}>
                   <Icon source="check" size={12} color={colors.textMuted} />
                 </Pressable>
@@ -571,7 +581,7 @@ export function MainVehicleCard({
                     : `Hoje: ${r.titulo}`}
                 </Text>
               </View>
-              {device.podeGerenciarManutencao ? (
+              {device.podeGerenciarManutencao && canMarcarRecDataFeita ? (
                 <Pressable style={styles.alertBtn} onPress={() => markDateRecurrenceDone(r.id, r.titulo)}>
                   <Icon source="check" size={12} color={colors.textMuted} />
                 </Pressable>
@@ -611,32 +621,38 @@ export function MainVehicleCard({
           </View>
         ) : null}
 
-        <View style={styles.commandsGrid}>
-          <Pressable
-            style={[styles.cmdBtn, styles.cmdBtnDanger, isSendingCommand && styles.cmdBtnDisabled]}
-            onPress={() => sendCommand('engineStop')}
-            disabled={isSendingCommand}
-          >
-            {isSendingCommand ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Icon source="lock" size={14} color="#fff" />
-            )}
-            <Text style={styles.cmdBtnText}>Bloquear</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.cmdBtn, styles.cmdBtnSuccess, isSendingCommand && styles.cmdBtnDisabled]}
-            onPress={() => sendCommand('engineResume')}
-            disabled={isSendingCommand}
-          >
-            {isSendingCommand ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Icon source="lock-open" size={14} color="#fff" />
-            )}
-            <Text style={styles.cmdBtnText}>Desbloquear</Text>
-          </Pressable>
-        </View>
+        {canBloquear || canDesbloquear ? (
+          <View style={styles.commandsGrid}>
+            {canBloquear ? (
+              <Pressable
+                style={[styles.cmdBtn, styles.cmdBtnDanger, isSendingCommand && styles.cmdBtnDisabled]}
+                onPress={() => sendCommand('engineStop')}
+                disabled={isSendingCommand}
+              >
+                {isSendingCommand ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Icon source="lock" size={14} color="#fff" />
+                )}
+                <Text style={styles.cmdBtnText}>Bloquear</Text>
+              </Pressable>
+            ) : null}
+            {canDesbloquear ? (
+              <Pressable
+                style={[styles.cmdBtn, styles.cmdBtnSuccess, isSendingCommand && styles.cmdBtnDisabled]}
+                onPress={() => sendCommand('engineResume')}
+                disabled={isSendingCommand}
+              >
+                {isSendingCommand ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Icon source="lock-open" size={14} color="#fff" />
+                )}
+                <Text style={styles.cmdBtnText}>Desbloquear</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.actionsSection}>
           <Text style={styles.actionsTitle}>AÇÕES</Text>
@@ -653,29 +669,31 @@ export function MainVehicleCard({
               </View>
               <Text style={styles.actionText}>Compartilhar</Text>
             </Pressable>
-            <Pressable
-              style={styles.actionBtn}
-              onPress={handleCercaPress}
-            >
-              <View style={[
-                styles.actionIconWrap,
-                deviceGeofences.length > 0 && styles.actionIconWrapCercaAtiva,
-              ]}>
-                <Icon
-                  source={deviceGeofences.length > 0 ? 'circle-slice-8' : 'circle-outline'}
-                  size={18}
-                  color={deviceGeofences.length > 0 ? '#fff' : '#555'}
-                />
-                {isCreatingGeofence && (
-                  <View style={styles.actionLoading}>
-                    <ActivityIndicator size="small" color="#f39c12" />
-                  </View>
-                )}
-              </View>
-              <Text style={[styles.actionText, deviceGeofences.length > 0 && styles.actionTextCercaAtiva]}>
-                {deviceGeofences.length > 0 ? 'Cerca Ativa' : 'Cerca'}
-              </Text>
-            </Pressable>
+            {canCriarCerca ? (
+              <Pressable
+                style={styles.actionBtn}
+                onPress={handleCercaPress}
+              >
+                <View style={[
+                  styles.actionIconWrap,
+                  deviceGeofences.length > 0 && styles.actionIconWrapCercaAtiva,
+                ]}>
+                  <Icon
+                    source={deviceGeofences.length > 0 ? 'circle-slice-8' : 'circle-outline'}
+                    size={18}
+                    color={deviceGeofences.length > 0 ? '#fff' : '#555'}
+                  />
+                  {isCreatingGeofence && (
+                    <View style={styles.actionLoading}>
+                      <ActivityIndicator size="small" color="#f39c12" />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.actionText, deviceGeofences.length > 0 && styles.actionTextCercaAtiva]}>
+                  {deviceGeofences.length > 0 ? 'Cerca Ativa' : 'Cerca'}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 

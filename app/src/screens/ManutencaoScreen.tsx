@@ -24,6 +24,7 @@ import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
 import type { TrackingDevice } from '../tracking/trackingTypes';
+import { useAuth } from '../auth/AuthProvider';
 
 type Dispositivo = TrackingDevice & {
   manutencaoAtiva: boolean;
@@ -245,6 +246,13 @@ function descRecData(r: RecorrenciaData): string {
 export function ManutencaoScreen() {
   const toast = useToast();
   const confirm = useConfirmDialog();
+  const { can } = useAuth();
+  const canCriar = can('manutencao.criar');
+  const canCriarRecorrencia = can('manutencao.criarRecorrencia');
+  const canEditar = can('manutencao.editar');
+  const canExcluir = can('manutencao.excluir');
+  const canEditarRecorrencia = can('manutencao.editarRecorrencia');
+  const canMarcarFeita = can('manutencao.marcarFeita');
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
@@ -869,7 +877,7 @@ export function ManutencaoScreen() {
                       </View>
                       {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
                         <View style={styles.cardActions}>
-                          {r.origem !== 'ADMIN' ? (
+                          {r.origem !== 'ADMIN' && canEditarRecorrencia ? (
                             <>
                               <Pressable
                                 accessibilityRole="button"
@@ -889,14 +897,16 @@ export function ManutencaoScreen() {
                               </Pressable>
                             </>
                           ) : null}
-                          <Pressable
-                            accessibilityRole="button"
-                            style={styles.doneBtn}
-                            onPress={() => markDone(r)}
-                          >
-                            <Icon source="check-circle-outline" size={18} color={colors.success} />
-                            <Text style={styles.doneBtnText}>Feito</Text>
-                          </Pressable>
+                          {canMarcarFeita ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              style={styles.doneBtn}
+                              onPress={() => markDone(r)}
+                            >
+                              <Icon source="check-circle-outline" size={18} color={colors.success} />
+                              <Text style={styles.doneBtnText}>Feito</Text>
+                            </Pressable>
+                          ) : null}
                         </View>
                       )}
                     </View>
@@ -940,7 +950,7 @@ export function ManutencaoScreen() {
                       </View>
                       {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
                         <View style={styles.cardActions}>
-                          {r.origem !== 'ADMIN' ? (
+                          {r.origem !== 'ADMIN' && canEditarRecorrencia ? (
                             <>
                               <Pressable
                                 accessibilityRole="button"
@@ -960,14 +970,16 @@ export function ManutencaoScreen() {
                               </Pressable>
                             </>
                           ) : null}
-                          <Pressable
-                            accessibilityRole="button"
-                            style={styles.doneBtn}
-                            onPress={() => markDoneData(r)}
-                          >
-                            <Icon source="check-circle-outline" size={18} color={colors.success} />
-                            <Text style={styles.doneBtnText}>Feito</Text>
-                          </Pressable>
+                          {canMarcarFeita ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              style={styles.doneBtn}
+                              onPress={() => markDoneData(r)}
+                            >
+                              <Icon source="check-circle-outline" size={18} color={colors.success} />
+                              <Text style={styles.doneBtnText}>Feito</Text>
+                            </Pressable>
+                          ) : null}
                         </View>
                       )}
                     </View>
@@ -1042,20 +1054,24 @@ export function ManutencaoScreen() {
                       <View style={styles.cardActions}>
                         {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && r.origem !== 'ADMIN' ? (
                           <>
-                            <IconButton
-                              icon="pencil"
-                              size={18}
-                              iconColor="#2980b9"
-                              style={styles.deleteBtn}
-                              onPress={() => editRegistro(r)}
-                            />
-                            <IconButton
-                              icon="delete-outline"
-                              size={18}
-                              iconColor={colors.danger}
-                              style={styles.deleteBtn}
-                              onPress={() => deleteRegistro(r.id)}
-                            />
+                            {canEditar ? (
+                              <IconButton
+                                icon="pencil"
+                                size={18}
+                                iconColor="#2980b9"
+                                style={styles.deleteBtn}
+                                onPress={() => editRegistro(r)}
+                              />
+                            ) : null}
+                            {canExcluir ? (
+                              <IconButton
+                                icon="delete-outline"
+                                size={18}
+                                iconColor={colors.danger}
+                                style={styles.deleteBtn}
+                                onPress={() => deleteRegistro(r.id)}
+                              />
+                            ) : null}
                           </>
                         ) : null}
                         {hasExtra ? (
@@ -1089,8 +1105,10 @@ export function ManutencaoScreen() {
         </ScrollView>
       ))}
 
-      {/* FAB */}
-      {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva && (
+      {/* FAB — só aparece se a tela alvo tem permissão de criar */}
+      {selectedDevice?.podeGerenciarManutencao && selectedDevice?.manutencaoAtiva
+        && ((activeTab === 'recorrencias' && canCriarRecorrencia)
+          || (activeTab === 'registros' && canCriar)) && (
         <Pressable
           accessibilityRole="button"
           style={styles.fab}

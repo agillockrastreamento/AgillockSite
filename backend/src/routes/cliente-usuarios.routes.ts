@@ -29,11 +29,12 @@ router.get('/me/permissoes', async (req: ClienteRequest, res: Response): Promise
   });
 });
 
-// Tudo abaixo é restrito ao responsável
-router.use(requireResponsavel);
+// IMPORTANTE: NÃO usar `router.use(requireResponsavel)` aqui porque o middleware roda
+// para qualquer request que entre neste router (mesmo as não-correspondentes), bloqueando
+// rotas dos demais routers montados no mesmo prefixo `/api/cliente`. Aplique nas rotas.
 
 // GET /api/cliente/usuarios — lista sub-usuários do cliente atual
-router.get('/usuarios', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
 
   const usuarios = await prisma.clienteLogin.findMany({
@@ -61,7 +62,7 @@ router.get('/usuarios', async (req: ClienteRequest, res: Response): Promise<void
 });
 
 // GET /api/cliente/usuarios/:id — detalhe (para o form de edição)
-router.get('/usuarios/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const id = param(req, 'id');
 
@@ -126,7 +127,7 @@ async function validarDispositivos(
 }
 
 // POST /api/cliente/usuarios
-router.post('/usuarios', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.post('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const criadoPorLoginId = req.cliente!.sub;
   const body = req.body as PayloadUsuario;
@@ -183,7 +184,7 @@ router.post('/usuarios', async (req: ClienteRequest, res: Response): Promise<voi
 });
 
 // PUT /api/cliente/usuarios/:id
-router.put('/usuarios/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.put('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const id = param(req, 'id');
   const body = req.body as PayloadUsuario;
@@ -259,7 +260,7 @@ router.put('/usuarios/:id', async (req: ClienteRequest, res: Response): Promise<
 });
 
 // PATCH /api/cliente/usuarios/:id/status — toggle ativo
-router.patch('/usuarios/:id/status', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.patch('/usuarios/:id/status', requireResponsavel, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const id = param(req, 'id');
 
@@ -281,7 +282,7 @@ router.patch('/usuarios/:id/status', async (req: ClienteRequest, res: Response):
 });
 
 // DELETE /api/cliente/usuarios/:id
-router.delete('/usuarios/:id', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.delete('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const id = param(req, 'id');
 
@@ -300,7 +301,7 @@ router.delete('/usuarios/:id', async (req: ClienteRequest, res: Response): Promi
 
 // GET /api/cliente/usuarios-dispositivos — dispositivos disponíveis para vincular ao sub-usuário
 // (todos os dispositivos ativos do cliente). Helper exclusivo da tela Usuários.
-router.get('/usuarios-dispositivos', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.get('/usuarios-dispositivos', requireResponsavel, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const dispositivos = await prisma.dispositivo.findMany({
     where: { clienteId, ativo: true },

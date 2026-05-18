@@ -318,10 +318,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
     prisma.dispositivo.findMany({
       where: {
         ativo: true,
-        OR: [
-          { clienteId },
-          { clientesVinculados: { some: { clienteId } } },
-        ],
+        ...whereDispositivosDoCliente(req),
       },
       select: {
         id: true, nome: true, identificador: true, placa: true,
@@ -405,10 +402,7 @@ router.get('/rastreamento/dispositivos/:id/historico', async (req: ClienteReques
     where: {
       id: dispositivoId,
       ativo: true,
-      OR: [
-        { clienteId },
-        { clientesVinculados: { some: { clienteId } } },
-      ],
+      ...whereDispositivosDoCliente(req),
     },
     select: { id: true, nome: true, identificador: true, placa: true, categoria: true, ...DISPOSITIVO_MEDIDORES_SELECT },
   });
