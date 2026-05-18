@@ -84,17 +84,22 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     const tipo: 'responsavel' | 'vinculado' =
       clienteLogin.tipo === 'vinculado' ? 'vinculado' : 'responsavel';
 
+    // Sub-usuário usa o nome próprio (se cadastrado); responsável usa o nome do cliente.
+    const nomeExibicao = (tipo === 'vinculado' && clienteLogin.nome)
+      ? clienteLogin.nome
+      : clienteLogin.cliente.nome;
+
     const token = signClienteToken({
       sub: clienteLogin.id,
       clienteId: clienteLogin.cliente.id,
       role: 'CLIENTE',
       tipo,
-      nome: clienteLogin.cliente.nome,
+      nome: nomeExibicao,
     });
 
     res.json({
       token,
-      user: { id: clienteLogin.cliente.id, nome: clienteLogin.cliente.nome, email: clienteLogin.email, role: 'CLIENTE', tipo },
+      user: { id: clienteLogin.cliente.id, nome: nomeExibicao, email: clienteLogin.email, role: 'CLIENTE', tipo },
     });
     return;
   }
@@ -169,17 +174,19 @@ router.post('/cliente', async (req: Request, res: Response): Promise<void> => {
   const tipo: 'responsavel' | 'vinculado' =
     login.tipo === 'vinculado' ? 'vinculado' : 'responsavel';
 
+  const nomeExibicao = (tipo === 'vinculado' && login.nome) ? login.nome : login.cliente.nome;
+
   const token = signClienteToken({
     sub: login.id,
     clienteId: login.cliente.id,
     role: 'CLIENTE',
     tipo,
-    nome: login.cliente.nome,
+    nome: nomeExibicao,
   });
 
   res.json({
     token,
-    cliente: { id: login.cliente.id, nome: login.cliente.nome, tipo },
+    cliente: { id: login.cliente.id, nome: nomeExibicao, tipo },
   });
 });
 

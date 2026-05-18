@@ -59,16 +59,24 @@ const navigationTheme = {
 };
 
 function ClienteDrawerContent(props: DrawerContentComponentProps) {
-  const { user, signOut } = useAuth();
+  const { user, me, signOut } = useAuth();
   const toast = useToast();
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [profile, setProfile] = useState<ClientePerfil | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  // Sub-usuário (vinculado) não tem perfil próprio editável; apenas exibe nome.
+  const isResponsavel = (me?.tipo ?? user?.tipo ?? 'responsavel') === 'responsavel';
   const avatarUri = resolveUploadUrl(profile?.avatarUrl);
   const logoUri = resolveUploadUrl(profile?.logoUrl);
 
   useEffect(() => {
     let mounted = true;
+
+    if (!isResponsavel) {
+      // Vinculado não chama /cliente/perfil (rota de responsável); evita 403 e loading inútil.
+      setIsProfileLoading(false);
+      return () => { mounted = false; };
+    }
 
     setIsProfileLoading(true);
     getClientePerfil()
@@ -83,7 +91,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isResponsavel]);
 
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={styles.drawer}>
@@ -105,7 +113,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
       </View>
 
       <View style={styles.logoSpacer} />
-      {logoUri ? (
+      {isResponsavel && logoUri ? (
         <View style={styles.logoContainer}>
           <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
         </View>
@@ -113,35 +121,57 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
       <View style={styles.logoSpacer} />
 
       <View style={styles.profileArea}>
-        <Pressable
-          accessibilityRole="button"
-          style={styles.profileButton}
-          onPress={() => setIsProfileVisible(true)}
-        >
-          <View style={styles.avatarWrap}>
-            {isProfileLoading ? (
-              <ActivityIndicator size="small" />
-            ) : avatarUri ? (
-              <Avatar.Image size={52} source={{ uri: avatarUri }} />
-            ) : (
+        {isResponsavel ? (
+          <Pressable
+            accessibilityRole="button"
+            style={styles.profileButton}
+            onPress={() => setIsProfileVisible(true)}
+          >
+            <View style={styles.avatarWrap}>
+              {isProfileLoading ? (
+                <ActivityIndicator size="small" />
+              ) : avatarUri ? (
+                <Avatar.Image size={52} source={{ uri: avatarUri }} />
+              ) : (
+                <Avatar.Text
+                  size={52}
+                  label={(user?.nome ?? 'CL').slice(0, 2).toUpperCase()}
+                  color={colors.primaryText}
+                  style={styles.profileAvatar}
+                />
+              )}
+            </View>
+            <View style={styles.profileText}>
+              <Text style={styles.drawerName} numberOfLines={1}>
+                {profile?.nome ?? user?.nome ?? 'Cliente'}
+              </Text>
+              <Text style={styles.drawerEmail} numberOfLines={1}>
+                {profile?.email ?? user?.email}
+              </Text>
+            </View>
+            <Icon source="chevron-up" size={22} color={colors.textMuted} />
+          </Pressable>
+        ) : (
+          // Vinculado: só exibe nome, sem botão de perfil/upload nem chevron
+          <View style={styles.profileButtonVinculado}>
+            <View style={styles.avatarWrap}>
               <Avatar.Text
                 size={52}
-                label={(user?.nome ?? 'CL').slice(0, 2).toUpperCase()}
+                label={(user?.nome ?? 'US').slice(0, 2).toUpperCase()}
                 color={colors.primaryText}
                 style={styles.profileAvatar}
               />
-            )}
+            </View>
+            <View style={styles.profileText}>
+              <Text style={styles.drawerName} numberOfLines={1}>
+                {user?.nome ?? 'Usuário'}
+              </Text>
+              <Text style={styles.drawerEmail} numberOfLines={1}>
+                {user?.email}
+              </Text>
+            </View>
           </View>
-          <View style={styles.profileText}>
-            <Text style={styles.drawerName} numberOfLines={1}>
-              {profile?.nome ?? user?.nome ?? 'Cliente'}
-            </Text>
-            <Text style={styles.drawerEmail} numberOfLines={1}>
-              {profile?.email ?? user?.email}
-            </Text>
-          </View>
-          <Icon source="chevron-up" size={22} color={colors.textMuted} />
-        </Pressable>
+        )}
 
         <Pressable
           accessibilityRole="button"
@@ -199,9 +229,19 @@ function ClienteDrawer() {
   const verRelatorio = responsavel || can('relatorio.ver');
   const verManutencao = responsavel || can('manutencao.ver');
 
+  // initialRouteName precisa apontar para uma tela visível ao usuário,
+  // senão o React Navigation crasha. Pega a primeira tela disponível.
+  const initialRouteName: keyof ClienteDrawerParamList = verMapa
+    ? 'Mapa'
+    : verRelatorio
+    ? 'Relatorio'
+    : verManutencao
+    ? 'Manutencao'
+    : 'Mapa';
+
   return (
     <Drawer.Navigator
-      initialRouteName="Mapa"
+      initialRouteName={initialRouteName}
       drawerContent={(props) => <ClienteDrawerContent {...props} />}
       screenOptions={({ route }) => ({
         swipeEnabled: false,
@@ -226,7 +266,17 @@ function ClienteDrawer() {
         ),
       })}
     >
-      {verMapa ? <Drawer.Screen name="Mapa" component={MapScreen} /> : null}
+      {verMapa ? (
+        <Drawer.Screen name="Mapa" component={MapScreen} />
+      ) : !verRelatorio && !verManutencao ? (
+        // Sub-usuário sem nenhuma permissão de tela: monta um placeholder
+        // sob o nome "Mapa" para satisfazer o initialRouteName e evitar crash.
+        <Drawer.Screen
+          name="Mapa"
+          options={{ title: 'Acesso' }}
+          children={() => <PlaceholderScreen title="Sem permissões atribuídas" />}
+        />
+      ) : null}
       {verRelatorio ? (
         <Drawer.Screen name="Relatorio" options={{ title: 'Relatório' }} component={ReportScreen} />
       ) : null}
@@ -394,6 +444,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   profileButton: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  profileButtonVinculado: {
     minHeight: 72,
     flexDirection: 'row',
     alignItems: 'center',

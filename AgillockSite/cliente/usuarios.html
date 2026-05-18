@@ -147,9 +147,12 @@
         usuarios.forEach(function (u) {
           var linha = document.createElement('div');
           linha.className = 'usuario-linha';
+          var primario = u.nome ? u.nome : u.email;
+          var secundario = u.nome ? u.email : '';
           linha.innerHTML =
             '<div class="usuario-info">' +
-              '<div class="usuario-email">' + escapeHtml(u.email) + '</div>' +
+              '<div class="usuario-email">' + escapeHtml(primario) + '</div>' +
+              (secundario ? '<div class="usuario-sub" style="font-size:12px;color:#888;margin-top:2px;">' + escapeHtml(secundario) + '</div>' : '') +
               '<div class="usuario-meta">' +
                 (u.perfil ? '<i class="fa fa-tag"></i> ' + escapeHtml(u.perfil) + ' &middot; ' : '') +
                 '<i class="fa fa-car"></i> ' + (u.dispositivoIds || []).length + ' veículo(s) &middot; ' +

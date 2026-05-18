@@ -93,10 +93,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (credentials: LoginCredentials) => {
     const session = await loginCliente(credentials);
     await sessionStorage.set(session.token, session.user);
-    setUser(session.user);
-    setToken(session.token);
+    // Busca permissões ANTES de marcar autenticado. Se setarmos `user` e só depois `me`,
+    // o navigator monta com `me=null` e telas escondidas — crasha em initialRouteName.
     const fetched = await fetchMePermissoes();
     setMe(fetched);
+    setUser(session.user);
+    setToken(session.token);
     await ensureExpoPushTokenRegistered();
   }, []);
 

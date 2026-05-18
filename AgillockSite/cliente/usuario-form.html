@@ -13,34 +13,254 @@
   <style>
     body { overflow: hidden !important; height: 100vh; }
     .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
-    #form-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 24px 24px; scrollbar-gutter: stable; }
+    #form-scroll {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: 20px 24px 24px; scrollbar-gutter: stable;
+      background: #f5f7fa;
+    }
+    html.dark-theme #form-scroll { background: #161b22; }
     #form-scroll::-webkit-scrollbar { width: 7px; }
     #form-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     html.dark-theme #form-scroll::-webkit-scrollbar-thumb { background: #3a4555; }
 
-    .form-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.05); padding: 20px; max-width: 900px; margin: 0 auto 16px; }
-    html.dark-theme .form-card { background: #1e2530; }
-    .form-card h3 { font-size: 14px; margin-top: 0; margin-bottom: 12px; color: #555; border-bottom: 1px solid #eee; padding-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-    html.dark-theme .form-card h3 { color: #aab; border-color: #2d3748; }
+    /* ── Card ─────────────────────────────────────────────────────────── */
+    .uf-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.04);
+      padding: 22px 24px;
+      max-width: 920px;
+      margin: 0 auto 18px;
+    }
+    html.dark-theme .uf-card { background: #1e2530; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    @media (max-width: 720px) { .form-row { grid-template-columns: 1fr; } }
-    .form-control[disabled] { opacity: 0.6; }
+    .uf-card-title {
+      font-size: 11px;
+      margin: 0 0 16px;
+      color: #1976d2;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    html.dark-theme .uf-card-title { color: #64b5f6; }
+    .uf-card-title i { font-size: 14px; }
 
-    .veiculos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 240px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
-    html.dark-theme .veiculos-grid { border-color: #2d3748; background: #161b22; }
-    .veiculos-grid label { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: normal; font-size: 13px; cursor: pointer; }
-    .veiculos-grid label input { margin: 0; }
+    /* ── Inputs ───────────────────────────────────────────────────────── */
+    .uf-field { margin-bottom: 14px; }
+    .uf-field:last-child { margin-bottom: 0; }
+    .uf-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #666;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    html.dark-theme .uf-label { color: #aab; }
+    .uf-label .req { color: #e74c3c; margin-left: 2px; }
+    .uf-input {
+      width: 100%;
+      box-sizing: border-box;
+      height: 42px;
+      padding: 0 14px;
+      font-size: 14px;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      background: #f9fafc;
+      color: #1e2530;
+      transition: border .15s, background .15s, box-shadow .15s;
+    }
+    html.dark-theme .uf-input {
+      background: #161b22; border-color: #2d3748; color: #e0e6f0;
+    }
+    .uf-input:focus {
+      outline: none;
+      border-color: #2196f3;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.12);
+    }
+    html.dark-theme .uf-input:focus {
+      background: #1a212b;
+      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.25);
+    }
+    .uf-hint { font-size: 11px; color: #999; margin-top: 4px; }
 
-    .perm-group { margin-bottom: 16px; }
-    .perm-group-titulo { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; user-select: none; font-weight: 700; }
-    .perm-group-titulo input[type=checkbox] { width: 18px; height: 18px; }
-    .perm-children { padding-left: 28px; display: none; flex-direction: column; gap: 6px; }
-    .perm-children.open { display: flex; }
-    .perm-children label { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: normal; font-size: 13px; }
+    .uf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 720px) { .uf-row { grid-template-columns: 1fr; } }
 
-    .action-bar-fixo { flex-shrink: 0; background: #fff; border-top: 1px solid #eee; padding: 12px 24px; display: flex; justify-content: flex-end; gap: 10px; }
-    html.dark-theme .action-bar-fixo { background: #1e2530; border-color: #2d3748; }
+    /* ── Switch toggle ────────────────────────────────────────────────── */
+    .uf-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .uf-switch input { opacity: 0; width: 0; height: 0; }
+    .uf-switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #cbd5e0;
+      border-radius: 24px;
+      transition: background .2s;
+    }
+    .uf-switch-slider::before {
+      content: '';
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform .2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .uf-switch input:checked + .uf-switch-slider { background: #2196f3; }
+    .uf-switch input:checked + .uf-switch-slider::before { transform: translateX(20px); }
+    .uf-switch input:disabled + .uf-switch-slider { opacity: 0.5; cursor: not-allowed; }
+    html.dark-theme .uf-switch-slider { background: #4a5568; }
+
+    /* ── Lista de itens com switch ────────────────────────────────────── */
+    .uf-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      cursor: pointer;
+      user-select: none;
+      transition: background .15s;
+      border-radius: 8px;
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+    .uf-toggle-row:hover { background: rgba(33, 150, 243, 0.04); }
+    html.dark-theme .uf-toggle-row:hover { background: rgba(33, 150, 243, 0.08); }
+    .uf-toggle-row .uf-toggle-label {
+      flex: 1;
+      font-size: 13.5px;
+      color: #1e2530;
+    }
+    html.dark-theme .uf-toggle-row .uf-toggle-label { color: #e0e6f0; }
+    .uf-toggle-row .uf-toggle-sub {
+      font-size: 12px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    /* ── Veículos ─────────────────────────────────────────────────────── */
+    .uf-actions-mini {
+      margin-top: 10px;
+      display: flex;
+      gap: 14px;
+      font-size: 12px;
+    }
+    .uf-link {
+      color: #2196f3;
+      font-weight: 700;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .uf-link:hover { text-decoration: underline; }
+
+    /* ── Grupos de permissão ──────────────────────────────────────────── */
+    .uf-perm-group {
+      border-top: 1px solid #eef2f7;
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+    .uf-perm-group:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+    html.dark-theme .uf-perm-group { border-color: #2d3748; }
+    .uf-perm-group-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 8px;
+    }
+    .uf-perm-group-header:hover { background: rgba(33, 150, 243, 0.04); }
+    html.dark-theme .uf-perm-group-header:hover { background: rgba(33, 150, 243, 0.08); }
+    .uf-perm-group-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: rgba(33, 150, 243, 0.1); color: #2196f3;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .uf-perm-group-title { flex: 1; font-weight: 700; font-size: 14px; color: #1e2530; }
+    html.dark-theme .uf-perm-group-title { color: #e0e6f0; }
+    .uf-perm-children {
+      padding-left: 52px;
+      margin-top: 4px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .25s ease;
+    }
+    .uf-perm-children.open { max-height: 600px; }
+
+    /* ── Footer fixo ──────────────────────────────────────────────────── */
+    .uf-footer {
+      flex-shrink: 0;
+      background: #fff;
+      border-top: 1px solid #eef2f7;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      box-shadow: 0 -2px 8px rgba(0,0,0,.04);
+    }
+    html.dark-theme .uf-footer { background: #1e2530; border-color: #2d3748; }
+    .uf-btn {
+      height: 40px;
+      padding: 0 20px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity .15s, transform .1s;
+    }
+    .uf-btn:hover { opacity: 0.9; }
+    .uf-btn:active { transform: translateY(1px); }
+    .uf-btn-secondary {
+      background: #f0f3f7;
+      color: #555;
+    }
+    html.dark-theme .uf-btn-secondary { background: #2d3748; color: #aab; }
+    .uf-btn-primary {
+      background: #2196f3;
+      color: #fff;
+    }
+    .uf-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── Veículos como lista de switch ────────────────────────────────── */
+    .uf-veiculos-list {
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid #eef2f7;
+      border-radius: 10px;
+      padding: 4px 0;
+    }
+    html.dark-theme .uf-veiculos-list { border-color: #2d3748; }
+    .uf-veiculos-list::-webkit-scrollbar { width: 6px; }
+    .uf-veiculos-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    html.dark-theme .uf-veiculos-list::-webkit-scrollbar-thumb { background: #3a4555; }
+    .uf-veiculo-icon {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(120, 144, 156, 0.15); color: #607d8b;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -82,97 +302,170 @@
 
     <div id="form-scroll">
       <form id="form-usuario">
-        <div class="form-card">
-          <h3>Acesso</h3>
-          <div class="form-row">
-            <div>
-              <label>Email <span style="color:#e74c3c;">*</span></label>
-              <input type="email" id="campo-email" class="form-control" required maxlength="120" />
+
+        <!-- ─── Card: Acesso ─────────────────────────────────────────── -->
+        <div class="uf-card">
+          <h3 class="uf-card-title"><i class="fa fa-id-card"></i> Acesso</h3>
+
+          <div class="uf-field">
+            <label class="uf-label">Nome <span class="req">*</span></label>
+            <input type="text" id="campo-nome" class="uf-input" maxlength="80" required placeholder="Nome do usuário" />
+          </div>
+
+          <div class="uf-row">
+            <div class="uf-field">
+              <label class="uf-label">Email <span class="req">*</span></label>
+              <input type="email" id="campo-email" class="uf-input" required maxlength="120" placeholder="email@exemplo.com" />
             </div>
-            <div>
-              <label>Senha <span id="senha-obrigatoria" style="color:#e74c3c;">*</span></label>
-              <input type="password" id="campo-senha" class="form-control" minlength="6" />
-              <small id="senha-hint" class="text-muted" style="display:none;">Deixe em branco para manter a senha atual.</small>
+            <div class="uf-field">
+              <label class="uf-label">Senha <span id="senha-obrigatoria" class="req">*</span></label>
+              <input type="password" id="campo-senha" class="uf-input" minlength="6" placeholder="Mínimo 6 caracteres" />
+              <div id="senha-hint" class="uf-hint" style="display:none;">Deixe em branco para manter a senha atual.</div>
             </div>
           </div>
-          <div style="margin-top:14px;">
-            <label>Perfil (ex: Locatário, Mecânico, Motorista)</label>
-            <input type="text" id="campo-perfil" class="form-control" maxlength="60" placeholder="Opcional" />
+
+          <div class="uf-field">
+            <label class="uf-label">Perfil</label>
+            <input type="text" id="campo-perfil" class="uf-input" maxlength="60" placeholder="Locatário, Mecânico, Motorista..." />
+            <div class="uf-hint">Rótulo opcional para identificar o tipo do usuário.</div>
           </div>
         </div>
 
-        <div class="form-card">
-          <h3>Veículos com acesso</h3>
-          <p class="text-muted" style="margin: 0 0 10px; font-size: 12px;">Marque quais veículos esse usuário poderá visualizar e operar conforme as permissões abaixo.</p>
-          <div id="veiculos-grid" class="veiculos-grid">
-            <div style="grid-column: 1/-1; color:#999; text-align:center; padding: 16px;">
+        <!-- ─── Card: Veículos ───────────────────────────────────────── -->
+        <div class="uf-card">
+          <h3 class="uf-card-title"><i class="fa fa-car"></i> Veículos com acesso</h3>
+          <p class="uf-hint" style="margin: -8px 0 12px;">Selecione quais veículos esse usuário poderá visualizar e operar conforme as permissões abaixo.</p>
+
+          <div id="veiculos-grid" class="uf-veiculos-list">
+            <div style="color:#999; text-align:center; padding: 18px;">
               <i class="fa fa-spinner fa-spin"></i> Carregando veículos...
             </div>
           </div>
-          <div style="margin-top:8px;">
-            <button type="button" id="btn-marcar-todos" class="btn btn-link btn-sm" style="padding:0;">Marcar todos</button>
-            <span style="color:#ccc;">|</span>
-            <button type="button" id="btn-desmarcar-todos" class="btn btn-link btn-sm" style="padding:0;">Desmarcar todos</button>
+
+          <div class="uf-actions-mini">
+            <button type="button" id="btn-marcar-todos" class="uf-link">Selecionar todos</button>
+            <button type="button" id="btn-desmarcar-todos" class="uf-link">Limpar seleção</button>
           </div>
         </div>
 
-        <div class="form-card">
-          <h3>Permissões por tela</h3>
-          <p class="text-muted" style="margin: 0 0 10px; font-size: 12px;">Marque a tela para liberar acesso. Em cada tela, escolha o que esse usuário poderá fazer.</p>
+        <!-- ─── Card: Permissões ─────────────────────────────────────── -->
+        <div class="uf-card">
+          <h3 class="uf-card-title"><i class="fa fa-shield"></i> Permissões por tela</h3>
+          <p class="uf-hint" style="margin: -8px 0 12px;">Ative cada tela e escolha o que esse usuário poderá fazer dentro dela.</p>
 
           <!-- Rastreamento -->
-          <div class="perm-group">
-            <div class="perm-group-titulo">
-              <input type="checkbox" id="perm-rastreamento-ver" data-tela="rastreamento" data-acao="ver" />
-              <i class="fa fa-map-marker"></i> Mapa (Rastreamento)
-            </div>
-            <div class="perm-children" data-tela="rastreamento">
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="bloquear" /> Bloquear veículo</label>
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="desbloquear" /> Desbloquear veículo</label>
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="criarCerca" /> Criar/editar/remover cerca</label>
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="verCerca" /> Visualizar cercas</label>
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="verEventos" /> Ver notificações/eventos do veículo</label>
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="marcarManutencaoRecorrenteFeita" /> Marcar manutenção recorrente como feita</label>
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="marcarRecorrenciaDataFeita" /> Marcar recorrência de data como feita</label>
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="uploadFoto" /> Fazer upload / alterar foto do veículo</label>
-              <label><input type="checkbox" data-tela="rastreamento" data-acao="editarIdentificacao" /> Editar identificação do veículo (apelido)</label>
+          <div class="uf-perm-group">
+            <label class="uf-perm-group-header" for="perm-rastreamento-ver">
+              <div class="uf-perm-group-icon"><i class="fa fa-map-marker"></i></div>
+              <span class="uf-perm-group-title">Mapa (Rastreamento)</span>
+              <label class="uf-switch" onclick="event.stopPropagation();">
+                <input type="checkbox" id="perm-rastreamento-ver" data-tela="rastreamento" data-acao="ver" />
+                <span class="uf-switch-slider"></span>
+              </label>
+            </label>
+            <div class="uf-perm-children" data-tela="rastreamento">
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Bloquear veículo</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="bloquear" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Desbloquear veículo</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="desbloquear" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Criar / editar / remover cerca</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="criarCerca" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Visualizar cercas</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="verCerca" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Ver notificações / eventos do veículo</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="verEventos" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Marcar manutenção recorrente como feita</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="marcarManutencaoRecorrenteFeita" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Marcar recorrência de data como feita</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="marcarRecorrenciaDataFeita" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Upload / alterar foto do veículo</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="uploadFoto" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Editar identificação do veículo</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="rastreamento" data-acao="editarIdentificacao" /><span class="uf-switch-slider"></span></label>
+              </div>
             </div>
           </div>
 
           <!-- Manutenção -->
-          <div class="perm-group">
-            <div class="perm-group-titulo">
-              <input type="checkbox" id="perm-manutencao-ver" data-tela="manutencao" data-acao="ver" />
-              <i class="fa fa-wrench"></i> Manutenção
-            </div>
-            <div class="perm-children" data-tela="manutencao">
-              <label><input type="checkbox" data-tela="manutencao" data-acao="criar" /> Criar registros</label>
-              <label><input type="checkbox" data-tela="manutencao" data-acao="editar" /> Editar registros</label>
-              <label><input type="checkbox" data-tela="manutencao" data-acao="excluir" /> Excluir registros</label>
-              <label><input type="checkbox" data-tela="manutencao" data-acao="criarRecorrencia" /> Criar recorrências (km/data)</label>
-              <label><input type="checkbox" data-tela="manutencao" data-acao="editarRecorrencia" /> Editar/excluir recorrências</label>
-              <label><input type="checkbox" data-tela="manutencao" data-acao="marcarFeita" /> Marcar manutenção como feita</label>
+          <div class="uf-perm-group">
+            <label class="uf-perm-group-header" for="perm-manutencao-ver">
+              <div class="uf-perm-group-icon"><i class="fa fa-wrench"></i></div>
+              <span class="uf-perm-group-title">Manutenção</span>
+              <label class="uf-switch" onclick="event.stopPropagation();">
+                <input type="checkbox" id="perm-manutencao-ver" data-tela="manutencao" data-acao="ver" />
+                <span class="uf-switch-slider"></span>
+              </label>
+            </label>
+            <div class="uf-perm-children" data-tela="manutencao">
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Criar registros</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="manutencao" data-acao="criar" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Editar registros</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="manutencao" data-acao="editar" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Excluir registros</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="manutencao" data-acao="excluir" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Criar recorrências (km / data)</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="manutencao" data-acao="criarRecorrencia" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Editar / excluir recorrências</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="manutencao" data-acao="editarRecorrencia" /><span class="uf-switch-slider"></span></label>
+              </div>
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Marcar manutenção como feita</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="manutencao" data-acao="marcarFeita" /><span class="uf-switch-slider"></span></label>
+              </div>
             </div>
           </div>
 
           <!-- Relatório -->
-          <div class="perm-group">
-            <div class="perm-group-titulo">
-              <input type="checkbox" id="perm-relatorio-ver" data-tela="relatorio" data-acao="ver" />
-              <i class="fa fa-bar-chart"></i> Relatório
-            </div>
-            <div class="perm-children" data-tela="relatorio">
-              <label><input type="checkbox" data-tela="relatorio" data-acao="exportar" /> Exportar relatórios</label>
+          <div class="uf-perm-group">
+            <label class="uf-perm-group-header" for="perm-relatorio-ver">
+              <div class="uf-perm-group-icon"><i class="fa fa-bar-chart"></i></div>
+              <span class="uf-perm-group-title">Relatório</span>
+              <label class="uf-switch" onclick="event.stopPropagation();">
+                <input type="checkbox" id="perm-relatorio-ver" data-tela="relatorio" data-acao="ver" />
+                <span class="uf-switch-slider"></span>
+              </label>
+            </label>
+            <div class="uf-perm-children" data-tela="relatorio">
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Exportar relatórios</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="relatorio" data-acao="exportar" /><span class="uf-switch-slider"></span></label>
+              </div>
             </div>
           </div>
         </div>
       </form>
     </div>
 
-    <div class="action-bar-fixo">
-      <a href="usuarios.html" class="btn btn-default">Cancelar</a>
-      <button type="button" id="btn-salvar" class="btn btn-primary">
-        <i class="fa fa-save"></i> Salvar
+    <div class="uf-footer">
+      <a href="usuarios.html" class="uf-btn uf-btn-secondary">Cancelar</a>
+      <button type="button" id="btn-salvar" class="uf-btn uf-btn-primary">
+        <i class="fa fa-check"></i> Salvar
       </button>
     </div>
   </div>
@@ -209,15 +502,16 @@
         document.getElementById('campo-senha').removeAttribute('required');
       }
 
-      // Liga "ver" da tela ao show/hide das permissões filhas
-      document.querySelectorAll('.perm-group-titulo input[type=checkbox]').forEach(function (chk) {
+      // Toggle "ver" da tela mostra/esconde permissões filhas
+      document.querySelectorAll('input[type=checkbox][data-acao="ver"]').forEach(function (chk) {
         chk.addEventListener('change', function () {
           var tela = chk.getAttribute('data-tela');
-          var children = document.querySelector('.perm-children[data-tela="' + tela + '"]');
+          var children = document.querySelector('.uf-perm-children[data-tela="' + tela + '"]');
           if (children) children.classList.toggle('open', chk.checked);
-          if (!chk.checked) {
-            // desmarcar todas filhas para evitar enviar permissão sem ter acesso à tela
-            children.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+          if (!chk.checked && children) {
+            children.querySelectorAll('input[type=checkbox]').forEach(function (c) {
+              if (c !== chk) c.checked = false;
+            });
           }
         });
       });
@@ -245,19 +539,27 @@
         var grid = document.getElementById('veiculos-grid');
         grid.innerHTML = '';
         if (!veiculos.length) {
-          grid.innerHTML = '<div style="grid-column:1/-1;color:#999;text-align:center;padding:16px;">Nenhum veículo ativo encontrado.</div>';
+          grid.innerHTML = '<div style="color:#999;text-align:center;padding:18px;">Nenhum veículo ativo encontrado.</div>';
           return;
         }
         veiculos.forEach(function (v) {
-          var lbl = document.createElement('label');
           var nome = v.apelidoCliente || v.nome || '(sem nome)';
-          var placa = v.placa ? ' — ' + v.placa : '';
-          lbl.innerHTML = '<input type="checkbox" value="' + v.id + '" data-disp-id="' + v.id + '" /> ' + escapeHtml(nome + placa);
-          grid.appendChild(lbl);
+          var placa = v.placa || '';
+          var row = document.createElement('label');
+          row.className = 'uf-toggle-row';
+          row.innerHTML =
+            '<div class="uf-veiculo-icon"><i class="fa fa-car"></i></div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div class="uf-toggle-label" style="font-weight:600;">' + escapeHtml(nome) + '</div>' +
+              (placa ? '<div class="uf-toggle-sub">' + escapeHtml(placa) + '</div>' : '') +
+            '</div>' +
+            '<label class="uf-switch"><input type="checkbox" value="' + v.id + '" data-disp-id="' + v.id + '" /><span class="uf-switch-slider"></span></label>';
+          grid.appendChild(row);
         });
       }
 
       function preencherForm(u) {
+        document.getElementById('campo-nome').value = u.nome || '';
         document.getElementById('campo-email').value = u.email || '';
         document.getElementById('campo-perfil').value = u.perfil || '';
         (u.dispositivoIds || []).forEach(function (id) {
@@ -265,11 +567,11 @@
           if (chk) chk.checked = true;
         });
         var perms = u.permissoes || {};
-        document.querySelectorAll('.perm-group-titulo input[type=checkbox]').forEach(function (chk) {
+        document.querySelectorAll('input[type=checkbox][data-acao="ver"]').forEach(function (chk) {
           var tela = chk.getAttribute('data-tela');
           var marcado = !!(perms[tela] && perms[tela].ver);
           chk.checked = marcado;
-          var children = document.querySelector('.perm-children[data-tela="' + tela + '"]');
+          var children = document.querySelector('.uf-perm-children[data-tela="' + tela + '"]');
           if (children) {
             children.classList.toggle('open', marcado);
             children.querySelectorAll('input[type=checkbox]').forEach(function (c) {
@@ -288,7 +590,6 @@
           if (!permissoes[tela]) permissoes[tela] = {};
           permissoes[tela][acao] = c.checked;
         });
-        // Se "ver" está desmarcado, força todas as ações filhas a false (já feito ao desligar visual)
         ['rastreamento', 'manutencao', 'relatorio'].forEach(function (tela) {
           if (!permissoes[tela].ver) {
             Object.keys(permissoes[tela]).forEach(function (acao) {
@@ -300,9 +601,11 @@
       }
 
       function salvar() {
+        var nome = document.getElementById('campo-nome').value.trim();
         var email = document.getElementById('campo-email').value.trim();
         var senha = document.getElementById('campo-senha').value;
         var perfil = document.getElementById('campo-perfil').value.trim();
+        if (!nome) return AL_CLIENTE.showAlert('Informe o nome.');
         if (!email) return AL_CLIENTE.showAlert('Informe o email.');
         if (!modoEdicao && !senha) return AL_CLIENTE.showAlert('Informe a senha.');
         if (senha && senha.length < 6) return AL_CLIENTE.showAlert('A senha deve ter pelo menos 6 caracteres.');
@@ -311,6 +614,7 @@
           .map(function (c) { return c.value; });
 
         var payload = {
+          nome: nome,
           email: email,
           perfil: perfil || null,
           permissoes: coletarPermissoes(),

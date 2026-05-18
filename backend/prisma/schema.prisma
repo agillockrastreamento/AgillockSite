@@ -379,6 +379,8 @@ model ClienteLogin {
   // Tipo de login: 'responsavel' = login original do cliente (acesso total),
   // 'vinculado' = sub-usuário criado pelo responsável (acesso limitado por permissões/placas)
   tipo             String   @default("responsavel")
+  // Nome exibido nas telas para sub-usuário. Para responsável, fica null e usamos Cliente.nome.
+  nome             String?
   // Rótulo livre para o perfil do sub-usuário (ex: "Locatário", "Mecânico", "Motorista")
   perfil           String?
   // Permissões granulares (JSON). Vazio para responsável (acesso total implícito).

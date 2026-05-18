@@ -22,6 +22,7 @@ import type { RootStackParamList } from '../navigation/routes';
 type Usuario = {
   id: string;
   email: string;
+  nome: string | null;
   ativo: boolean;
   perfil: string | null;
   permissoes: Record<string, Record<string, boolean>>;
@@ -141,9 +142,14 @@ export function UsuariosScreen() {
               onPress={() => navigation.navigate('UsuarioForm', { id: u.id })}
             >
               <View style={styles.cardHeader}>
-                <Text style={styles.cardEmail} numberOfLines={1}>
-                  {u.email}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardEmail} numberOfLines={1}>
+                    {u.nome || u.email}
+                  </Text>
+                  {u.nome ? (
+                    <Text style={styles.cardSub} numberOfLines={1}>{u.email}</Text>
+                  ) : null}
+                </View>
                 <View style={[styles.badge, u.ativo ? styles.badgeAtivo : styles.badgeInativo]}>
                   <Text style={styles.badgeText}>{u.ativo ? 'ATIVO' : 'INATIVO'}</Text>
                 </View>
@@ -258,10 +264,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   cardEmail: {
-    flex: 1,
     fontSize: 15,
     fontWeight: '900',
     color: colors.text,
+  },
+  cardSub: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   badge: {
     paddingHorizontal: spacing.sm,

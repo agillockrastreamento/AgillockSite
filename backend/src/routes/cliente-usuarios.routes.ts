@@ -42,6 +42,7 @@ router.get('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Res
     select: {
       id: true,
       email: true,
+      nome: true,
       ativo: true,
       perfil: true,
       permissoes: true,
@@ -71,6 +72,7 @@ router.get('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res:
     select: {
       id: true,
       email: true,
+      nome: true,
       ativo: true,
       perfil: true,
       permissoes: true,
@@ -95,6 +97,7 @@ router.get('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res:
 interface PayloadUsuario {
   email?: string;
   senha?: string;
+  nome?: string | null;
   perfil?: string | null;
   permissoes?: unknown;
   dispositivoIds?: string[];
@@ -162,6 +165,7 @@ router.post('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Re
       email: body.email!,
       senhaHash,
       tipo: 'vinculado',
+      nome: body.nome?.trim() ?? null,
       perfil: body.perfil ?? null,
       permissoes: permissoes as unknown as object,
       criadoPorLoginId,
@@ -170,7 +174,7 @@ router.post('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Re
       },
     },
     select: {
-      id: true, email: true, ativo: true, perfil: true,
+      id: true, email: true, nome: true, ativo: true, perfil: true,
       permissoes: true, createdAt: true,
       placasPermitidas: { select: { dispositivoId: true } },
     },
@@ -227,6 +231,7 @@ router.put('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res:
   const data: Record<string, unknown> = {};
   if (body.email) data.email = body.email;
   if (body.senha) data.senhaHash = await bcrypt.hash(body.senha, 10);
+  if (body.nome !== undefined) data.nome = body.nome?.trim() || null;
   if (body.perfil !== undefined) data.perfil = body.perfil ?? null;
   if (body.permissoes !== undefined) {
     data.permissoes = normalizarPermissoes(body.permissoes) as unknown as object;
@@ -247,7 +252,7 @@ router.put('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res:
   const atualizado = await prisma.clienteLogin.findUnique({
     where: { id },
     select: {
-      id: true, email: true, ativo: true, perfil: true,
+      id: true, email: true, nome: true, ativo: true, perfil: true,
       permissoes: true, updatedAt: true,
       placasPermitidas: { select: { dispositivoId: true } },
     },

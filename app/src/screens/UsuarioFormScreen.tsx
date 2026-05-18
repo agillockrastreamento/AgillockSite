@@ -29,6 +29,7 @@ type Dispositivo = {
 type Usuario = {
   id: string;
   email: string;
+  nome: string | null;
   ativo: boolean;
   perfil: string | null;
   permissoes: Record<string, Record<string, boolean>>;
@@ -97,6 +98,7 @@ export function UsuarioFormScreen() {
   const [saving, setSaving] = useState(false);
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [nome, setNome] = useState('');
   const [perfil, setPerfil] = useState('');
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
   const [dispSelecionados, setDispSelecionados] = useState<Set<string>>(new Set());
@@ -116,6 +118,7 @@ export function UsuarioFormScreen() {
         setDispositivos(disps);
         if (user) {
           setEmail(user.email);
+          setNome(user.nome ?? '');
           setPerfil(user.perfil ?? '');
           setDispSelecionados(new Set(user.dispositivoIds));
           const base = permsVazias();
@@ -174,6 +177,10 @@ export function UsuarioFormScreen() {
   };
 
   const salvar = async () => {
+    if (!nome.trim()) {
+      toast.show({ message: 'Informe o nome.', type: 'error' });
+      return;
+    }
     if (!email.trim()) {
       toast.show({ message: 'Informe o email.', type: 'error' });
       return;
@@ -187,6 +194,7 @@ export function UsuarioFormScreen() {
       return;
     }
     const payload: Record<string, unknown> = {
+      nome: nome.trim(),
       email: email.trim(),
       perfil: perfil.trim() || null,
       permissoes,
@@ -234,6 +242,15 @@ export function UsuarioFormScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.card}>
           <Text style={styles.cardTitulo}>Acesso</Text>
+          <Text style={styles.label}>Nome *</Text>
+          <TextInput
+            value={nome}
+            onChangeText={setNome}
+            style={styles.input}
+            maxLength={80}
+            placeholder="Nome do usuário"
+            placeholderTextColor={colors.textMuted}
+          />
           <Text style={styles.label}>Email *</Text>
           <TextInput
             value={email}
