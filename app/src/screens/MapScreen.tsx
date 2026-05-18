@@ -49,6 +49,7 @@ import {
 import type { TrackingAccessStatus, TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
 import { useMarkerBitmaps, OffscreenCapturePool } from '../tracking/useMarkerBitmaps';
+import { useClusterBitmaps, ClusterCapturePool } from '../tracking/useClusterBitmaps';
 import {
   formatSpeed,
   getStatusColor,
@@ -112,33 +113,24 @@ function ClusterMarker({
   lat,
   lng,
   count,
+  bitmapUri,
   onPress,
 }: {
   lat: number;
   lng: number;
   count: number;
+  bitmapUri: string | undefined;
   onPress(): void;
 }) {
-  const [tracks, setTracks] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setTracks(false), 800);
-    return () => clearTimeout(t);
-  }, []);
   return (
     <Marker
       coordinate={{ latitude: lat, longitude: lng }}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={tracks}
+      image={bitmapUri ? { uri: bitmapUri } : undefined}
+      tracksViewChanges={!bitmapUri}
       zIndex={500}
       onPress={onPress}
-    >
-      <View style={styles.clusterBadgeWrap}>
-        <View style={styles.clusterShadow} />
-        <View style={styles.clusterBadge}>
-          <Text style={styles.clusterBadgeText}>{count}</Text>
-        </View>
-      </View>
-    </Marker>
+    />
   );
 }
 
@@ -354,6 +346,16 @@ export function MapScreen() {
 
     return groups;
   }, [locatedDevices, pxToLatDeg, pxToLngDeg]);
+
+  const clusterCounts = useMemo(
+    () => clusterGroups.filter((g) => g.devices.length > 1).map((g) => g.devices.length),
+    [clusterGroups],
+  );
+  const {
+    getClusterBitmap,
+    pending: clusterPending,
+    onReady: onClusterReady,
+  } = useClusterBitmaps(clusterCounts);
 
   const spiderPositions = useMemo(() => {
     if (!spiderClusterKey) return null;
@@ -901,6 +903,7 @@ export function MapScreen() {
                   lat={group.lat}
                   lng={group.lng}
                   count={group.devices.length}
+                  bitmapUri={getClusterBitmap(group.devices.length)}
                   onPress={() => openSpider(group.key)}
                 />,
               ];
@@ -982,6 +985,7 @@ export function MapScreen() {
       </MapView>
 
       <OffscreenCapturePool pending={pending} onReady={onReady} />
+      <ClusterCapturePool pending={clusterPending} onReady={onClusterReady} />
 
       <View style={styles.mapControls}>
         <MapFloatingButton
@@ -1307,37 +1311,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 11,
     fontWeight: '800',
-  },
-  clusterBadgeWrap: {
-    width: 60,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  clusterShadow: {
-    position: 'absolute',
-    top: 8,
-    left: 4,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(0,0,0,0.22)',
-  },
-  clusterBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 3,
-    borderColor: '#fff',
-    backgroundColor: '#8e44ad',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clusterBadgeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
   },
   geofenceTapTarget: {
     width: 28,
