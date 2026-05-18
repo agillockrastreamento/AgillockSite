@@ -320,27 +320,19 @@ export function ManutencaoScreen() {
   }, [selectedId]);
 
   useEffect(() => {
-    loadDispositivos();
-  }, []);
-
-  useEffect(() => {
     if (selectedId) loadData();
   }, [selectedId, loadData]);
 
-  // Refs com valores correntes para usarmos dentro do useFocusEffect sem
-  // depender de mudanças de estado (que disparariam cleanup em loop).
-  const selectedIdRef = useRef(selectedId);
-  selectedIdRef.current = selectedId;
-  const dispositivosCountRef = useRef(dispositivos.length);
-  dispositivosCountRef.current = dispositivos.length;
+  // Ref para evitar re-execução do useFocusEffect quando loadDispositivos muda
+  // (sua dep `selectedId` muda no cleanup, o que reanimaria a callback em loop).
+  const loadDispositivosRef = useRef(loadDispositivos);
+  loadDispositivosRef.current = loadDispositivos;
 
-  // Ao sair da tela limpa a seleção; ao voltar, se houver mais de 1 veículo,
-  // reabre o SearchBottomSheet para escolha.
+  // Ao focar a tela: recarrega lista de dispositivos (que faz auto-select para 1 veículo
+  // ou abre o picker para múltiplos). Ao sair, zera a seleção para que o picker reabra na próxima entrada.
   useFocusEffect(
     useCallback(() => {
-      if (dispositivosCountRef.current > 1 && !selectedIdRef.current) {
-        setSearchSheetVisible(true);
-      }
+      loadDispositivosRef.current();
       return () => {
         setSelectedId(null);
         setSearchSheetVisible(false);

@@ -542,7 +542,15 @@ router.get('/rastreamento/dispositivos/:id/paradas', async (req: ClienteRequest,
 });
 
 // ── GET /api/cliente/rastreamento/dispositivos/:id/eventos ───────────────────
-router.get('/rastreamento/dispositivos/:id/eventos', requirePermission('rastreamento.verEventos'), async (req: ClienteRequest, res: Response): Promise<void> => {
+// Aceita rastreamento.verEventos (painel do mapa) OU relatorio.ver (aba Eventos do relatório).
+router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest, res: Response, next): Promise<void> => {
+  const perms = req.cliente!.permissoes;
+  if (!perms.rastreamento.verEventos && !perms.relatorio.ver) {
+    res.status(403).json({ error: 'Sem permissão para esta ação.' });
+    return;
+  }
+  next();
+}, async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const dispositivoId = param(req, 'id');
   const from = query(req.query.from);

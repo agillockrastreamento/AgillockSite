@@ -11,14 +11,20 @@
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
   <style>
+    /* Cor primária do tema AgilLock (amarelo) — sincronizada com admin.css */
+    :root {
+      --uf-primary: #fab32c;
+      --uf-primary-hover: #e09520;
+      --uf-primary-soft: rgba(250, 179, 44, 0.12);
+      --uf-primary-text: #222;
+    }
+
     body { overflow: hidden !important; height: 100vh; }
     .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
     #form-scroll {
       flex: 1; overflow-y: auto; overflow-x: hidden;
       padding: 20px 24px 24px; scrollbar-gutter: stable;
-      background: #f5f7fa;
     }
-    html.dark-theme #form-scroll { background: #161b22; }
     #form-scroll::-webkit-scrollbar { width: 7px; }
     #form-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     html.dark-theme #form-scroll::-webkit-scrollbar-thumb { background: #3a4555; }
@@ -37,7 +43,7 @@
     .uf-card-title {
       font-size: 11px;
       margin: 0 0 16px;
-      color: #1976d2;
+      color: var(--uf-primary-hover);
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 1.2px;
@@ -45,7 +51,7 @@
       align-items: center;
       gap: 8px;
     }
-    html.dark-theme .uf-card-title { color: #64b5f6; }
+    html.dark-theme .uf-card-title { color: var(--uf-primary); }
     .uf-card-title i { font-size: 14px; }
 
     /* ── Inputs ───────────────────────────────────────────────────────── */
@@ -79,13 +85,13 @@
     }
     .uf-input:focus {
       outline: none;
-      border-color: #2196f3;
+      border-color: var(--uf-primary);
       background: #fff;
-      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.12);
+      box-shadow: 0 0 0 3px var(--uf-primary-soft);
     }
     html.dark-theme .uf-input:focus {
       background: #1a212b;
-      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.25);
+      box-shadow: 0 0 0 3px rgba(250, 179, 44, 0.25);
     }
     .uf-hint { font-size: 11px; color: #999; margin-top: 4px; }
 
@@ -121,7 +127,7 @@
       transition: transform .2s;
       box-shadow: 0 1px 3px rgba(0,0,0,.2);
     }
-    .uf-switch input:checked + .uf-switch-slider { background: #2196f3; }
+    .uf-switch input:checked + .uf-switch-slider { background: var(--uf-primary); }
     .uf-switch input:checked + .uf-switch-slider::before { transform: translateX(20px); }
     .uf-switch input:disabled + .uf-switch-slider { opacity: 0.5; cursor: not-allowed; }
     html.dark-theme .uf-switch-slider { background: #4a5568; }
@@ -139,8 +145,8 @@
       padding-left: 8px;
       padding-right: 8px;
     }
-    .uf-toggle-row:hover { background: rgba(33, 150, 243, 0.04); }
-    html.dark-theme .uf-toggle-row:hover { background: rgba(33, 150, 243, 0.08); }
+    .uf-toggle-row:hover { background: var(--uf-primary-soft); }
+    html.dark-theme .uf-toggle-row:hover { background: rgba(250, 179, 44, 0.10); }
     .uf-toggle-row .uf-toggle-label {
       flex: 1;
       font-size: 13.5px;
@@ -161,13 +167,14 @@
       font-size: 12px;
     }
     .uf-link {
-      color: #2196f3;
+      color: var(--uf-primary-hover);
       font-weight: 700;
       cursor: pointer;
       background: none;
       border: none;
       padding: 0;
     }
+    html.dark-theme .uf-link { color: var(--uf-primary); }
     .uf-link:hover { text-decoration: underline; }
 
     /* ── Grupos de permissão ──────────────────────────────────────────── */
@@ -187,13 +194,14 @@
       user-select: none;
       border-radius: 8px;
     }
-    .uf-perm-group-header:hover { background: rgba(33, 150, 243, 0.04); }
-    html.dark-theme .uf-perm-group-header:hover { background: rgba(33, 150, 243, 0.08); }
+    .uf-perm-group-header:hover { background: var(--uf-primary-soft); }
+    html.dark-theme .uf-perm-group-header:hover { background: rgba(250, 179, 44, 0.10); }
     .uf-perm-group-icon {
       width: 32px; height: 32px; border-radius: 8px;
-      background: rgba(33, 150, 243, 0.1); color: #2196f3;
+      background: var(--uf-primary-soft); color: var(--uf-primary-hover);
       display: flex; align-items: center; justify-content: center; font-size: 16px;
     }
+    html.dark-theme .uf-perm-group-icon { color: var(--uf-primary); }
     .uf-perm-group-title { flex: 1; font-weight: 700; font-size: 14px; color: #1e2530; }
     html.dark-theme .uf-perm-group-title { color: #e0e6f0; }
     .uf-perm-children {
@@ -228,19 +236,21 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      transition: opacity .15s, transform .1s;
+      transition: background .15s, opacity .15s, transform .1s;
     }
-    .uf-btn:hover { opacity: 0.9; }
     .uf-btn:active { transform: translateY(1px); }
     .uf-btn-secondary {
       background: #f0f3f7;
       color: #555;
     }
+    .uf-btn-secondary:hover { background: #e4e8ee; }
     html.dark-theme .uf-btn-secondary { background: #2d3748; color: #aab; }
+    html.dark-theme .uf-btn-secondary:hover { background: #36404f; }
     .uf-btn-primary {
-      background: #2196f3;
-      color: #fff;
+      background: var(--uf-primary);
+      color: var(--uf-primary-text);
     }
+    .uf-btn-primary:hover { background: var(--uf-primary-hover); }
     .uf-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
     /* ── Veículos como lista de switch ────────────────────────────────── */
@@ -257,10 +267,11 @@
     html.dark-theme .uf-veiculos-list::-webkit-scrollbar-thumb { background: #3a4555; }
     .uf-veiculo-icon {
       width: 32px; height: 32px; border-radius: 50%;
-      background: rgba(120, 144, 156, 0.15); color: #607d8b;
+      background: var(--uf-primary-soft); color: var(--uf-primary-hover);
       display: flex; align-items: center; justify-content: center; font-size: 14px;
       flex-shrink: 0;
     }
+    html.dark-theme .uf-veiculo-icon { color: var(--uf-primary); }
   </style>
 </head>
 <body>

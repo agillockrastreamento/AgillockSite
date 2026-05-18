@@ -169,6 +169,7 @@ export function MapScreen() {
   const confirm = useConfirmDialog();
   const { can: canPerm } = useAuth();
   const canVerCerca = canPerm('rastreamento.verCerca') || canPerm('rastreamento.criarCerca');
+  const canVerEventos = canPerm('rastreamento.verEventos');
   const mapRef = useRef<MapView | null>(null);
   const [accessStatus, setAccessStatus] = useState<TrackingAccessStatus | null>(null);
   const [devices, setDevices] = useState<TrackingDevice[]>([]);
@@ -267,13 +268,14 @@ export function MapScreen() {
   }, [route.params, navigation]);
 
   useEffect(() => {
+    if (!canVerEventos) return;
     const loadUnreadCount = async () => {
       const { getUnreadCount } = await import('../notifications/notificationService');
       const count = await getUnreadCount();
       setUnreadCount(count);
     };
     loadUnreadCount();
-  }, []);
+  }, [canVerEventos]);
 
   useEffect(() => {
     if (notificationsSheetVisible) setUnreadCount(0);
@@ -695,16 +697,20 @@ export function MapScreen() {
       headerRight: () => (
         <View style={styles.headerButtons}>
           <IconButton icon="magnify" iconColor={colors.surface} size={22} onPress={() => setSearchSheetVisible(true)} />
-          <IconButton icon="bell-outline" iconColor={colors.surface} size={22} onPress={() => setNotificationsSheetVisible(true)} />
-          {unreadCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-            </View>
-          )}
+          {canVerEventos ? (
+            <>
+              <IconButton icon="bell-outline" iconColor={colors.surface} size={22} onPress={() => setNotificationsSheetVisible(true)} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
+            </>
+          ) : null}
         </View>
       ),
     });
-  }, [navigation, unreadCount]);
+  }, [navigation, unreadCount, canVerEventos]);
 
   useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
 
@@ -1211,18 +1217,20 @@ export function MapScreen() {
         }}
       />
 
-      <NotificationsBottomSheet
-        visible={notificationsSheetVisible}
-        devices={devices}
-        onClose={() => setNotificationsSheetVisible(false)}
-        onSelectEvent={(event) => {
-          if (event.dispositivoId) {
-            const device = devices.find((d) => d.dispositivoId === event.dispositivoId);
-            if (device) focusDevice(device, true);
-          }
-          setNotificationsSheetVisible(false);
-        }}
-      />
+      {canVerEventos ? (
+        <NotificationsBottomSheet
+          visible={notificationsSheetVisible}
+          devices={devices}
+          onClose={() => setNotificationsSheetVisible(false)}
+          onSelectEvent={(event) => {
+            if (event.dispositivoId) {
+              const device = devices.find((d) => d.dispositivoId === event.dispositivoId);
+              if (device) focusDevice(device, true);
+            }
+            setNotificationsSheetVisible(false);
+          }}
+        />
+      ) : null}
     </View>
   );
 }
