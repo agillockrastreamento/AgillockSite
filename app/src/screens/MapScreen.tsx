@@ -27,6 +27,7 @@ import MapView, {
 } from 'react-native-maps';
 import { Icon, IconButton } from 'react-native-paper';
 
+import { useAuth } from '../auth/AuthProvider';
 import { SearchBottomSheet } from '../components/SearchBottomSheet';
 import { NotificationsBottomSheet } from '../components/NotificationsBottomSheet';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
@@ -166,6 +167,8 @@ export function MapScreen() {
   const route = useRoute<NativeStackScreenProps<RootStackParamList, 'Map'>['route']>();
   const toast = useToast();
   const confirm = useConfirmDialog();
+  const { can: canPerm } = useAuth();
+  const canVerCerca = canPerm('rastreamento.verCerca') || canPerm('rastreamento.criarCerca');
   const mapRef = useRef<MapView | null>(null);
   const [accessStatus, setAccessStatus] = useState<TrackingAccessStatus | null>(null);
   const [devices, setDevices] = useState<TrackingDevice[]>([]);
@@ -706,9 +709,9 @@ export function MapScreen() {
   useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
 
   useEffect(() => {
-    if (!showFences) { setGeofences([]); return; }
+    if (!showFences || !canVerCerca) { setGeofences([]); return; }
     getGeofences().then(setGeofences).catch(() => {});
-  }, [showFences]);
+  }, [showFences, canVerCerca]);
 
   useEffect(() => {
     if (!showTracks) { setTracks([]); return; }
@@ -1026,12 +1029,14 @@ export function MapScreen() {
                 active={showLabels}
                 onPress={() => setShowLabels(v => !v)}
               />
-              <LayerOption
-                icon="circle-outline"
-                label="Cercas"
-                active={showFences}
-                onPress={() => setShowFences(v => !v)}
-              />
+              {canVerCerca ? (
+                <LayerOption
+                  icon="circle-outline"
+                  label="Cercas"
+                  active={showFences}
+                  onPress={() => setShowFences(v => !v)}
+                />
+              ) : null}
               <LayerOption
                 icon="timeline-outline"
                 label="Rastro"
@@ -1171,7 +1176,7 @@ export function MapScreen() {
               isUploading={isPhotoUploading}
               onGeofenceCreated={handleGeofenceCreated}
               onGeofenceDeleted={() => {
-                if (showFences) getGeofences().then(setGeofences).catch(() => {});
+                if (showFences && canVerCerca) getGeofences().then(setGeofences).catch(() => {});
               }}
               onFocusDevice={() => animateToDevice(selectedDevice, MAIN_CARD_HEIGHT)}
               onVerMais={() => {

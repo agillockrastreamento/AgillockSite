@@ -38,6 +38,23 @@
     relatorio: { ver: true, exportar: true }
   };
 
+  // Permissões vazias (vinculado sem dados carregados). Default seguro: nada visível
+  // até o /me/permissoes responder e atualizar o cache.
+  var PERMS_VAZIAS = {
+    rastreamento: {
+      ver: false, bloquear: false, desbloquear: false,
+      criarCerca: false, verCerca: false, verEventos: false,
+      marcarManutencaoRecorrenteFeita: false,
+      marcarRecorrenciaDataFeita: false,
+      uploadFoto: false, editarIdentificacao: false
+    },
+    manutencao: {
+      ver: false, criar: false, editar: false, excluir: false,
+      criarRecorrencia: false, editarRecorrencia: false, marcarFeita: false
+    },
+    relatorio: { ver: false, exportar: false }
+  };
+
   // ─── Token ────────────────────────────────────────────────────────────────
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
@@ -56,7 +73,9 @@
   function getPermissoes() {
     var me = _cachedMe();
     if (me && me.permissoes) return me.permissoes;
-    // Sem cache (acesso ainda não inicializado): assume total (responsável) — refinará após /me/permissoes resolver.
+    // Sem cache: olha o JWT. Responsável → total; vinculado → vazio (default seguro até /me/permissoes resolver).
+    var u = getUser();
+    if (u && u.tipo === 'vinculado') return PERMS_VAZIAS;
     return PERMS_TOTAIS;
   }
   function isResponsavel() {

@@ -258,9 +258,14 @@ export function MainVehicleCard({
   }, [device.dispositivoId]);
 
   const loadGeofences = useCallback(async () => {
+    // Sub-usuário sem permissão de cercas não deve nem chamar a API (evita 403).
+    if (!can('rastreamento.verCerca') && !can('rastreamento.criarCerca')) {
+      setDeviceGeofences([]);
+      return;
+    }
     const geofences = await getDeviceGeofences(device.dispositivoId);
     setDeviceGeofences(geofences);
-  }, [device.dispositivoId]);
+  }, [device.dispositivoId, can]);
 
   useEffect(() => {
     fetchSummary();

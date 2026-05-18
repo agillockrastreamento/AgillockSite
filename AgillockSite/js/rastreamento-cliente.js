@@ -270,9 +270,18 @@ function _ajustarAlturaCardDispositivo() {
 let _cercasPermitidas = new Set();
 
 document.addEventListener('DOMContentLoaded', function () {
-  AL_CLIENTE.apiGet('/api/cliente/rastreamento/cercas').then(cercas => {
-    cercas.forEach(c => _cercasPermitidas.add(c.id));
-  }).catch(() => {});
+  // Aguarda permissões antes de chamar /cercas para evitar 403 espontâneos quando vinculado.
+  const _refresh = window.AL_CLIENTE?.refreshPermissoes
+    ? window.AL_CLIENTE.refreshPermissoes()
+    : Promise.resolve();
+  _refresh.finally(function () {
+    const _podeVerCercas = !window.AL_CLIENTE?.can || window.AL_CLIENTE.can('rastreamento.verCerca');
+    if (_podeVerCercas) {
+      AL_CLIENTE.apiGet('/api/cliente/rastreamento/cercas').then(cercas => {
+        cercas.forEach(c => _cercasPermitidas.add(c.id));
+      }).catch(() => {});
+    }
+  });
 
   verificarAcesso().then(function (bloqueado) {
     if (bloqueado) return;
@@ -2418,15 +2427,22 @@ function mostrarCardDispositivo(id) {
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
   _carregarResumoHojeCliente(id);
 
-  // Verifica cercas para ativar o botão visualmente
-  AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
-    const btnCerca = card.querySelector('.dcard-acao[data-acao="cerca"]');
-    if (btnCerca) btnCerca.classList.toggle('ativo', !!(cercas && cercas.length > 0));
-  }).catch(() => {});
+  // Verifica cercas para ativar o botão visualmente (só se tem permissão)
+  if (!window.AL_CLIENTE?.can || window.AL_CLIENTE.can('rastreamento.verCerca')) {
+    AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/cercas`).then(cercas => {
+      const btnCerca = card.querySelector('.dcard-acao[data-acao="cerca"]');
+      if (btnCerca) btnCerca.classList.toggle('ativo', !!(cercas && cercas.length > 0));
+    }).catch(() => {});
+  }
 
-  // Carrega tipos de comandos (Bloqueio/Desbloqueio)
+  // Carrega tipos de comandos (Bloqueio/Desbloqueio) — filtra pelas permissões do cliente
   AL_CLIENTE.apiGet(`/api/cliente/dispositivos/${id}/tipos-comandos`).then(tipos => {
-    const permitidos = ['engineStop', 'engineResume'];
+    const podeBlock = !window.AL_CLIENTE?.can || window.AL_CLIENTE.can('rastreamento.bloquear');
+    const podeUnblock = !window.AL_CLIENTE?.can || window.AL_CLIENTE.can('rastreamento.desbloquear');
+    const permitidosBase = ['engineStop', 'engineResume'];
+    const permitidos = permitidosBase.filter(t =>
+      (t === 'engineStop' && podeBlock) || (t === 'engineResume' && podeUnblock));
+    if (!permitidos.length) return;
     const suportados = Array.isArray(tipos) ? tipos.map(t => (typeof t === 'string' ? t : t.type)).filter(t => permitidos.includes(t)) : [];
     if (suportados.length > 0) {
       const grid = document.getElementById(`dcard-comandos-grid-${id}`);
@@ -2821,6 +2837,10 @@ function _criarCamadaCerca(cerca) {
 }
 
 async function carregarCercas() {
+  // Sub-usuário sem permissão de ver cercas: retorna lista vazia silenciosamente.
+  if (window.AL_CLIENTE?.can && !window.AL_CLIENTE.can('rastreamento.verCerca')) {
+    return [];
+  }
   const data = await AL_CLIENTE.apiGet('/api/cliente/rastreamento/cercas');
   return Array.isArray(data) ? data : (data.cercas || []);
 }
@@ -3009,6 +3029,7 @@ window.acaoDispositivoCliente = async function(acao, dispositivoId) {
 
 function _htmlAcoesCard(dispositivoId) {
   const rotaAtiva = !!_rotasIndividuais[dispositivoId];
+  const podeCerca = !window.AL_CLIENTE?.can || window.AL_CLIENTE.can('rastreamento.criarCerca');
   return `
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
       <div class= "dcard-section-title-title">AÇÕES</div>
@@ -3025,10 +3046,10 @@ function _htmlAcoesCard(dispositivoId) {
           <span class="dcard-acao-icon"><i class="fa fa-share-alt"></i></span>
           <span>Compartilhar</span>
         </button>
-        <button class="dcard-acao" data-acao="cerca" onclick="acaoDispositivoCliente('cerca','${dispositivoId}')" title="Criar Cerca">
+        ${podeCerca ? `<button class="dcard-acao" data-acao="cerca" onclick="acaoDispositivoCliente('cerca','${dispositivoId}')" title="Criar Cerca">
           <span class="dcard-acao-icon"><i class="fa fa-circle-o"></i></span>
           <span>Cerca</span>
-        </button>
+        </button>` : ''}
       </div>
     </div>`;
 }
@@ -3106,11 +3127,11 @@ function _aplicarPermissoesRastreamentoUI() {
     b.style.display = can('rastreamento.criarCerca') ? '' : 'none';
   });
 
-  // Botões de bloquear/desbloquear (engineStop / engineResume)
-  document.querySelectorAll('[data-cmd="engineStop"], .btn-cmd-engineStop').forEach(b => {
+  // Botões de bloquear/desbloquear (.cmd-btn[data-tipo=...] gerados em mostrarCardDispositivo)
+  document.querySelectorAll('.cmd-btn[data-tipo="engineStop"], [data-cmd="engineStop"], .btn-cmd-engineStop').forEach(b => {
     b.style.display = can('rastreamento.bloquear') ? '' : 'none';
   });
-  document.querySelectorAll('[data-cmd="engineResume"], .btn-cmd-engineResume').forEach(b => {
+  document.querySelectorAll('.cmd-btn[data-tipo="engineResume"], [data-cmd="engineResume"], .btn-cmd-engineResume').forEach(b => {
     b.style.display = can('rastreamento.desbloquear') ? '' : 'none';
   });
 

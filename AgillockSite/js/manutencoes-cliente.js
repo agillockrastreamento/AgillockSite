@@ -53,6 +53,17 @@
     return !!(v && v.podeGerenciarManutencao);
   }
 
+  // Helpers granulares por permissão do cliente logado.
+  function _permCan(key) {
+    return !window.AL_CLIENTE?.can || window.AL_CLIENTE.can(key);
+  }
+  function podeCriarRegistro()        { return podeGerenciarManutencao() && _permCan('manutencao.criar'); }
+  function podeEditarRegistro()       { return podeGerenciarManutencao() && _permCan('manutencao.editar'); }
+  function podeExcluirRegistro()      { return podeGerenciarManutencao() && _permCan('manutencao.excluir'); }
+  function podeCriarRecorrencia()     { return podeGerenciarManutencao() && _permCan('manutencao.criarRecorrencia'); }
+  function podeEditarRecorrencia()    { return podeGerenciarManutencao() && _permCan('manutencao.editarRecorrencia'); }
+  function podeMarcarFeita()          { return podeGerenciarManutencao() && _permCan('manutencao.marcarFeita'); }
+
   function manutencaoAtiva() {
     const v = veiculos.find(v => v.dispositivoId === dispositivoIdAtivo);
     return !v || v.manutencaoAtiva !== false;
@@ -165,15 +176,22 @@
     const pode = podeGerenciarManutencao();
     const ativa = manutencaoAtiva();
     const podeOperar = pode && ativa;
+    const podeCriarReg = podeOperar && _permCan('manutencao.criar');
+    const podeCriarRec = podeOperar && _permCan('manutencao.criarRecorrencia');
     const btnRegistro = document.getElementById('btn-novo-registro');
     const btnRecorrencia = document.getElementById('btn-nova-recorrencia');
     if (btnRegistro) {
-      btnRegistro.disabled = !dispositivoIdAtivo || !podeOperar;
-      btnRegistro.title = !ativa ? 'Manutenções desativadas para este veículo.' : (!pode ? 'Apenas o responsavel pelo faturamento pode registrar manutencoes.' : '');
+      btnRegistro.style.display = podeCriarReg ? '' : 'none';
+      btnRegistro.disabled = !dispositivoIdAtivo || !podeCriarReg;
     }
     if (btnRecorrencia) {
-      btnRecorrencia.disabled = !dispositivoIdAtivo || !podeOperar;
-      btnRecorrencia.title = !ativa ? 'Manutenções desativadas para este veículo.' : (!pode ? 'Apenas o responsavel pelo faturamento pode criar recorrencias.' : '');
+      btnRecorrencia.style.display = podeCriarRec ? '' : 'none';
+      btnRecorrencia.disabled = !dispositivoIdAtivo || !podeCriarRec;
+    }
+    // Botão "Nova Recorrência por Data" também (se existir)
+    const btnRecData = document.getElementById('btn-nova-rec-data');
+    if (btnRecData) {
+      btnRecData.style.display = podeCriarRec ? '' : 'none';
     }
     const banner = document.getElementById('man-banner-desativado');
     if (banner) banner.classList.toggle('visivel', !!dispositivoIdAtivo && !ativa);
@@ -201,6 +219,10 @@
 
   // ── Init ─────────────────────────────────────────────────────────────────────
   async function init() {
+    // Aguarda permissões antes de carregar listas para renderizar botões corretamente
+    if (window.AL_CLIENTE?.refreshPermissoes) {
+      await window.AL_CLIENTE.refreshPermissoes();
+    }
     await carregarVeiculos();
     bindEvents();
   }
@@ -312,7 +334,8 @@
       const dataStr = new Date(r.dataRealizacao).toLocaleDateString('pt-BR');
       const fotos = Array.isArray(r.fotos) ? r.fotos : [];
       const isAdmin = r.origem === 'ADMIN';
-      const podeGerenciar = podeGerenciarManutencao();
+      const podeEditar = podeEditarRegistro() && !isAdmin;
+      const podeExcluir = podeExcluirRegistro() && !isAdmin;
 
       return `
         <div class="man-card" data-id="${r.id}">
@@ -332,8 +355,8 @@
               </div>
             </div>
             <div class="man-card-actions">
-              ${podeGerenciar && !isAdmin ? `<button class="btn btn-info btn-xs" onclick="_editarRegistro('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
-              ${podeGerenciar && !isAdmin ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','registro')" title="Excluir"><i class="fa fa-trash"></i></button>` : ''}
+              ${podeEditar ? `<button class="btn btn-info btn-xs" onclick="_editarRegistro('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
+              ${podeExcluir ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','registro')" title="Excluir"><i class="fa fa-trash"></i></button>` : ''}
               ${(r.notas || fotos.length) ? `<button class="btn btn-default btn-xs" onclick="_toggleExtra(this)" title="Ver mais"><i class="fa fa-chevron-down"></i></button>` : ''}
             </div>
           </div>
@@ -367,7 +390,8 @@
       const kmRestante = r.intervaloKm - kmPercorrido;
       const pct = Math.min(100, Math.max(0, (kmPercorrido / r.intervaloKm) * 100));
       const isAdmin = r.origem === 'ADMIN';
-      const podeGerenciar = podeGerenciarManutencao();
+      const podeFeito = podeMarcarFeita();
+      const podeEditar = podeEditarRecorrencia() && !isAdmin;
 
       let statusClass, statusLabel, fillClass, statusIcon;
       if (kmRestante > 50) {
@@ -407,11 +431,11 @@
               </div>
             </div>
             <div class="man-rec-actions">
-              ${podeGerenciar ? `<button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}','${_esc(r.titulo).replace(/'/g, "\\'")}')">
+              ${podeFeito ? `<button class="btn btn-success btn-sm" onclick="_abrirFeito('${r.id}','${_esc(r.titulo).replace(/'/g, "\\'")}')">
                 <i class="fa fa-check"></i> Feito
               </button>` : ''}
-              ${podeGerenciar && !isAdmin ? `<button class="btn btn-info btn-xs" onclick="_editarRecorrencia('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
-              ${podeGerenciar && !isAdmin ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','recorrencia')" title="Cancelar"><i class="fa fa-times"></i></button>` : ''}
+              ${podeEditar ? `<button class="btn btn-info btn-xs" onclick="_editarRecorrencia('${r.id}')" title="Editar"><i class="fa fa-pencil"></i></button>` : ''}
+              ${podeEditar ? `<button class="btn btn-danger btn-xs" onclick="_confirmarExcluir('${r.id}','recorrencia')" title="Cancelar"><i class="fa fa-times"></i></button>` : ''}
             </div>
           </div>
         </div>
@@ -802,6 +826,8 @@
     if (empty) empty.style.display = 'none';
 
     const podGer = podeGerenciarManutencao();
+    const _canFeita = podeMarcarFeita();
+    const _canEditarRec = podeEditarRecorrencia();
 
     list.innerHTML = recorrenciasData.map(r => {
       const diff = _diffDiasC(r.dataReferencia);
@@ -820,8 +846,8 @@
         statusClass = 'status-overdue'; statusLabel = 'Pendente — ' + Math.abs(diff) + ' dia(s) atrás'; statusIcon = 'fa-times-circle'; borderColor = '#c0392b';
       }
 
-      const podeMexer = podGer;
-      const podeEditar = podGer && r.origem !== 'ADMIN';
+      const podeMexer = podGer && _canFeita;
+      const podeEditar = podGer && _canEditarRec && r.origem !== 'ADMIN';
 
       return `
         <div class="man-rec-card" style="border-left:4px solid ${borderColor};">
@@ -994,35 +1020,4 @@
   }
 
   init();
-
-  // ── Permissões UI (sub-usuários) ────────────────────────────────────────────
-  function _aplicarPermissoesManutencoesUI() {
-    if (!window.AL_CLIENTE || !AL_CLIENTE.can) return;
-    const can = AL_CLIENTE.can;
-
-    const btnNovo = document.getElementById('btn-novo-registro');
-    if (btnNovo) btnNovo.style.display = can('manutencao.criar') ? '' : 'none';
-
-    // Botões nos cards renderizados (editar/excluir/feito) — usam classes/data-attrs no JS
-    document.querySelectorAll('[data-acao="editar"], .btn-edit-registro, .btn-edit-recorrencia').forEach(b => {
-      const eRecorrencia = b.classList.contains('btn-edit-recorrencia') || b.dataset.tipo === 'recorrencia';
-      b.style.display = (eRecorrencia ? can('manutencao.editarRecorrencia') : can('manutencao.editar')) ? '' : 'none';
-    });
-    document.querySelectorAll('[data-acao="excluir"], .btn-del-registro, .btn-del-recorrencia').forEach(b => {
-      const eRecorrencia = b.classList.contains('btn-del-recorrencia') || b.dataset.tipo === 'recorrencia';
-      b.style.display = (eRecorrencia ? can('manutencao.editarRecorrencia') : can('manutencao.excluir')) ? '' : 'none';
-    });
-    document.querySelectorAll('[data-acao="feito"], .btn-feito').forEach(b => {
-      b.style.display = can('manutencao.marcarFeita') ? '' : 'none';
-    });
-    document.querySelectorAll('[data-acao="nova-recorrencia"], .btn-nova-recorrencia').forEach(b => {
-      b.style.display = can('manutencao.criarRecorrencia') ? '' : 'none';
-    });
-  }
-
-  if (window.AL_CLIENTE && AL_CLIENTE.refreshPermissoes) {
-    AL_CLIENTE.refreshPermissoes().then(_aplicarPermissoesManutencoesUI);
-  }
-  const _obsManut = new MutationObserver(_aplicarPermissoesManutencoesUI);
-  _obsManut.observe(document.body, { childList: true, subtree: true });
 })();

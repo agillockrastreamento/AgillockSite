@@ -747,7 +747,9 @@ router.get('/rastreamento/relatorios/batch/paradas', async (req: ClienteRequest,
   } catch { res.status(502).json({ error: 'Erro ao buscar paradas.' }); }
 });
 
-router.get('/rastreamento/relatorios/batch/eventos', requirePermission('rastreamento.verEventos'), async (req: ClienteRequest, res: Response): Promise<void> => {
+// Eventos no contexto do RELATÓRIO — não exige permissão de "ver eventos no mapa".
+// O acesso à tela de relatório já é controlado pelo frontend via `relatorio.ver`.
+router.get('/rastreamento/relatorios/batch/eventos', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const { from, to } = req.query as { from?: string; to?: string };
   const deviceIds = req.query.deviceId as string[] | string;
