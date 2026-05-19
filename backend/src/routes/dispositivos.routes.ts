@@ -79,7 +79,7 @@ function numberOrNull(value: unknown): number | null {
 
 /**
  * Sincroniza a TagBLE principal do dispositivo com o campo enderecoMac.
- * Se o MAC for fornecido e não existir TagBLE com aquele MAC, cria uma.
+ * Usa upsert (atômico) para evitar race condition entre requests simultâneos.
  * Não remove tags existentes (apenas garante que o MAC do dispositivo
  * tenha sua TagBLE correspondente disponível para atribuição ao resgate).
  */
@@ -87,13 +87,10 @@ async function syncTagPrincipal(dispositivoId: string, enderecoMac: string | nul
   if (!enderecoMac) return;
   const macNormalizado = enderecoMac.toUpperCase().trim();
   if (!macNormalizado) return;
-  const existente = await prisma.tagBLE.findUnique({
+  await prisma.tagBLE.upsert({
     where: { dispositivoId_mac: { dispositivoId, mac: macNormalizado } },
-    select: { id: true },
-  });
-  if (existente) return;
-  await prisma.tagBLE.create({
-    data: {
+    update: {}, // mantém tag existente intocada (preserva apelido/fingerprint manuais)
+    create: {
       dispositivoId,
       mac: macNormalizado,
       apelido: 'Tag principal',

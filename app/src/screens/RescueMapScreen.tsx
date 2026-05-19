@@ -218,8 +218,11 @@ export function RescueMapScreen() {
         });
       }
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      // Log explícito pra ajudar a diagnosticar erros de autenticação/permissão
+      console.error('[RescueMapScreen] Falha ao carregar veículos:', errorMsg, err);
       toast.show({
-        message: err instanceof Error ? err.message : 'Não foi possível carregar os veículos.',
+        message: `Erro ao carregar: ${errorMsg}`,
         type: 'error',
       });
     } finally {
