@@ -10,12 +10,9 @@ import {
   View,
 } from 'react-native';
 import { ActivityIndicator, Icon } from 'react-native-paper';
-import Svg, {
-  Circle as SvgCircle,
-  Defs,
-  RadialGradient,
-  Stop,
-} from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import Svg, { Path } from 'react-native-svg';
 
 import {
   type BleDevice,
@@ -24,9 +21,7 @@ import {
   waitForBleReady,
 } from '../ble/bleManager';
 import {
-  classifyProximity,
   classifyTrend,
-  type ProximityInfo,
   RssiSmoother,
   rssiToDistance,
   type TrendDirection,
@@ -38,10 +33,7 @@ import {
   matchTagToScan,
 } from '../ble/tagMatcher';
 import { apiRequest } from '../services/api/apiClient';
-import { colors } from '../theme/colors';
-import { radius, spacing } from '../theme/layout';
-
-const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle);
+import { spacing } from '../theme/layout';
 
 export type RescueVehicleTag = {
   id: string;
@@ -74,55 +66,112 @@ type OutraTag = {
   lastSeenAt: number;
 };
 
-const STALE_TIMEOUT_MS = 12000;
+const STALE_TIMEOUT_MS = 5000;
+const SOUND_PREF_KEY = '@agillock/rescue/sound_haptic_enabled';
 
-// Pattern de vibração por zona
+// Heading buckets para correlação direção-RSSI
+const HEADING_BUCKET_DEG = 15;
+// Mostra a seta direcional assim que tem 1 heading registrado.
+// Imprecisa no começo (só 1 amostra), melhora à medida que o usuário gira.
+const HEADING_SAMPLES_MIN = 1;
+const HEADING_DECAY_MS = 10000;
+
 function getVibrationInterval(distance: number): number | null {
-  if (distance < 2) return 400;
-  if (distance < 5) return 900;
-  if (distance < 15) return 1800;
-  if (distance < 35) return 3000;
+  if (distance < 2) return 350;
+  if (distance < 5) return 800;
+  if (distance < 15) return 1600;
+  if (distance < 35) return 2800;
   return null;
 }
 
-function getTrendMessage(trend: TrendDirection, distance: number): string {
-  if (distance < 2) return 'Olhe ao redor — a tag está bem perto!';
-  if (trend === 'aproximando') return 'Continue na mesma direção…';
-  if (trend === 'afastando') return 'Volte — você está se afastando.';
-  return 'Caminhe em qualquer direção para detectar mudança.';
+// Texto contextual baseado no ângulo relativo entre o telefone e a tag
+function getDirectionLabel(relAngle: number, distance: number): string {
+  if (distance < 1.5) return 'Bem perto';
+  const a = Math.abs(((relAngle + 540) % 360) - 180); // 0..180 (0 = atrás, 180 = na frente)
+  const front = 180 - a; // 0 = na frente, 180 = atrás
+  if (front < 30) return 'em frente';
+  if (front < 75) return relAngle > 0 ? 'à direita' : 'à esquerda';
+  if (front < 135) return relAngle > 0 ? 'atrás à direita' : 'atrás à esquerda';
+  return 'atrás de você';
+}
+
+function getStateMessage(hasDistance: boolean, hasDirection: boolean, isScanning: boolean): string {
+  if (!isScanning) return 'Toque em "Buscar" para começar';
+  if (!hasDistance) return 'Procurando tag…';
+  if (!hasDirection) return 'Vire-se devagar para localizar';
+  return '';
+}
+
+function colorForDistance(distance: number | null): string {
+  if (distance == null) return '#2d4566';
+  if (distance < 2) return '#1b8d3a';
+  if (distance < 8) return '#22a043';
+  if (distance < 20) return '#3aa84a';
+  if (distance < 40) return '#3c6e93';
+  return '#2f4e6e';
 }
 
 export function TagScanner({ veiculoAlvo }: TagScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Estado da tag alvo
-  const [alvoSmoother] = useState(() => new RssiSmoother(0.3, 8));
+  // Tag alvo
+  const [alvoSmoother] = useState(() => new RssiSmoother(0.45, 8));
   const [alvoRssi, setAlvoRssi] = useState<number | null>(null);
   const [alvoDistance, setAlvoDistance] = useState<number | null>(null);
   const [alvoConfidence, setAlvoConfidence] = useState<MatchConfidence>('none');
   const [alvoLastSeenAt, setAlvoLastSeenAt] = useState<number | null>(null);
   const [alvoTrackingId, setAlvoTrackingId] = useState<string | null>(null);
-  const [trend, setTrend] = useState<TrendDirection>('estavel');
   const [cacheSaved, setCacheSaved] = useState(false);
+  const [trend, setTrend] = useState<TrendDirection>('estavel');
 
   const [outras, setOutras] = useState<Record<string, OutraTag>>({});
 
+  // Heading do telefone + heading estimada da tag
+  const [deviceHeading, setDeviceHeading] = useState(0);
+  const deviceHeadingRef = useRef(0);
+  deviceHeadingRef.current = deviceHeading;
+
+  // Histórico (heading bucket → melhor RSSI recente)
+  const headingRssiRef = useRef<Map<number, { rssi: number; ts: number }>>(new Map());
+  const [estimatedTagHeading, setEstimatedTagHeading] = useState<number | null>(null);
+
   // Animações
-  const corePulse = useRef(new Animated.Value(1)).current;
-  const ring1Anim = useRef(new Animated.Value(0)).current;
-  const ring2Anim = useRef(new Animated.Value(0)).current;
-  const ring3Anim = useRef(new Animated.Value(0)).current;
+  const arrowRotationAnim = useRef(new Animated.Value(0)).current;
+  const arrowOpacityAnim = useRef(new Animated.Value(0)).current;
+  const sphereOpacityAnim = useRef(new Animated.Value(1)).current;
+  const spherePulse = useRef(new Animated.Value(1)).current;
+  const backgroundColorAnim = useRef(new Animated.Value(0)).current; // 0=cinza, 1=verde
+  const dotPosAnim = useRef(new Animated.Value(0.5)).current; // posição da bolinha pequena
   const trendArrowAnim = useRef(new Animated.Value(0)).current;
-  const colorIntensity = useRef(new Animated.Value(0)).current;
 
   const veiculoAlvoRef = useRef(veiculoAlvo);
   veiculoAlvoRef.current = veiculoAlvo;
+  const soundEnabledRef = useRef(true);
+  soundEnabledRef.current = soundEnabled;
 
   const stopScanRef = useRef<(() => void) | null>(null);
   const vibrationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const headingWatcherRef = useRef<Location.LocationSubscription | null>(null);
 
-  // Reset ao trocar de veículo
+  // ── Preferência de som persistida ─────────────────────
+  useEffect(() => {
+    AsyncStorage.getItem(SOUND_PREF_KEY)
+      .then((v) => { if (v !== null) setSoundEnabled(v === '1'); })
+      .catch(() => {});
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem(SOUND_PREF_KEY, next ? '1' : '0').catch(() => {});
+      if (!next) Vibration.cancel();
+      return next;
+    });
+  }, []);
+
+  // ── Reset ao trocar de veículo ───────────────────────
   useEffect(() => {
     alvoSmoother.reset();
     setAlvoRssi(null);
@@ -130,16 +179,48 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     setAlvoConfidence('none');
     setAlvoLastSeenAt(null);
     setAlvoTrackingId(null);
-    setTrend('estavel');
     setCacheSaved(false);
+    setTrend('estavel');
     setOutras({});
+    setEstimatedTagHeading(null);
+    headingRssiRef.current.clear();
   }, [veiculoAlvo?.id, alvoSmoother]);
 
-  // Limpa tags antigas
+  // ── Heading do telefone ─────────────────────────────
+  useEffect(() => {
+    if (!isScanning) {
+      headingWatcherRef.current?.remove();
+      headingWatcherRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    Location.requestForegroundPermissionsAsync().then((perm) => {
+      if (!perm.granted || cancelled) return;
+      Location.watchHeadingAsync((h) => {
+        // trueHeading compensa declinação magnética; se < 0 (não disponível), usa magnético
+        const heading = h.trueHeading >= 0 ? h.trueHeading : h.magHeading;
+        if (Number.isFinite(heading)) setDeviceHeading(heading);
+      }).then((watcher) => {
+        if (cancelled) {
+          watcher.remove();
+          return;
+        }
+        headingWatcherRef.current = watcher;
+      }).catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+      headingWatcherRef.current?.remove();
+      headingWatcherRef.current = null;
+    };
+  }, [isScanning]);
+
+  // ── Cleanup das tags antigas + atualizar heading estimada da tag ─
   useEffect(() => {
     if (!isScanning) return;
     const interval = setInterval(() => {
       const now = Date.now();
+      // Limpa outras tags antigas
       setOutras((current) => {
         const next: Record<string, OutraTag> = {};
         let changed = false;
@@ -149,90 +230,94 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         }
         return changed ? next : current;
       });
+      // Decai buckets de heading antigos
+      const map = headingRssiRef.current;
+      for (const [k, v] of map) {
+        if (now - v.ts > HEADING_DECAY_MS) map.delete(k);
+      }
+      // Tag alvo perdida
       if (alvoLastSeenAt && now - alvoLastSeenAt > STALE_TIMEOUT_MS) {
         alvoSmoother.reset();
         setAlvoRssi(null);
         setAlvoDistance(null);
-        setTrend('estavel');
+        setEstimatedTagHeading(null);
       }
     }, 2000);
     return () => clearInterval(interval);
   }, [isScanning, alvoLastSeenAt, alvoSmoother]);
 
-  // Anéis concêntricos pulsando (estilo radar)
+  // ── Animação: transição esfera → seta (3 estados) ────
+  // Esfera fica visível em: sem sinal + sinal sem direção (ela aquece de cor com bg).
+  // Seta aparece sobre a esfera quando já temos direção.
   useEffect(() => {
-    if (alvoDistance == null) {
-      ring1Anim.stopAnimation();
-      ring2Anim.stopAnimation();
-      ring3Anim.stopAnimation();
-      ring1Anim.setValue(0);
-      ring2Anim.setValue(0);
-      ring3Anim.setValue(0);
-      return;
-    }
-    // Velocidade dos anéis baseada na distância (perto = rápido)
-    const duration = Math.max(900, Math.min(2800, alvoDistance * 90));
-    const makeLoop = (anim: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: false,
-          }),
-          Animated.timing(anim, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: false,
-          }),
-        ]),
-      );
-    const l1 = makeLoop(ring1Anim, 0);
-    const l2 = makeLoop(ring2Anim, duration * 0.33);
-    const l3 = makeLoop(ring3Anim, duration * 0.66);
-    l1.start();
-    l2.start();
-    l3.start();
-    return () => {
-      l1.stop();
-      l2.stop();
-      l3.stop();
-    };
-  }, [alvoDistance, ring1Anim, ring2Anim, ring3Anim]);
+    const hasDirection = estimatedTagHeading != null;
+    Animated.parallel([
+      Animated.timing(arrowOpacityAnim, {
+        toValue: hasDirection ? 1 : 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sphereOpacityAnim, {
+        toValue: hasDirection ? 0 : 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [estimatedTagHeading, arrowOpacityAnim, sphereOpacityAnim]);
 
-  // Pulse do núcleo
+  // ── Pulse da esfera (visível enquanto não há direção) ─
   useEffect(() => {
-    if (alvoDistance == null) {
-      corePulse.stopAnimation();
-      corePulse.setValue(1);
+    if (estimatedTagHeading != null) {
+      spherePulse.stopAnimation();
+      spherePulse.setValue(1);
       return;
     }
-    const duration = Math.max(450, Math.min(1400, alvoDistance * 70));
+    // Quando já captou distância, pulso fica mais rápido pra dar feedback de "esquentou"
+    const fast = alvoDistance != null;
+    const dur = fast ? 600 : 900;
+    const scale = fast ? 1.12 : 1.08;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(corePulse, { toValue: 1.12, duration, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(corePulse, { toValue: 1, duration, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(spherePulse, { toValue: scale, duration: dur, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(spherePulse, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [alvoDistance, corePulse]);
+  }, [alvoDistance, estimatedTagHeading, spherePulse]);
 
-  // Cor de fundo animada
+  // ── Rotação da seta (apontando pra direção estimada) ─
+  useEffect(() => {
+    if (estimatedTagHeading == null) return;
+    const rel = ((estimatedTagHeading - deviceHeading + 540) % 360) - 180;
+    Animated.spring(arrowRotationAnim, {
+      toValue: rel,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 60,
+    }).start();
+  }, [estimatedTagHeading, deviceHeading, arrowRotationAnim]);
+
+  // ── Animação posição da bolinha pequena (perto = topo) ─
   useEffect(() => {
     if (alvoDistance == null) {
-      Animated.timing(colorIntensity, { toValue: 0, duration: 400, useNativeDriver: false }).start();
+      Animated.timing(dotPosAnim, { toValue: 0.5, duration: 300, useNativeDriver: false }).start();
       return;
     }
-    const i = alvoDistance < 5 ? 1 :
-              alvoDistance < 15 ? 0.6 :
-              alvoDistance < 35 ? 0.3 : 0.1;
-    Animated.timing(colorIntensity, { toValue: i, duration: 600, useNativeDriver: false }).start();
-  }, [alvoDistance, colorIntensity]);
+    const target = Math.max(0.05, Math.min(1, 1 - alvoDistance / 40));
+    Animated.spring(dotPosAnim, { toValue: target, useNativeDriver: false, friction: 7, tension: 50 }).start();
+  }, [alvoDistance, dotPosAnim]);
 
-  // Animação da seta de trend
+  // ── Cor de fundo — depende SÓ da distância, não da direção ─
+  // Assim a tela já fica verde assim que captou sinal, mesmo antes de a seta aparecer.
+  useEffect(() => {
+    const target = alvoDistance != null
+      ? (alvoDistance < 2 ? 1 : alvoDistance < 8 ? 0.85 : alvoDistance < 20 ? 0.6 : 0.35)
+      : 0;
+    Animated.timing(backgroundColorAnim, { toValue: target, duration: 600, useNativeDriver: false }).start();
+  }, [alvoDistance, backgroundColorAnim]);
+
+  // ── Animação do trend arrow (cima/baixo) ────────────
   useEffect(() => {
     if (trend === 'estavel') {
       trendArrowAnim.stopAnimation();
@@ -249,17 +334,18 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     return () => loop.stop();
   }, [trend, trendArrowAnim]);
 
-  // Vibração progressiva
+  // ── Vibração progressiva ────────────────────────────
   useEffect(() => {
     if (vibrationTimerRef.current) {
       clearInterval(vibrationTimerRef.current);
       vibrationTimerRef.current = null;
     }
-    if (alvoDistance == null) return;
+    if (!soundEnabled || alvoDistance == null) return;
     const interval = getVibrationInterval(alvoDistance);
     if (interval == null) return;
     Vibration.vibrate(alvoDistance < 2 ? [0, 100, 60, 100] : 50);
     vibrationTimerRef.current = setInterval(() => {
+      if (!soundEnabledRef.current) return;
       Vibration.vibrate(alvoDistance < 2 ? [0, 100, 60, 100] : 50);
     }, interval);
     return () => {
@@ -268,15 +354,38 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         vibrationTimerRef.current = null;
       }
     };
-  }, [alvoDistance]);
+  }, [alvoDistance, soundEnabled]);
 
   useEffect(() => {
     return () => {
       if (vibrationTimerRef.current) clearInterval(vibrationTimerRef.current);
       Vibration.cancel();
+      headingWatcherRef.current?.remove();
     };
   }, []);
 
+  // ── Atualiza heading estimada da tag a cada scan ────
+  const updateEstimatedHeading = useCallback((rssi: number) => {
+    const heading = deviceHeadingRef.current;
+    const bucket = Math.round(heading / HEADING_BUCKET_DEG) * HEADING_BUCKET_DEG;
+    const now = Date.now();
+    const map = headingRssiRef.current;
+    const existing = map.get(bucket);
+    // Mantém o melhor RSSI por bucket (com decay temporal)
+    if (!existing || rssi > existing.rssi || now - existing.ts > 3000) {
+      map.set(bucket, { rssi, ts: now });
+    }
+    // Estima a heading da tag: bucket com melhor RSSI
+    if (map.size >= HEADING_SAMPLES_MIN) {
+      let best: { heading: number; rssi: number } | null = null;
+      for (const [h, v] of map) {
+        if (!best || v.rssi > best.rssi) best = { heading: h, rssi: v.rssi };
+      }
+      if (best) setEstimatedTagHeading(best.heading);
+    }
+  }, []);
+
+  // ── Inicia scan ─────────────────────────────────────
   const startScan = useCallback(async () => {
     setPermissionError(null);
     const perm = await ensureBlePermissions();
@@ -295,21 +404,24 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         const tag = veiculoAlvoRef.current?.tag ?? null;
         const match = tag ? matchTagToScan(tag, device) : null;
         if (match) {
-          const txPower = tag?.txPowerCalibrado ?? -65;
-          const smoothed = alvoSmoother.push(device.rssi ?? -100);
-          const dist = rssiToDistance(smoothed, txPower, 3.0);
+          const txPower = tag?.txPowerCalibrado ?? -59;
+          const rawRssi = device.rssi ?? -100;
+          const smoothed = alvoSmoother.push(rawRssi);
+          const dist = rssiToDistance(smoothed, txPower, 2.5);
+          console.log(`[TagScan match] rssi=${rawRssi} smoothed=${smoothed.toFixed(1)} dist=${dist.toFixed(1)}m conf=${match.confidence}`);
           setAlvoRssi(Math.round(smoothed));
           setAlvoDistance(dist);
           setAlvoConfidence(match.confidence);
           setAlvoTrackingId(match.trackingId);
           setAlvoLastSeenAt(Date.now());
           setTrend(classifyTrend(alvoSmoother.trend()));
+          updateEstimatedHeading(rawRssi);
           return;
         }
         const id = device.id;
         const name = (device.localName ?? device.name ?? `Sem nome · ${id.slice(-5)}`).trim();
         const rssi = device.rssi ?? -100;
-        const distance = rssiToDistance(rssi, -65, 3.0);
+        const distance = rssiToDistance(rssi, -59, 2.5);
         setOutras((current) => ({
           ...current,
           [id]: { id, name, rssi, distance, lastSeenAt: Date.now() },
@@ -325,7 +437,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     );
     stopScanRef.current = stop;
     setIsScanning(true);
-  }, [alvoSmoother]);
+  }, [alvoSmoother, updateEstimatedHeading]);
 
   const stopScan = useCallback(() => {
     stopScanRef.current?.();
@@ -345,6 +457,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     };
   }, []);
 
+  // ── Cache iOS fingerprint ───────────────────────────
   const saveCacheToBackend = useCallback(async () => {
     const tag = veiculoAlvoRef.current?.tag;
     if (!tag || cacheSaved || !alvoTrackingId) return;
@@ -368,28 +481,41 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     }
   }, [alvoConfidence, saveCacheToBackend]);
 
-  const proximity: ProximityInfo | null = useMemo(
-    () => (alvoDistance != null ? classifyProximity(alvoDistance) : null),
-    [alvoDistance],
+  // ── Computed ────────────────────────────────────────
+  const hasDistance = alvoDistance != null;
+  const hasDirection = estimatedTagHeading != null;
+  const relAngle = estimatedTagHeading != null
+    ? ((estimatedTagHeading - deviceHeading + 540) % 360) - 180
+    : 0;
+
+  const directionLabel = useMemo(() => {
+    if (alvoDistance == null) return '';
+    return getDirectionLabel(relAngle, alvoDistance);
+  }, [alvoDistance, relAngle]);
+
+  const stateMessage = useMemo(
+    () => getStateMessage(hasDistance, hasDirection, isScanning),
+    [hasDistance, hasDirection, isScanning],
   );
 
-  const outrasOrdenadas = useMemo(
-    () => Object.values(outras).sort((a, b) => a.distance - b.distance).slice(0, 6),
-    [outras],
-  );
-
-  // Background interpolado: do azul-marinho frio ao quase-vermelho quente (estilo Find My)
-  const backgroundColor = colorIntensity.interpolate({
-    inputRange: [0, 0.3, 0.6, 1],
-    outputRange: ['#0c1830', '#0e3460', '#225e3a', '#7a3a1f'],
+  // Background interpolado
+  const bg = backgroundColorAnim.interpolate({
+    inputRange: [0, 0.35, 0.6, 0.85, 1],
+    outputRange: ['#142035', '#1f4a3a', '#23733a', '#1b9038', '#13a83c'],
   });
 
-  // ── Sem veículo selecionado ────────────────────────────
+  // Rotação da seta em string graus
+  const arrowRotateStr = arrowRotationAnim.interpolate({
+    inputRange: [-180, 180],
+    outputRange: ['-180deg', '180deg'],
+  });
+
+  // ── Sem veículo ─────────────────────────────────────
   if (!veiculoAlvo) {
     return (
-      <View style={styles.container}>
+      <View style={styles.containerIdle}>
         <View style={styles.placeholderBox}>
-          <Icon source="cursor-default-click-outline" size={32} color={colors.textMuted} />
+          <Icon source="cursor-default-click-outline" size={32} color="rgba(255,255,255,0.5)" />
           <Text style={styles.placeholderText}>
             Selecione um veículo no mapa para começar a busca.
           </Text>
@@ -398,257 +524,191 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     );
   }
 
-  // ── Veículo sem tag ────────────────────────────────────
+  // ── Sem tag ─────────────────────────────────────────
   if (!veiculoAlvo.tag) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Icon source="bluetooth-off" size={22} color={colors.textMuted} />
-          <Text style={styles.headerTitle}>{veiculoAlvo.nome}</Text>
-        </View>
+      <View style={styles.containerIdle}>
+        <Text style={styles.titleTop} numberOfLines={1}>{veiculoAlvo.nome}</Text>
         <View style={styles.alvoBox}>
-          <View style={styles.warningInline}>
-            <Icon source="map-marker" size={18} color={colors.primary} />
-            <Text style={styles.warningInlineText}>
-              Sem tag BLE — use a posição GPS no mapa para localizar.
-            </Text>
-          </View>
+          <Icon source="map-marker" size={18} color="#fff" />
+          <Text style={styles.warningInlineText}>
+            Sem tag BLE — use a posição GPS no mapa para localizar.
+          </Text>
         </View>
       </View>
     );
   }
 
   return (
-    <Animated.View style={[styles.container, { backgroundColor }]}>
-      <View style={styles.header}>
-        <View style={styles.headerTextWrap}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {veiculoAlvo.nome}{veiculoAlvo.placa ? ` — ${veiculoAlvo.placa}` : ''}
-          </Text>
-          <Text style={styles.headerSub} numberOfLines={1}>
-            {veiculoAlvo.tag.apelido ?? veiculoAlvo.tag.nomeBleAdvertised ?? veiculoAlvo.tag.mac}
-          </Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={isScanning ? stopScan : startScan}
-          style={[styles.scanButton, isScanning && styles.scanButtonStop]}
-        >
-          {isScanning ? (
-            <>
-              <ActivityIndicator size={14} color="#fff" />
-              <Text style={styles.scanButtonText}>Parar</Text>
-            </>
-          ) : (
-            <>
-              <Icon source="magnify" size={16} color="#fff" />
-              <Text style={styles.scanButtonText}>Buscar</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
+    <Animated.View style={[styles.container, { backgroundColor: bg }]}>
+      {/* Título no topo (como na foto Find My) */}
+      <Text style={styles.titleTop} numberOfLines={1}>
+        {veiculoAlvo.nome}{veiculoAlvo.placa ? ` — ${veiculoAlvo.placa}` : ''}
+      </Text>
 
       {permissionError ? (
         <View style={styles.errorBox}>
-          <Icon source="alert-circle" size={16} color={colors.danger} />
+          <Icon source="alert-circle" size={16} color="#ff6b6b" />
           <Text style={styles.errorText}>{permissionError}</Text>
         </View>
       ) : null}
 
-      {/* ── Display principal — estilo Find My ─────────── */}
-      <View style={styles.findMyArea}>
-        {alvoDistance != null && proximity ? (
-          <FindMyCircle
-            distance={alvoDistance}
-            color={proximity.color}
-            corePulse={corePulse}
-            ring1Anim={ring1Anim}
-            ring2Anim={ring2Anim}
-            ring3Anim={ring3Anim}
-          />
-        ) : (
-          <FindMyCircleIdle scanning={isScanning} />
-        )}
+      {/* Área central: esfera (idle) ou seta direcional (com sinal) */}
+      <View style={styles.centerArea}>
+        {/* Esfera idle */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.spheresLayer,
+            { opacity: sphereOpacityAnim, transform: [{ scale: spherePulse }] },
+          ]}
+        >
+          <IdleSphere />
+        </Animated.View>
 
-        {alvoDistance != null && proximity ? (
+        {/* Bolinha pequena topo (igual foto Find My) — aparece com direção */}
+        {hasDirection ? (
+          <View style={styles.topDot} pointerEvents="none">
+            <View style={styles.topDotInner} />
+          </View>
+        ) : null}
+
+        {/* Seta direcional rotacionada */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.arrowLayer,
+            { opacity: arrowOpacityAnim, transform: [{ rotate: arrowRotateStr }] },
+          ]}
+        >
+          <Svg width={180} height={220} viewBox="0 0 180 220">
+            <Path
+              d={`
+                M 90 18
+                L 156 110
+                L 116 110
+                L 116 198
+                L 64 198
+                L 64 110
+                L 24 110
+                Z
+              `}
+              fill="#ffffff"
+              strokeWidth={0}
+            />
+          </Svg>
+        </Animated.View>
+      </View>
+
+      {/* Distância + texto contextual ou direção */}
+      <View style={styles.bottomInfo}>
+        {hasDistance ? (
           <>
-            <Text style={[styles.zoneLabel, { color: proximity.color }]}>
-              {proximity.label.toUpperCase()}
-            </Text>
-            <TrendIndicator trend={trend} anim={trendArrowAnim} />
-            <Text style={styles.trendMessage}>
-              {getTrendMessage(trend, alvoDistance)}
-            </Text>
-            <View style={styles.confidenceRow}>
-              <Icon
-                source={
-                  alvoConfidence === 'exact-mac' || alvoConfidence === 'cached-uuid'
-                    ? 'check-decagram'
-                    : 'alert-decagram-outline'
-                }
-                size={11}
-                color="rgba(255,255,255,0.55)"
-              />
-              <Text style={styles.confidenceText}>
-                {alvoConfidence === 'exact-mac' ? 'Match por MAC'
-                  : alvoConfidence === 'cached-uuid' ? 'Match cacheado'
-                  : alvoConfidence === 'fingerprint' ? 'Match por nome + dados'
-                  : alvoConfidence === 'name-only' ? 'Match só por nome (incerto)'
-                  : ''}
-                {alvoRssi != null ? ` · ${alvoRssi} dBm` : ''}
+            <View style={styles.distanceRow}>
+              <Text style={styles.distanceValue}>
+                {alvoDistance! < 1
+                  ? Math.round(alvoDistance! * 100)
+                  : alvoDistance! < 10
+                  ? alvoDistance!.toFixed(1).replace('.', ',')
+                  : Math.round(alvoDistance!)}
+              </Text>
+              <Text style={styles.distanceUnit}>
+                {alvoDistance! < 1 ? ' cm' : ' m'}
               </Text>
             </View>
-          </>
-        ) : isScanning ? (
-          <>
-            <Text style={styles.searchingText}>Procurando tag…</Text>
-            <Text style={styles.searchingHint}>
-              Caminhe lentamente em volta do veículo
+            <Text style={styles.directionText}>
+              {hasDirection ? directionLabel : 'Vire-se devagar para localizar'}
             </Text>
+            <TrendIndicator trend={trend} anim={trendArrowAnim} />
           </>
         ) : (
-          <Text style={styles.idleText}>Pressione "Buscar" para iniciar</Text>
+          <Text style={styles.idleText}>{stateMessage}</Text>
         )}
       </View>
 
-      {/* ── Outras tags próximas ──────────────────────── */}
-      {isScanning && outrasOrdenadas.length > 0 ? (
-        <View style={styles.outrasSection}>
-          <Text style={styles.outrasTitle}>Outras tags ({outrasOrdenadas.length})</Text>
-          {outrasOrdenadas.map((t) => (
-            <View key={t.id} style={styles.outraRow}>
-              <Icon source="bluetooth" size={12} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.outraName} numberOfLines={1}>{t.name}</Text>
-              <Text style={styles.outraDist}>
-                {t.distance < 1 ? `${Math.round(t.distance * 100)} cm` : `~${t.distance.toFixed(0)} m`}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
+      {/* Rodapé com controles (igual foto Find My) */}
+      <View style={styles.footer}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isScanning ? 'Parar busca' : 'Iniciar busca'}
+          onPress={isScanning ? stopScan : startScan}
+          style={styles.footerButton}
+          hitSlop={10}
+        >
+          {isScanning ? (
+            <Icon source="close" size={20} color="#fff" />
+          ) : (
+            <Icon source="magnify" size={20} color="#fff" />
+          )}
+        </Pressable>
+
+        {hasDistance ? (
+          <View style={styles.confidenceFooter}>
+            <Icon
+              source={isHighConfidence(alvoConfidence) ? 'check-decagram' : 'alert-decagram-outline'}
+              size={11}
+              color="rgba(255,255,255,0.5)"
+            />
+            <Text style={styles.confidenceFooterText}>
+              {alvoConfidence === 'exact-mac' ? 'MAC' :
+               alvoConfidence === 'cached-uuid' ? 'UUID cacheado' :
+               alvoConfidence === 'fingerprint' ? 'Nome + dados' :
+               'Só nome'}
+              {alvoRssi != null ? ` · ${alvoRssi} dBm` : ''}
+            </Text>
+            <FreshnessTick lastSeenAt={alvoLastSeenAt} />
+          </View>
+        ) : <View style={{ flex: 1 }} />}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={soundEnabled ? 'Desativar vibração' : 'Ativar vibração'}
+          onPress={toggleSound}
+          style={styles.footerButton}
+          hitSlop={10}
+        >
+          <Icon
+            source={soundEnabled ? 'volume-high' : 'volume-off'}
+            size={20}
+            color={soundEnabled ? '#fff' : 'rgba(255,255,255,0.4)'}
+          />
+        </Pressable>
+      </View>
     </Animated.View>
   );
 }
 
-// ════════════════════════════════════════════════════════
-// COMPONENTES VISUAIS
-// ════════════════════════════════════════════════════════
-
-const CIRCLE_SIZE = 200;
-const CENTER = CIRCLE_SIZE / 2;
-
-function FindMyCircle({
-  distance,
-  color,
-  corePulse,
-  ring1Anim,
-  ring2Anim,
-  ring3Anim,
-}: {
-  distance: number;
-  color: string;
-  corePulse: Animated.Value;
-  ring1Anim: Animated.Value;
-  ring2Anim: Animated.Value;
-  ring3Anim: Animated.Value;
-}) {
-  const distLabel = distance < 1
-    ? `${Math.round(distance * 100)}`
-    : distance < 10
-    ? distance.toFixed(1)
-    : Math.round(distance).toString();
-  const distUnit = distance < 1 ? 'cm' : 'm';
-
-  // Anéis: raio varia de 35 → 90 com opacidade caindo
-  const radiusFor = (anim: Animated.Value) =>
-    anim.interpolate({ inputRange: [0, 1], outputRange: [35, 90] });
-  const opacityFor = (anim: Animated.Value) =>
-    anim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0.7, 0] });
-
+// ─────────────────────────────────────────────────────
+// Esfera idle (pré-sinal)
+// ─────────────────────────────────────────────────────
+/**
+ * Pequeno dot pulsante + tempo desde a última leitura.
+ * Verde quando recém-recebida, amarelo se passar de 1.5s, vermelho se passar de 4s.
+ */
+function FreshnessTick({ lastSeenAt }: { lastSeenAt: number | null }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 500);
+    return () => clearInterval(id);
+  }, []);
+  if (!lastSeenAt) return null;
+  const age = Date.now() - lastSeenAt;
+  const color = age < 1500 ? '#a8f5b8' : age < 4000 ? '#ffd966' : '#ff9c9c';
+  const label = age < 1000 ? 'ao vivo' : `${(age / 1000).toFixed(1)}s atrás`;
+  // tick é usado para re-render periódico
+  void tick;
   return (
-    <View style={styles.circleWrap}>
-      <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} viewBox={`0 0 ${CIRCLE_SIZE} ${CIRCLE_SIZE}`}>
-        <Defs>
-          <RadialGradient id="coreGrad" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={color} stopOpacity={0.95} />
-            <Stop offset="70%" stopColor={color} stopOpacity={0.55} />
-            <Stop offset="100%" stopColor={color} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        {/* Anéis (pulsando pra fora) */}
-        <AnimatedCircle
-          cx={CENTER}
-          cy={CENTER}
-          r={radiusFor(ring1Anim) as unknown as number}
-          stroke={color}
-          strokeWidth={2}
-          fill="none"
-          opacity={opacityFor(ring1Anim) as unknown as number}
-        />
-        <AnimatedCircle
-          cx={CENTER}
-          cy={CENTER}
-          r={radiusFor(ring2Anim) as unknown as number}
-          stroke={color}
-          strokeWidth={2}
-          fill="none"
-          opacity={opacityFor(ring2Anim) as unknown as number}
-        />
-        <AnimatedCircle
-          cx={CENTER}
-          cy={CENTER}
-          r={radiusFor(ring3Anim) as unknown as number}
-          stroke={color}
-          strokeWidth={2}
-          fill="none"
-          opacity={opacityFor(ring3Anim) as unknown as number}
-        />
-        {/* Halo de fundo */}
-        <SvgCircle cx={CENTER} cy={CENTER} r={80} fill="url(#coreGrad)" />
-      </Svg>
-      {/* Núcleo central com pulse */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.coreOverlay,
-          { transform: [{ scale: corePulse }] },
-        ]}
-      >
-        <Text style={[styles.distanceValue, { color: '#fff' }]}>{distLabel}</Text>
-        <Text style={[styles.distanceUnit, { color: '#fff' }]}>{distUnit}</Text>
-      </Animated.View>
-    </View>
-  );
-}
-
-function FindMyCircleIdle({ scanning }: { scanning: boolean }) {
-  return (
-    <View style={styles.circleWrap}>
-      <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} viewBox={`0 0 ${CIRCLE_SIZE} ${CIRCLE_SIZE}`}>
-        <SvgCircle cx={CENTER} cy={CENTER} r={70} stroke="rgba(255,255,255,0.1)" strokeWidth={2} fill="rgba(255,255,255,0.04)" />
-        <SvgCircle cx={CENTER} cy={CENTER} r={50} stroke="rgba(255,255,255,0.08)" strokeWidth={1.5} fill="none" />
-        <SvgCircle cx={CENTER} cy={CENTER} r={30} stroke="rgba(255,255,255,0.06)" strokeWidth={1} fill="none" />
-      </Svg>
-      <View style={styles.coreOverlay} pointerEvents="none">
-        {scanning ? (
-          <ActivityIndicator color="rgba(255,255,255,0.6)" />
-        ) : (
-          <Icon source="bluetooth-settings" size={42} color="rgba(255,255,255,0.4)" />
-        )}
-      </View>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 6 }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+      <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '700' }}>
+        {label}
+      </Text>
     </View>
   );
 }
 
 function TrendIndicator({ trend, anim }: { trend: TrendDirection; anim: Animated.Value }) {
-  if (trend === 'estavel') {
-    return (
-      <View style={styles.trendBox}>
-        <Icon source="circle-medium" size={18} color="rgba(255,255,255,0.5)" />
-        <Text style={styles.trendStable}>Estável</Text>
-      </View>
-    );
-  }
+  if (trend === 'estavel') return null;
   const isUp = trend === 'aproximando';
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, isUp ? -6 : 6] });
   return (
@@ -656,113 +716,142 @@ function TrendIndicator({ trend, anim }: { trend: TrendDirection; anim: Animated
       <Animated.View style={{ transform: [{ translateY }] }}>
         <Icon
           source={isUp ? 'arrow-up-bold' : 'arrow-down-bold'}
-          size={22}
-          color={isUp ? '#2ecc71' : '#e74c3c'}
+          size={18}
+          color={isUp ? '#a8f5b8' : '#ff9c9c'}
         />
       </Animated.View>
-      <Text style={[styles.trendLabel, { color: isUp ? '#2ecc71' : '#e74c3c' }]}>
+      <Text style={[styles.trendLabel, { color: isUp ? '#a8f5b8' : '#ff9c9c' }]}>
         {isUp ? 'APROXIMANDO' : 'AFASTANDO'}
       </Text>
     </View>
   );
 }
 
+function IdleSphere() {
+  return (
+    <View style={styles.sphereOuter}>
+      <View style={styles.sphereMid}>
+        <View style={styles.sphereInner} />
+      </View>
+    </View>
+  );
+}
+
+const SPHERE_OUTER = 180;
+const SPHERE_MID = 130;
+const SPHERE_INNER = 80;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.md,
-    backgroundColor: '#0c1830', // azul-marinho frio
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  headerTextWrap: {
-    flex: 1,
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  headerSub: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  scanButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    paddingTop: spacing.lg,
     paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    paddingBottom: spacing.sm,
+    backgroundColor: '#142035',
   },
-  scanButtonStop: {
-    backgroundColor: colors.danger,
+  containerIdle: {
+    flex: 1,
+    padding: spacing.md,
+    backgroundColor: '#142035',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  scanButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
+  titleTop: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     padding: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: '#fff1ef',
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,107,107,0.18)',
     marginBottom: spacing.sm,
   },
-  errorText: {
-    flex: 1,
-    color: colors.danger,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  findMyArea: {
+  errorText: { flex: 1, color: '#fff', fontSize: 11, fontWeight: '700' },
+  centerArea: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  spheresLayer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowLayer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topDot: {
+    position: 'absolute',
+    top: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: 'rgba(255,255,255,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topDotInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+  },
+  sphereOuter: {
+    width: SPHERE_OUTER,
+    height: SPHERE_OUTER,
+    borderRadius: SPHERE_OUTER / 2,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sphereMid: {
+    width: SPHERE_MID,
+    height: SPHERE_MID,
+    borderRadius: SPHERE_MID / 2,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sphereInner: {
+    width: SPHERE_INNER,
+    height: SPHERE_INNER,
+    borderRadius: SPHERE_INNER / 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  bottomInfo: {
+    alignItems: 'center',
     paddingVertical: spacing.sm,
   },
-  circleWrap: {
-    width: CIRCLE_SIZE,
-    height: CIRCLE_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coreOverlay: {
-    position: 'absolute',
-    width: CIRCLE_SIZE,
-    height: CIRCLE_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
+  distanceRow: {
     flexDirection: 'row',
+    alignItems: 'baseline',
   },
   distanceValue: {
-    fontSize: 64,
-    fontWeight: '900',
-    letterSpacing: -2,
+    color: '#fff',
+    fontSize: 48,
+    fontWeight: '700',
+    letterSpacing: -1,
+    lineHeight: 56,
   },
   distanceUnit: {
-    fontSize: 22,
-    fontWeight: '900',
-    marginLeft: 4,
-    marginBottom: 8,
-    alignSelf: 'flex-end',
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '500',
   },
-  zoneLabel: {
-    marginTop: spacing.sm,
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 2,
+  directionText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '500',
+    marginTop: -4,
   },
   trendBox: {
     flexDirection: 'row',
@@ -771,108 +860,66 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   trendLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
-  trendStable: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  trendMessage: {
-    marginTop: 4,
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
+  idleText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
   },
-  confidenceRow: {
+  footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  confidenceText: {
-    color: 'rgba(255,255,255,0.55)',
+  footerButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  confidenceFooter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  confidenceFooterText: {
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 10,
     fontWeight: '700',
   },
-  searchingText: {
-    marginTop: spacing.md,
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  searchingHint: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-    textAlign: 'center',
-    paddingHorizontal: spacing.lg,
-    marginTop: 4,
-  },
-  idleText: {
-    marginTop: spacing.md,
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 13,
-  },
   placeholderBox: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
   placeholderText: {
-    color: 'rgba(255,255,255,0.55)',
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 13,
     textAlign: 'center',
   },
   alvoBox: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  warningInline: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    padding: spacing.md,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   warningInlineText: {
     flex: 1,
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
-  },
-  outrasSection: {
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.15)',
-  },
-  outrasTitle: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  outraRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
-  },
-  outraName: {
-    flex: 1,
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  outraDist: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 10,
-    fontWeight: '700',
   },
 });

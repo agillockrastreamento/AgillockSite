@@ -11,8 +11,8 @@
  */
 export function rssiToDistance(
   rssi: number,
-  txPower: number = -65,
-  pathLossExponent: number = 3.0,
+  txPower: number = -59,
+  pathLossExponent: number = 2.5,
 ): number {
   if (!Number.isFinite(rssi)) return Infinity;
   return Math.pow(10, (txPower - rssi) / (10 * pathLossExponent));

@@ -394,7 +394,8 @@ export function RescueMapScreen() {
     }).start(() => {
       setMainCardVisible(false);
       setMainCardPeeked(false);
-      setSelectedDeviceId(null);
+      // NÃO zera selectedDeviceId — assim o scanner continua trabalhando no veículo.
+      // Pra reabrir o card, toque novamente no marcador do mapa.
     });
   }, [mainCardAnim, cardFullHeight]);
 
