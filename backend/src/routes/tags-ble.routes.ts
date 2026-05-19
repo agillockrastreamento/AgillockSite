@@ -28,6 +28,28 @@ router.get(
   requireRoles('ADMIN', 'RESGATE'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     const id = param(req, 'id');
+
+    // Auto-sync: se o dispositivo tem enderecoMac mas nenhuma TagBLE
+    // com aquele MAC (pode ter sido cadastrado antes da feature de tags),
+    // cria a TagBLE principal agora — assim os dispositivos legados aparecem
+    // corretamente na atribuição ao resgate.
+    const dispositivo = await prisma.dispositivo.findUnique({
+      where: { id },
+      select: { id: true, enderecoMac: true },
+    });
+    if (dispositivo?.enderecoMac) {
+      const mac = dispositivo.enderecoMac.toUpperCase().trim();
+      const existente = await prisma.tagBLE.findUnique({
+        where: { dispositivoId_mac: { dispositivoId: id, mac } },
+        select: { id: true },
+      });
+      if (!existente) {
+        await prisma.tagBLE.create({
+          data: { dispositivoId: id, mac, apelido: 'Tag principal' },
+        });
+      }
+    }
+
     const tags = await prisma.tagBLE.findMany({
       where: { dispositivoId: id },
       select: TAG_SELECT,

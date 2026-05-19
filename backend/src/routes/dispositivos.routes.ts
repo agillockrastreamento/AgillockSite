@@ -77,6 +77,30 @@ function numberOrNull(value: unknown): number | null {
   return Number.isFinite(numero) ? numero : null;
 }
 
+/**
+ * Sincroniza a TagBLE principal do dispositivo com o campo enderecoMac.
+ * Se o MAC for fornecido e não existir TagBLE com aquele MAC, cria uma.
+ * Não remove tags existentes (apenas garante que o MAC do dispositivo
+ * tenha sua TagBLE correspondente disponível para atribuição ao resgate).
+ */
+async function syncTagPrincipal(dispositivoId: string, enderecoMac: string | null): Promise<void> {
+  if (!enderecoMac) return;
+  const macNormalizado = enderecoMac.toUpperCase().trim();
+  if (!macNormalizado) return;
+  const existente = await prisma.tagBLE.findUnique({
+    where: { dispositivoId_mac: { dispositivoId, mac: macNormalizado } },
+    select: { id: true },
+  });
+  if (existente) return;
+  await prisma.tagBLE.create({
+    data: {
+      dispositivoId,
+      mac: macNormalizado,
+      apelido: 'Tag principal',
+    },
+  });
+}
+
 function buildTraccarAccumulatorData(dispositivo: Record<string, unknown>) {
   const odometroMetros = numberOrNull(dispositivo.odometroSistemaMetros);
   const horimetroSegundos = numberOrNull(dispositivo.horimetroSistemaSegundos);
@@ -266,6 +290,9 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
     }
   }
 
+  // Garante que existe uma TagBLE associada ao MAC informado (para resgate)
+  await syncTagPrincipal(dispositivo.id, dispositivo.enderecoMac);
+
   // Registrar na Traccar (best-effort — falha não bloqueia criação)
   traccarCreateDevice(buildTraccarDeviceSyncData(dispositivo))
     .then(td => syncTraccarAccumulators(td.id, dispositivo))
@@ -368,6 +395,11 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
       cliente: { select: { id: true, nome: true } },
     },
   });
+
+  // Garante TagBLE associada ao MAC quando este foi atualizado
+  if (enderecoMac !== undefined) {
+    await syncTagPrincipal(dispositivo.id, dispositivo.enderecoMac);
+  }
 
   // Se manutencaoAtiva foi desativado, cancela todas as recorrências ativas do dispositivo
   if (manutencaoAtiva !== undefined && !(manutencaoAtiva === 'true' || manutencaoAtiva === true)) {

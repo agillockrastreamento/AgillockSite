@@ -56,7 +56,7 @@
       <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
       <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
       <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
-      <li class="sidebar-dropdown">
+      <li class="sidebar-dropdown open">
         <a href="#" class="dropdown-toggle-link">
           <i class="fa fa-tv fa-fw"></i>
           <span style="flex:1">Área de Controle</span>
@@ -163,7 +163,7 @@
         </div>
         <div id="disp-lista" style="margin-top:14px;"></div>
         <p style="font-size:12px;color:#888;margin-top:10px;margin-bottom:0;">
-          <i class="fa fa-info-circle"></i> Para cada veículo, escolha a tag Bluetooth correspondente (caso já tenha sido pareada). Sem tag selecionada, o app ainda mostra o veículo no mapa mas sem busca BLE.
+          <i class="fa fa-info-circle"></i> Veículos com MAC cadastrado no formulário do dispositivo aparecem aqui com tag automaticamente. Para veículos identificados apenas por IMEI (sem MAC), o app continua mostrando a posição via GPS — a busca BLE simplesmente não fica disponível.
         </p>
       </div>
 
@@ -334,7 +334,7 @@
           });
           var tagsHtml = d.tagsDisponiveis.length
             ? '<select class="form-control sel-tag" data-idx="' + idx + '">' + tagOpts + '</select>'
-            : '<span style="font-size:12px;color:#dc3545;font-style:italic;">Sem tags cadastradas</span>';
+            : '<span style="font-size:11px;color:#6c757d;font-style:italic;" title="Sem tag BLE — localização apenas por GPS"><i class="fa fa-map-marker" style="margin-right:4px;"></i>Só GPS</span>';
 
           html += '<div class="disp-linha">' +
             '<div class="info"><strong>' + d.nome + '</strong>' +
