@@ -88,7 +88,13 @@ router.get(
       },
       orderBy: { nome: 'asc' },
     });
-    res.json(dispositivos);
+    // Normaliza `tagsBle` → `tags` para o frontend
+    res.json(
+      dispositivos.map((d) => {
+        const { tagsBle, ...rest } = d;
+        return { ...rest, tags: tagsBle };
+      })
+    );
   }
 );
 
