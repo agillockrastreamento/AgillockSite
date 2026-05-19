@@ -198,10 +198,25 @@ export function PareadorTagScreen() {
     }
   }, [toast, loadTags]);
 
+  // Conjunto de IDs (MAC no Android / UUID no iOS) das tags já pareadas com este dispositivo.
+  // Filtramos as candidatas para não exibir tags que já estão cadastradas — evita
+  // clique acidental que dispararia erro 500 (unique constraint do MAC).
+  const tagsCadastradasIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tags) {
+      if (t.mac) set.add(t.mac.toUpperCase().replace(/[^0-9A-F]/g, ''));
+    }
+    return set;
+  }, [tags]);
+
   const candidatesOrdenados = useMemo(
-    () =>
-      Object.values(candidates).sort((a, b) => a.distance - b.distance),
-    [candidates],
+    () => {
+      const normalize = (s: string) => s.toUpperCase().replace(/[^0-9A-F]/g, '');
+      return Object.values(candidates)
+        .filter((c) => !tagsCadastradasIds.has(normalize(c.id)))
+        .sort((a, b) => a.distance - b.distance);
+    },
+    [candidates, tagsCadastradasIds],
   );
 
   return (

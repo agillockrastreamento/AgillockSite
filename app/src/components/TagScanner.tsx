@@ -159,7 +159,6 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
   const lastAnyScanAtRef = useRef<number>(0);
   const restartWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const consecutiveThrottlesRef = useRef<number>(0);
-  const [chronicThrottle, setChronicThrottle] = useState(false);
 
   // ── Preferência de som persistida ─────────────────────
   useEffect(() => {
@@ -415,7 +414,6 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         const match = tag ? matchTagToScan(tag, device) : null;
         if (match) {
           consecutiveThrottlesRef.current = 0;
-          setChronicThrottle(false);
           const txPower = tag?.txPowerCalibrado ?? -59;
           const rawRssi = device.rssi ?? -100;
           const smoothed = alvoSmoother.push(rawRssi);
@@ -451,17 +449,11 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     // de uso contínuo. Restartar contorna isso transparentemente.
     let currentStop: () => void = stop;
     consecutiveThrottlesRef.current = 0;
-    setChronicThrottle(false);
     if (restartWatchdogRef.current) clearInterval(restartWatchdogRef.current);
     restartWatchdogRef.current = setInterval(() => {
       const since = Date.now() - lastAnyScanAtRef.current;
       if (since > 4000) {
         consecutiveThrottlesRef.current++;
-        // Se 3+ restarts seguidos sem match nenhum, sinaliza throttling crônico
-        // (provavelmente economia de bateria do sistema operacional).
-        if (consecutiveThrottlesRef.current >= 3) {
-          setChronicThrottle(true);
-        }
         try { currentStop(); } catch {}
         // Reinicia o scan sem mudar UI/estado
         const newStop = startBleScan(
@@ -472,8 +464,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
             if (match) {
               // Recebeu match — zera o contador de throttle
               consecutiveThrottlesRef.current = 0;
-              setChronicThrottle(false);
-              const txPower = tag?.txPowerCalibrado ?? -59;
+                  const txPower = tag?.txPowerCalibrado ?? -59;
               const rawRssi = device.rssi ?? -100;
               const smoothed = alvoSmoother.push(rawRssi);
               const dist = rssiToDistance(smoothed, txPower, 2.5);
@@ -624,16 +615,6 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         <View style={styles.errorBox}>
           <Icon source="alert-circle" size={16} color="#ff6b6b" />
           <Text style={styles.errorText}>{permissionError}</Text>
-        </View>
-      ) : null}
-
-      {chronicThrottle ? (
-        <View style={styles.warningBox}>
-          <Icon source="battery-alert" size={16} color="#ffd966" />
-          <Text style={styles.warningBoxText}>
-            Sistema pausando Bluetooth. Desative a economia de bateria do app
-            e mantenha a tela ligada.
-          </Text>
         </View>
       ) : null}
 
@@ -857,21 +838,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   errorText: { flex: 1, color: '#fff', fontSize: 11, fontWeight: '700' },
-  warningBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    padding: spacing.sm,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 217, 102, 0.18)',
-    marginBottom: spacing.sm,
-  },
-  warningBoxText: {
-    flex: 1,
-    color: '#ffd966',
-    fontSize: 11,
-    fontWeight: '700',
-  },
   centerArea: {
     flex: 1,
     alignItems: 'center',

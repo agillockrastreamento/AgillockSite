@@ -387,9 +387,12 @@ export function RescueMapScreen() {
       if (primeiro) {
         setSelectedDeviceId(primeiro.dispositivoId);
         setMainCardVisible(true);
+        // Pequeno delay pra garantir que o MapView já está renderizado
+        // antes de animar a câmera ao primeiro veículo.
+        setTimeout(() => animateToDevice(primeiro, true), 300);
       }
     }
-  }, [devices, selectedDeviceId]);
+  }, [devices, selectedDeviceId, animateToDevice]);
 
   const expandMainCard = useCallback(() => {
     setMainCardPeeked(false);

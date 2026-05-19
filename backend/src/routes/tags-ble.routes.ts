@@ -29,22 +29,23 @@ router.get(
   async (req: AuthRequest, res: Response): Promise<void> => {
     const id = param(req, 'id');
 
-    // Auto-sync: se o dispositivo tem enderecoMac mas nenhuma TagBLE
-    // com aquele MAC (pode ter sido cadastrado antes da feature de tags),
-    // cria a TagBLE principal agora — assim os dispositivos legados aparecem
-    // corretamente na atribuição ao resgate. Upsert evita race condition.
-    const dispositivo = await prisma.dispositivo.findUnique({
-      where: { id },
-      select: { id: true, enderecoMac: true },
-    });
-    if (dispositivo?.enderecoMac) {
-      const mac = dispositivo.enderecoMac.toUpperCase().trim();
-      if (mac) {
-        await prisma.tagBLE.upsert({
-          where: { dispositivoId_mac: { dispositivoId: id, mac } },
-          update: {},
-          create: { dispositivoId: id, mac, apelido: 'Tag principal' },
-        });
+    // Auto-sync: cria a TagBLE principal a partir do enderecoMac do dispositivo
+    // SOMENTE se ainda não houver NENHUMA tag cadastrada para esse dispositivo.
+    // Sem essa restrição, deletar uma tag fica impossível: a próxima leitura
+    // recriaria automaticamente.
+    const existemTags = await prisma.tagBLE.count({ where: { dispositivoId: id } });
+    if (existemTags === 0) {
+      const dispositivo = await prisma.dispositivo.findUnique({
+        where: { id },
+        select: { enderecoMac: true },
+      });
+      if (dispositivo?.enderecoMac) {
+        const mac = dispositivo.enderecoMac.toUpperCase().trim();
+        if (mac) {
+          await prisma.tagBLE.create({
+            data: { dispositivoId: id, mac, apelido: 'Tag principal' },
+          });
+        }
       }
     }
 
