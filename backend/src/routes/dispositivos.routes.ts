@@ -42,6 +42,7 @@ const DISPOSITIVO_SELECT = {
   odometroSistemaMetros: true, horimetroSistemaSegundos: true,
   telemetriaUltimaPosicaoEm: true, telemetriaUltimaLatitude: true, telemetriaUltimaLongitude: true, telemetriaUltimaIgnicao: true,
   imagemUrl: true, valorPadrao: true,
+  mapa: true,
   enderecoMac: true,
   clienteId: true, vendedorId: true, criadoPorId: true,
   createdAt: true, updatedAt: true,
@@ -207,11 +208,15 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
     modeloRastreador, telefoneRastreador, iccid, operadora,
     placa, marca, modeloVeiculo, cor, ano, renavam, chassi, combustivel, localInstalacao, instalador,
     consumo, limiteVelocidade, senha, ignorarOdometro, manutencaoAtiva,
-    odometro, enderecoMac,
+    odometro, enderecoMac, mapa,
     valorPadrao, clienteId, vendedorId,
   } = req.body;
 
   const odometroKm = parseOptionalKm(odometro);
+  const mapaNumero = (() => {
+    const n = Number(mapa);
+    return n === 2 ? 2 : 1;
+  })();
 
   if (!nome || !identificador) {
     res.status(400).json({ error: 'Nome e identificador são obrigatórios.' });
@@ -264,6 +269,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
       odometroSistemaMetros: odometroKm != null ? Math.round(odometroKm * 1000) : null,
       imagemUrl,
       valorPadrao: valorPadrao ? Number(valorPadrao) : null,
+      mapa: mapaNumero,
       enderecoMac: enderecoMac ? String(enderecoMac).toUpperCase().trim() : null,
       clienteId: clienteId || null,
       vendedorId: vendedorId || null,
@@ -317,10 +323,15 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     modeloRastreador, telefoneRastreador, iccid, operadora,
     placa, marca, modeloVeiculo, cor, ano, renavam, chassi, combustivel, localInstalacao, instalador,
     consumo, limiteVelocidade, senha, ignorarOdometro, manutencaoAtiva,
-    odometro, enderecoMac,
+    odometro, enderecoMac, mapa,
     valorPadrao, clienteId, vendedorId,
   } = req.body;
   const odometroKm = parseOptionalKm(odometro);
+  const mapaNumeroPut = (() => {
+    if (mapa === undefined) return undefined;
+    const n = Number(mapa);
+    return n === 2 ? 2 : 1;
+  })();
 
   // Verificar unicidade do identificador (se mudou)
   const novoIdentificador = identificador ? String(identificador).trim() : existe.identificador;
@@ -385,6 +396,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
       ...(enderecoMac !== undefined ? { enderecoMac: enderecoMac ? String(enderecoMac).toUpperCase().trim() : null } : {}),
       ...(req.file ? { imagemUrl: novaImagemUrl } : {}),
       ...(valorPadrao !== undefined ? { valorPadrao: valorPadrao ? Number(valorPadrao) : null } : {}),
+      ...(mapaNumeroPut !== undefined ? { mapa: mapaNumeroPut } : {}),
       ...(clienteId !== undefined ? { clienteId: clienteId || null } : {}),
       ...(vendedorId !== undefined ? { vendedorId: vendedorId || null } : {}),
     },

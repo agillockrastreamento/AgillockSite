@@ -77,8 +77,14 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const MAIN_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.60);
 const MAIN_CARD_PEEK_HEIGHT = 76; // mostra apenas alça + header (nome/placa + X)
 const MAP_PREFERENCES_KEY = 'agillock_map_preferences_v1';
+const MAPA_ATIVO_KEY = 'agillock_mapa_ativo_v1';
 const CLUSTER_PX = 40;
 const SPIDER_RADIUS_PX = 55;
+
+function getMapaDoDevice(d: TrackingDevice): 1 | 2 {
+  const m = Number(d.mapa);
+  return m === 2 ? 2 : 1;
+}
 
 type QuickSheetMode = 'closed' | 'peek' | 'expanded';
 
@@ -202,6 +208,8 @@ export function MapScreen() {
     longitudeDelta: number;
   }>(DEFAULT_REGION);
   const [spiderClusterKey, setSpiderClusterKey] = useState<string | null>(null);
+  const [mapaAtivo, setMapaAtivo] = useState<1 | 2>(1);
+  const mapaAtivoHydrated = useRef(false);
   const lastSpiderInteractionRef = useRef(0);
   const quickSheetModeBeforeFocusRef = useRef<QuickSheetMode | null>(null);
   const moveQuickSheetRef = useRef<((mode: QuickSheetMode) => void) | null>(null);
@@ -248,6 +256,39 @@ export function MapScreen() {
     ).catch(() => {});
   }, [showLabels, showFences, showTracks]);
 
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(MAPA_ATIVO_KEY)
+      .then((raw) => {
+        if (cancelled) return;
+        const n = Number(raw);
+        if (n === 2) setMapaAtivo(2);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) mapaAtivoHydrated.current = true; });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!mapaAtivoHydrated.current) return;
+    AsyncStorage.setItem(MAPA_ATIVO_KEY, String(mapaAtivo)).catch(() => {});
+  }, [mapaAtivo]);
+
+  // Quando o mapa ativo muda, fecha o card se o veículo selecionado pertencer ao outro mapa
+  // e reposiciona o zoom para os veículos do novo mapa.
+  useEffect(() => {
+    if (!mapaAtivoHydrated.current) return;
+    if (selectedDeviceId) {
+      const device = devices.find((d) => d.dispositivoId === selectedDeviceId);
+      if (device && getMapaDoDevice(device) !== mapaAtivo) {
+        setSelectedDeviceId(null);
+        if (mainCardVisible) closeMainCard();
+      }
+    }
+    fitAllDevices(devices.filter((d) => getMapaDoDevice(d) === mapaAtivo));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapaAtivo]);
+
   // Push notification navigation
   useEffect(() => {
     const targetDeviceId = route.params?.dispositivoId;
@@ -281,11 +322,31 @@ export function MapScreen() {
     if (notificationsSheetVisible) setUnreadCount(0);
   }, [notificationsSheetVisible]);
 
-  const quickSheetHeights = useMemo(() => getQuickSheetHeights(devices.length), [devices.length]);
+  const mapasUsados = useMemo(() => {
+    const set = new Set<1 | 2>();
+    devices.forEach((d) => set.add(getMapaDoDevice(d)));
+    return set;
+  }, [devices]);
+  const seletorVisivel = mapasUsados.size > 1;
+
+  // Quando há apenas um mapa em uso, sincroniza `mapaAtivo` com ele.
+  useEffect(() => {
+    if (mapasUsados.size === 1) {
+      const unico = mapasUsados.values().next().value as 1 | 2;
+      if (mapaAtivo !== unico) setMapaAtivo(unico);
+    }
+  }, [mapasUsados, mapaAtivo]);
+
+  const filteredDevices = useMemo(
+    () => devices.filter((device) => getMapaDoDevice(device) === mapaAtivo),
+    [devices, mapaAtivo],
+  );
+
+  const quickSheetHeights = useMemo(() => getQuickSheetHeights(filteredDevices.length), [filteredDevices.length]);
   const quickSheetHeight = useRef(new Animated.Value(Math.round(SCREEN_HEIGHT * 0.3))).current;
 
   useEffect(() => {
-    if (devices.length > 0) {
+    if (filteredDevices.length > 0) {
       Animated.spring(quickSheetHeight, {
         toValue: quickSheetHeights[quickSheetMode],
         useNativeDriver: false,
@@ -293,11 +354,11 @@ export function MapScreen() {
         tension: 82,
       }).start();
     }
-  }, [devices.length, quickSheetHeights, quickSheetHeight, quickSheetMode]);
+  }, [filteredDevices.length, quickSheetHeights, quickSheetHeight, quickSheetMode]);
 
   const locatedDevices = useMemo(
-    () => devices.filter((device) => !!getDeviceCoordinate(device)),
-    [devices],
+    () => filteredDevices.filter((device) => !!getDeviceCoordinate(device)),
+    [filteredDevices],
   );
   const selectedDevice = useMemo(
     () => devices.find((device) => device.dispositivoId === selectedDeviceId) ?? null,
@@ -680,7 +741,7 @@ export function MapScreen() {
         return;
       }
       setDevices(snapshot);
-      fitAllDevices(snapshot);
+      fitAllDevices(snapshot.filter((d) => getMapaDoDevice(d) === mapaAtivo));
     } catch (error) {
       toast.show({
         message: error instanceof Error ? error.message : 'Não foi possível carregar o rastreamento.',
@@ -690,10 +751,32 @@ export function MapScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [fitAllDevices, toast]);
+  }, [fitAllDevices, toast, mapaAtivo]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
+      headerTitle: seletorVisivel
+        ? () => (
+            <View style={styles.mapaSeletor}>
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: mapaAtivo === 1 }}
+                style={[styles.mapaSeletorOpt, mapaAtivo === 1 && styles.mapaSeletorOptAtivo]}
+                onPress={() => setMapaAtivo(1)}
+              >
+                <Text style={[styles.mapaSeletorText, mapaAtivo === 1 && styles.mapaSeletorTextAtivo]}>Mapa 1</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: mapaAtivo === 2 }}
+                style={[styles.mapaSeletorOpt, mapaAtivo === 2 && styles.mapaSeletorOptAtivo]}
+                onPress={() => setMapaAtivo(2)}
+              >
+                <Text style={[styles.mapaSeletorText, mapaAtivo === 2 && styles.mapaSeletorTextAtivo]}>Mapa 2</Text>
+              </Pressable>
+            </View>
+          )
+        : 'Mapa',
       headerRight: () => (
         <View style={styles.headerButtons}>
           <IconButton icon="magnify" iconColor={colors.surface} size={22} onPress={() => setSearchSheetVisible(true)} />
@@ -710,7 +793,7 @@ export function MapScreen() {
         </View>
       ),
     });
-  }, [navigation, unreadCount, canVerEventos]);
+  }, [navigation, unreadCount, canVerEventos, mapaAtivo, seletorVisivel]);
 
   useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
 
@@ -1090,7 +1173,16 @@ export function MapScreen() {
         </View>
       ) : null}
 
-      {!accessStatus?.bloqueado && devices.length ? (
+      {!isLoading && !accessStatus?.bloqueado && devices.length > 0 && !filteredDevices.length && seletorVisivel ? (
+        <View style={styles.emptyPanel}>
+          <Text style={styles.emptyTitle}>Sem veículos no Mapa {mapaAtivo}</Text>
+          <Text style={styles.emptyText}>
+            Toque em Mapa {mapaAtivo === 1 ? 2 : 1} no topo para ver os outros veículos.
+          </Text>
+        </View>
+      ) : null}
+
+      {!accessStatus?.bloqueado && filteredDevices.length ? (
         <Animated.View style={[styles.quickSheet, { height: quickSheetHeight }]}>
           <View style={styles.quickHandleArea} {...quickSheetPanResponder.panHandlers}>
             <Pressable
@@ -1106,9 +1198,9 @@ export function MapScreen() {
             <>
               <View style={styles.quickHeader}>
                 <View>
-                  <Text style={styles.quickTitle}>Veículos</Text>
+                  <Text style={styles.quickTitle}>{seletorVisivel ? `Veículos · Mapa ${mapaAtivo}` : 'Veículos'}</Text>
                   <Text style={styles.quickMeta}>
-                    {locatedDevices.length} com posição de {devices.length}
+                    {locatedDevices.length} com posição de {filteredDevices.length}
                   </Text>
                 </View>
                 <Pressable
@@ -1128,10 +1220,10 @@ export function MapScreen() {
                 showsVerticalScrollIndicator={quickSheetMode === 'expanded'}
                 contentContainerStyle={[
                   styles.quickList,
-                  devices.length === 1 && styles.quickListCenter,
+                  filteredDevices.length === 1 && styles.quickListCenter,
                 ]}
               >
-                {devices.map((device) => (
+                {filteredDevices.map((device) => (
                   <QuickVehicleCard
                     key={device.dispositivoId}
                     device={device}
@@ -1209,7 +1301,7 @@ export function MapScreen() {
 
       <SearchBottomSheet
         visible={searchSheetVisible}
-        devices={devices}
+        devices={filteredDevices}
         onClose={() => setSearchSheetVisible(false)}
         onSelectDevice={(device) => {
           focusDevice(device, true);
@@ -1220,12 +1312,15 @@ export function MapScreen() {
       {canVerEventos ? (
         <NotificationsBottomSheet
           visible={notificationsSheetVisible}
-          devices={devices}
+          devices={filteredDevices}
           onClose={() => setNotificationsSheetVisible(false)}
           onSelectEvent={(event) => {
             if (event.dispositivoId) {
               const device = devices.find((d) => d.dispositivoId === event.dispositivoId);
-              if (device) focusDevice(device, true);
+              if (device) {
+                if (getMapaDoDevice(device) !== mapaAtivo) setMapaAtivo(getMapaDoDevice(device));
+                focusDevice(device, true);
+              }
             }
             setNotificationsSheetVisible(false);
           }}
@@ -1243,6 +1338,29 @@ const styles = StyleSheet.create({
   headerButtons: {
     flexDirection: 'row',
     marginRight: spacing.xs,
+  },
+  mapaSeletor: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 999,
+    padding: 3,
+    alignSelf: 'center',
+  },
+  mapaSeletorOpt: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  mapaSeletorOptAtivo: {
+    backgroundColor: colors.primary,
+  },
+  mapaSeletorText: {
+    color: colors.surface,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  mapaSeletorTextAtivo: {
+    color: colors.primaryText,
   },
   mapControls: {
     position: 'absolute',

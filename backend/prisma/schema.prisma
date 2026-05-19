@@ -269,6 +269,9 @@ model Dispositivo {
   // Billing (equivalente a Placa)
   valorPadrao Decimal? @db.Decimal(10, 2)
 
+  // Agrupamento visual no portal do cliente / app — permite dividir a frota em "Mapa 1" e "Mapa 2"
+  mapa Int @default(1)
+
   // Tag BLE (para localização auxiliar via Bluetooth durante operações de resgate)
   enderecoMac String?
 

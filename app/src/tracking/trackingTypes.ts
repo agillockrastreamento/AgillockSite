@@ -43,6 +43,7 @@ export type TrackingDevice = {
   status: string;
   lastUpdate: string | null;
   posicao: TrackingPosition | null;
+  mapa?: number | null;
   _recorrencias?: Array<{
     id: string;
     titulo: string;

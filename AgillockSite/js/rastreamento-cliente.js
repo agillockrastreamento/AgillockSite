@@ -15,6 +15,22 @@ const _spider = { markers: [], linhas: [], chave: null };
 const CACHE_KEY = 'rastr_cli_pos_v1';
 const CLUSTER_PX = 40;
 
+// ── Mapa ativo (1 ou 2) — agrupamento visual no portal cliente ───────────────
+const MAPA_STORAGE_KEY = 'rastr_cli_mapa_ativo';
+let mapaAtivo = (() => {
+  try {
+    const v = Number(localStorage.getItem(MAPA_STORAGE_KEY));
+    return v === 2 ? 2 : 1;
+  } catch { return 1; }
+})();
+function _mapaDoVeiculo(v) { const n = Number(v && v.mapa); return n === 2 ? 2 : 1; }
+function _veiculoNoMapaAtivo(v) { return v && _mapaDoVeiculo(v) === mapaAtivo; }
+function _mapasUsados() {
+  const set = new Set();
+  Object.values(veiculosMap).forEach(v => set.add(_mapaDoVeiculo(v)));
+  return set;
+}
+
 let ws = null;
 let wsReconectando = false;
 let wsReconectTimer = null;
@@ -65,6 +81,10 @@ function _restaurarFocoCliente() {
     try { dispositivoId = sessionStorage.getItem(CLIENT_FOCUS_STORAGE_KEY); } catch {}
   }
   if (!dispositivoId || !veiculosMap[dispositivoId]) return;
+  // Se o veículo a ser restaurado pertence a outro mapa, troca o mapa ativo antes de focar.
+  if (!_veiculoNoMapaAtivo(veiculosMap[dispositivoId])) {
+    setMapaAtivo(_mapaDoVeiculo(veiculosMap[dispositivoId]));
+  }
   focarCliente(dispositivoId);
 }
 
@@ -706,6 +726,7 @@ function adicionarEvento(evt) {
   const tiposPermitidos = TIPOS_EVENTO_CLIENTE_FILTRO.map(t => t.tipo);
   if (evt.adminEvento === true) return;
   if (evt.origemTipo === 'ADMIN' && evt.notificarCliente === false) return;
+  // O evento é mantido em memória, mas o filtro de exibição por mapa acontece em renderEventosLista.
   if (evt.origemTipo === 'CLIENTE' && window.AL_CLIENTE && AL_CLIENTE.getUser) {
     const user = AL_CLIENTE.getUser() || {};
     if (evt.clienteId && user.clienteId && evt.clienteId !== user.clienteId) return;
@@ -739,6 +760,8 @@ function renderEventosLista() {
   const placaFiltro = _normalizarPlacaFiltro(_evtPlacaFiltro);
   const filtrados = _eventos.filter(e => {
     if (_evtFiltros.has(e.tipo)) return false;
+    // Filtra eventos por mapa ativo: oculta eventos de dispositivos que pertencem a outro mapa.
+    if (e.dispositivoId && veiculosMap[e.dispositivoId] && !_veiculoNoMapaAtivo(veiculosMap[e.dispositivoId])) return false;
     if (!placaFiltro) return true;
     return _normalizarPlacaFiltro(_placaEventoCliente(e)).includes(placaFiltro);
   });
@@ -1262,7 +1285,7 @@ function _limparRastros() {
 }
 
 async function _carregarRastros() {
-  const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao);
+  const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao && _veiculoNoMapaAtivo(veiculosMap[id]));
   for (const id of ids) {
     if (!_overlay.rastro) break;
     try {
@@ -1298,6 +1321,7 @@ function _renderAlarmeBadge(id, v) {
     delete _alarmeBadges[id];
   }
   if (!_overlay.alarmes || !v?.posicao?.alarme) return;
+  if (!_veiculoNoMapaAtivo(v)) return;
   const badge = L.marker([v.posicao.latitude, v.posicao.longitude], {
     icon: L.divIcon({
       html: `<div style="background:#e74c3c;color:#fff;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;gap:4px;"><i class="fa fa-bell" style="font-size:9px"></i> ${v.posicao.alarme}</div>`,
@@ -1343,6 +1367,85 @@ function _adicionarBotaoLocalizacao(mapInst) {
 
 // ── Carga de posições ─────────────────────────────────────────────────────────
 
+function _atualizarBotoesMapaSeletor() {
+  document.querySelectorAll('#mapa-seletor .mapa-opt').forEach(btn => {
+    const ativo = Number(btn.dataset.mapa) === mapaAtivo;
+    btn.classList.toggle('ativo', ativo);
+    btn.setAttribute('aria-selected', String(ativo));
+  });
+}
+
+// Esconde o toggle quando todos os veículos do cliente estão no mesmo mapa.
+// Mostra somente se houver pelo menos 1 em cada mapa.
+function _atualizarVisibilidadeSeletor() {
+  const seletor = document.getElementById('mapa-seletor');
+  if (!seletor) return;
+  const usados = _mapasUsados();
+  if (usados.size < 2) {
+    // Sincroniza mapaAtivo com o único mapa em uso (default 1 quando lista vazia)
+    const unico = usados.size === 1 ? usados.values().next().value : 1;
+    if (mapaAtivo !== unico) {
+      mapaAtivo = unico;
+      try { localStorage.setItem(MAPA_STORAGE_KEY, String(unico)); } catch {}
+      _atualizarBotoesMapaSeletor();
+    }
+    seletor.style.display = 'none';
+  } else {
+    seletor.style.display = 'inline-flex';
+  }
+}
+
+function setMapaAtivo(novo) {
+  const valor = Number(novo) === 2 ? 2 : 1;
+  if (valor === mapaAtivo) return;
+  mapaAtivo = valor;
+  try { localStorage.setItem(MAPA_STORAGE_KEY, String(valor)); } catch {}
+  _atualizarBotoesMapaSeletor();
+
+  // Se o veículo focado mudou de mapa, desfaz o foco.
+  if (ativoId && veiculosMap[ativoId] && !_veiculoNoMapaAtivo(veiculosMap[ativoId])) {
+    modoFoco = false;
+    ativoId = null;
+    _limparFocoCliente();
+    const card = document.getElementById('device-detail-card');
+    if (card) { card.style.display = 'none'; card.innerHTML = ''; }
+  }
+
+  // Remove badges de alarme dos veículos que saíram do mapa visível
+  Object.keys(_alarmeBadges).forEach(id => {
+    if (!_veiculoNoMapaAtivo(veiculosMap[id])) {
+      if (map && map.hasLayer(_alarmeBadges[id])) map.removeLayer(_alarmeBadges[id]);
+      delete _alarmeBadges[id];
+    }
+  });
+  // Remove rastros dos veículos que saíram do mapa visível
+  Object.keys(_rastros).forEach(id => {
+    if (!_veiculoNoMapaAtivo(veiculosMap[id])) {
+      const r = _rastros[id];
+      if (r) {
+        if (r.linha && map.hasLayer(r.linha)) map.removeLayer(r.linha);
+        (r.setas || []).forEach(s => { if (map.hasLayer(s)) map.removeLayer(s); });
+        delete _rastros[id];
+      }
+    }
+  });
+
+  renderMarcadores();
+  renderSidebar();
+  renderBarraVeiculos();
+  renderEventosLista();
+  ajustarBounds();
+  if (_overlay.alarmes) _atualizarAlarmeBadges();
+  if (_overlay.rastro) _carregarRastros();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  _atualizarBotoesMapaSeletor();
+  document.querySelectorAll('#mapa-seletor .mapa-opt').forEach(btn => {
+    btn.addEventListener('click', () => setMapaAtivo(btn.dataset.mapa));
+  });
+});
+
 async function carregarPosicoes() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -1352,7 +1455,8 @@ async function carregarPosicoes() {
         veiculosMap[v.dispositivoId] = v;
         if (v.traccarId) traccarIdParaDispositivoId[v.traccarId] = v.dispositivoId;
       });
-      renderMarcadores(); renderSidebar(); renderBarraVeiculos(); 
+      _atualizarVisibilidadeSeletor();
+      renderMarcadores(); renderSidebar(); renderBarraVeiculos();
       if (ajustarBounds()) boundsAjustados = true;
       _restaurarFocoCliente();
     }
@@ -1385,6 +1489,7 @@ async function carregarPosicoes() {
     });
 
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(lista)); } catch {}
+    _atualizarVisibilidadeSeletor();
     renderMarcadores(); renderSidebar(); renderBarraVeiculos();
     if (!boundsAjustados) {
       if (ajustarBounds()) boundsAjustados = true;
@@ -1516,7 +1621,7 @@ function processarMensagemWs(msg) {
 // ── Cluster / Spider ─────────────────────────────────────────────────────────
 
 function _agruparPorPixel() {
-  const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao);
+  const ids = Object.keys(veiculosMap).filter(id => veiculosMap[id]?.posicao && _veiculoNoMapaAtivo(veiculosMap[id]));
   const visitados = new Set(); const grupos = {};
   ids.forEach(id => {
     if (visitados.has(id)) return;
@@ -1569,6 +1674,12 @@ function _abrirSpider(chave, centroLatLng) {
 // ── Marcadores ────────────────────────────────────────────────────────────────
 
 function renderMarcadores() {
+  // Remove do mapa qualquer marcador de veículo que não pertença ao mapa ativo
+  Object.keys(marcadores).forEach(id => {
+    if (!_veiculoNoMapaAtivo(veiculosMap[id])) {
+      if (map.hasLayer(marcadores[id])) map.removeLayer(marcadores[id]);
+    }
+  });
   const grupos = _agruparPorPixel();
   Object.keys(_clusterGrupos).forEach(k => delete _clusterGrupos[k]);
   Object.assign(_clusterGrupos, grupos);
@@ -1611,6 +1722,8 @@ function renderMarcadores() {
 
 function atualizarMarcador(did) {
   const v = veiculosMap[did]; if (!v?.posicao) return;
+  // Posições de veículos em outro mapa atualizam apenas em memória; nada é renderizado.
+  if (!_veiculoNoMapaAtivo(v)) return;
   if (!marcadores[did]) { renderMarcadores(); return; }
   const { latitude, longitude } = v.posicao;
   marcadores[did].setLatLng([latitude, longitude]);
@@ -1778,7 +1891,7 @@ function _atualizarBindingsPopup() {
 // ── Contadores ────────────────────────────────────────────────────────────────
 
 function renderSidebar() {
-  const todos = Object.values(veiculosMap);
+  const todos = Object.values(veiculosMap).filter(_veiculoNoMapaAtivo);
   const online = todos.filter(v => v.status === 'online').length;
   const offline = todos.length - online;
   const semPos = todos.filter(v => !v.posicao).length;
@@ -1793,10 +1906,12 @@ function renderBuscaResultados() {
   if (!filtro) { el.style.display = 'none'; el.innerHTML = ''; return; }
 
   const filtrados = Object.values(veiculosMap).filter(v =>
-    v.nome.toLowerCase().includes(filtro) ||
-    (v.placa && v.placa.toLowerCase().includes(filtro)) ||
-    (v.apelidoCliente && v.apelidoCliente.toLowerCase().includes(filtro)) ||
-    (v.cliente?.nome?.toLowerCase().includes(filtro))
+    _veiculoNoMapaAtivo(v) && (
+      v.nome.toLowerCase().includes(filtro) ||
+      (v.placa && v.placa.toLowerCase().includes(filtro)) ||
+      (v.apelidoCliente && v.apelidoCliente.toLowerCase().includes(filtro)) ||
+      (v.cliente?.nome?.toLowerCase().includes(filtro))
+    )
   ).slice(0, 8);
 
   if (!filtrados.length) { el.innerHTML = '<div style="padding:12px;text-align:center;color:#aaa;font-size:12px">Nenhum resultado.</div>'; el.style.display = 'block'; return; }
@@ -1827,9 +1942,14 @@ const API_BASE = window.API_URL || 'http://localhost:3000';
 function renderBarraVeiculos() {
   const barra = document.getElementById('barra-veiculos');
   if (!barra) return;
-  const veiculos = Object.values(veiculosMap);
+  const veiculos = Object.values(veiculosMap).filter(_veiculoNoMapaAtivo);
 
-  if (!veiculos.length) { barra.innerHTML = ''; return; }
+  if (!veiculos.length) {
+    const seletorVisivel = _mapasUsados().size > 1;
+    const txt = seletorVisivel ? ('Nenhum veículo no Mapa ' + mapaAtivo + '.') : 'Nenhum veículo disponível.';
+    barra.innerHTML = '<div style="width:100%;text-align:center;padding:14px;font-size:12px;color:#888;">' + txt + '</div>';
+    return;
+  }
 
   barra.classList.remove('expandida');
   barra.innerHTML = veiculos.map(v => cardVeiculoHtml(v)).join('');
@@ -2706,7 +2826,7 @@ window.focarCliente = function (did) {
 
 function ajustarBounds() {
   if (map) map.invalidateSize();
-  const comPos = Object.values(veiculosMap).filter(v => v.posicao);
+  const comPos = Object.values(veiculosMap).filter(v => v.posicao && _veiculoNoMapaAtivo(v));
   if (!comPos.length) return false;
   if (comPos.length === 1) { 
     map.setView([comPos[0].posicao.latitude, comPos[0].posicao.longitude], 13); 

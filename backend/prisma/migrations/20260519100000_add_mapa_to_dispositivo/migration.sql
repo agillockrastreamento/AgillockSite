@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Dispositivo" ADD COLUMN "mapa" INTEGER NOT NULL DEFAULT 1;

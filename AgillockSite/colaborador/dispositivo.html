@@ -140,6 +140,21 @@
             </div>
           </div>
         </div>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Mapa</label>
+              <div id="d-mapa-toggle" style="display:flex;gap:8px;">
+                <button type="button" class="btn btn-default d-mapa-opt" data-mapa="1" style="flex:1;font-weight:700;"><i class="fa fa-map-o"></i> Mapa 1</button>
+                <button type="button" class="btn btn-default d-mapa-opt" data-mapa="2" style="flex:1;font-weight:700;"><i class="fa fa-map-o"></i> Mapa 2</button>
+              </div>
+              <input type="hidden" id="d-mapa" value="1" />
+              <p class="help-block" style="font-size:12px;color:#888;margin-top:6px;">
+                <i class="fa fa-info-circle"></i> Define em qual mapa (1 ou 2) este dispositivo será exibido no portal do cliente e no app.
+              </p>
+            </div>
+          </div>
+        </div>
         <!-- Clientes Vinculados -->
         <div id="clientes-vinculados-section" style="margin-top:18px;">
           <label style="font-weight:600;font-size:13px;">Clientes Vinculados</label>
@@ -541,6 +556,22 @@
       document.getElementById('d-ativo-label').textContent = this.checked ? 'Ativo' : 'Inativo';
     });
 
+    // ── Toggle de mapa (1 ou 2) ───────────────────────────────────────────
+    function aplicarEstiloMapa(valor) {
+      document.getElementById('d-mapa').value = String(valor);
+      document.querySelectorAll('.d-mapa-opt').forEach(function(btn) {
+        var ativo = String(btn.dataset.mapa) === String(valor);
+        btn.style.background = ativo ? '#c8870a' : '';
+        btn.style.color = ativo ? '#fff' : '';
+        btn.style.borderColor = ativo ? '#c8870a' : '';
+        btn.classList.toggle('active', ativo);
+      });
+    }
+    document.querySelectorAll('.d-mapa-opt').forEach(function(btn) {
+      btn.addEventListener('click', function() { aplicarEstiloMapa(this.dataset.mapa); });
+    });
+    aplicarEstiloMapa('1');
+
     // ── Toggle manutenção ─────────────────────────────────────────────────
     document.getElementById('d-manutencao-ativa').addEventListener('change', function() {
       document.getElementById('d-manutencao-ativa-label').textContent = this.checked ? 'Manutenções ativas' : 'Manutenções desativadas';
@@ -694,6 +725,7 @@
       document.getElementById('d-contato').value = d.contato || '';
       document.getElementById('d-ativo').checked = d.ativo !== false;
       document.getElementById('d-ativo-label').textContent = d.ativo !== false ? 'Ativo' : 'Inativo';
+      aplicarEstiloMapa(Number(d.mapa) === 2 ? '2' : '1');
       if (d.categoria) {
         var cat = CATEGORIAS.find(function(c){ return c.value === d.categoria; });
         document.getElementById('d-categoria-input').value = cat ? cat.label : d.categoria;
@@ -800,6 +832,7 @@
       formData.append('senha', document.getElementById('d-senha').value.trim());
       formData.append('ignorarOdometro', document.getElementById('d-ignorar-odometro').checked ? 'true' : 'false');
       formData.append('manutencaoAtiva', document.getElementById('d-manutencao-ativa').checked ? 'true' : 'false');
+      formData.append('mapa', document.getElementById('d-mapa').value || '1');
       formData.append('clienteId', document.getElementById('d-cliente-id').value);
       formData.append('clientesExtras', JSON.stringify(clientesExtras.map(function(c){ return c.id; })));
       if (selectedFile) formData.append('imagem', selectedFile);
