@@ -6,6 +6,8 @@ import { param, query } from '../utils/params';
 import { reverseGeocode } from '../utils/reverse-geocode';
 import {
   traccarGetDeviceByImei,
+  traccarGetDevices,
+  traccarGetPositions,
   traccarSendCommand,
 } from '../services/traccar.service';
 
@@ -36,10 +38,6 @@ router.get(
             cor: true,
             ano: true,
             enderecoMac: true,
-            telemetriaUltimaLatitude: true,
-            telemetriaUltimaLongitude: true,
-            telemetriaUltimaPosicaoEm: true,
-            telemetriaUltimaIgnicao: true,
           },
         },
         tag: {
@@ -58,11 +56,44 @@ router.get(
       },
     });
 
+    if (!atribuicoes.length) {
+      res.json([]);
+      return;
+    }
+
+    // Posições FRESCAS direto do Traccar (mesmo padrão do cliente).
+    // Sem essa consulta, o endpoint retornaria os campos `telemetriaUltima*`
+    // do banco que só são atualizados quando o cliente carrega o mapa.
+    const traccarResult = await Promise.allSettled([
+      traccarGetDevices(),
+      traccarGetPositions(),
+    ]);
+    const traccarDevices = traccarResult[0].status === 'fulfilled' ? traccarResult[0].value : [];
+    const traccarPositions = traccarResult[1].status === 'fulfilled' ? traccarResult[1].value : [];
+
+    const traccarByImei = new Map(traccarDevices.map((d) => [d.uniqueId, d]));
+    const posicaoPorDeviceId = new Map(traccarPositions.map((p) => [p.deviceId, p]));
+
     res.json(
-      atribuicoes.map((a) => ({
-        ...a.dispositivo,
-        tag: a.tag,
-      }))
+      atribuicoes.map((a) => {
+        const d = a.dispositivo;
+        const traccar = traccarByImei.get(d.identificador);
+        const pos = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
+        return {
+          ...d,
+          tag: a.tag,
+          // Campos compatíveis com o snapshot do cliente — posição fresca do Traccar
+          telemetriaUltimaLatitude: pos?.latitude ?? null,
+          telemetriaUltimaLongitude: pos?.longitude ?? null,
+          telemetriaUltimaPosicaoEm: pos?.fixTime ?? pos?.serverTime ?? null,
+          telemetriaUltimaIgnicao: pos?.attributes?.ignition ?? null,
+          // Extras úteis pra UI
+          velocidade: pos?.speed ?? null,
+          curso: pos?.course ?? null,
+          status: traccar?.status ?? 'unknown',
+          lastUpdate: traccar?.lastUpdate ?? null,
+        };
+      })
     );
   }
 );

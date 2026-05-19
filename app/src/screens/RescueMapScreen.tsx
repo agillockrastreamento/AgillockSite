@@ -345,25 +345,17 @@ export function RescueMapScreen() {
     [containerHeight, splitFraction, snapToPosition, cycleSplit],
   );
 
-  const animateToDevice = useCallback((device: TrackingDevice, cardOpen = false) => {
+  const animateToDevice = useCallback((device: TrackingDevice, _cardOpen = false) => {
     const coord = getDeviceCoordinate(device);
     if (!coord) return;
-    // Quando o card está aberto/abrindo, desloca o centro do mapa pra cima
-    // de modo que o marcador fique visível acima da bandeja, não atrás.
-    const latitudeOffset = cardOpen
-      ? (cardFullHeight / SCREEN_HEIGHT) * 0.011
-      : 0;
+    // O reposicionamento do marker acima do card é feito automaticamente via
+    // mapPadding (passado ao MapView). animateCamera respeita o padding e
+    // posiciona o ponto no centro visível, não no centro físico da view.
     mapRef.current?.animateCamera(
-      {
-        center: {
-          latitude: coord.latitude - latitudeOffset,
-          longitude: coord.longitude,
-        },
-        zoom: 16,
-      },
+      { center: coord, zoom: 16 },
       { duration: 420 },
     );
-  }, [cardFullHeight]);
+  }, []);
 
   const focusDevice = useCallback(
     (device: TrackingDevice) => {
@@ -503,8 +495,15 @@ export function RescueMapScreen() {
           initialRegion={DEFAULT_REGION}
           showsUserLocation
           showsMyLocationButton={false}
-          // Empurra a bússola/botões nativos pra baixo dos nossos controles flutuantes
-          mapPadding={{ top: insets.top + 60, right: 0, bottom: 0, left: 0 }}
+          // Empurra bússola/botões nativos pra baixo dos controles flutuantes,
+          // e quando o card está aberto (não em peek), aumenta o padding inferior
+          // pra o marker centralizar ACIMA do card em vez de ficar atrás.
+          mapPadding={{
+            top: insets.top + 60,
+            right: 0,
+            bottom: mainCardVisible && !mainCardPeeked ? cardFullHeight : 0,
+            left: 0,
+          }}
         >
           {devices.map((device) => {
             const coord = getDeviceCoordinate(device);
