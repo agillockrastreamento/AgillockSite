@@ -45,9 +45,12 @@ const DEFAULT_REGION = {
 };
 
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'hybrid'];
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+// Usa `screen.height` (tela física inteira, incl. status bar) porque o mapa
+// é edge-to-edge. `window.height` em Android translucent exclui a status bar
+// e faria a divisória visualmente subir pro lado do mapa.
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 const MAIN_CARD_PEEK_HEIGHT = 52;
-const DIVIDER_HEIGHT = 18;
+const DIVIDER_HEIGHT = 16;
 const MIN_PANEL_FRACTION = 0.12;
 const MAX_PANEL_FRACTION = 0.88;
 // Posições de snap do split: scanner grande / igual / mapa grande
@@ -588,7 +591,7 @@ export function RescueMapScreen() {
         <View style={styles.dividerToggle}>
           <Icon
             source="drag-horizontal-variant"
-            size={20}
+            size={14}
             color={colors.text}
           />
         </View>
@@ -823,19 +826,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   dividerToggle: {
-    width: 54,
-    height: 30,
+    width: 44,
+    height: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
+    borderRadius: 7,
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.18,
-    shadowRadius: 4,
+    shadowRadius: 3,
   },
   scannerPanel: {
     position: 'relative',
