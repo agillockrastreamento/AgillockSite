@@ -98,7 +98,7 @@ function getDirectionLabel(relAngle: number, distance: number): string {
 }
 
 function getStateMessage(hasDistance: boolean, hasDirection: boolean, isScanning: boolean): string {
-  if (!isScanning) return 'Toque em "Buscar" para começar';
+  if (!isScanning) return 'Toque em \u{1F50D} para começar';
   if (!hasDistance) return 'Procurando tag…';
   if (!hasDirection) return 'Vire-se devagar para localizar';
   return '';
@@ -439,32 +439,45 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
       {
         onlyTags: true,
         onError: (msg) => {
+          // Rate limit transitório do Android — o watchdog reinicia, não polui UI
+          if (msg.toLowerCase().includes('cannot start scanning')) return;
           setPermissionError(msg);
           setIsScanning(false);
         },
       },
     );
     // Watchdog: detecta throttle do Android e reinicia o scan.
-    // Alguns Androids (Xiaomi/Realme/Samsung) pausam BLE scan após poucos segundos
-    // de uso contínuo. Restartar contorna isso transparentemente.
+    // O Android tem rate limit RIGOROSO: máx 5 startDeviceScan() por 30s.
+    // Se ultrapassar, sistema responde "Cannot Start Scanning Operation".
+    // Por isso: threshold de 8s (max ~4 restarts/30s) + delay entre stop/start.
     let currentStop: () => void = stop;
+    const recentRestartsRef = { times: [] as number[] };
     consecutiveThrottlesRef.current = 0;
     if (restartWatchdogRef.current) clearInterval(restartWatchdogRef.current);
     restartWatchdogRef.current = setInterval(() => {
-      const since = Date.now() - lastAnyScanAtRef.current;
-      if (since > 4000) {
-        consecutiveThrottlesRef.current++;
-        try { currentStop(); } catch {}
-        // Reinicia o scan sem mudar UI/estado
+      const now = Date.now();
+      const since = now - lastAnyScanAtRef.current;
+      if (since <= 8000) return;
+
+      // Limite hard: máximo 4 restarts a cada 30s (margem do rate limit do Android = 5/30s)
+      recentRestartsRef.times = recentRestartsRef.times.filter((t) => now - t < 30000);
+      if (recentRestartsRef.times.length >= 4) return;
+      recentRestartsRef.times.push(now);
+
+      consecutiveThrottlesRef.current++;
+      try { currentStop(); } catch {}
+
+      // Delay 600ms entre stop e novo start — dá tempo do Android liberar
+      // o slot interno do scanner BLE antes de tentar reabrir.
+      setTimeout(() => {
         const newStop = startBleScan(
           (device: BleDevice) => {
             lastAnyScanAtRef.current = Date.now();
             const tag = veiculoAlvoRef.current?.tag ?? null;
             const match = tag ? matchTagToScan(tag, device) : null;
             if (match) {
-              // Recebeu match — zera o contador de throttle
               consecutiveThrottlesRef.current = 0;
-                  const txPower = tag?.txPowerCalibrado ?? -59;
+              const txPower = tag?.txPowerCalibrado ?? -59;
               const rawRssi = device.rssi ?? -100;
               const smoothed = alvoSmoother.push(rawRssi);
               const dist = rssiToDistance(smoothed, txPower, 2.5);
@@ -486,11 +499,19 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
               [id]: { id, name, rssi, distance, lastSeenAt: Date.now() },
             }));
           },
-          { onlyTags: true, onError: (msg) => { setPermissionError(msg); } },
+          {
+            onlyTags: true,
+            onError: (msg) => {
+              // Não popula permissionError em erros transitórios de scan
+              // (ex: rate limit) — apenas loga e o watchdog tenta de novo.
+              if (msg.includes('Cannot start scanning')) return;
+              setPermissionError(msg);
+            },
+          },
         );
         currentStop = newStop;
         lastAnyScanAtRef.current = Date.now();
-      }
+      }, 600);
     }, 2000);
 
     const stopAll = () => {
