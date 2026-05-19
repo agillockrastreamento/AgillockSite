@@ -42,6 +42,7 @@ const DISPOSITIVO_SELECT = {
   odometroSistemaMetros: true, horimetroSistemaSegundos: true,
   telemetriaUltimaPosicaoEm: true, telemetriaUltimaLatitude: true, telemetriaUltimaLongitude: true, telemetriaUltimaIgnicao: true,
   imagemUrl: true, valorPadrao: true,
+  enderecoMac: true,
   clienteId: true, vendedorId: true, criadoPorId: true,
   createdAt: true, updatedAt: true,
 };
@@ -185,7 +186,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
     modeloRastreador, telefoneRastreador, iccid, operadora,
     placa, marca, modeloVeiculo, cor, ano, renavam, chassi, combustivel, localInstalacao, instalador,
     consumo, limiteVelocidade, senha, ignorarOdometro, manutencaoAtiva,
-    odometro,
+    odometro, enderecoMac,
     valorPadrao, clienteId, vendedorId,
   } = req.body;
 
@@ -242,6 +243,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
       odometroSistemaMetros: odometroKm != null ? Math.round(odometroKm * 1000) : null,
       imagemUrl,
       valorPadrao: valorPadrao ? Number(valorPadrao) : null,
+      enderecoMac: enderecoMac ? String(enderecoMac).toUpperCase().trim() : null,
       clienteId: clienteId || null,
       vendedorId: vendedorId || null,
       criadoPorId: req.user!.userId,
@@ -291,7 +293,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     modeloRastreador, telefoneRastreador, iccid, operadora,
     placa, marca, modeloVeiculo, cor, ano, renavam, chassi, combustivel, localInstalacao, instalador,
     consumo, limiteVelocidade, senha, ignorarOdometro, manutencaoAtiva,
-    odometro,
+    odometro, enderecoMac,
     valorPadrao, clienteId, vendedorId,
   } = req.body;
   const odometroKm = parseOptionalKm(odometro);
@@ -356,6 +358,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
       ...(ignorarOdometro !== undefined ? { ignorarOdometro: ignorarOdometro === 'true' || ignorarOdometro === true } : {}),
       ...(manutencaoAtiva !== undefined ? { manutencaoAtiva: manutencaoAtiva === 'true' || manutencaoAtiva === true } : {}),
       ...(odometro !== undefined ? { odometroSistemaMetros: odometroKm != null ? Math.round(odometroKm * 1000) : null } : {}),
+      ...(enderecoMac !== undefined ? { enderecoMac: enderecoMac ? String(enderecoMac).toUpperCase().trim() : null } : {}),
       ...(req.file ? { imagemUrl: novaImagemUrl } : {}),
       ...(valorPadrao !== undefined ? { valorPadrao: valorPadrao ? Number(valorPadrao) : null } : {}),
       ...(clienteId !== undefined ? { clienteId: clienteId || null } : {}),

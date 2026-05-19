@@ -30,7 +30,10 @@ import { NotificationHandlers } from '../notifications/NotificationHandlers';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
+import { RescueStack } from './RescueStack';
+import { AdminPareadorStack } from './AdminPareadorStack';
 import type { ClienteDrawerParamList, RootStackParamList } from './routes';
+import type { ClienteUser } from '../auth/authTypes';
 
 const drawerLogo = require('../../assets/agillock_new_symbol.png');
 
@@ -60,12 +63,13 @@ const navigationTheme = {
 
 function ClienteDrawerContent(props: DrawerContentComponentProps) {
   const { user, me, signOut } = useAuth();
+  const clienteUser = user && user.role === 'CLIENTE' ? (user as ClienteUser) : null;
   const toast = useToast();
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [profile, setProfile] = useState<ClientePerfil | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   // Sub-usuário (vinculado) não tem perfil próprio editável; apenas exibe nome.
-  const isResponsavel = (me?.tipo ?? user?.tipo ?? 'responsavel') === 'responsavel';
+  const isResponsavel = (me?.tipo ?? clienteUser?.tipo ?? 'responsavel') === 'responsavel';
   const avatarUri = resolveUploadUrl(profile?.avatarUrl);
   const logoUri = resolveUploadUrl(profile?.logoUrl);
 
@@ -205,6 +209,7 @@ function HeaderActions() {
 
 function ClienteDrawer() {
   const { user, me, can } = useAuth();
+  const clienteUser = user && user.role === 'CLIENTE' ? (user as ClienteUser) : null;
   const [canAccessPayments, setCanAccessPayments] = useState(false);
 
   useEffect(() => {
@@ -223,7 +228,7 @@ function ClienteDrawer() {
 
   // Tipo do login determina o que aparece no menu. Responsável vê tudo;
   // vinculado só vê telas com permissão 'ver'. Notificações/Pagamentos/Usuários só responsável.
-  const tipo = me?.tipo ?? user?.tipo ?? 'responsavel';
+  const tipo = me?.tipo ?? clienteUser?.tipo ?? 'responsavel';
   const responsavel = tipo === 'responsavel';
   const verMapa = responsavel || can('rastreamento.ver');
   const verRelatorio = responsavel || can('relatorio.ver');
@@ -305,26 +310,37 @@ function ClienteDrawer() {
 }
 
 export function AppNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, tipoSessao } = useAuth();
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) setNotificationsEnabled(true);
-  }, [isAuthenticated]);
+    if (isAuthenticated && tipoSessao === 'cliente') {
+      setNotificationsEnabled(true);
+    }
+  }, [isAuthenticated, tipoSessao]);
 
   if (isLoading) return <SessionLoadingScreen />;
+
+  const renderRootScreen = () => {
+    if (!isAuthenticated) {
+      return <Stack.Screen name="Login" component={LoginScreen} />;
+    }
+    if (tipoSessao === 'resgate') {
+      return <Stack.Screen name="Resgate" component={RescueStack} />;
+    }
+    if (tipoSessao === 'admin') {
+      return <Stack.Screen name="AdminPareador" component={AdminPareadorStack} />;
+    }
+    return <Stack.Screen name="Cliente" component={ClienteDrawer} />;
+  };
 
   return (
     <>
       <NotificationHandlers navigation={navigationRef} />
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {isAuthenticated ? (
-            <Stack.Screen name="Cliente" component={ClienteDrawer} />
-          ) : (
-            <Stack.Screen name="Login" component={LoginScreen} />
-          )}
+          {renderRootScreen()}
           <Stack.Screen
             name="Historico"
             component={HistoricoScreen}

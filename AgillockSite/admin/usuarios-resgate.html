@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Usuários Resgate — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css?v=2" />
+
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
+    #al-alert-container, .filter-bar { flex-shrink: 0; }
+    .table-responsive {
+      flex: 1;
+      overflow-y: auto;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.05);
+      margin-bottom: 0;
+    }
+    html.dark-theme .table-responsive { background: #141820; }
+    .admin-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+          <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
+          <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li class="active"><a href="usuarios-resgate.html"><i class="fa fa-life-ring fa-fw"></i> Usuários Resgate</a></li>
+          <li><a href="geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Usuários Resgate</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-primary-al" id="btn-novo"><i class="fa fa-plus"></i> Novo Usuário</button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-6">
+          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por nome ou e-mail…" />
+        </div>
+        <div class="col-sm-3">
+          <select id="filtro-status" class="form-control">
+            <option value="">Todos os status</option>
+            <option value="ATIVO">Ativo</option>
+            <option value="INATIVO">Inativo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Veículos atribuídos</th>
+            <th>Status</th>
+            <th>Criado em</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="../js/topbar-rastrear-global.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = user.role; ub.className = 'al-badge badge-ativo';
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      var lista = [];
+
+      function load() {
+        var tb = document.getElementById('tbody');
+        tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i></td></tr>';
+        AL.apiGet('/api/usuarios-resgate')
+          .then(function (data) {
+            lista = data || [];
+            filtrar();
+          })
+          .catch(function (err) {
+            tb.innerHTML = '<tr><td colspan="6" class="text-danger text-center">' + err.message + '</td></tr>';
+          });
+      }
+
+      var _debounce = null;
+      function filtrar() {
+        var busca = document.getElementById('filtro-busca').value.toLowerCase().trim();
+        var status = document.getElementById('filtro-status').value;
+        var filtrado = lista.filter(function (u) {
+          var matchBusca = !busca || (u.nome + ' ' + u.email).toLowerCase().indexOf(busca) !== -1;
+          var matchStatus = !status || (status === 'ATIVO' ? u.ativo : !u.ativo);
+          return matchBusca && matchStatus;
+        });
+        renderTabela(filtrado);
+      }
+      document.getElementById('filtro-busca').addEventListener('input', function () {
+        clearTimeout(_debounce);
+        _debounce = setTimeout(filtrar, 300);
+      });
+      document.getElementById('filtro-status').addEventListener('change', filtrar);
+
+      function renderTabela(dados) {
+        var tb = document.getElementById('tbody');
+        var items = dados !== undefined ? dados : lista;
+        if (!items.length) {
+          tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum usuário de resgate cadastrado.</td></tr>';
+          return;
+        }
+        var html = '';
+        items.forEach(function (u) {
+          var qtd = u._count ? u._count.dispositivosResgate : 0;
+          html += '<tr data-id="' + u.id + '">' +
+            '<td><i class="fa fa-life-ring fa-fw" style="color:#aaa;margin-right:4px;"></i> ' + u.nome + '</td>' +
+            '<td>' + u.email + '</td>' +
+            '<td><span class="badge" style="background:#6c757d;">' + qtd + '</span></td>' +
+            '<td>' + (u.ativo ? AL.badgeStatus('ATIVO') : AL.badgeStatus('INATIVO')) + '</td>' +
+            '<td>' + AL.fmtDate(u.createdAt) + '</td>' +
+            '<td>' +
+            '<button class="btn btn-xs btn-default btn-edit" data-id="' + u.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' +
+            '<button class="btn btn-xs ' + (u.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + u.id + '" title="' + (u.ativo ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button> ' +
+            '<button class="btn btn-xs btn-danger btn-del" data-id="' + u.id + '" data-nome="' + u.nome + '" title="Excluir"><i class="fa fa-trash"></i></button>' +
+            '</td></tr>';
+        });
+        tb.innerHTML = html;
+
+        tb.querySelectorAll('.btn-edit').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            window.location.href = 'usuario-resgate-form.html?id=' + this.dataset.id;
+          });
+        });
+        tb.querySelectorAll('.btn-toggle').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            AL.apiPatch('/api/usuarios-resgate/' + this.dataset.id + '/status', {})
+              .then(load).catch(function (err) { AL.showAlert(err.message); });
+          });
+        });
+        tb.querySelectorAll('.btn-del').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var id = this.dataset.id;
+            var nome = this.dataset.nome;
+            AL.confirmar({
+              titulo: 'Excluir Usuário de Resgate',
+              mensagem: 'Excluir o usuário <strong>' + nome + '</strong>?',
+              consequencias: 'Esta ação é irreversível. O usuário perderá o acesso imediatamente ao aplicativo de resgate.',
+              btnTexto: '<i class="fa fa-trash"></i> Excluir permanentemente',
+            }).then(function (ok) {
+              if (!ok) return;
+              AL.apiDelete('/api/usuarios-resgate/' + id)
+                .then(function () { load(); AL.showAlert('Usuário excluído.', 'success'); })
+                .catch(function (err) { AL.showAlert(err.message); });
+            });
+          });
+        });
+      }
+
+      document.getElementById('btn-novo').addEventListener('click', function () {
+        window.location.href = 'usuario-resgate-form.html';
+      });
+
+      load();
+    })();
+  </script>
+</body>
+
+</html>

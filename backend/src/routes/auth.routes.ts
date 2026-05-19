@@ -23,6 +23,10 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       res.status(401).json({ error: 'Usuário inativo. Contate o administrador.' });
       return;
     }
+    if (user.role === 'RESGATE') {
+      res.status(403).json({ error: 'Usuário de resgate só pode acessar pelo aplicativo.' });
+      return;
+    }
     const senhaValida = await bcrypt.compare(senha, user.senhaHash);
     if (!senhaValida) {
       res.status(401).json({ error: 'Credenciais inválidas.' });
@@ -100,6 +104,107 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     res.json({
       token,
       user: { id: clienteLogin.cliente.id, nome: nomeExibicao, email: clienteLogin.email, role: 'CLIENTE', tipo },
+    });
+    return;
+  }
+
+  res.status(401).json({ error: 'Credenciais inválidas.' });
+});
+
+// POST /api/auth/login-app — login unificado para o aplicativo móvel
+// Aceita: User (ADMIN, RESGATE) e ClienteLogin (CLIENTE)
+// Retorna `tipoSessao` para o app rotear pra tela correta
+router.post('/login-app', async (req: Request, res: Response): Promise<void> => {
+  const { email, senha } = req.body;
+
+  if (!email || !senha) {
+    res.status(400).json({ error: 'Email e senha são obrigatórios.' });
+    return;
+  }
+
+  // 1. Tentar como User (ADMIN para parear tags, RESGATE para resgate)
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (user) {
+    if (!user.ativo) {
+      res.status(401).json({ error: 'Usuário inativo. Contate o administrador.' });
+      return;
+    }
+    // No app, só ADMIN e RESGATE têm tela útil (COLABORADOR/VENDEDOR usam o site)
+    if (user.role !== 'ADMIN' && user.role !== 'RESGATE') {
+      res.status(403).json({
+        error: 'Este perfil de usuário só pode acessar pelo site (https://agillock.com.br).',
+      });
+      return;
+    }
+    const senhaValida = await bcrypt.compare(senha, user.senhaHash);
+    if (!senhaValida) {
+      res.status(401).json({ error: 'Credenciais inválidas.' });
+      return;
+    }
+
+    const payload: Parameters<typeof signToken>[0] = {
+      userId: user.id,
+      role: user.role,
+      nome: user.nome,
+    };
+    const token = signToken(payload);
+    const tipoSessao = user.role === 'RESGATE' ? 'resgate' : 'admin';
+    res.json({
+      token,
+      tipoSessao,
+      user: { id: user.id, nome: user.nome, email: user.email, role: user.role },
+    });
+    return;
+  }
+
+  // 2. Tentar como ClienteLogin (portal do cliente)
+  const clienteLogin = await prisma.clienteLogin.findUnique({
+    where: { email },
+    include: {
+      cliente: { select: { id: true, nome: true, status: true } },
+    },
+  });
+
+  if (clienteLogin) {
+    if (!clienteLogin.ativo) {
+      res.status(401).json({ error: 'Acesso inativo. Contate o administrador.' });
+      return;
+    }
+    if (clienteLogin.cliente.status !== 'ATIVO') {
+      res.status(401).json({ error: 'Cliente inativo. Contate o administrador.' });
+      return;
+    }
+    const senhaValida = await bcrypt.compare(senha, clienteLogin.senhaHash);
+    if (!senhaValida) {
+      res.status(401).json({ error: 'Credenciais inválidas.' });
+      return;
+    }
+
+    const tipo: 'responsavel' | 'vinculado' =
+      clienteLogin.tipo === 'vinculado' ? 'vinculado' : 'responsavel';
+
+    const nomeExibicao =
+      tipo === 'vinculado' && clienteLogin.nome ? clienteLogin.nome : clienteLogin.cliente.nome;
+
+    const token = signClienteToken({
+      sub: clienteLogin.id,
+      clienteId: clienteLogin.cliente.id,
+      role: 'CLIENTE',
+      tipo,
+      nome: nomeExibicao,
+    });
+
+    res.json({
+      token,
+      tipoSessao: 'cliente',
+      user: {
+        id: clienteLogin.cliente.id,
+        nome: nomeExibicao,
+        email: clienteLogin.email,
+        role: 'CLIENTE',
+        tipo,
+      },
     });
     return;
   }

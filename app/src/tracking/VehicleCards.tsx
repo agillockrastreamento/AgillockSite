@@ -165,6 +165,7 @@ export function MainVehicleCard({
   onShowRoute,
   onCompartilhar,
   onFocusDevice,
+  modoResgate,
 }: {
   device: TrackingDevice;
   onUploadPhoto(): void;
@@ -176,6 +177,8 @@ export function MainVehicleCard({
   onShowRoute?: () => void;
   onCompartilhar?: () => void;
   onFocusDevice?: () => void;
+  /** No modo resgate, esconde foto/upload, recorrências km/data, resumo do dia e botão "ver histórico". */
+  modoResgate?: boolean;
 }) {
   const toast = useToast();
   const confirm = useConfirmDialog();
@@ -471,29 +474,31 @@ export function MainVehicleCard({
         onConfirm={handleGeofenceConfirm}
       />
 
-      <View style={styles.mainCoverWrap}>
-        <Pressable onPress={onFocusDevice} style={StyleSheet.absoluteFill}>
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.mainCoverImage} />
-          ) : (
-            <View style={styles.mainCoverFallback}>
-              <VehicleIcon categoria={device.categoria} color={getMarkerColor(device)} course={0} size={96} />
-            </View>
-          )}
-        </Pressable>
-        {canUploadFoto ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Alterar foto do veículo"
-            onPress={onUploadPhoto}
-            disabled={isUploading}
-            hitSlop={8}
-            style={styles.coverCameraBadge}
-          >
-            <Icon source="camera" size={16} color={colors.primaryText} />
+      {!modoResgate ? (
+        <View style={styles.mainCoverWrap}>
+          <Pressable onPress={onFocusDevice} style={StyleSheet.absoluteFill}>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={styles.mainCoverImage} />
+            ) : (
+              <View style={styles.mainCoverFallback}>
+                <VehicleIcon categoria={device.categoria} color={getMarkerColor(device)} course={0} size={96} />
+              </View>
+            )}
           </Pressable>
-        ) : null}
-      </View>
+          {canUploadFoto ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Alterar foto do veículo"
+              onPress={onUploadPhoto}
+              disabled={isUploading}
+              hitSlop={8}
+              style={styles.coverCameraBadge}
+            >
+              <Icon source="camera" size={16} color={colors.primaryText} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.mainBody}>
         <Text style={styles.sectionTitle}>Informações do Dispositivo</Text>
@@ -546,7 +551,7 @@ export function MainVehicleCard({
           <Speedometer speed={p?.velocidade || 0} limit={device.limiteVelocidade || 110} />
         </View>
 
-        {maintenanceAlerts.map(r => {
+        {!modoResgate ? maintenanceAlerts.map(r => {
           const odometroM = r.dispositivo?.odometroSistemaMetros ?? p?.odometro ?? 0;
           const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
           const pastDue = kmRestante < 0;
@@ -567,9 +572,9 @@ export function MainVehicleCard({
               ) : null}
             </View>
           );
-        })}
+        }) : null}
 
-        {recorrenciasData.map(r => {
+        {!modoResgate ? recorrenciasData.map(r => {
           const dp = String(r.dataReferencia).slice(0, 10).split('-');
           const data = new Date(Number(dp[0]), Number(dp[1]) - 1, Number(dp[2]));
           const hoje = new Date();
@@ -593,7 +598,7 @@ export function MainVehicleCard({
               ) : null}
             </View>
           );
-        })}
+        }) : null}
 
         <View style={styles.updateSection}>
           <Text style={styles.updateTitle}>Última Atualização</Text>
@@ -702,23 +707,25 @@ export function MainVehicleCard({
           </View>
         </View>
 
-        <View style={styles.summarySection}>
-          <Text style={styles.summaryTitle}>RESUMO DE HOJE</Text>
-          {!summary ? (
-            <Text style={styles.loadingSummary}>Carregando...</Text>
-          ) : (
-            <View style={styles.summaryGrid}>
-              <SummaryItem label="Distância" value={summary.km} />
-              <SummaryItem label="Vel. Máxima" value={summary.velMax} />
-              <SummaryItem label="Em Movimento" value={summary.tempo} />
-              <SummaryItem label="Viagens" value={summary.viagens} />
-            </View>
-          )}
-          <Pressable style={styles.verMaisBtn} onPress={onVerMais}>
-            <Icon source="history" size={14} color="#fff" />
-            <Text style={styles.verMaisText}>Ver Histórico</Text>
-          </Pressable>
-        </View>
+        {!modoResgate ? (
+          <View style={styles.summarySection}>
+            <Text style={styles.summaryTitle}>RESUMO DE HOJE</Text>
+            {!summary ? (
+              <Text style={styles.loadingSummary}>Carregando...</Text>
+            ) : (
+              <View style={styles.summaryGrid}>
+                <SummaryItem label="Distância" value={summary.km} />
+                <SummaryItem label="Vel. Máxima" value={summary.velMax} />
+                <SummaryItem label="Em Movimento" value={summary.tempo} />
+                <SummaryItem label="Viagens" value={summary.viagens} />
+              </View>
+            )}
+            <Pressable style={styles.verMaisBtn} onPress={onVerMais}>
+              <Icon source="history" size={14} color="#fff" />
+              <Text style={styles.verMaisText}>Ver Histórico</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </View>
   );

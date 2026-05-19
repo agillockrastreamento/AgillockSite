@@ -1,23 +1,25 @@
 import { apiRequest } from '../services/api/apiClient';
-import type { ClienteUser, LoginCredentials, LoginResponse } from './authTypes';
+import type { AppUser, LoginCredentials, LoginResponse, TipoSessao } from './authTypes';
 
-export async function loginCliente(credentials: LoginCredentials) {
-  const response = await apiRequest<LoginResponse>('/auth/login', {
+/**
+ * Faz login unificado pelo app (cliente, resgate ou admin pareador).
+ * O backend distingue automaticamente o tipo a partir do e-mail
+ * (User com role ADMIN/RESGATE vs ClienteLogin) e devolve `tipoSessao`.
+ */
+export async function loginApp(credentials: LoginCredentials) {
+  const response = await apiRequest<LoginResponse>('/auth/login-app', {
     method: 'POST',
     auth: false,
     body: credentials,
   });
 
-  if (!response.token || response.user?.role !== 'CLIENTE') {
-    throw new Error('Este aplicativo é exclusivo para clientes.');
-  }
-
-  if (response.user.tipo !== 'responsavel' && response.user.tipo !== 'vinculado') {
-    throw new Error('Perfil de cliente inválido para o aplicativo.');
+  if (!response.token || !response.user || !response.tipoSessao) {
+    throw new Error('Resposta de login inválida.');
   }
 
   return {
     token: response.token,
-    user: response.user as ClienteUser,
+    tipoSessao: response.tipoSessao as TipoSessao,
+    user: response.user as AppUser,
   };
 }

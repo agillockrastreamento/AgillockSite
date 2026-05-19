@@ -10,6 +10,7 @@ enum Role {
   ADMIN
   COLABORADOR
   VENDEDOR
+  RESGATE
 }
 
 enum StatusCliente {
@@ -78,6 +79,7 @@ model User {
   pagamentos            PagamentoComissao[]
   contratosCriados      Contrato[]                  @relation("ContratoCriador")
   adminPreferencia      AdminPreferencia?
+  dispositivosResgate   UsuarioResgateDispositivo[]
 }
 
 model AdminPreferencia {
@@ -267,6 +269,9 @@ model Dispositivo {
   // Billing (equivalente a Placa)
   valorPadrao Decimal? @db.Decimal(10, 2)
 
+  // Tag BLE (para localização auxiliar via Bluetooth durante operações de resgate)
+  enderecoMac String?
+
   clienteId   String?
   cliente     Cliente? @relation(fields: [clienteId], references: [id])
   vendedorId  String?
@@ -286,9 +291,50 @@ model Dispositivo {
   recorrenciasData         ManutencaoRecorrenciaData[]
   geocercas                GeocercaDispositivo[]
   loginsPermitidos         ClienteLoginPlaca[]
+  tagsBle                  TagBLE[]
+  usuariosResgate          UsuarioResgateDispositivo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Tag Bluetooth Low Energy associada a um dispositivo, usada para
+// localizar fisicamente o veículo durante operações de resgate.
+// Múltiplas tags podem ser cadastradas por dispositivo.
+model TagBLE {
+  id                     String   @id @default(uuid())
+  dispositivoId          String
+  apelido                String?
+  mac                    String? // capturado no Android (iOS não expõe MAC por privacidade)
+  nomeBleAdvertised      String? // fingerprint cross-platform (ex: "iTAG_A1B2")
+  manufacturerCompanyId  Int? // BLE company identifier
+  manufacturerDataHex    String? // bytes do manufacturer data em hex
+  serviceUuids           Json? // ex: ["FFE0", "180A"]
+  txPowerCalibrado       Int? // dBm @ 1m (default -59)
+  iosPeripheralUuidCache Json     @default("{}") // { "deviceId iOS": "peripheralUUID" }
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  dispositivo     Dispositivo                 @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  usuariosResgate UsuarioResgateDispositivo[]
+
+  @@unique([dispositivoId, mac])
+  @@index([dispositivoId])
+}
+
+// Junção: quais dispositivos (e suas tags) um usuário de resgate pode acessar
+model UsuarioResgateDispositivo {
+  usuarioId     String
+  dispositivoId String
+  tagId         String?
+
+  usuario     User        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  dispositivo Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  tag         TagBLE?     @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
+  @@id([usuarioId, dispositivoId])
+  @@index([dispositivoId])
+  @@index([tagId])
 }
 
 model Motorista {

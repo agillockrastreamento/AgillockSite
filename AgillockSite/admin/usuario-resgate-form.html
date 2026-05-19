@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Usuário Resgate — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; padding-right: 0 !important; overflow: hidden; }
+    .page-scroll { flex: 1; overflow-y: auto; padding-right: 24px; padding-bottom: 40px; }
+    #page-body { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+    .card-section { background:#fff; border-radius:10px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.07); margin-bottom:20px; }
+    html.dark-theme .card-section { background:#1e2530; color:#c9d1d9; }
+    .card-section h5 { font-weight:700; font-size:15px; margin:0 0 18px; color:#c8870a; border-bottom:2px solid #c8870a22; padding-bottom:8px; }
+
+    .disp-busca-wrap { position:relative; }
+    .disp-busca-resultados {
+      position:absolute; z-index:200; width:100%; background:white;
+      border:1px solid #ddd; border-radius:4px; max-height:240px;
+      overflow-y:auto; display:none;
+    }
+    html.dark-theme .disp-busca-resultados { background:#1e2530; border-color:#3d4a5c; }
+    .disp-item { padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f2f5; }
+    html.dark-theme .disp-item { border-bottom-color:#2d3748; color:#c9d1d9; }
+    .disp-item:hover { background:#fff8e6; }
+    html.dark-theme .disp-item:hover { background:#2a2010; }
+    .disp-item .meta { display:block; font-size:11px; color:#888; margin-top:2px; }
+
+    .disp-linha {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; border:1px solid #e5e8eb; border-radius:6px;
+      margin-bottom:8px; background:#fafbfc;
+    }
+    html.dark-theme .disp-linha { background:#252e3a; border-color:#3d4a5c; }
+    .disp-linha .info { flex:1; }
+    .disp-linha .info strong { display:block; font-size:13px; }
+    .disp-linha .info small { font-size:11px; color:#888; }
+    .disp-linha select { max-width:240px; font-size:12px; }
+    .disp-linha .btn-remover { background:none; border:none; color:#dc3545; cursor:pointer; font-size:16px; }
+  </style>
+</head>
+<body>
+
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+          <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
+          <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li class="active"><a href="usuarios-resgate.html"><i class="fa fa-life-ring fa-fw"></i> Usuários Resgate</a></li>
+          <li><a href="geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <button class="btn btn-default btn-sm" id="btn-voltar"><i class="fa fa-arrow-left"></i></button>
+        <h2 class="topbar-title" id="page-title">Novo Usuário Resgate</h2>
+      </div>
+    </div>
+
+    <div class="page-scroll">
+    <div id="al-alert-container"></div>
+
+    <div id="page-body">
+
+      <!-- Card Identificação -->
+      <div class="card-section">
+        <h5><i class="fa fa-user"></i> Identificação</h5>
+        <div class="row">
+          <div class="col-sm-12">
+            <div class="form-group">
+              <label>Nome *</label>
+              <input class="form-control" id="f-nome" placeholder="Ex.: João Silva" autofocus />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-12">
+            <div class="form-group">
+              <label>E-mail *</label>
+              <input type="email" class="form-control" id="f-email" placeholder="usuario@exemplo.com" />
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label id="senha-label">Senha *</label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="f-senha" />
+                <span class="input-group-btn">
+                  <button class="btn btn-default btn-toggle-senha" type="button" data-target="f-senha"><i class="fa fa-eye"></i></button>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label id="senha2-label">Confirmar Senha *</label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="f-senha2" />
+                <span class="input-group-btn">
+                  <button class="btn btn-default btn-toggle-senha" type="button" data-target="f-senha2"><i class="fa fa-eye"></i></button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#888;margin:0;">
+          <i class="fa fa-info-circle"></i> Este usuário acessa apenas pelo aplicativo móvel (não tem acesso ao site). Verá somente a tela de rastreamento dos veículos atribuídos abaixo, com scanner Bluetooth para localizar as tags.
+        </p>
+      </div>
+
+      <!-- Card Dispositivos -->
+      <div class="card-section">
+        <h5><i class="fa fa-car"></i> Veículos atribuídos</h5>
+        <div class="disp-busca-wrap">
+          <input class="form-control" id="disp-busca" placeholder="Buscar veículo por placa, nome ou identificador..." autocomplete="off" />
+          <div class="disp-busca-resultados" id="disp-busca-resultados"></div>
+        </div>
+        <div id="disp-lista" style="margin-top:14px;"></div>
+        <p style="font-size:12px;color:#888;margin-top:10px;margin-bottom:0;">
+          <i class="fa fa-info-circle"></i> Para cada veículo, escolha a tag Bluetooth correspondente (caso já tenha sido pareada). Sem tag selecionada, o app ainda mostra o veículo no mapa mas sem busca BLE.
+        </p>
+      </div>
+
+      <!-- Botão Salvar -->
+      <div style="text-align:right; margin-top:8px;">
+        <button type="button" class="btn btn-primary-al btn-lg" id="btn-salvar">
+          <span id="btn-salvar-txt"><i class="fa fa-save"></i> Salvar Usuário</span>
+          <span id="btn-salvar-spin" style="display:none;"><i class="fa fa-spinner fa-spin"></i> Salvando…</span>
+        </button>
+      </div>
+
+    </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="../js/topbar-rastrear-global.js"></script>
+  <script>
+    (function () {
+      var user = AL.requireAuth(['ADMIN']);
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      var ub = document.getElementById('user-badge');
+      ub.textContent = user.role; ub.className = 'al-badge badge-ativo';
+
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      document.getElementById('btn-voltar').addEventListener('click', function () {
+        window.location.href = 'usuarios-resgate.html';
+      });
+
+      // Toggle senha
+      document.querySelectorAll('.btn-toggle-senha').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var input = document.getElementById(this.dataset.target);
+          if (input.type === 'password') {
+            input.type = 'text';
+            this.querySelector('i').className = 'fa fa-eye-slash';
+          } else {
+            input.type = 'password';
+            this.querySelector('i').className = 'fa fa-eye';
+          }
+        });
+      });
+
+      var qs = new URLSearchParams(window.location.search);
+      var usuarioId = qs.get('id');
+      // dispositivosSelecionados: [{dispositivoId, nome, placa, identificador, tagId, tagsDisponiveis: []}]
+      var dispositivosSelecionados = [];
+
+      if (usuarioId) {
+        document.getElementById('page-title').textContent = 'Editar Usuário Resgate';
+        document.getElementById('senha-label').innerHTML = 'Nova Senha <small class="text-muted">(opcional)</small>';
+        document.getElementById('senha2-label').innerHTML = 'Confirmar Nova Senha';
+        AL.apiGet('/api/usuarios-resgate/' + usuarioId)
+          .then(function (u) {
+            document.getElementById('f-nome').value = u.nome;
+            document.getElementById('f-email').value = u.email;
+            // Hidratar dispositivos atribuídos
+            return Promise.all(u.dispositivosResgate.map(function (atr) {
+              return AL.apiGet('/api/dispositivos/' + atr.dispositivoId + '/tags')
+                .then(function (tags) {
+                  return {
+                    dispositivoId: atr.dispositivoId,
+                    nome: atr.dispositivo.nome,
+                    placa: atr.dispositivo.placa,
+                    identificador: atr.dispositivo.identificador,
+                    tagId: atr.tagId,
+                    tagsDisponiveis: tags || [],
+                  };
+                });
+            }));
+          })
+          .then(function (rows) {
+            dispositivosSelecionados = rows;
+            renderListaDispositivos();
+          })
+          .catch(function (err) { AL.showAlert(err.message); });
+      }
+
+      // ── Busca de dispositivos ──────────────────────────────────────────
+      var inputBusca = document.getElementById('disp-busca');
+      var resultadosEl = document.getElementById('disp-busca-resultados');
+      var debBusca = null;
+
+      inputBusca.addEventListener('input', function () {
+        var q = this.value.trim();
+        clearTimeout(debBusca);
+        if (q.length < 1) {
+          resultadosEl.style.display = 'none';
+          return;
+        }
+        debBusca = setTimeout(function () {
+          AL.apiGet('/api/dispositivos?busca=' + encodeURIComponent(q))
+            .then(function (data) {
+              var items = (data.items || data || []).filter(function (d) {
+                return !dispositivosSelecionados.some(function (s) { return s.dispositivoId === d.id; });
+              });
+              if (!items.length) {
+                resultadosEl.innerHTML = '<div class="disp-item" style="cursor:default;color:#888;">Nenhum dispositivo encontrado.</div>';
+                resultadosEl.style.display = 'block';
+                return;
+              }
+              var html = '';
+              items.slice(0, 12).forEach(function (d) {
+                html += '<div class="disp-item" data-id="' + d.id + '" data-nome="' + encodeURIComponent(d.nome) + '" data-placa="' + (d.placa || '') + '" data-identificador="' + d.identificador + '">' +
+                  '<strong>' + d.nome + '</strong>' +
+                  '<span class="meta">' + (d.placa ? d.placa + ' · ' : '') + d.identificador + '</span>' +
+                  '</div>';
+              });
+              resultadosEl.innerHTML = html;
+              resultadosEl.style.display = 'block';
+
+              resultadosEl.querySelectorAll('.disp-item[data-id]').forEach(function (item) {
+                item.addEventListener('click', function () {
+                  var dispositivoId = this.dataset.id;
+                  AL.apiGet('/api/dispositivos/' + dispositivoId + '/tags')
+                    .then(function (tags) {
+                      dispositivosSelecionados.push({
+                        dispositivoId: dispositivoId,
+                        nome: decodeURIComponent(item.dataset.nome),
+                        placa: item.dataset.placa || null,
+                        identificador: item.dataset.identificador,
+                        tagId: tags && tags.length ? tags[0].id : null,
+                        tagsDisponiveis: tags || [],
+                      });
+                      renderListaDispositivos();
+                      inputBusca.value = '';
+                      resultadosEl.style.display = 'none';
+                    })
+                    .catch(function (err) { AL.showAlert(err.message); });
+                });
+              });
+            })
+            .catch(function () { resultadosEl.style.display = 'none'; });
+        }, 280);
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('.disp-busca-wrap')) resultadosEl.style.display = 'none';
+      });
+
+      function renderListaDispositivos() {
+        var lista = document.getElementById('disp-lista');
+        if (!dispositivosSelecionados.length) {
+          lista.innerHTML = '<div style="font-size:13px;color:#888;font-style:italic;">Nenhum veículo selecionado ainda. Use a busca acima para adicionar.</div>';
+          return;
+        }
+        var html = '';
+        dispositivosSelecionados.forEach(function (d, idx) {
+          var tagOpts = '<option value="">Sem tag</option>';
+          d.tagsDisponiveis.forEach(function (t) {
+            var label = (t.apelido || t.nomeBleAdvertised || ('Tag ' + (t.mac || '—')));
+            tagOpts += '<option value="' + t.id + '"' + (t.id === d.tagId ? ' selected' : '') + '>' + label + '</option>';
+          });
+          var tagsHtml = d.tagsDisponiveis.length
+            ? '<select class="form-control sel-tag" data-idx="' + idx + '">' + tagOpts + '</select>'
+            : '<span style="font-size:12px;color:#dc3545;font-style:italic;">Sem tags cadastradas</span>';
+
+          html += '<div class="disp-linha">' +
+            '<div class="info"><strong>' + d.nome + '</strong>' +
+            '<small>' + (d.placa ? d.placa + ' · ' : '') + d.identificador + '</small></div>' +
+            tagsHtml +
+            '<button type="button" class="btn-remover" data-idx="' + idx + '" title="Remover"><i class="fa fa-times"></i></button>' +
+            '</div>';
+        });
+        lista.innerHTML = html;
+
+        lista.querySelectorAll('.sel-tag').forEach(function (sel) {
+          sel.addEventListener('change', function () {
+            dispositivosSelecionados[+this.dataset.idx].tagId = this.value || null;
+          });
+        });
+        lista.querySelectorAll('.btn-remover').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            dispositivosSelecionados.splice(+this.dataset.idx, 1);
+            renderListaDispositivos();
+          });
+        });
+      }
+
+      // ── Salvar ──────────────────────────────────────────────────────────
+      document.getElementById('btn-salvar').addEventListener('click', function () {
+        var nome = document.getElementById('f-nome').value.trim();
+        var email = document.getElementById('f-email').value.trim();
+        var senha = document.getElementById('f-senha').value;
+        var senha2 = document.getElementById('f-senha2').value;
+
+        if (!nome || !email) {
+          AL.showAlert('Nome e e-mail são obrigatórios.');
+          return;
+        }
+        if (!usuarioId && (!senha || senha !== senha2)) {
+          AL.showAlert('Senhas são obrigatórias e devem coincidir.');
+          return;
+        }
+        if (usuarioId && senha && senha !== senha2) {
+          AL.showAlert('As senhas não coincidem.');
+          return;
+        }
+
+        var payload = {
+          nome: nome,
+          email: email,
+          dispositivos: dispositivosSelecionados.map(function (d) {
+            return { dispositivoId: d.dispositivoId, tagId: d.tagId || null };
+          }),
+        };
+        if (senha) payload.senha = senha;
+
+        var btn = document.getElementById('btn-salvar');
+        btn.disabled = true;
+        document.getElementById('btn-salvar-txt').style.display = 'none';
+        document.getElementById('btn-salvar-spin').style.display = 'inline';
+
+        var req = usuarioId
+          ? AL.apiPut('/api/usuarios-resgate/' + usuarioId, payload)
+          : AL.apiPost('/api/usuarios-resgate', payload);
+
+        req.then(function () {
+          AL.showAlert(usuarioId ? 'Usuário atualizado.' : 'Usuário criado.', 'success');
+          setTimeout(function () { window.location.href = 'usuarios-resgate.html'; }, 600);
+        }).catch(function (err) {
+          AL.showAlert(err.message);
+          btn.disabled = false;
+          document.getElementById('btn-salvar-txt').style.display = 'inline';
+          document.getElementById('btn-salvar-spin').style.display = 'none';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

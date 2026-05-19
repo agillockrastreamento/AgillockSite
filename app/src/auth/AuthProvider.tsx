@@ -8,9 +8,9 @@ import {
   useState,
 } from 'react';
 
-import { loginCliente } from './authService';
+import { loginApp } from './authService';
 import { sessionStorage } from './sessionStorage';
-import type { ClienteUser, LoginCredentials } from './authTypes';
+import type { AppUser, ClienteUser, LoginCredentials, TipoSessao } from './authTypes';
 import { apiRequest, setUnauthorizedHandler } from '../services/api/apiClient';
 import {
   ensureExpoPushTokenRegistered,
@@ -23,8 +23,9 @@ import {
 } from './permissoes';
 
 type AuthState = {
-  user: ClienteUser | null;
+  user: AppUser | null;
   token: string | null;
+  tipoSessao: TipoSessao | null;
   me: MePermissoes | null;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -48,9 +49,14 @@ async function fetchMePermissoes(): Promise<MePermissoes | null> {
   }
 }
 
+function isClienteUser(user: AppUser): user is ClienteUser {
+  return user.role === 'CLIENTE';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<ClienteUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [tipoSessao, setTipoSessao] = useState<TipoSessao | null>(null);
   const [me, setMe] = useState<MePermissoes | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -61,16 +67,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .get()
       .then(async (session) => {
         if (!mounted || !session) return;
+
+        // Validação de sessão depende do tipo
         try {
-          await apiRequest('/cliente/perfil');
+          if (session.tipoSessao === 'cliente') {
+            await apiRequest('/cliente/perfil');
+          } else {
+            // Para resgate/admin basta validar que o token ainda funciona
+            await apiRequest('/auth/me');
+          }
         } catch {
           await sessionStorage.clear();
           return;
         }
+
         setUser(session.user);
         setToken(session.token);
-        const fetched = await fetchMePermissoes();
-        if (mounted) setMe(fetched);
+        setTipoSessao(session.tipoSessao);
+
+        if (session.tipoSessao === 'cliente') {
+          const fetched = await fetchMePermissoes();
+          if (mounted) setMe(fetched);
+        }
       })
       .finally(() => {
         if (mounted) setIsLoading(false);
@@ -86,70 +104,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await sessionStorage.clear();
       setUser(null);
       setToken(null);
+      setTipoSessao(null);
+      setMe(null);
     });
     return () => setUnauthorizedHandler(null);
   }, []);
 
   const signIn = useCallback(async (credentials: LoginCredentials) => {
-    const session = await loginCliente(credentials);
-    await sessionStorage.set(session.token, session.user);
-    // Busca permissões ANTES de marcar autenticado. Se setarmos `user` e só depois `me`,
-    // o navigator monta com `me=null` e telas escondidas — crasha em initialRouteName.
-    const fetched = await fetchMePermissoes();
-    setMe(fetched);
+    const session = await loginApp(credentials);
+    await sessionStorage.set(session.token, session.user, session.tipoSessao);
+
+    // Para cliente, carregamos permissões antes de marcar autenticado
+    // (senão o navigator monta sem permissões e crasha em initialRouteName).
+    if (session.tipoSessao === 'cliente') {
+      const fetched = await fetchMePermissoes();
+      setMe(fetched);
+    } else {
+      setMe(null);
+    }
+
     setUser(session.user);
     setToken(session.token);
-    await ensureExpoPushTokenRegistered();
+    setTipoSessao(session.tipoSessao);
+
+    if (session.tipoSessao === 'cliente') {
+      await ensureExpoPushTokenRegistered();
+    }
   }, []);
 
   const signOut = useCallback(async () => {
-    await unregisterStoredExpoPushToken().catch(() => undefined);
+    if (tipoSessao === 'cliente') {
+      await unregisterStoredExpoPushToken().catch(() => undefined);
+    }
     await sessionStorage.clear();
     setUser(null);
     setToken(null);
+    setTipoSessao(null);
     setMe(null);
-  }, []);
+  }, [tipoSessao]);
 
   const refreshPermissoes = useCallback(async () => {
+    if (tipoSessao !== 'cliente') return;
     const fetched = await fetchMePermissoes();
     setMe(fetched);
-  }, []);
+  }, [tipoSessao]);
 
   const can = useCallback(
     (key: PermKey) => {
+      // Não-cliente (resgate/admin) tem acesso por convenção de role; permissões
+      // granulares não se aplicam.
+      if (tipoSessao !== 'cliente') return true;
+
+      const clienteUser = user && isClienteUser(user) ? user : null;
       // Responsável (sem cache ainda ou explicitamente) tem todas as permissões.
       if (!me) {
-        return user?.tipo === 'responsavel' || !user?.tipo;
+        return clienteUser?.tipo === 'responsavel' || !clienteUser?.tipo;
       }
       if (me.tipo === 'responsavel') return true;
       return pode(me.permissoes, key);
     },
-    [me, user],
+    [me, user, tipoSessao],
   );
 
   const podeAcessarDispositivoCb = useCallback(
-    (dispositivoId: string) => {
+    (_dispositivoId: string) => {
+      if (tipoSessao !== 'cliente') return true;
       if (!me) return true;
       if (me.dispositivoIdsPermitidos === null) return true;
-      return me.dispositivoIdsPermitidos.includes(dispositivoId);
+      return me.dispositivoIdsPermitidos.includes(_dispositivoId);
     },
-    [me],
+    [me, tipoSessao],
   );
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       token,
+      tipoSessao,
       me,
       isLoading,
-      isAuthenticated: !!token && !!user,
+      isAuthenticated: !!token && !!user && !!tipoSessao,
       signIn,
       signOut,
       refreshPermissoes,
       can,
       podeAcessarDispositivo: podeAcessarDispositivoCb,
     }),
-    [isLoading, signIn, signOut, token, user, me, refreshPermissoes, can, podeAcessarDispositivoCb],
+    [
+      isLoading,
+      signIn,
+      signOut,
+      token,
+      user,
+      tipoSessao,
+      me,
+      refreshPermissoes,
+      can,
+      podeAcessarDispositivoCb,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

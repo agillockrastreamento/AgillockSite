@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -73,6 +73,7 @@
           <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
           <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
           <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li><a href="usuarios-resgate.html"><i class="fa fa-life-ring fa-fw"></i> Usuários Resgate</a></li>
           <li><a href="geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>
         </ul>
       </li>
@@ -212,6 +213,22 @@
             <div class="form-group">
               <label>Operadora do Chip</label>
               <input class="form-control" id="d-operadora" placeholder="Ex.: Claro, Vivo, TIM..." />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Tag Bluetooth (BLE) -->
+      <div class="card-section">
+        <h5><i class="fa fa-bluetooth-b"></i> Tag Bluetooth (Resgate)</h5>
+        <div class="row">
+          <div class="col-sm-6">
+            <div class="form-group">
+              <label>Endereço MAC da tag</label>
+              <input class="form-control" id="d-endereco-mac" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" style="text-transform:uppercase;" />
+              <p class="help-block" style="font-size:12px;color:#888;margin-top:6px;">
+                <i class="fa fa-info-circle"></i> Preenchendo o MAC, o app de resgate consegue identificar a tag deste veículo automaticamente entre outros sinais Bluetooth próximos, acelerando muito a localização física. Pode ser deixado em branco — o pareamento via app também captura essa informação.
+              </p>
             </div>
           </div>
         </div>
@@ -727,6 +744,8 @@
       document.getElementById('d-telefone-rastreador').value = d.telefoneRastreador || '';
       document.getElementById('d-iccid').value = d.iccid || '';
       document.getElementById('d-operadora').value = d.operadora || '';
+      // Tag BLE
+      document.getElementById('d-endereco-mac').value = d.enderecoMac || '';
       // Veículo
       document.getElementById('d-placa').value = d.placa || '';
       document.getElementById('d-marca').value = d.marca || '';
@@ -789,6 +808,7 @@
       formData.append('telefoneRastreador', document.getElementById('d-telefone-rastreador').value.trim());
       formData.append('iccid', document.getElementById('d-iccid').value.trim());
       formData.append('operadora', document.getElementById('d-operadora').value.trim());
+      formData.append('enderecoMac', document.getElementById('d-endereco-mac').value.trim().toUpperCase());
       formData.append('placa', document.getElementById('d-placa').value.trim().toUpperCase());
       formData.append('marca', document.getElementById('d-marca').value.trim());
       formData.append('modeloVeiculo', document.getElementById('d-modelo-veiculo').value.trim());

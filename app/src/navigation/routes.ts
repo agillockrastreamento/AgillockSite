@@ -1,6 +1,8 @@
 export type RootStackParamList = {
   Login: undefined;
   Cliente: undefined;
+  Resgate: undefined;
+  AdminPareador: undefined;
   Map: { dispositivoId?: string; highlight?: boolean } | undefined;
   Notifications: undefined;
   Payments: undefined;
@@ -19,4 +21,13 @@ export type ClienteDrawerParamList = {
   Manutencao: undefined;
   Pagamentos: undefined;
   Usuarios: undefined;
+};
+
+export type RescueStackParamList = {
+  RescueMap: undefined;
+};
+
+export type AdminPareadorParamList = {
+  Pareador: undefined;
+  PareadorTag: { dispositivoId: string; nome: string };
 };

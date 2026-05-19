@@ -20,7 +20,9 @@
         "NSPhotoLibraryUsageDescription": "A AgilLock acessa suas fotos apenas quando você escolhe uma imagem para perfil, veículo ou comprovantes dentro do app.",
         "NSPhotoLibraryAddUsageDescription": "A AgilLock pode salvar arquivos exportados por você, como relatórios e comprovantes, quando essa ação for solicitada no app.",
         "NSLocationWhenInUseUsageDescription": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos.",
-        "NSFaceIDUsageDescription": "A AgilLock usa o Face ID / Touch ID para permitir um login mais rápido e seguro."
+        "NSFaceIDUsageDescription": "A AgilLock usa o Face ID / Touch ID para permitir um login mais rápido e seguro.",
+        "NSBluetoothAlwaysUsageDescription": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate.",
+        "NSBluetoothPeripheralUsageDescription": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate."
       }
     },
     "android": {
@@ -32,7 +34,9 @@
         "READ_MEDIA_IMAGES",
         "READ_EXTERNAL_STORAGE",
         "USE_BIOMETRIC",
-        "USE_FINGERPRINT"
+        "USE_FINGERPRINT",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -66,7 +70,16 @@
           "locationWhenInUsePermission": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "neverForLocation": false,
+          "modes": ["central"],
+          "bluetoothAlwaysPermission": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate."
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://api.agillock.com.br/api",
