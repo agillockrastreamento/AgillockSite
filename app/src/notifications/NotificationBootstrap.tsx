@@ -13,8 +13,12 @@ type Props = {
 
 export function NotificationBootstrap({ enabled }: Props) {
   const requestedRef = useRef(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, tipoSessao } = useAuth();
   const toast = useToast();
+
+  // Push tokens são registrados no endpoint /api/cliente/notificacoes/app-tokens
+  // que só aceita JWT de CLIENTE. Para RESGATE/ADMIN não há registro de push.
+  const isCliente = isAuthenticated && tipoSessao === 'cliente';
 
   useEffect(() => {
     if (!enabled || requestedRef.current) return;
@@ -23,7 +27,7 @@ export function NotificationBootstrap({ enabled }: Props) {
     requestExpoPushToken()
       .then((token) => {
         if (!token) return;
-        if (isAuthenticated) return ensureExpoPushTokenRegistered();
+        if (isCliente) return ensureExpoPushTokenRegistered();
         console.log(token);
       })
       .catch((error) => {
@@ -33,12 +37,12 @@ export function NotificationBootstrap({ enabled }: Props) {
             : 'Não foi possível habilitar notificações.';
         toast.show({ message, type: 'error' });
       });
-  }, [enabled, isAuthenticated, toast]);
+  }, [enabled, isCliente, toast]);
 
   useEffect(() => {
-    if (!enabled || !isAuthenticated) return;
+    if (!enabled || !isCliente) return;
     ensureExpoPushTokenRegistered().catch(() => undefined);
-  }, [enabled, isAuthenticated]);
+  }, [enabled, isCliente]);
 
   return null;
 }

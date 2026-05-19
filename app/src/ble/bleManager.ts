@@ -62,38 +62,40 @@ function normalizeUuid(uuid: string | null | undefined): string {
 /**
  * Filtra um peripheral retornado pelo scan, decidindo se é
  * provavelmente uma tag BLE útil para a busca de resgate.
+ *
+ * Lógica defensiva: bloqueia apenas o que é claramente NÃO-tag
+ * (áudio, smartphones, smartwatches). Tudo o mais passa, porque
+ * tags chinesas genéricas podem advertir sem nome e sem serviços
+ * conhecidos — bloqueá-las cegamente esconde o que o resgatador
+ * está tentando encontrar.
  */
 export function looksLikeTag(device: Device): boolean {
   const services = (device.serviceUUIDs ?? []).map(normalizeUuid);
   const name = (device.localName ?? device.name ?? '').trim();
 
-  // Bloqueio explícito por nome (áudio, watches, celulares)
+  // Bloqueio explícito por nome (áudio, watches, celulares).
+  // Padrões devem ser específicos para não bloquear tags com nomes acidentais.
   if (name && EXCLUDED_NAME_PATTERNS.some((re) => re.test(name))) {
     return false;
   }
-  // Bloqueio por service UUID de áudio/HID
+  // Bloqueio por service UUID de áudio/HID.
   if (services.some((u) => EXCLUDED_SERVICE_UUIDS.includes(u))) {
     return false;
   }
 
-  // Aceite por whitelist explícita (mais provável de ser tag)
-  if (services.some((u) => KNOWN_TAG_SERVICE_UUIDS.includes(u))) {
-    return true;
-  }
+  // Tudo o mais passa. Inclui:
+  //  - tags genéricas sem nome e sem services conhecidos (chinesas)
+  //  - tags com service UUID conhecido (iTAG, Tile, Chipolo, etc.)
+  //  - dispositivos não identificados que podem ser a tag procurada
+  return true;
+}
 
-  // Se não tem nome E não tem services conhecidos, ainda pode ser
-  // uma tag genérica chinesa que só anuncia em "broadcast" — aceita
-  // se o RSSI for forte (próximo) e nome curto/vazio.
-  if (!name && services.length === 0 && (device.rssi ?? -100) > -85) {
-    return true;
-  }
-
-  // Tem nome curto e parece tag (uma palavra, sem padrão de marca conhecida)
-  if (name && name.length <= 12 && services.length === 0) {
-    return true;
-  }
-
-  return false;
+/**
+ * Versão mais agressiva: aceita TUDO (inclusive áudio).
+ * Útil para o modo debug do admin parear uma tag obscura.
+ */
+export function passthroughAll(_device: Device): boolean {
+  return true;
 }
 
 /**

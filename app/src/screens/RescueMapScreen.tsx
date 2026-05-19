@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Image,
   Modal,
   PanResponder,
   Pressable,
@@ -11,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Avatar } from 'react-native-paper';
 import * as Location from 'expo-location';
 import MapView, {
   Marker,
@@ -43,9 +45,12 @@ const DEFAULT_REGION = {
 
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'hybrid'];
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-const MAIN_CARD_PEEK_HEIGHT = 76;
-
-type SplitMode = 'normal' | 'mapMax' | 'scannerMax';
+const MAIN_CARD_PEEK_HEIGHT = 52;
+const DIVIDER_HEIGHT = 18;
+const MIN_PANEL_FRACTION = 0.12;
+const MAX_PANEL_FRACTION = 0.88;
+// Posições de snap do split: scanner grande / igual / mapa grande
+const SNAP_POSITIONS = [0.15, 0.5, 0.85];
 
 // Endpoint /api/app/resgate/dispositivos retorna campos do Dispositivo + tag.
 // Adaptamos para um TrackingDevice mínimo (faltando alguns campos não relevantes).
@@ -150,7 +155,6 @@ export function RescueMapScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLocating, setIsLocating] = useState(false);
   const [mapTypeIndex, setMapTypeIndex] = useState(0);
-  const [splitMode, setSplitMode] = useState<SplitMode>('normal');
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   // Card state
@@ -159,9 +163,18 @@ export function RescueMapScreen() {
   const mainCardPeekedRef = useRef(false);
   mainCardPeekedRef.current = mainCardPeeked;
 
-  // Tamanho do card é dinâmico baseado no split
-  const mapPanelFlex = useRef(new Animated.Value(1)).current;
-  const scannerPanelFlex = useRef(new Animated.Value(1)).current;
+  // Split contínuo: fração da altura ocupada pelo mapa (0..1).
+  // Snapa nas três posições padrão; o usuário pode arrastar livremente
+  // pela divisória ou tocar nela pra ciclar entre as posições.
+  const splitFraction = useRef(new Animated.Value(0.5)).current;
+  const splitFractionRef = useRef(0.5);
+  useEffect(() => {
+    const id = splitFraction.addListener(({ value }) => {
+      splitFractionRef.current = value;
+    });
+    return () => splitFraction.removeListener(id);
+  }, [splitFraction]);
+
   const mainCardAnim = useRef(new Animated.Value(0)).current;
 
   const selectedDevice = useMemo(
@@ -183,21 +196,25 @@ export function RescueMapScreen() {
       }
     : null;
 
-  // Altura disponível pra metade superior (mapa+card) baseada no split
-  const containerHeight = SCREEN_HEIGHT - insets.top - insets.bottom;
-  const mapPanelHeight = useMemo(() => {
-    switch (splitMode) {
-      case 'mapMax':
-        return containerHeight - 56; // só barra mínima do scanner embaixo
-      case 'scannerMax':
-        return 56; // só barra mínima do mapa em cima
-      case 'normal':
-      default:
-        return Math.round(containerHeight * 0.5);
-    }
-  }, [splitMode, containerHeight]);
+  // Altura total disponível para os dois painéis (mapa + scanner)
+  const containerHeight = SCREEN_HEIGHT - insets.top - insets.bottom - DIVIDER_HEIGHT;
 
-  const cardFullHeight = Math.max(0, Math.round(mapPanelHeight * 0.85));
+  // Heights interpolados a partir da fração do split
+  const mapPanelHeightAnim = splitFraction.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, containerHeight],
+  });
+  const scannerPanelHeightAnim = splitFraction.interpolate({
+    inputRange: [0, 1],
+    outputRange: [containerHeight, 0],
+  });
+
+  // Card menor para o resgate (deixa mais mapa visível).
+  // Como o painel do mapa varia, usamos um valor fixo razoável.
+  // Card compacto pra deixar mais mapa visível. Conteúdo do MainVehicleCard
+  // em modoResgate é enxuto (status, endereço, bloquear/desbloquear), então
+  // 240 acomoda sem cortar nada e pode ser arrastado pra peek a qualquer momento.
+  const cardFullHeight = 220;
 
   const loadDevices = useCallback(async () => {
     setIsLoading(true);
@@ -234,29 +251,68 @@ export function RescueMapScreen() {
     loadDevices();
   }, [loadDevices]);
 
-  // Animação dos painéis em resposta ao splitMode
-  useEffect(() => {
-    const targets = {
-      normal: { map: 1, scanner: 1 },
-      mapMax: { map: 12, scanner: 1 },
-      scannerMax: { map: 1, scanner: 12 },
-    } as const;
-    const t = targets[splitMode];
-    Animated.parallel([
-      Animated.spring(mapPanelFlex, {
-        toValue: t.map,
-        useNativeDriver: false,
-        friction: 8,
-        tension: 80,
+  // Snap o split para uma das três posições padrão
+  const snapToPosition = useCallback((target: number) => {
+    Animated.spring(splitFraction, {
+      toValue: target,
+      useNativeDriver: false,
+      friction: 9,
+      tension: 78,
+    }).start();
+  }, [splitFraction]);
+
+  // Toque na divisória cicla pelas posições: meio → mapa grande → scanner grande → meio
+  const cycleSplit = useCallback(() => {
+    const v = splitFractionRef.current;
+    let target: number;
+    if (v >= 0.7) target = SNAP_POSITIONS[0];          // mapa grande → scanner grande
+    else if (v <= 0.3) target = SNAP_POSITIONS[1];     // scanner grande → meio
+    else target = SNAP_POSITIONS[2];                    // meio → mapa grande
+    snapToPosition(target);
+  }, [snapToPosition]);
+
+  // PanResponder para arrastar a divisória verticalmente
+  const dragBaseRef = useRef(0.5);
+  const dividerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 3,
+        onPanResponderGrant: () => {
+          dragBaseRef.current = splitFractionRef.current;
+        },
+        onPanResponderMove: (_, gs) => {
+          if (containerHeight <= 0) return;
+          const delta = gs.dy / containerHeight;
+          const next = Math.max(
+            MIN_PANEL_FRACTION,
+            Math.min(MAX_PANEL_FRACTION, dragBaseRef.current + delta),
+          );
+          splitFraction.setValue(next);
+        },
+        onPanResponderRelease: (_, gs) => {
+          // Se foi um tap (sem movimento), cicla; senão snap para o mais próximo.
+          const isTap = Math.abs(gs.dy) < 6 && Math.abs(gs.vy) < 0.2;
+          if (isTap) {
+            cycleSplit();
+            return;
+          }
+          const v = splitFractionRef.current;
+          // Considera velocidade pra deixar mais responsivo
+          let target = SNAP_POSITIONS[1];
+          if (gs.vy < -0.6) target = SNAP_POSITIONS[2];
+          else if (gs.vy > 0.6) target = SNAP_POSITIONS[0];
+          else {
+            // Snap pro mais próximo
+            target = SNAP_POSITIONS.reduce((best, p) =>
+              Math.abs(p - v) < Math.abs(best - v) ? p : best,
+            SNAP_POSITIONS[1]);
+          }
+          snapToPosition(target);
+        },
       }),
-      Animated.spring(scannerPanelFlex, {
-        toValue: t.scanner,
-        useNativeDriver: false,
-        friction: 8,
-        tension: 80,
-      }),
-    ]).start();
-  }, [splitMode, mapPanelFlex, scannerPanelFlex]);
+    [containerHeight, splitFraction, snapToPosition, cycleSplit],
+  );
 
   const animateToDevice = useCallback((device: TrackingDevice) => {
     const coord = getDeviceCoordinate(device);
@@ -388,16 +444,12 @@ export function RescueMapScreen() {
     }
   }, [toast]);
 
-  const toggleSplit = useCallback((target: SplitMode) => {
-    setSplitMode((current) => (current === target ? 'normal' : target));
-  }, []);
-
   const currentMapType = MAP_TYPES[mapTypeIndex];
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* ── Metade superior: mapa + card flutuante ───────────── */}
-      <Animated.View style={[styles.mapPanel, { flex: mapPanelFlex }]}>
+      <Animated.View style={[styles.mapPanel, { height: mapPanelHeightAnim }]}>
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFill}
@@ -438,20 +490,6 @@ export function RescueMapScreen() {
           style={[styles.hamburgerButton, { top: 12 }]}
         >
           <Icon source="menu" size={22} color={colors.text} />
-        </Pressable>
-
-        {/* Botão minimizar/maximizar do mapa (move para metade superior) */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Maximizar mapa"
-          onPress={() => toggleSplit('mapMax')}
-          style={[styles.splitToggleTopRight, { top: 12 }]}
-        >
-          <Icon
-            source={splitMode === 'mapMax' ? 'arrow-collapse' : 'arrow-expand'}
-            size={18}
-            color={colors.text}
-          />
         </Pressable>
 
         {/* Controles do mapa: localização + tipo */}
@@ -513,7 +551,7 @@ export function RescueMapScreen() {
                   {selectedDevice.placa ? ` — ${selectedDevice.placa}` : ''}
                 </Text>
               </Pressable>
-              <IconButton icon="close" size={22} onPress={closeMainCard} />
+              <IconButton icon="close" size={18} style={{ margin: 0 }} onPress={closeMainCard} />
             </View>
             <ScrollView
               showsVerticalScrollIndicator={false}
@@ -533,42 +571,25 @@ export function RescueMapScreen() {
         ) : null}
       </Animated.View>
 
-      {/* ── Divisor com botão de split central ───────────────── */}
-      <View style={styles.divider}>
+      {/* ── Divisor arrastável (tap cicla, drag ajusta) ────── */}
+      <View
+        accessibilityRole="adjustable"
+        accessibilityLabel="Ajustar divisão entre mapa e scanner"
+        style={styles.divider}
+        {...dividerPanResponder.panHandlers}
+      >
         <View style={styles.dividerLine} />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Resetar layout"
-          onPress={() => toggleSplit('normal')}
-          style={styles.dividerToggle}
-        >
+        <View style={styles.dividerToggle}>
           <Icon
-            source={
-              splitMode === 'normal'
-                ? 'unfold-more-horizontal'
-                : 'unfold-less-horizontal'
-            }
-            size={18}
+            source="drag-horizontal-variant"
+            size={20}
             color={colors.text}
           />
-        </Pressable>
+        </View>
       </View>
 
       {/* ── Metade inferior: scanner ─────────────────────────── */}
-      <Animated.View style={[styles.scannerPanel, { flex: scannerPanelFlex }]}>
-        {/* Botão minimizar/maximizar do scanner */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Maximizar scanner"
-          onPress={() => toggleSplit('scannerMax')}
-          style={styles.splitToggleScanner}
-        >
-          <Icon
-            source={splitMode === 'scannerMax' ? 'arrow-collapse' : 'arrow-expand'}
-            size={18}
-            color={colors.text}
-          />
-        </Pressable>
+      <Animated.View style={[styles.scannerPanel, { height: scannerPanelHeightAnim }]}>
         <TagScanner veiculoAlvo={veiculoAlvo} />
       </Animated.View>
 
@@ -581,46 +602,71 @@ export function RescueMapScreen() {
       >
         <Pressable style={styles.drawerOverlay} onPress={() => setDrawerVisible(false)}>
           <Pressable style={styles.drawerPanel} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.drawerHeader}>
-              <Icon source="account-circle" size={48} color={colors.primary} />
-              <View style={styles.drawerUserInfo}>
-                <Text style={styles.drawerUserName} numberOfLines={1}>
-                  {user?.nome ?? 'Usuário'}
-                </Text>
-                <Text style={styles.drawerUserEmail} numberOfLines={1}>
-                  {user?.email}
-                </Text>
-                <View style={styles.drawerBadge}>
-                  <Icon source="life-buoy" size={11} color={colors.primaryText} />
-                  <Text style={styles.drawerBadgeText}>Resgate</Text>
+            {/* Brand header (mesmo estilo do drawer do cliente) */}
+            <View style={styles.drawerBrandHeader}>
+              <View style={styles.drawerBrandRow}>
+                <View style={styles.drawerLogoTile}>
+                  <Image
+                    source={require('../../assets/agillock_new_symbol.png')}
+                    style={styles.drawerLogo}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.drawerBrandTitle}>AgilLock</Text>
+                  <Text style={styles.drawerBrandSubtitle}>Resgate</Text>
                 </View>
               </View>
             </View>
 
-            <Pressable
-              style={styles.drawerAction}
-              onPress={() => {
-                setDrawerVisible(false);
-                loadDevices();
-              }}
-            >
-              <Icon source="refresh" size={20} color={colors.text} />
-              <Text style={styles.drawerActionText}>Recarregar veículos</Text>
-            </Pressable>
+            {/* Menu de ações */}
+            <View style={styles.drawerNavArea}>
+              <Text style={styles.drawerNavLabel}>Menu</Text>
+              <Pressable
+                style={styles.drawerNavItem}
+                onPress={() => {
+                  setDrawerVisible(false);
+                  loadDevices();
+                }}
+              >
+                <Icon source="refresh" size={22} color={colors.text} />
+                <Text style={styles.drawerNavItemText}>Recarregar veículos</Text>
+              </Pressable>
+            </View>
 
             <View style={{ flex: 1 }} />
 
-            <Pressable
-              style={[styles.drawerAction, styles.drawerLogout]}
-              onPress={async () => {
-                setDrawerVisible(false);
-                await signOut();
-                toast.show({ message: 'Sessão encerrada.', type: 'info' });
-              }}
-            >
-              <Icon source="logout" size={20} color={colors.danger} />
-              <Text style={[styles.drawerActionText, { color: colors.danger }]}>Sair</Text>
-            </Pressable>
+            {/* Perfil + sair */}
+            <View style={styles.drawerProfileArea}>
+              <View style={styles.drawerProfileCard}>
+                <Avatar.Text
+                  size={52}
+                  label={(user?.nome ?? 'RG').slice(0, 2).toUpperCase()}
+                  color={colors.primaryText}
+                  style={{ backgroundColor: colors.primary }}
+                />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.drawerProfileName} numberOfLines={1}>
+                    {user?.nome ?? 'Usuário'}
+                  </Text>
+                  <Text style={styles.drawerProfileEmail} numberOfLines={1}>
+                    {user?.email}
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable
+                style={styles.drawerLogoutBtn}
+                onPress={async () => {
+                  setDrawerVisible(false);
+                  await signOut();
+                  toast.show({ message: 'Sessão encerrada.', type: 'info' });
+                }}
+              >
+                <Icon source="logout" size={20} color={colors.danger} />
+                <Text style={styles.drawerLogoutText}>Sair</Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -652,17 +698,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
-  },
-  splitToggleTopRight: {
-    position: 'absolute',
-    right: 12,
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    elevation: 3,
   },
   mapControls: {
     position: 'absolute',
@@ -735,13 +770,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   mainCardDragArea: {
-    height: 24,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   mainCardHandle: {
-    width: 42,
-    height: 4,
+    width: 36,
+    height: 3,
     borderRadius: 2,
     backgroundColor: colors.border,
   },
@@ -749,8 +784,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: spacing.lg,
-    minHeight: 52,
+    paddingLeft: spacing.md,
+    paddingRight: 2,
+    minHeight: 36,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
@@ -758,56 +794,47 @@ const styles = StyleSheet.create({
     flex: 1,
     alignSelf: 'stretch',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: 4,
   },
   mainCardTitle: {
     color: colors.text,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
   divider: {
-    height: 8,
+    height: DIVIDER_HEIGHT,
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.background,
   },
   dividerLine: {
     position: 'absolute',
-    top: 3,
+    top: DIVIDER_HEIGHT / 2 - 1,
     left: 0,
     right: 0,
     height: 2,
     backgroundColor: colors.border,
   },
   dividerToggle: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: -10,
-    width: 42,
-    height: 28,
+    width: 54,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
+    borderRadius: 15,
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    elevation: 3,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
   },
   scannerPanel: {
     position: 'relative',
+    overflow: 'hidden',
     backgroundColor: colors.background,
-  },
-  splitToggleScanner: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    zIndex: 5,
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    elevation: 3,
   },
   drawerOverlay: {
     flex: 1,
@@ -815,68 +842,114 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   drawerPanel: {
-    width: 280,
+    width: 296,
     height: '100%',
-    paddingTop: 48,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
     backgroundColor: colors.surface,
     elevation: 10,
   },
-  drawerHeader: {
+  drawerBrandHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl + spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  drawerBrandRow: {
+    minHeight: 74,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingBottom: spacing.lg,
-    marginBottom: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.loginBackgroundStart,
   },
-  drawerUserInfo: {
-    flex: 1,
-    minWidth: 0,
+  drawerLogoTile: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  drawerUserName: {
+  drawerLogo: {
+    width: 32,
+    height: 32,
+  },
+  drawerBrandTitle: {
+    color: colors.surface,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  drawerBrandSubtitle: {
+    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  drawerNavArea: {
+    paddingHorizontal: spacing.sm,
+  },
+  drawerNavLabel: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+    color: colors.textSubtle,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  drawerNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.sm,
+    marginVertical: 2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+  },
+  drawerNavItemText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  drawerProfileArea: {
+    padding: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  drawerProfileCard: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  drawerProfileName: {
     color: colors.text,
     fontSize: 15,
     fontWeight: '900',
   },
-  drawerUserEmail: {
+  drawerProfileEmail: {
+    marginTop: 2,
     color: colors.textMuted,
     fontSize: 12,
-    marginTop: 2,
   },
-  drawerBadge: {
+  drawerLogoutBtn: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    alignSelf: 'flex-start',
-  },
-  drawerBadgeText: {
-    color: colors.primaryText,
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  drawerAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
     borderRadius: radius.md,
-  },
-  drawerActionText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  drawerLogout: {
     backgroundColor: '#fff1ef',
+  },
+  drawerLogoutText: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '900',
   },
 });

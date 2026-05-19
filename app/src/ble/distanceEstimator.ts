@@ -5,14 +5,14 @@
  *   distancia = 10 ^ ((TxPower - RSSI) / (10 * n))
  *
  * onde `n` é o expoente de perda de propagação:
- *   - 2.0 em espaço aberto
- *   - 2.5 ambiente urbano comum (carro estacionado, vegetação leve)
- *   - 3.0+ ambientes muito obstruídos (estofamento denso, paredes)
+ *   - 2.0 espaço aberto
+ *   - 3.0 ambiente urbano com obstáculos (default — uso de resgate na rua)
+ *   - 3.5+ ambientes muito obstruídos (estofamento denso, paredes)
  */
 export function rssiToDistance(
   rssi: number,
-  txPower: number = -59,
-  pathLossExponent: number = 2.5,
+  txPower: number = -65,
+  pathLossExponent: number = 3.0,
 ): number {
   if (!Number.isFinite(rssi)) return Infinity;
   return Math.pow(10, (txPower - rssi) / (10 * pathLossExponent));
@@ -25,8 +25,9 @@ export function rssiToDistance(
  */
 export class RssiSmoother {
   private value: number | null = null;
+  private history: number[] = [];
 
-  constructor(private readonly alpha: number = 0.3) {}
+  constructor(private readonly alpha: number = 0.3, private readonly historySize: number = 8) {}
 
   push(rssi: number): number {
     if (this.value === null) {
@@ -34,6 +35,8 @@ export class RssiSmoother {
     } else {
       this.value = this.alpha * rssi + (1 - this.alpha) * this.value;
     }
+    this.history.push(this.value);
+    if (this.history.length > this.historySize) this.history.shift();
     return this.value;
   }
 
@@ -41,8 +44,24 @@ export class RssiSmoother {
     return this.value;
   }
 
+  /**
+   * Compara a média dos últimos pontos com a média dos pontos anteriores.
+   * Retorna a variação em dBm — positivo = esquentando (sinal melhorou),
+   * negativo = esfriando, ~0 = estável.
+   */
+  trend(): number {
+    if (this.history.length < 4) return 0;
+    const mid = Math.floor(this.history.length / 2);
+    const oldHalf = this.history.slice(0, mid);
+    const newHalf = this.history.slice(mid);
+    const avgOld = oldHalf.reduce((s, v) => s + v, 0) / oldHalf.length;
+    const avgNew = newHalf.reduce((s, v) => s + v, 0) / newHalf.length;
+    return avgNew - avgOld;
+  }
+
   reset() {
     this.value = null;
+    this.history = [];
   }
 }
 
@@ -56,6 +75,11 @@ export type ProximityInfo = {
   intensity: number;
 };
 
+/**
+ * Zonas calibradas para uso de resgate em RUA aberta — não em ambiente
+ * doméstico próximo. As distâncias são mais amplas para acomodar a
+ * dificuldade típica do cenário (veículo estacionado ao longe).
+ */
 const ZONES: Array<{
   minDistance: number;
   zone: ProximityZone;
@@ -63,14 +87,13 @@ const ZONES: Array<{
   color: string;
   intensity: number;
 }> = [
-  { minDistance: 0,  zone: 'muito-quente', label: 'Muito perto', color: '#e74c3c', intensity: 1.0 },
-  { minDistance: 3,  zone: 'quente',       label: 'Quente',      color: '#f39c12', intensity: 0.75 },
-  { minDistance: 10, zone: 'morno',        label: 'Morno',       color: '#27ae60', intensity: 0.5 },
-  { minDistance: 20, zone: 'frio',         label: 'Frio',        color: '#3498db', intensity: 0.25 },
+  { minDistance: 0,   zone: 'muito-quente', label: 'Muito perto', color: '#e74c3c', intensity: 1.0 },
+  { minDistance: 5,   zone: 'quente',       label: 'Quente',      color: '#f39c12', intensity: 0.75 },
+  { minDistance: 15,  zone: 'morno',        label: 'Morno',       color: '#27ae60', intensity: 0.5 },
+  { minDistance: 35,  zone: 'frio',         label: 'Frio',        color: '#3498db', intensity: 0.25 },
 ];
 
 export function classifyProximity(distanceMeters: number): ProximityInfo {
-  // Itera do mais frio pro mais quente — o último que satisfizer fica
   let match = ZONES[ZONES.length - 1];
   for (let i = ZONES.length - 1; i >= 0; i--) {
     if (distanceMeters >= ZONES[i].minDistance) {
@@ -84,4 +107,12 @@ export function classifyProximity(distanceMeters: number): ProximityInfo {
     color: match.color,
     intensity: match.intensity,
   };
+}
+
+export type TrendDirection = 'aproximando' | 'afastando' | 'estavel';
+
+export function classifyTrend(deltaDbm: number): TrendDirection {
+  if (deltaDbm > 2.5) return 'aproximando';
+  if (deltaDbm < -2.5) return 'afastando';
+  return 'estavel';
 }

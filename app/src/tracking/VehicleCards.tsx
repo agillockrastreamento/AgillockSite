@@ -271,15 +271,19 @@ export function MainVehicleCard({
   }, [device.dispositivoId, can]);
 
   useEffect(() => {
+    // Endpoints /cliente/* exigem JWT de cliente — não chamar no modo resgate
+    // (resgate usa JWT de role RESGATE) para evitar 401 que desautentica a sessão.
+    if (modoResgate) return;
     fetchSummary();
     fetchRecurrences();
     fetchRecorrenciasData();
-  }, [fetchSummary, fetchRecurrences, fetchRecorrenciasData]);
+  }, [modoResgate, fetchSummary, fetchRecurrences, fetchRecorrenciasData]);
 
   useEffect(() => {
+    if (modoResgate) return;
     if (!device.dispositivoId) return;
     loadGeofences();
-  }, [device.dispositivoId, loadGeofences]);
+  }, [modoResgate, device.dispositivoId, loadGeofences]);
 
   useEffect(() => {
     if (p?.endereco) {
@@ -292,12 +296,14 @@ export function MainVehicleCard({
         setAddress(_geocodeCache[cacheKey] || `(${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)})`);
         return;
       }
+      // Endpoint depende do tipo de sessão: cliente usa /cliente/*, resgate usa /app/resgate/*
+      const geocodeUrl = modoResgate
+        ? `/app/resgate/geocode/reverse?lat=${encodeURIComponent(p.latitude as number)}&lon=${encodeURIComponent(p.longitude as number)}`
+        : `/cliente/rastreamento/geocode/reverse?lat=${encodeURIComponent(p.latitude as number)}&lon=${encodeURIComponent(p.longitude as number)}`;
       const geocode = async () => {
         setIsGeocoding(true);
         try {
-          const result = await apiRequest<{ endereco?: string }>(
-            `/cliente/rastreamento/geocode/reverse?lat=${encodeURIComponent(p.latitude as number)}&lon=${encodeURIComponent(p.longitude as number)}`
-          );
+          const result = await apiRequest<{ endereco?: string }>(geocodeUrl);
           const end = result?.endereco || '';
           _geocodeCache[cacheKey] = end;
           setAddress(end || `(${p.latitude!.toFixed(5)}, ${p.longitude!.toFixed(5)})`);
@@ -311,7 +317,7 @@ export function MainVehicleCard({
     } else {
       setAddress(null);
     }
-  }, [p?.latitude, p?.longitude, p?.endereco]);
+  }, [modoResgate, p?.latitude, p?.longitude, p?.endereco]);
 
   const openInMaps = () => {
     if (!p?.latitude || !p?.longitude) return;
@@ -337,7 +343,10 @@ export function MainVehicleCard({
     if (!confirmed) return;
     setIsSendingCommand(true);
     try {
-      await apiRequest(`/cliente/dispositivos/${device.dispositivoId}/comandos`, {
+      const cmdUrl = modoResgate
+        ? `/app/resgate/dispositivos/${device.dispositivoId}/comandos`
+        : `/cliente/dispositivos/${device.dispositivoId}/comandos`;
+      await apiRequest(cmdUrl, {
         method: 'POST',
         body: { tipo, atributos: {} },
       });
@@ -664,6 +673,7 @@ export function MainVehicleCard({
           </View>
         ) : null}
 
+        {!modoResgate ? (
         <View style={styles.actionsSection}>
           <Text style={styles.actionsTitle}>AÇÕES</Text>
           <View style={styles.actionsGrid}>
@@ -706,6 +716,7 @@ export function MainVehicleCard({
             ) : null}
           </View>
         </View>
+        ) : null}
 
         {!modoResgate ? (
           <View style={styles.summarySection}>
