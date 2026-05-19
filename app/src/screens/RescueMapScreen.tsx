@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { Avatar } from 'react-native-paper';
+import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import MapView, {
   Marker,
@@ -196,8 +197,10 @@ export function RescueMapScreen() {
       }
     : null;
 
-  // Altura total disponível para os dois painéis (mapa + scanner)
-  const containerHeight = SCREEN_HEIGHT - insets.top - insets.bottom - DIVIDER_HEIGHT;
+  // Altura total disponível para os dois painéis (mapa + scanner).
+  // O mapa ocupa edge-to-edge (incluindo o espaço sob a status bar),
+  // então só subtraímos o inset de baixo + divisória.
+  const containerHeight = SCREEN_HEIGHT - insets.bottom - DIVIDER_HEIGHT;
 
   // Heights interpolados a partir da fração do split
   const mapPanelHeightAnim = splitFraction.interpolate({
@@ -447,7 +450,8 @@ export function RescueMapScreen() {
   const currentMapType = MAP_TYPES[mapTypeIndex];
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={styles.root}>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
       {/* ── Metade superior: mapa + card flutuante ───────────── */}
       <Animated.View style={[styles.mapPanel, { height: mapPanelHeightAnim }]}>
         <MapView
@@ -458,6 +462,8 @@ export function RescueMapScreen() {
           initialRegion={DEFAULT_REGION}
           showsUserLocation
           showsMyLocationButton={false}
+          // Empurra a bússola/botões nativos pra baixo dos nossos controles flutuantes
+          mapPadding={{ top: insets.top + 60, right: 0, bottom: 0, left: 0 }}
         >
           {devices.map((device) => {
             const coord = getDeviceCoordinate(device);
@@ -482,18 +488,18 @@ export function RescueMapScreen() {
           })}
         </MapView>
 
-        {/* Hamburger flutuante (sem header padrão) */}
+        {/* Hamburger flutuante (sem header padrão) — abaixo da status bar */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Abrir menu"
           onPress={() => setDrawerVisible(true)}
-          style={[styles.hamburgerButton, { top: 12 }]}
+          style={[styles.hamburgerButton, { top: insets.top + 8 }]}
         >
           <Icon source="menu" size={22} color={colors.text} />
         </Pressable>
 
-        {/* Controles do mapa: localização + tipo */}
-        <View style={[styles.mapControls, { top: 64 }]}>
+        {/* Controles do mapa: localização + tipo — alinhados ao hamburger */}
+        <View style={[styles.mapControls, { top: insets.top + 8 }]}>
           <MapFloatingButton
             icon={isLocating ? 'crosshairs-question' : 'crosshairs-gps'}
             active={isLocating}
