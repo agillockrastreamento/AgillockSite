@@ -66,7 +66,7 @@ type OutraTag = {
   lastSeenAt: number;
 };
 
-const STALE_TIMEOUT_MS = 5000;
+const STALE_TIMEOUT_MS = 10000;
 const SOUND_PREF_KEY = '@agillock/rescue/sound_haptic_enabled';
 
 // Heading buckets para correlação direção-RSSI
@@ -74,7 +74,9 @@ const HEADING_BUCKET_DEG = 15;
 // Mostra a seta direcional assim que tem 1 heading registrado.
 // Imprecisa no começo (só 1 amostra), melhora à medida que o usuário gira.
 const HEADING_SAMPLES_MIN = 1;
-const HEADING_DECAY_MS = 10000;
+// Decay menor para a seta seguir o movimento do usuário. Buckets antigos
+// expiram rápido, então a estimativa sempre reflete os últimos segundos.
+const HEADING_DECAY_MS = 4000;
 
 function getVibrationInterval(distance: number): number | null {
   if (distance < 2) return 350;
@@ -84,14 +86,14 @@ function getVibrationInterval(distance: number): number | null {
   return null;
 }
 
-// Texto contextual baseado no ângulo relativo entre o telefone e a tag
+// Texto contextual baseado no ângulo relativo entre o telefone e a tag.
+// relAngle: -180..+180  (0 = na frente, +90 = direita, -90 = esquerda, ±180 = atrás)
 function getDirectionLabel(relAngle: number, distance: number): string {
   if (distance < 1.5) return 'Bem perto';
-  const a = Math.abs(((relAngle + 540) % 360) - 180); // 0..180 (0 = atrás, 180 = na frente)
-  const front = 180 - a; // 0 = na frente, 180 = atrás
-  if (front < 30) return 'em frente';
-  if (front < 75) return relAngle > 0 ? 'à direita' : 'à esquerda';
-  if (front < 135) return relAngle > 0 ? 'atrás à direita' : 'atrás à esquerda';
+  const abs = Math.abs(relAngle);
+  if (abs < 30) return 'em frente';
+  if (abs < 75) return relAngle > 0 ? 'à direita' : 'à esquerda';
+  if (abs < 135) return relAngle > 0 ? 'atrás à direita' : 'atrás à esquerda';
   return 'atrás de você';
 }
 
@@ -117,7 +119,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Tag alvo
-  const [alvoSmoother] = useState(() => new RssiSmoother(0.45, 8));
+  const [alvoSmoother] = useState(() => new RssiSmoother(0.35, 8));
   const [alvoRssi, setAlvoRssi] = useState<number | null>(null);
   const [alvoDistance, setAlvoDistance] = useState<number | null>(null);
   const [alvoConfidence, setAlvoConfidence] = useState<MatchConfidence>('none');
@@ -154,6 +156,10 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
   const stopScanRef = useRef<(() => void) | null>(null);
   const vibrationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const headingWatcherRef = useRef<Location.LocationSubscription | null>(null);
+  const lastAnyScanAtRef = useRef<number>(0);
+  const restartWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const consecutiveThrottlesRef = useRef<number>(0);
+  const [chronicThrottle, setChronicThrottle] = useState(false);
 
   // ── Preferência de som persistida ─────────────────────
   useEffect(() => {
@@ -370,12 +376,12 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     const bucket = Math.round(heading / HEADING_BUCKET_DEG) * HEADING_BUCKET_DEG;
     const now = Date.now();
     const map = headingRssiRef.current;
-    const existing = map.get(bucket);
-    // Mantém o melhor RSSI por bucket (com decay temporal)
-    if (!existing || rssi > existing.rssi || now - existing.ts > 3000) {
-      map.set(bucket, { rssi, ts: now });
-    }
-    // Estima a heading da tag: bucket com melhor RSSI
+    // SEMPRE atualiza com o RSSI mais recente — assim os buckets refletem
+    // a situação atual, não o pico histórico. Quando o usuário afasta da tag,
+    // o RSSI cai em todos os buckets e a estimativa se mantém coerente.
+    map.set(bucket, { rssi, ts: now });
+
+    // Estima a heading da tag: bucket com melhor RSSI atual (entre os recentes)
     if (map.size >= HEADING_SAMPLES_MIN) {
       let best: { heading: number; rssi: number } | null = null;
       for (const [h, v] of map) {
@@ -399,16 +405,21 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
       return;
     }
 
+    // Inicializa o watchdog antes do callback ser registrado
+    lastAnyScanAtRef.current = Date.now();
+
     const stop = startBleScan(
       (device: BleDevice) => {
+        lastAnyScanAtRef.current = Date.now();
         const tag = veiculoAlvoRef.current?.tag ?? null;
         const match = tag ? matchTagToScan(tag, device) : null;
         if (match) {
+          consecutiveThrottlesRef.current = 0;
+          setChronicThrottle(false);
           const txPower = tag?.txPowerCalibrado ?? -59;
           const rawRssi = device.rssi ?? -100;
           const smoothed = alvoSmoother.push(rawRssi);
           const dist = rssiToDistance(smoothed, txPower, 2.5);
-          console.log(`[TagScan match] rssi=${rawRssi} smoothed=${smoothed.toFixed(1)} dist=${dist.toFixed(1)}m conf=${match.confidence}`);
           setAlvoRssi(Math.round(smoothed));
           setAlvoDistance(dist);
           setAlvoConfidence(match.confidence);
@@ -435,7 +446,70 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         },
       },
     );
-    stopScanRef.current = stop;
+    // Watchdog: detecta throttle do Android e reinicia o scan.
+    // Alguns Androids (Xiaomi/Realme/Samsung) pausam BLE scan após poucos segundos
+    // de uso contínuo. Restartar contorna isso transparentemente.
+    let currentStop: () => void = stop;
+    consecutiveThrottlesRef.current = 0;
+    setChronicThrottle(false);
+    if (restartWatchdogRef.current) clearInterval(restartWatchdogRef.current);
+    restartWatchdogRef.current = setInterval(() => {
+      const since = Date.now() - lastAnyScanAtRef.current;
+      if (since > 4000) {
+        consecutiveThrottlesRef.current++;
+        // Se 3+ restarts seguidos sem match nenhum, sinaliza throttling crônico
+        // (provavelmente economia de bateria do sistema operacional).
+        if (consecutiveThrottlesRef.current >= 3) {
+          setChronicThrottle(true);
+        }
+        try { currentStop(); } catch {}
+        // Reinicia o scan sem mudar UI/estado
+        const newStop = startBleScan(
+          (device: BleDevice) => {
+            lastAnyScanAtRef.current = Date.now();
+            const tag = veiculoAlvoRef.current?.tag ?? null;
+            const match = tag ? matchTagToScan(tag, device) : null;
+            if (match) {
+              // Recebeu match — zera o contador de throttle
+              consecutiveThrottlesRef.current = 0;
+              setChronicThrottle(false);
+              const txPower = tag?.txPowerCalibrado ?? -59;
+              const rawRssi = device.rssi ?? -100;
+              const smoothed = alvoSmoother.push(rawRssi);
+              const dist = rssiToDistance(smoothed, txPower, 2.5);
+              setAlvoRssi(Math.round(smoothed));
+              setAlvoDistance(dist);
+              setAlvoConfidence(match.confidence);
+              setAlvoTrackingId(match.trackingId);
+              setAlvoLastSeenAt(Date.now());
+              setTrend(classifyTrend(alvoSmoother.trend()));
+              updateEstimatedHeading(rawRssi);
+              return;
+            }
+            const id = device.id;
+            const name = (device.localName ?? device.name ?? `Sem nome · ${id.slice(-5)}`).trim();
+            const rssi = device.rssi ?? -100;
+            const distance = rssiToDistance(rssi, -59, 2.5);
+            setOutras((current) => ({
+              ...current,
+              [id]: { id, name, rssi, distance, lastSeenAt: Date.now() },
+            }));
+          },
+          { onlyTags: true, onError: (msg) => { setPermissionError(msg); } },
+        );
+        currentStop = newStop;
+        lastAnyScanAtRef.current = Date.now();
+      }
+    }, 2000);
+
+    const stopAll = () => {
+      if (restartWatchdogRef.current) {
+        clearInterval(restartWatchdogRef.current);
+        restartWatchdogRef.current = null;
+      }
+      try { currentStop(); } catch {}
+    };
+    stopScanRef.current = stopAll;
     setIsScanning(true);
   }, [alvoSmoother, updateEstimatedHeading]);
 
@@ -550,6 +624,16 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         <View style={styles.errorBox}>
           <Icon source="alert-circle" size={16} color="#ff6b6b" />
           <Text style={styles.errorText}>{permissionError}</Text>
+        </View>
+      ) : null}
+
+      {chronicThrottle ? (
+        <View style={styles.warningBox}>
+          <Icon source="battery-alert" size={16} color="#ffd966" />
+          <Text style={styles.warningBoxText}>
+            Sistema pausando Bluetooth. Desative a economia de bateria do app
+            e mantenha a tela ligada.
+          </Text>
         </View>
       ) : null}
 
@@ -773,6 +857,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   errorText: { flex: 1, color: '#fff', fontSize: 11, fontWeight: '700' },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 217, 102, 0.18)',
+    marginBottom: spacing.sm,
+  },
+  warningBoxText: {
+    flex: 1,
+    color: '#ffd966',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   centerArea: {
     flex: 1,
     alignItems: 'center',

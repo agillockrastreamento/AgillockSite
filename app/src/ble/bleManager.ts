@@ -190,7 +190,11 @@ export function startBleScan(
   const manager = getManager();
   const scanOptions: ScanOptions = {
     allowDuplicates: true, // queremos updates de RSSI
-    scanMode: 2, // SCAN_MODE_LOW_LATENCY (Android)
+    // BALANCED (1) é menos agressivo que LOW_LATENCY (2) no Android.
+    // Em devices com battery saving (Xiaomi/Realme), BALANCED é mais estável
+    // porque o sistema não classifica como uso pesado e não pausa o scan.
+    // A frequência de atualização é ~3x menor mas mais consistente.
+    scanMode: 1,
   };
 
   manager.startDeviceScan(null, scanOptions, (error, device) => {

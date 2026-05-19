@@ -47,13 +47,14 @@ export class RssiSmoother {
   /**
    * Compara a média dos últimos pontos com a média dos pontos anteriores.
    * Retorna a variação em dBm — positivo = esquentando (sinal melhorou),
-   * negativo = esfriando, ~0 = estável.
+   * negativo = esfriando, ~0 = estável. Requer pelo menos 2 amostras.
    */
   trend(): number {
-    if (this.history.length < 4) return 0;
-    const mid = Math.floor(this.history.length / 2);
+    if (this.history.length < 2) return 0;
+    const mid = Math.max(1, Math.floor(this.history.length / 2));
     const oldHalf = this.history.slice(0, mid);
     const newHalf = this.history.slice(mid);
+    if (newHalf.length === 0) return 0;
     const avgOld = oldHalf.reduce((s, v) => s + v, 0) / oldHalf.length;
     const avgNew = newHalf.reduce((s, v) => s + v, 0) / newHalf.length;
     return avgNew - avgOld;
@@ -112,7 +113,7 @@ export function classifyProximity(distanceMeters: number): ProximityInfo {
 export type TrendDirection = 'aproximando' | 'afastando' | 'estavel';
 
 export function classifyTrend(deltaDbm: number): TrendDirection {
-  if (deltaDbm > 2.5) return 'aproximando';
-  if (deltaDbm < -2.5) return 'afastando';
+  if (deltaDbm > 1.5) return 'aproximando';
+  if (deltaDbm < -1.5) return 'afastando';
   return 'estavel';
 }

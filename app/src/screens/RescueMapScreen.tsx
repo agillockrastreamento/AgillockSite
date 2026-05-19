@@ -35,6 +35,9 @@ import {
   MainVehicleCard,
 } from '../tracking/VehicleCards';
 import { VehicleIcon } from '../tracking/VehicleIcon';
+import { useMarkerBitmaps, OffscreenCapturePool } from '../tracking/useMarkerBitmaps';
+import { useTrackingWebSocket, updateDeviceFromMessage } from '../tracking/useTrackingWebSocket';
+import { buildTraccarDeviceIndex } from '../tracking/trackingService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
 
 const DEFAULT_REGION = {
@@ -91,6 +94,12 @@ function toTrackingDevice(raw: RescueDeviceRaw): TrackingDevice {
   const hasPosition =
     typeof raw.telemetriaUltimaLatitude === 'number' &&
     typeof raw.telemetriaUltimaLongitude === 'number';
+  // Considera "online" só se a última telemetria foi há menos de 15 min,
+  // caso contrário marca offline (cor laranja) mesmo tendo última posição.
+  const lastFixMs = raw.telemetriaUltimaPosicaoEm
+    ? Date.parse(raw.telemetriaUltimaPosicaoEm)
+    : 0;
+  const isRecent = lastFixMs > 0 && Date.now() - lastFixMs < 15 * 60 * 1000;
   return {
     dispositivoId: raw.id,
     nome: raw.nome,
@@ -104,13 +113,15 @@ function toTrackingDevice(raw: RescueDeviceRaw): TrackingDevice {
     podeGerenciarManutencao: false,
     cliente: null,
     traccarId: raw.traccarId,
-    status: hasPosition ? 'online' : 'offline',
+    status: hasPosition && isRecent ? 'online' : 'offline',
     lastUpdate: raw.telemetriaUltimaPosicaoEm,
     posicao: hasPosition
       ? {
           latitude: raw.telemetriaUltimaLatitude,
           longitude: raw.telemetriaUltimaLongitude,
           ignicao: raw.telemetriaUltimaIgnicao,
+          // Se ignição está ligada e fix recente, consideramos em movimento
+          emMovimento: !!(raw.telemetriaUltimaIgnicao && isRecent),
           fixTime: raw.telemetriaUltimaPosicaoEm,
         }
       : null,
@@ -242,8 +253,6 @@ export function RescueMapScreen() {
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
-      // Log explícito pra ajudar a diagnosticar erros de autenticação/permissão
-      console.error('[RescueMapScreen] Falha ao carregar veículos:', errorMsg, err);
       toast.show({
         message: `Erro ao carregar: ${errorMsg}`,
         type: 'error',
@@ -256,6 +265,22 @@ export function RescueMapScreen() {
   useEffect(() => {
     loadDevices();
   }, [loadDevices]);
+
+  // Updates em tempo real via WebSocket de rastreamento (mesmo do cliente)
+  const traccarDeviceIndex = useMemo(
+    () => buildTraccarDeviceIndex(devices),
+    [devices],
+  );
+  const handleWsMessage = useCallback(
+    (position: import('../tracking/trackingWebSocket').WsPosition, dispositivoId: string) => {
+      setDevices((current) => updateDeviceFromMessage(current, dispositivoId, position));
+    },
+    [],
+  );
+  useTrackingWebSocket(devices, traccarDeviceIndex, handleWsMessage);
+
+  // Bitmaps dos marcadores (renderizados offscreen e cacheados como PNG)
+  const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, false);
 
   // Snap o split para uma das três posições padrão
   const snapToPosition = useCallback((target: number) => {
@@ -320,14 +345,25 @@ export function RescueMapScreen() {
     [containerHeight, splitFraction, snapToPosition, cycleSplit],
   );
 
-  const animateToDevice = useCallback((device: TrackingDevice) => {
+  const animateToDevice = useCallback((device: TrackingDevice, cardOpen = false) => {
     const coord = getDeviceCoordinate(device);
     if (!coord) return;
+    // Quando o card está aberto/abrindo, desloca o centro do mapa pra cima
+    // de modo que o marcador fique visível acima da bandeja, não atrás.
+    const latitudeOffset = cardOpen
+      ? (cardFullHeight / SCREEN_HEIGHT) * 0.011
+      : 0;
     mapRef.current?.animateCamera(
-      { center: coord, zoom: 16 },
+      {
+        center: {
+          latitude: coord.latitude - latitudeOffset,
+          longitude: coord.longitude,
+        },
+        zoom: 16,
+      },
       { duration: 420 },
     );
-  }, []);
+  }, [cardFullHeight]);
 
   const focusDevice = useCallback(
     (device: TrackingDevice) => {
@@ -337,7 +373,8 @@ export function RescueMapScreen() {
         return;
       }
       setSelectedDeviceId(device.dispositivoId);
-      animateToDevice(device);
+      // Anima com offset porque o card vai abrir e cobrir parte inferior do mapa
+      animateToDevice(device, true);
       // Abre o card expandido
       setMainCardVisible(true);
       setMainCardPeeked(false);
@@ -472,25 +509,34 @@ export function RescueMapScreen() {
           {devices.map((device) => {
             const coord = getDeviceCoordinate(device);
             if (!coord) return null;
+            const bitmapUri = getBitmap(device);
             return (
               <Marker
                 key={device.dispositivoId}
                 coordinate={coord}
+                image={bitmapUri ? { uri: bitmapUri } : undefined}
                 anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={!bitmapUri}
                 onPress={() => focusDevice(device)}
               >
-                <View style={styles.markerWrap}>
-                  <VehicleIcon
-                    categoria={device.categoria}
-                    color={getMarkerColor(device)}
-                    course={device.posicao?.curso}
-                    size={50}
-                  />
-                </View>
+                {!bitmapUri ? (
+                  <View style={styles.markerContainer}>
+                    <View style={styles.markerWrap}>
+                      <VehicleIcon
+                        categoria={device.categoria}
+                        color={getMarkerColor(device)}
+                        course={device.posicao?.curso}
+                        size={58}
+                      />
+                    </View>
+                  </View>
+                ) : null}
               </Marker>
             );
           })}
         </MapView>
+
+        <OffscreenCapturePool pending={pending} onReady={onReady} />
 
         {/* Hamburger flutuante (sem header padrão) — abaixo da status bar */}
         <Pressable
@@ -718,11 +764,19 @@ const styles = StyleSheet.create({
     margin: 0,
     elevation: 3,
   },
-  markerWrap: {
-    width: 60,
-    height: 60,
+  markerContainer: {
+    width: 84,
+    height: 104,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
+  },
+  markerWrap: {
+    width: 70,
+    height: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
   },
   loadingOverlay: {
     position: 'absolute',
