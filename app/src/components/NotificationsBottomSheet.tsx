@@ -215,8 +215,13 @@ export function NotificationsBottomSheet({
     setTypePickerVisible(false);
   }, [selectedTypes.size]);
 
+  const deviceIdsDoMapa = new Set(devices.map((d) => d.dispositivoId));
+
   const filteredEvents = events.filter((e) => {
     if (!selectedTypes.has(e.tipo)) return false;
+    // Oculta eventos de dispositivos que pertencem a outro mapa.
+    // Eventos sem dispositivoId (sistema/financeiro) continuam visíveis.
+    if (e.dispositivoId && !deviceIdsDoMapa.has(e.dispositivoId)) return false;
     if (selectedDeviceIds.size > 0) {
       if (!e.dispositivoId || !selectedDeviceIds.has(e.dispositivoId)) return false;
     }
