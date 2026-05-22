@@ -17,6 +17,7 @@
 
   var dispositivosSelecionados = [];
   var todosDispositivos = [];
+  var filtroDispositivos = '';
   var editandoId = null;
   var areaPendenteEdicao = null;
 
@@ -31,7 +32,9 @@
     Promise.all([
       carregarDispositivos(),
       editandoId ? carregarGeocerca(editandoId) : Promise.resolve()
-    ]).catch(function (e) {
+    ]).then(function () {
+      renderizarDispositivos();
+    }).catch(function (e) {
       AL_CLIENTE.showAlert('Erro ao carregar dados: ' + e.message, 'danger');
     });
 
@@ -69,7 +72,7 @@
       dispositivosSelecionados = (geo.dispositivos || []).map(function (d) {
         return { id: d.id, nome: d.nome || '', placa: d.placa || '', identificador: '' };
       });
-      renderizarTags();
+      renderizarDispositivos();
 
       setChecked('geo-notificar-cliente', !!geo.notificarCliente);
       var notifSistemas = document.getElementById('geo-notif-sistemas');
@@ -106,61 +109,27 @@
       document.getElementById('geo-notif-sistemas').classList.toggle('visivel', this.checked);
     });
 
-    var searchTimer = null;
     var searchEl = document.getElementById('geo-devices-search');
 
     searchEl.addEventListener('input', function () {
-      clearTimeout(searchTimer);
-      var q = this.value.trim();
-      if (!q) { document.getElementById('geo-devices-results').style.display = 'none'; return; }
-      if (q.indexOf(',') !== -1) {
-        var resultsEl = document.getElementById('geo-devices-results');
-        resultsEl.innerHTML = '<div style="padding:9px 13px;font-size:12px;color:#888;font-style:italic;">' +
-          '<i class="fa fa-info-circle" style="color:#fab32c;margin-right:5px;"></i>' +
-          'Pressione Enter para adicionar todos os valores separados por vírgula</div>';
-        resultsEl.style.display = 'block';
-        return;
-      }
-      searchTimer = setTimeout(function () { pesquisarDispositivos(q); }, 200);
+      filtroDispositivos = this.value || '';
+      renderizarDispositivos();
     });
 
+    // Enter habilita todos os dispositivos que estão aparecendo na busca atual.
     searchEl.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter') return;
       e.preventDefault();
-      var raw = this.value.trim();
-      if (!raw) return;
-
-      if (raw.indexOf(',') !== -1) {
-        var termos = raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-        var adicionados = 0, naoEncontrados = [];
-        termos.forEach(function (termo) {
-          var lower = termo.toLowerCase();
-          var encontrado = todosDispositivos.find(function (d) {
-            return (d.identificador && d.identificador.toLowerCase() === lower) ||
-                   (d.placa && d.placa.toLowerCase() === lower) ||
-                   (d.nome && d.nome.toLowerCase() === lower);
-          });
-          if (encontrado && !dispositivosSelecionados.find(function (s) { return s.id === encontrado.id; })) {
-            dispositivosSelecionados.push(encontrado);
-            adicionados++;
-          } else if (!encontrado) {
-            naoEncontrados.push(termo);
-          }
-        });
-        renderizarTags();
-        this.value = '';
-        document.getElementById('geo-devices-results').style.display = 'none';
-        var msg = adicionados + ' dispositivo(s) adicionado(s)';
-        if (naoEncontrados.length) msg += '. Não encontrados: ' + naoEncontrados.join(', ');
-        AL_CLIENTE.showAlert(msg, naoEncontrados.length ? 'warning' : 'success');
-      } else {
-        var primeiro = document.querySelector('.gf-device-result');
-        if (primeiro) primeiro.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      }
+      var filtrados = dispositivosFiltrados();
+      if (!filtrados.length) return;
+      adicionarDispositivos(filtrados);
     });
 
-    searchEl.addEventListener('blur', function () {
-      setTimeout(function () { document.getElementById('geo-devices-results').style.display = 'none'; }, 200);
+    document.getElementById('btn-add-todos').addEventListener('click', function () {
+      adicionarDispositivos(dispositivosFiltrados());
+    });
+    document.getElementById('btn-rem-todos').addEventListener('click', function () {
+      removerDispositivos(dispositivosFiltrados());
     });
   }
 
@@ -453,66 +422,95 @@
     return !!areaWkt;
   }
 
-  // ── Pesquisa de dispositivos ───────────────────────────────────────────────
-  function pesquisarDispositivos(q) {
-    var lower = q.toLowerCase();
-    var filtrados = todosDispositivos.filter(function (d) {
+  // ── Lista de dispositivos com switch ───────────────────────────────────────
+  function estaSelecionado(id) {
+    return !!dispositivosSelecionados.find(function (s) { return s.id === id; });
+  }
+
+  // Dispositivos que batem com a busca atual (ou todos, se a busca está vazia).
+  function dispositivosFiltrados() {
+    var lower = filtroDispositivos.trim().toLowerCase();
+    if (!lower) return todosDispositivos.slice();
+    return todosDispositivos.filter(function (d) {
       return (d.nome && d.nome.toLowerCase().indexOf(lower) !== -1) ||
              (d.placa && d.placa.toLowerCase().indexOf(lower) !== -1) ||
              (d.identificador && d.identificador.toLowerCase().indexOf(lower) !== -1);
-    }).filter(function (d) {
-      return !dispositivosSelecionados.find(function (s) { return s.id === d.id; });
-    }).slice(0, 8);
-
-    var results = document.getElementById('geo-devices-results');
-    if (!filtrados.length) { results.style.display = 'none'; return; }
-
-    results.innerHTML = filtrados.map(function (d) {
-      return '<div class="gf-device-result" data-id="' + esc(d.id) + '">' +
-        '<i class="fa fa-car" style="opacity:.45;color:#fab32c"></i>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-weight:600;">' + esc(d.nome) + '</div>' +
-          '<div style="font-size:11px;color:#999;margin-top:1px;">' +
-            (d.placa ? '<span style="margin-right:8px;"><i class="fa fa-id-card-o"></i> ' + esc(d.placa) + '</span>' : '') +
-            (d.identificador ? '<span style="font-family:monospace;"><i class="fa fa-barcode"></i> ' + esc(d.identificador) + '</span>' : '') +
-          '</div>' +
-        '</div></div>';
-    }).join('');
-
-    results.querySelectorAll('.gf-device-result').forEach(function (el) {
-      el.addEventListener('mousedown', function (e) {
-        e.preventDefault();
-        var id = el.dataset.id;
-        var dispo = todosDispositivos.find(function (d) { return d.id === id; });
-        if (dispo && !dispositivosSelecionados.find(function (s) { return s.id === id; })) {
-          dispositivosSelecionados.push(dispo);
-          renderizarTags();
-        }
-        document.getElementById('geo-devices-search').value = '';
-        results.style.display = 'none';
-      });
     });
-
-    results.style.display = 'block';
   }
 
-  function renderizarTags() {
-    var container = document.getElementById('geo-devices-selected');
-    var empty = document.getElementById('geo-devices-empty');
-    container.innerHTML = dispositivosSelecionados.map(function (d) {
-      return '<span class="gf-device-tag" data-id="' + esc(d.id) + '">' +
-        esc(d.nome) + (d.placa ? ' (' + esc(d.placa) + ')' : '') +
-        '<button type="button" title="Remover"><i class="fa fa-times"></i></button>' +
-        '</span>';
-    }).join('');
-    container.querySelectorAll('.gf-device-tag button').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var id = btn.closest('.gf-device-tag').dataset.id;
-        dispositivosSelecionados = dispositivosSelecionados.filter(function (d) { return d.id !== id; });
-        renderizarTags();
-      });
+  function adicionarDispositivos(lista) {
+    lista.forEach(function (d) {
+      if (!estaSelecionado(d.id)) dispositivosSelecionados.push(d);
     });
-    empty.style.display = dispositivosSelecionados.length ? 'none' : '';
+    renderizarDispositivos();
+  }
+
+  function removerDispositivos(lista) {
+    var ids = lista.map(function (d) { return d.id; });
+    dispositivosSelecionados = dispositivosSelecionados.filter(function (d) {
+      return ids.indexOf(d.id) === -1;
+    });
+    renderizarDispositivos();
+  }
+
+  function atualizarContador() {
+    var countEl = document.getElementById('geo-devices-count');
+    if (!countEl) return;
+    var n = dispositivosSelecionados.length;
+    countEl.textContent = n ? (n + ' selecionado' + (n > 1 ? 's' : '')) : 'Nenhum selecionado';
+  }
+
+  function renderizarDispositivos() {
+    var lista = document.getElementById('geo-devices-list');
+    var empty = document.getElementById('geo-devices-empty');
+    if (!lista || !empty) return;
+
+    var filtrados = dispositivosFiltrados();
+
+    if (!todosDispositivos.length) {
+      lista.innerHTML = '';
+      empty.textContent = 'Nenhum dispositivo disponível';
+      empty.style.display = '';
+    } else if (!filtrados.length) {
+      lista.innerHTML = '';
+      empty.textContent = 'Nenhum dispositivo encontrado para a busca';
+      empty.style.display = '';
+    } else {
+      empty.style.display = 'none';
+      lista.innerHTML = filtrados.map(function (d) {
+        var on = estaSelecionado(d.id);
+        return '<div class="gf-device-row" data-id="' + esc(d.id) + '">' +
+          '<div class="gf-device-info">' +
+            '<div class="gf-device-nome"><i class="fa fa-car" style="opacity:.45;color:#fab32c;margin-right:6px;"></i>' + esc(d.nome || '(sem nome)') + '</div>' +
+            '<div class="gf-device-meta">' +
+              (d.placa ? '<span style="margin-right:10px;"><i class="fa fa-id-card-o"></i> ' + esc(d.placa) + '</span>' : '') +
+              (d.identificador ? '<span style="font-family:monospace;"><i class="fa fa-barcode"></i> ' + esc(d.identificador) + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+          '<label class="gf-switch">' +
+            '<input type="checkbox" class="gf-device-toggle"' + (on ? ' checked' : '') + ' />' +
+            '<span class="gf-slider"></span>' +
+          '</label>' +
+        '</div>';
+      }).join('');
+
+      lista.querySelectorAll('.gf-device-toggle').forEach(function (input) {
+        input.addEventListener('change', function () {
+          var id = input.closest('.gf-device-row').dataset.id;
+          if (input.checked) {
+            if (!estaSelecionado(id)) {
+              var dispo = todosDispositivos.find(function (d) { return d.id === id; });
+              if (dispo) dispositivosSelecionados.push(dispo);
+            }
+          } else {
+            dispositivosSelecionados = dispositivosSelecionados.filter(function (d) { return d.id !== id; });
+          }
+          atualizarContador();
+        });
+      });
+    }
+
+    atualizarContador();
   }
 
   // ── Salvar ─────────────────────────────────────────────────────────────────
