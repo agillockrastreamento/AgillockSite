@@ -1248,9 +1248,6 @@ export function MapScreen() {
               <View style={styles.quickHeader}>
                 <View>
                   <Text style={styles.quickTitle}>{seletorVisivel ? `Veículos · Mapa ${mapaAtivo}` : 'Veículos'}</Text>
-                  <Text style={styles.quickMeta}>
-                    {locatedDevices.length} com posição de {filteredDevices.length}
-                  </Text>
                 </View>
                 <Pressable
                   accessibilityRole="button"
