@@ -166,6 +166,7 @@ export function MainVehicleCard({
   onCompartilhar,
   onFocusDevice,
   modoResgate,
+  geofenceRefreshKey,
 }: {
   device: TrackingDevice;
   onUploadPhoto(): void;
@@ -179,6 +180,8 @@ export function MainVehicleCard({
   onFocusDevice?: () => void;
   /** No modo resgate, esconde foto/upload, recorrências km/data, resumo do dia e botão "ver histórico". */
   modoResgate?: boolean;
+  /** Quando muda, recarrega as cercas do dispositivo (ex.: cerca removida pelo mapa). */
+  geofenceRefreshKey?: number;
 }) {
   const toast = useToast();
   const confirm = useConfirmDialog();
@@ -283,7 +286,7 @@ export function MainVehicleCard({
     if (modoResgate) return;
     if (!device.dispositivoId) return;
     loadGeofences();
-  }, [modoResgate, device.dispositivoId, loadGeofences]);
+  }, [modoResgate, device.dispositivoId, loadGeofences, geofenceRefreshKey]);
 
   useEffect(() => {
     if (p?.endereco) {
@@ -398,6 +401,10 @@ export function MainVehicleCard({
         onGeofenceDeleted?.();
         toast.show({ message: 'Cerca(s) removida(s)!', type: 'success' });
       } catch {
+        // Pode falhar se a cerca já foi removida (ex.: pelo mapa). Resincroniza o
+        // estado real do card para não ficar travado em "Cerca Ativa".
+        await loadGeofences().catch(() => {});
+        onGeofenceDeleted?.();
         toast.show({ message: 'Erro ao remover cerca.', type: 'error' });
       } finally {
         setIsCreatingGeofence(false);

@@ -198,6 +198,8 @@ export function MapScreen() {
   const [showFences, setShowFences] = useState(false);
   const [showTracks, setShowTracks] = useState(false);
   const [geofences, setGeofences] = useState<Geofence[]>([]);
+  // Incrementado ao remover cerca pelo mapa, para o card recarregar suas cercas.
+  const [geofenceRefreshKey, setGeofenceRefreshKey] = useState(0);
   const [tracks, setTracks] = useState<{ deviceId: string; coords: { latitude: number; longitude: number }[] }[]>([]);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
@@ -864,6 +866,8 @@ export function MapScreen() {
     try {
       await deleteGeofence(geofence.id);
       setGeofences(current => current.filter(g => g.id !== geofence.id));
+      // Sinaliza ao card do veículo focado para recarregar o estado "Cerca Ativa".
+      setGeofenceRefreshKey(k => k + 1);
       toast.show({ message: 'Cerca removida!', type: 'success' });
     } catch {
       toast.show({ message: 'Não foi possível remover esta cerca.', type: 'error' });
@@ -1318,6 +1322,7 @@ export function MapScreen() {
               onRemovePhoto={handleRemovePhoto}
               isUploading={isPhotoUploading}
               onGeofenceCreated={handleGeofenceCreated}
+              geofenceRefreshKey={geofenceRefreshKey}
               onGeofenceDeleted={() => {
                 if (showFences && canVerCerca) getGeofences().then(setGeofences).catch(() => {});
               }}
