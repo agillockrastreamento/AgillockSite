@@ -454,29 +454,37 @@
   }
 
   // Atualiza os switches já renderizados sem reconstruir a lista inteira.
+  // A animação é desligada durante o lote: muitas transições simultâneas dos
+  // sliders apagavam a camada de composição do mapa Leaflet logo abaixo.
   function sincronizarSwitches() {
     var lista = document.getElementById('geo-devices-list');
     if (lista) {
+      lista.classList.add('gf-no-anim');
       lista.querySelectorAll('.gf-device-row').forEach(function (row) {
         var input = row.querySelector('.gf-device-toggle');
         if (input) input.checked = estaSelecionado(row.dataset.id);
       });
+      void lista.offsetHeight; // aplica o estado sem animar
+      requestAnimationFrame(function () { lista.classList.remove('gf-no-anim'); });
     }
     atualizarContador();
     revalidarMapa();
   }
 
-  // Após mexer na lista de dispositivos, o repaint da página pode "apagar" os
-  // tiles do Leaflet. invalidateSize sozinho não resolve quando o tamanho não
-  // muda — por isso forçamos também o redraw dos tiles do layer ativo.
+  // Força o navegador a recompor a camada do mapa após uma mutação grande na
+  // lista ao lado (invalidateSize/redraw não recuperam o "branco"; alternar uma
+  // transform descarta e recria a camada GPU).
   function revalidarMapa() {
     if (!mapa) return;
-    setTimeout(function () {
+    var el = document.getElementById('geo-mapa');
+    if (!el) return;
+    el.style.transform = 'translateZ(0)';
+    requestAnimationFrame(function () {
       try {
+        el.style.transform = '';
         mapa.invalidateSize();
-        if (tileAtual && typeof tileAtual.redraw === 'function') tileAtual.redraw();
       } catch (e) {}
-    }, 80);
+    });
   }
 
   function atualizarContador() {
