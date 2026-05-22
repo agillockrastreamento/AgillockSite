@@ -124,6 +124,62 @@ router.post('/clicksign',
   }
 );
 
+// Tolerância para clock skew ao decidir se uma data está "no futuro" (5 min).
+const ZHENCB_SKEW_MS = 5 * 60_000;
+
+/**
+ * Interpreta o timestamp cru da ZHENCB como epoch (ms) em UTC.
+ *
+ * A ZHENCB envia datas SEM fuso (ex.: "2026-05-22T10:43:40"). O `new Date()` do
+ * Node interpretaria isso no fuso LOCAL do container; por isso forçamos UTC
+ * (sufixo "Z") quando a string não traz fuso, eliminando essa dependência.
+ * Datas que já trazem "Z" ou offset (+08:00) são respeitadas. Retorna null se
+ * não der para parsear.
+ */
+function parseZhencbRawUtcMs(raw: unknown): number | null {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  const valor = raw.trim();
+  const temFuso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(valor);
+  const ms = new Date(temFuso ? valor : `${valor}Z`).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * Detecta o deslocamento de fuso/relógio do lote ZHENCB.
+ *
+ * Não sabemos se o relógio da ZHENCB está em UTC ou em horário local (China =
+ * UTC+8). Como o webhook é quase em tempo real, o ponto MAIS RECENTE do lote
+ * corresponde a "agora". Se, interpretado como UTC, ele cai no futuro, a origem
+ * está adiantada em relação ao UTC — então retornamos esse adiantamento para
+ * descontá-lo de TODOS os pontos. Assim o lote é reancorado ao tempo real
+ * preservando o espaçamento entre os pontos (mantém o rastro), seja qual for o
+ * fuso. Lotes já em UTC (ou no passado) resultam em offset 0 — ficam intactos.
+ */
+function calcularOffsetFusoZhencb(devices: any[], agoraMs: number): number {
+  let maxMs = -Infinity;
+  for (const d of devices) {
+    const ms = parseZhencbRawUtcMs(d?.timestamp);
+    if (ms != null && ms > maxMs) maxMs = ms;
+  }
+  if (!Number.isFinite(maxMs)) return 0;
+  const adiantamento = maxMs - agoraMs;
+  return adiantamento > ZHENCB_SKEW_MS ? adiantamento : 0;
+}
+
+/**
+ * Converte o timestamp de um ponto em epoch (segundos) para o Traccar, aplicando
+ * o offset de fuso do lote. Se o ponto vier inválido ou continuar no futuro após
+ * a correção (skew residual), usa a hora atual — o que importa é a posição
+ * sempre cair dentro da janela de tempo do Traccar e o mapa atualizar.
+ */
+function timestampZhencbSegundos(raw: unknown, offsetMs: number, agoraMs: number): number {
+  const ms = parseZhencbRawUtcMs(raw);
+  if (ms == null) return Math.floor(agoraMs / 1000);
+  const corrigido = ms - offsetMs;
+  if (corrigido > agoraMs + ZHENCB_SKEW_MS) return Math.floor(agoraMs / 1000);
+  return Math.floor(corrigido / 1000);
+}
+
 /**
  * Webhook para dispositivos ZHENCB (A01, A02, A03)
  * Formato esperado (do documento):
@@ -147,10 +203,6 @@ router.post('/zhencb',
   async (req: Request, res: Response): Promise<void> => {
   const payload = req.body;
 
-  // [DEBUG] Logging temporário enquanto integração ZHENCB estabiliza — remover depois.
-  console.log('[Webhook ZHENCB] RAW headers:', JSON.stringify(req.headers));
-  console.log('[Webhook ZHENCB] RAW body:', JSON.stringify(payload));
-
   const devices = payload?.data;
 
   if (!Array.isArray(devices)) {
@@ -162,6 +214,14 @@ router.post('/zhencb',
   console.log(`[Webhook ZHENCB] Recebidos dados de ${devices.length} dispositivos`);
 
   const TRACCAR_OSMAND_URL = process.env.TRACCAR_OSMAND_URL || 'http://traccar:5055';
+
+  // Detecta o deslocamento de fuso do lote uma única vez, ancorando pelo ponto
+  // mais recente (= "agora"), e reaplica em todos os pontos abaixo.
+  const recebidoEmMs = Date.now();
+  const offsetFusoMs = calcularOffsetFusoZhencb(devices, recebidoEmMs);
+  if (offsetFusoMs > 0) {
+    console.log(`[Webhook ZHENCB] Offset de fuso detectado: ${Math.round(offsetFusoMs / 60_000)} min — reancorando timestamps.`);
+  }
 
   // Processa cada dispositivo em paralelo (best-effort)
   const results = await Promise.allSettled(devices.map(async (device: any) => {
@@ -177,7 +237,7 @@ router.post('/zhencb',
       id: deviceId,
       lat: latitude,
       lon: longitude,
-      timestamp: String(Math.floor(new Date(timestamp).getTime() / 1000)), // Traccar OsmAnd espera segundos ou ISO
+      timestamp: String(timestampZhencbSegundos(timestamp, offsetFusoMs, recebidoEmMs)), // segundos (UTC, reancorado)
       hdop: accuracy || '0',
     });
 
