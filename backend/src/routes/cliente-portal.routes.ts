@@ -1111,10 +1111,24 @@ router.get('/rastreamento/cercas', requirePermission('rastreamento.verCerca'), a
         { origemTipo: 'ADMIN', visivelCliente: true, dispositivos: { some: { dispositivoId: { in: dispositivosIds } } } },
       ],
     },
-    select: { traccarId: true, nome: true, descricao: true, area: true },
+    select: {
+      traccarId: true, nome: true, descricao: true, area: true,
+      // Mapas (1/2) dos dispositivos do cliente vinculados à cerca, para o
+      // frontend exibir a cerca apenas no mapa ativo correspondente.
+      dispositivos: {
+        where: { dispositivoId: { in: dispositivosIds } },
+        select: { dispositivo: { select: { mapa: true } } },
+      },
+    },
   });
 
-  res.json(geocercas.map(g => ({ id: g.traccarId, name: g.nome, description: g.descricao ?? '', area: g.area })));
+  res.json(geocercas.map(g => ({
+    id: g.traccarId,
+    name: g.nome,
+    description: g.descricao ?? '',
+    area: g.area,
+    mapas: [...new Set(g.dispositivos.map(d => (Number(d.dispositivo?.mapa) === 2 ? 2 : 1)))],
+  })));
 });
 
 router.get('/rastreamento/dispositivos/:dispositivoId/cercas', requirePermission('rastreamento.verCerca'), async (req: ClienteRequest, res: Response): Promise<void> => {

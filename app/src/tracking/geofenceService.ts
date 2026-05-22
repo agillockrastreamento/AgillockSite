@@ -5,6 +5,8 @@ export type Geofence = {
   name: string;
   description?: string;
   area: string;
+  // Mapas (1/2) dos dispositivos vinculados. Vazio = sem vínculo (aparece em qualquer mapa).
+  mapas?: number[];
 };
 
 export type DeviceGeofence = {

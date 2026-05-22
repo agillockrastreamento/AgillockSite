@@ -25,6 +25,12 @@ let mapaAtivo = (() => {
 })();
 function _mapaDoVeiculo(v) { const n = Number(v && v.mapa); return n === 2 ? 2 : 1; }
 function _veiculoNoMapaAtivo(v) { return v && _mapaDoVeiculo(v) === mapaAtivo; }
+// Cerca segue o(s) dispositivo(s) vinculado(s): aparece só no mapa ativo correspondente.
+// Cerca sem dispositivo vinculado (sem mapa) aparece em qualquer mapa.
+function _cercaNoMapaAtivo(c) {
+  if (!c || !Array.isArray(c.mapas) || c.mapas.length === 0) return true;
+  return c.mapas.indexOf(mapaAtivo) !== -1;
+}
 function _mapasUsados() {
   const set = new Set();
   Object.values(veiculosMap).forEach(v => set.add(_mapaDoVeiculo(v)));
@@ -1437,6 +1443,8 @@ function setMapaAtivo(novo) {
   ajustarBounds();
   if (_overlay.alarmes) _atualizarAlarmeBadges();
   if (_overlay.rastro) _carregarRastros();
+  // Recarrega as cercas para mostrar apenas as do mapa ativo.
+  if (_overlay.cercas) mostrarCercas();
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -2970,6 +2978,7 @@ function mostrarCercas() {
     ocultarCercas();
     _cercasLayer = L.layerGroup();
     cercas.forEach(function (c) {
+      if (!_cercaNoMapaAtivo(c)) return;
       const camada = _criarCamadaCerca(c);
       if (camada) _cercasLayer.addLayer(camada);
     });

@@ -86,6 +86,13 @@ function getMapaDoDevice(d: TrackingDevice): 1 | 2 {
   return m === 2 ? 2 : 1;
 }
 
+// Cerca segue o(s) dispositivo(s) vinculado(s): aparece só no mapa ativo correspondente.
+// Cerca sem dispositivo vinculado (sem mapa) aparece em qualquer mapa.
+function cercaNoMapaAtivo(g: Geofence, mapaAtivo: 1 | 2): boolean {
+  if (!Array.isArray(g.mapas) || g.mapas.length === 0) return true;
+  return g.mapas.includes(mapaAtivo);
+}
+
 type QuickSheetMode = 'closed' | 'peek' | 'expanded';
 
 function getQuickSheetHeights(deviceCount: number) {
@@ -340,6 +347,11 @@ export function MapScreen() {
   const filteredDevices = useMemo(
     () => devices.filter((device) => getMapaDoDevice(device) === mapaAtivo),
     [devices, mapaAtivo],
+  );
+
+  const filteredGeofences = useMemo(
+    () => geofences.filter((g) => cercaNoMapaAtivo(g, mapaAtivo)),
+    [geofences, mapaAtivo],
   );
 
   const quickSheetHeights = useMemo(() => getQuickSheetHeights(filteredDevices.length), [filteredDevices.length]);
@@ -1043,7 +1055,7 @@ export function MapScreen() {
             ))
           : null}
 
-        {showFences && geofences.map((geofence) => {
+        {showFences && filteredGeofences.map((geofence) => {
           const parsed = parseCircleArea(geofence.area);
           if (!parsed) return null;
           const center = { latitude: parsed.latitude, longitude: parsed.longitude };
@@ -1062,7 +1074,7 @@ export function MapScreen() {
           );
         })}
 
-        {showFences && geofences.map((geofence) => {
+        {showFences && filteredGeofences.map((geofence) => {
           const parsed = parseCircleArea(geofence.area);
           if (!parsed) return null;
           return (
