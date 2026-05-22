@@ -442,7 +442,7 @@
     lista.forEach(function (d) {
       if (!estaSelecionado(d.id)) dispositivosSelecionados.push(d);
     });
-    renderizarDispositivos();
+    sincronizarSwitches();
   }
 
   function removerDispositivos(lista) {
@@ -450,7 +450,20 @@
     dispositivosSelecionados = dispositivosSelecionados.filter(function (d) {
       return ids.indexOf(d.id) === -1;
     });
-    renderizarDispositivos();
+    sincronizarSwitches();
+  }
+
+  // Atualiza os switches já renderizados sem reconstruir a lista — evita o reflow
+  // que apagava os tiles do mapa Leaflet logo abaixo.
+  function sincronizarSwitches() {
+    var lista = document.getElementById('geo-devices-list');
+    if (lista) {
+      lista.querySelectorAll('.gf-device-row').forEach(function (row) {
+        var input = row.querySelector('.gf-device-toggle');
+        if (input) input.checked = estaSelecionado(row.dataset.id);
+      });
+    }
+    atualizarContador();
   }
 
   function atualizarContador() {
@@ -482,10 +495,7 @@
         return '<div class="gf-device-row" data-id="' + esc(d.id) + '">' +
           '<div class="gf-device-info">' +
             '<div class="gf-device-nome"><i class="fa fa-car" style="opacity:.45;color:#fab32c;margin-right:6px;"></i>' + esc(d.nome || '(sem nome)') + '</div>' +
-            '<div class="gf-device-meta">' +
-              (d.placa ? '<span style="margin-right:10px;"><i class="fa fa-id-card-o"></i> ' + esc(d.placa) + '</span>' : '') +
-              (d.identificador ? '<span style="font-family:monospace;"><i class="fa fa-barcode"></i> ' + esc(d.identificador) + '</span>' : '') +
-            '</div>' +
+            (d.placa ? '<div class="gf-device-meta"><i class="fa fa-id-card-o"></i> ' + esc(d.placa) + '</div>' : '') +
           '</div>' +
           '<label class="gf-switch">' +
             '<input type="checkbox" class="gf-device-toggle"' + (on ? ' checked' : '') + ' />' +
@@ -511,6 +521,12 @@
     }
 
     atualizarContador();
+
+    // O rebuild da lista acima provoca reflow; o Leaflet pode "apagar" os tiles
+    // até recalcular o tamanho do container. Forçamos a releitura.
+    if (mapa) {
+      requestAnimationFrame(function () { try { mapa.invalidateSize(); } catch (e) {} });
+    }
   }
 
   // ── Salvar ─────────────────────────────────────────────────────────────────
