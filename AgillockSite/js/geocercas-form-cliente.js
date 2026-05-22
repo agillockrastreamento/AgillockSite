@@ -115,22 +115,6 @@
       filtroDispositivos = this.value || '';
       renderizarDispositivos();
     });
-
-    // Enter habilita todos os dispositivos que estão aparecendo na busca atual.
-    searchEl.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      var filtrados = dispositivosFiltrados();
-      if (!filtrados.length) return;
-      adicionarDispositivos(filtrados);
-    });
-
-    document.getElementById('btn-add-todos').addEventListener('click', function () {
-      adicionarDispositivos(dispositivosFiltrados());
-    });
-    document.getElementById('btn-rem-todos').addEventListener('click', function () {
-      removerDispositivos(dispositivosFiltrados());
-    });
   }
 
   // ── Mapa Leaflet ───────────────────────────────────────────────────────────
@@ -436,39 +420,6 @@
              (d.placa && d.placa.toLowerCase().indexOf(lower) !== -1) ||
              (d.identificador && d.identificador.toLowerCase().indexOf(lower) !== -1);
     });
-  }
-
-  function adicionarDispositivos(lista) {
-    lista.forEach(function (d) {
-      if (!estaSelecionado(d.id)) dispositivosSelecionados.push(d);
-    });
-    sincronizarSwitches();
-  }
-
-  function removerDispositivos(lista) {
-    var ids = lista.map(function (d) { return d.id; });
-    dispositivosSelecionados = dispositivosSelecionados.filter(function (d) {
-      return ids.indexOf(d.id) === -1;
-    });
-    sincronizarSwitches();
-  }
-
-  // Atualiza os switches já renderizados sem reconstruir a lista inteira.
-  // A animação é desligada durante o lote: muitas transições simultâneas dos
-  // sliders apagavam a camada de composição do mapa Leaflet logo abaixo.
-  function sincronizarSwitches() {
-    var lista = document.getElementById('geo-devices-list');
-    if (lista) {
-      lista.classList.add('gf-no-anim');
-      lista.querySelectorAll('.gf-device-row').forEach(function (row) {
-        var input = row.querySelector('.gf-device-toggle');
-        if (input) input.checked = estaSelecionado(row.dataset.id);
-      });
-      void lista.offsetHeight; // aplica o estado sem animar
-      requestAnimationFrame(function () { lista.classList.remove('gf-no-anim'); });
-    }
-    atualizarContador();
-    revalidarMapa();
   }
 
   // Releitura leve do tamanho do mapa após mexer na lista ao lado.

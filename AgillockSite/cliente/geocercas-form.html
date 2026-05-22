@@ -45,7 +45,7 @@
     .gf-devices-search-wrap { position: relative; margin-bottom: 10px; }
 
     .gf-devices-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-    .gf-devices-count { font-size: 12px; color: #888; font-weight: 600; margin-left: auto; }
+    .gf-devices-count { font-size: 12px; color: #888; font-weight: 600; }
     html.dark-theme .gf-devices-count { color: #8b949e; }
 
     #geo-devices-list { border: 1px solid #eee; border-radius: 8px; max-height: 340px; overflow-y: auto; }
@@ -114,9 +114,6 @@
        slider a uma camada de GPU, e dezenas delas criadas no mesmo frame (botão
        "Adicionar/Remover todos") derrubavam a camada de composição do mapa. */
     .gf-switch input:checked + .gf-slider:before { left: 21px; }
-    /* Durante "Adicionar/Remover todos" desligamos a animação dos switches. */
-    #geo-devices-list.gf-no-anim .gf-slider,
-    #geo-devices-list.gf-no-anim .gf-slider:before { transition: none !important; }
 
     #geo-notif-sistemas { display: none; margin-top: 12px; padding: 12px 16px; background: #f8f9fa; border-radius: 8px; gap: 16px; flex-wrap: wrap; }
     html.dark-theme #geo-notif-sistemas { background: #252535; }
@@ -198,8 +195,6 @@
             <input type="text" id="geo-devices-search" class="form-control" placeholder="Pesquisar por nome ou placa..." />
           </div>
           <div class="gf-devices-actions">
-            <button type="button" class="tile-btn" id="btn-add-todos"><i class="fa fa-check-square-o"></i> Adicionar todos</button>
-            <button type="button" class="tile-btn" id="btn-rem-todos"><i class="fa fa-square-o"></i> Remover todos</button>
             <span id="geo-devices-count" class="gf-devices-count">Nenhum selecionado</span>
           </div>
           <div id="geo-devices-list"></div>
