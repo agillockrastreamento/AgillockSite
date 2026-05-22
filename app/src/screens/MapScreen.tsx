@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -20,6 +20,7 @@ import * as Location from 'expo-location';
 import MapView, {
   Circle,
   Marker,
+  Polygon,
   Polyline,
   PROVIDER_GOOGLE,
   type LatLng,
@@ -45,6 +46,7 @@ import {
   getGeofences,
   deleteGeofence,
   parseCircleArea,
+  parsePolygonArea,
   type Geofence,
 } from '../tracking/geofenceService';
 import type { TrackingAccessStatus, TrackingDevice } from '../tracking/trackingTypes';
@@ -1086,6 +1088,37 @@ export function MapScreen() {
               strokeColor="rgba(41,128,185,0.8)"
               fillColor="rgba(41,128,185,0.15)"
             />
+          );
+        })}
+
+        {showFences && filteredGeofences.map((geofence) => {
+          // Cercas em polígono (criadas no portal). O mobile só cria círculos,
+          // mas precisa desenhar polígonos vindos do web/admin igual ao site.
+          const pts = parsePolygonArea(geofence.area);
+          if (!pts) return null;
+          const centroide = {
+            latitude: pts.reduce((s, p) => s + p.latitude, 0) / pts.length,
+            longitude: pts.reduce((s, p) => s + p.longitude, 0) / pts.length,
+          };
+          return (
+            <Fragment key={`fence-poly-${geofence.id}`}>
+              <Polygon
+                coordinates={pts}
+                strokeWidth={2}
+                strokeColor="rgba(41,128,185,0.8)"
+                fillColor="rgba(41,128,185,0.15)"
+              />
+              <Marker
+                coordinate={centroide}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+                onPress={() => handleGeofencePress(geofence)}
+              >
+                <View style={styles.geofenceTapTarget}>
+                  <Icon source="circle-outline" size={14} color="#2980b9" />
+                </View>
+              </Marker>
+            </Fragment>
           );
         })}
 

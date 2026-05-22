@@ -67,3 +67,20 @@ export function parseCircleArea(area: string): { latitude: number; longitude: nu
   if (m2) return { latitude: parseFloat(m2[1]), longitude: parseFloat(m2[2]), radius: parseFloat(m2[3]) };
   return null;
 }
+
+// Parses "POLYGON ((lon lat, lon lat, ...))" → lista de vértices {latitude, longitude}.
+// No WKT do Traccar a ordem é "longitude latitude".
+export function parsePolygonArea(area: string): { latitude: number; longitude: number }[] | null {
+  if (!area) return null;
+  const m = area.match(/POLYGON\s*\(\((.*)\)\)/i);
+  if (!m) return null;
+  const pontos = m[1]
+    .trim()
+    .split(',')
+    .map((p) => {
+      const [lng, lat] = p.trim().split(/\s+/);
+      return { latitude: parseFloat(lat), longitude: parseFloat(lng) };
+    })
+    .filter((c) => Number.isFinite(c.latitude) && Number.isFinite(c.longitude));
+  return pontos.length >= 3 ? pontos : null;
+}
