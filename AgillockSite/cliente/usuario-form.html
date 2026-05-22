@@ -601,7 +601,7 @@
           return;
         }
         veiculos.forEach(function (v) {
-          var nome = v.apelidoCliente || v.nome || '(sem nome)';
+          var nome = v.nome || v.apelidoCliente || '(sem nome)';
           var placa = v.placa || '';
           var row = document.createElement('label');
           row.className = 'uf-toggle-row';
