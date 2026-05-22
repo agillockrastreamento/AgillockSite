@@ -453,8 +453,7 @@
     sincronizarSwitches();
   }
 
-  // Atualiza os switches já renderizados sem reconstruir a lista — evita o reflow
-  // que apagava os tiles do mapa Leaflet logo abaixo.
+  // Atualiza os switches já renderizados sem reconstruir a lista inteira.
   function sincronizarSwitches() {
     var lista = document.getElementById('geo-devices-list');
     if (lista) {
@@ -464,6 +463,20 @@
       });
     }
     atualizarContador();
+    revalidarMapa();
+  }
+
+  // Após mexer na lista de dispositivos, o repaint da página pode "apagar" os
+  // tiles do Leaflet. invalidateSize sozinho não resolve quando o tamanho não
+  // muda — por isso forçamos também o redraw dos tiles do layer ativo.
+  function revalidarMapa() {
+    if (!mapa) return;
+    setTimeout(function () {
+      try {
+        mapa.invalidateSize();
+        if (tileAtual && typeof tileAtual.redraw === 'function') tileAtual.redraw();
+      } catch (e) {}
+    }, 80);
   }
 
   function atualizarContador() {
@@ -521,12 +534,7 @@
     }
 
     atualizarContador();
-
-    // O rebuild da lista acima provoca reflow; o Leaflet pode "apagar" os tiles
-    // até recalcular o tamanho do container. Forçamos a releitura.
-    if (mapa) {
-      requestAnimationFrame(function () { try { mapa.invalidateSize(); } catch (e) {} });
-    }
+    revalidarMapa();
   }
 
   // ── Salvar ─────────────────────────────────────────────────────────────────
