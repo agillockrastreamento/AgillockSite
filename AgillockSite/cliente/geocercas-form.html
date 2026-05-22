@@ -110,9 +110,11 @@
     .gf-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; transition: .3s; border-radius: 24px; }
     .gf-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; transition: .3s; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
     .gf-switch input:checked + .gf-slider { background: #fab32c; }
-    .gf-switch input:checked + .gf-slider:before { transform: translateX(18px); }
-    /* Durante "Adicionar/Remover todos" desligamos a animação dos switches:
-       dezenas de transições simultâneas apagavam a camada de composição do mapa. */
+    /* Usamos `left` (não `transform`) para mover o knob: `transform` promove cada
+       slider a uma camada de GPU, e dezenas delas criadas no mesmo frame (botão
+       "Adicionar/Remover todos") derrubavam a camada de composição do mapa. */
+    .gf-switch input:checked + .gf-slider:before { left: 21px; }
+    /* Durante "Adicionar/Remover todos" desligamos a animação dos switches. */
     #geo-devices-list.gf-no-anim .gf-slider,
     #geo-devices-list.gf-no-anim .gf-slider:before { transition: none !important; }
 

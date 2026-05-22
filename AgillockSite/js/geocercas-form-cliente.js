@@ -471,20 +471,10 @@
     revalidarMapa();
   }
 
-  // Força o navegador a recompor a camada do mapa após uma mutação grande na
-  // lista ao lado (invalidateSize/redraw não recuperam o "branco"; alternar uma
-  // transform descarta e recria a camada GPU).
+  // Releitura leve do tamanho do mapa após mexer na lista ao lado.
   function revalidarMapa() {
     if (!mapa) return;
-    var el = document.getElementById('geo-mapa');
-    if (!el) return;
-    el.style.transform = 'translateZ(0)';
-    requestAnimationFrame(function () {
-      try {
-        el.style.transform = '';
-        mapa.invalidateSize();
-      } catch (e) {}
-    });
+    requestAnimationFrame(function () { try { mapa.invalidateSize(); } catch (e) {} });
   }
 
   function atualizarContador() {
