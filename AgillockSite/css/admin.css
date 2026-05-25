@@ -984,14 +984,20 @@ input:focus, select:focus, textarea:focus {
     right: 0;
     height: 40px;
     z-index: 9999;
-    background: #1e2530;
-    border-bottom: 1px solid #2d3748;
+    background: #ffffff;
+    border-bottom: 1px solid #e3e6ea;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 0 14px;
     overflow: visible;
     transition: height .22s ease, opacity .18s ease;
+}
+html.dark-theme #al-rastr-bar {
+    background: #1e2530;
+    border-bottom-color: #2d3748;
+    box-shadow: none;
 }
 html.rastr-bar-fechada #al-rastr-bar {
     height: 0;
@@ -1007,15 +1013,17 @@ html.rastr-bar-fechada #al-rastr-bar {
     height: 28px;
     flex-shrink: 0;
     background: transparent;
-    border: 1px solid rgba(255,255,255,.18);
+    border: 1px solid rgba(0,0,0,.15);
     border-radius: 6px;
-    color: #adb5bd;
+    color: #555;
     font-size: 14px;
     cursor: pointer;
     padding: 0;
     transition: background .15s, color .15s;
 }
-#al-rastr-menu-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
+#al-rastr-menu-btn:hover { background: rgba(0,0,0,.06); color: #222; }
+html.dark-theme #al-rastr-menu-btn { border-color: rgba(255,255,255,.18); color: #adb5bd; }
+html.dark-theme #al-rastr-menu-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
 /* Campo de busca — escopado dentro da barra global para não afetar outras páginas */
 #al-rastr-bar #topbar-busca-wrap {
     position: absolute;
@@ -1023,25 +1031,37 @@ html.rastr-bar-fechada #al-rastr-bar {
     top: 50%;
     transform: translate(-50%, -50%);
     width: calc(100% - 56px);
-    max-width: 420px;
+    max-width: 680px;
 }
 #al-rastr-bar #filtro {
     width: 100%;
-    height: 28px;
-    font-size: 12px;
-    padding: 3px 8px;
-    background: rgba(255,255,255,.08);
-    border: 1px solid rgba(255,255,255,.15);
-    border-radius: 6px;
-    color: #e0e6f0;
+    height: 34px;
+    font-size: 13.5px;
+    padding: 5px 12px;
+    background: #f4f5f7;
+    border: 1px solid #d9dde3;
+    border-radius: 8px;
+    color: #222;
     font-family: inherit;
     outline: none;
-    transition: border-color .15s, background .15s;
+    transition: border-color .15s, background .15s, box-shadow .15s;
 }
-#al-rastr-bar #filtro::placeholder { color: rgba(255,255,255,.4); }
+#al-rastr-bar #filtro::placeholder { color: #9aa1ab; }
 #al-rastr-bar #filtro:focus {
+    border-color: #fab32c;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(250,179,44,.18);
+}
+html.dark-theme #al-rastr-bar #filtro {
+    background: rgba(255,255,255,.08);
+    border-color: rgba(255,255,255,.15);
+    color: #e0e6f0;
+}
+html.dark-theme #al-rastr-bar #filtro::placeholder { color: rgba(255,255,255,.4); }
+html.dark-theme #al-rastr-bar #filtro:focus {
     border-color: rgba(250,179,44,.6);
     background: rgba(255,255,255,.12);
+    box-shadow: none;
 }
 /* Dropdown de resultados */
 #lista-resultados-busca {
@@ -1049,27 +1069,57 @@ html.rastr-bar-fechada #al-rastr-bar {
     top: 100%;
     left: 0;
     right: 0;
-    margin-top: 4px;
+    margin-top: 6px;
     z-index: 10000;
     background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    max-height: 260px;
+    border: 1px solid #e3e6ea;
+    border-radius: 8px;
+    max-height: 320px;
     overflow-y: auto;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.16);
 }
 html.dark-theme #lista-resultados-busca { background: #1e1e2e; border-color: #333; }
-/* Bolinhas de status nos contadores */
+/* Itens do dropdown de busca (mesmo visual da tela do cliente) */
+#lista-resultados-busca .veiculo-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background .12s;
+}
+#lista-resultados-busca .veiculo-item:last-child { border-bottom: none; }
+#lista-resultados-busca .veiculo-item:hover { background: #f7f7f7; }
+#lista-resultados-busca .veiculo-item.ativo { background: #e8f4fd; }
+html.dark-theme #lista-resultados-busca .veiculo-item { border-color: #2a2a3e; }
+html.dark-theme #lista-resultados-busca .veiculo-item:hover { background: #252535; }
+html.dark-theme #lista-resultados-busca .veiculo-item.ativo { background: #1a3a5c; }
+#lista-resultados-busca .v-nome { font-weight: 600; font-size: 13px; color: #222; }
+html.dark-theme #lista-resultados-busca .v-nome { color: #e8eaf0; }
+#lista-resultados-busca .v-placa {
+    display: inline-block;
+    background: #333;
+    color: #fff;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+#lista-resultados-busca .v-status { font-size: 11px; margin-top: 3px; color: #6b7280; }
+html.dark-theme #lista-resultados-busca .v-status { color: #9aa1ab; }
+/* Bolinhas de status (contadores e itens de busca) */
+.dot-online  { color: #27ae60; }
 .dot-moving  { color: #2980b9; }
 .dot-offline { color: #bdc3c7; }
+.dot-lastpos { color: #e67e22; }
 /* Contadores */
 #topbar-counters {
     font-size: 11px;
-    color: rgba(255,255,255,.55);
+    color: #6b7280;
     white-space: nowrap;
     flex-shrink: 0;
     margin-left: auto;
 }
+html.dark-theme #topbar-counters { color: rgba(255,255,255,.55); }
 /* Botão toggle (aba que fica logo abaixo da barra) */
 #topbar-busca-toggle {
     position: fixed;
@@ -1078,11 +1128,11 @@ html.dark-theme #lista-resultados-busca { background: #1e1e2e; border-color: #33
     transform: translateX(-50%);
     width: 44px;
     height: 18px;
-    border: 1px solid #2d3748;
+    border: 1px solid #e3e6ea;
     border-top: none;
     border-radius: 0 0 10px 10px;
-    background: #1e2530;
-    color: rgba(255,255,255,.45);
+    background: #ffffff;
+    color: #9aa1ab;
     font-size: 10px;
     cursor: pointer;
     display: flex;
@@ -1091,8 +1141,15 @@ html.dark-theme #lista-resultados-busca { background: #1e1e2e; border-color: #33
     transition: top .22s ease, color .15s;
     z-index: 9998;
     padding: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,.06);
 }
 #topbar-busca-toggle:hover { color: #fab32c; }
+html.dark-theme #topbar-busca-toggle {
+    border-color: #2d3748;
+    background: #1e2530;
+    color: rgba(255,255,255,.45);
+    box-shadow: none;
+}
 html.al-rastr-ativa.rastr-bar-fechada #topbar-busca-toggle { top: 0; }
 body.modal-open #topbar-busca-toggle { display: none; }
 /* Ajustes de posição: sidebar + topbar descem 40px — só quando a barra global está ativa */
