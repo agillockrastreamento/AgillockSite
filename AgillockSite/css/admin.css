@@ -980,7 +980,7 @@ input:focus, select:focus, textarea:focus {
 #al-rastr-bar {
     position: fixed;
     top: 0;
-    left: 0;
+    left: 240px; /* começa após o sidebar — não fica sobre ele */
     right: 0;
     height: 40px;
     z-index: 9999;
@@ -992,13 +992,16 @@ input:focus, select:focus, textarea:focus {
     gap: 10px;
     padding: 0 14px;
     overflow: visible;
-    transition: height .22s ease, opacity .18s ease;
+    transition: height .22s ease, opacity .18s ease, left .3s ease;
 }
 html.dark-theme #al-rastr-bar {
     background: #1e2530;
     border-bottom-color: #2d3748;
     box-shadow: none;
 }
+/* Acompanha o sidebar recolhido (anti-FOUC inicial + estado em runtime) */
+html.al-sb-collapsed #al-rastr-bar,
+html:has(.admin-sidebar.collapsed) #al-rastr-bar { left: 64px; }
 html.rastr-bar-fechada #al-rastr-bar {
     height: 0;
     opacity: 0;
@@ -1124,7 +1127,7 @@ html.dark-theme #topbar-counters { color: rgba(255,255,255,.55); }
 #topbar-busca-toggle {
     position: fixed;
     top: 40px;
-    left: 50%;
+    left: calc(50% + 120px); /* centralizado sobre a área de conteúdo (após o sidebar) */
     transform: translateX(-50%);
     width: 44px;
     height: 18px;
@@ -1150,14 +1153,14 @@ html.dark-theme #topbar-busca-toggle {
     color: rgba(255,255,255,.45);
     box-shadow: none;
 }
+/* Toggle acompanha o sidebar recolhido */
+html.al-sb-collapsed #topbar-busca-toggle,
+html:has(.admin-sidebar.collapsed) #topbar-busca-toggle { left: calc(50% + 32px); }
 html.al-rastr-ativa.rastr-bar-fechada #topbar-busca-toggle { top: 0; }
 body.modal-open #topbar-busca-toggle { display: none; }
-/* Ajustes de posição: sidebar + topbar descem 40px — só quando a barra global está ativa */
-html.al-rastr-ativa .admin-sidebar {
-    top: 40px;
-    height: calc(100vh - 40px);
-    transition: top .22s ease, height .22s ease;
-}
+/* Ajustes de posição: apenas topbar + conteúdo descem 40px quando a barra
+   global está ativa. O sidebar permanece no topo (a barra começa após ele,
+   não fica mais sobre o sidebar). */
 html.al-rastr-ativa .admin-topbar {
     top: 40px;
     transition: top .22s ease;
@@ -1166,8 +1169,7 @@ html.al-rastr-ativa .admin-content {
     padding-top: calc(80px + 40px);
     transition: padding-top .22s ease;
 }
-/* Quando a barra fecha, tudo volta ao topo */
-html.al-rastr-ativa.rastr-bar-fechada .admin-sidebar  { top: 0; height: 100vh; }
+/* Quando a barra fecha, topbar e conteúdo voltam ao topo */
 html.al-rastr-ativa.rastr-bar-fechada .admin-topbar   { top: 0; }
 html.al-rastr-ativa.rastr-bar-fechada .admin-content  { padding-top: 80px; }
 /* Modais descem para não ficarem sob a barra global */
@@ -1177,7 +1179,9 @@ html.al-rastr-ativa.rastr-bar-fechada .modal-dialog { margin-top: 0; }
     html.al-rastr-ativa .admin-content { padding-top: calc(72px + 40px); }
     html.al-rastr-ativa.rastr-bar-fechada .admin-content { padding-top: 72px; }
     #al-rastr-menu-btn { display: flex; }
-    #topbar-busca-toggle { transform: translateX(-50%); }
+    /* No mobile o sidebar é off-canvas: a barra ocupa toda a largura */
+    #al-rastr-bar { left: 0; }
+    #topbar-busca-toggle { left: 50%; }
     /* No mobile o botão de menu ocupa a esquerda: a busca volta ao fluxo flex */
     #al-rastr-bar #topbar-busca-wrap {
         position: relative;
@@ -1190,8 +1194,13 @@ html.al-rastr-ativa.rastr-bar-fechada .modal-dialog { margin-top: 0; }
     }
 }
 @media (max-width: 991px) and (min-width: 768px) {
-    html.al-rastr-ativa .admin-sidebar { top: 40px; height: calc(100vh - 40px); }
-    html.al-rastr-ativa.rastr-bar-fechada .admin-sidebar { top: 0; height: 100vh; }
+    /* Sidebar tem 200px nesta faixa — a barra acompanha */
+    #al-rastr-bar { left: 200px; }
+    #topbar-busca-toggle { left: calc(50% + 100px); }
+    html.al-sb-collapsed #al-rastr-bar,
+    html:has(.admin-sidebar.collapsed) #al-rastr-bar { left: 64px; }
+    html.al-sb-collapsed #topbar-busca-toggle,
+    html:has(.admin-sidebar.collapsed) #topbar-busca-toggle { left: calc(50% + 32px); }
 }
 
 /* ─── Botão de tema ─────────────────────────────────────────────────────── */
