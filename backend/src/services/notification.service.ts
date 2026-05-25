@@ -921,8 +921,8 @@ class NotificationService {
     const labels: Record<string, string> = {
       ignitionOn:    'Ignição Ligada',
       ignitionOff:   'Ignição Desligada',
-      geofenceEnter: 'Entrada em Cerca',
-      geofenceExit:  'Saída de Cerca',
+      geofenceEnter: 'Entrada em Zona de Segurança',
+      geofenceExit:  'Saída de Zona de Segurança',
       overspeed:     'Excesso de Velocidade',
       powerCut:      'Alimentação Cortada',
       alarm:         'Alarme',
@@ -950,8 +950,14 @@ class NotificationService {
     switch (tipo) {
       case 'ignitionOn':    return `Ignição Ligada: O veículo ${nome} ${p} foi ligado.`;
       case 'ignitionOff':   return `Ignição Desligada: O veículo ${nome} ${p} foi desligado.`;
-      case 'geofenceEnter': return `Zona: O veículo ${nome} ${p} entrou em uma área monitorada.`;
-      case 'geofenceExit':  return `Zona: O veículo ${nome} ${p} saiu de uma área monitorada.`;
+      case 'geofenceEnter': {
+        const zona = dados.geofenceNome ? `: ${dados.geofenceNome}` : '';
+        return `Zona de Segurança: O veículo ${nome} ${p} entrou em uma área monitorada${zona}.`;
+      }
+      case 'geofenceExit': {
+        const zona = dados.geofenceNome ? `: ${dados.geofenceNome}` : '';
+        return `Zona de Segurança: O veículo ${nome} ${p} saiu de uma área monitorada${zona}.`;
+      }
       case 'overspeed':     return `Excesso de Velocidade: O veículo ${nome} ${p} atingiu ${dados.velocidade} km/h (limite: ${dados.limiteConfigurado ?? '—'} km/h).`;
       case 'powerCut':      return `Alerta de Energia: A alimentação do rastreador no veículo ${nome} ${p} foi cortada.`;
       case 'alarm':         return `Alarme: O veículo ${nome} ${p} acionou um alerta${dados.alarme ? ` (${dados.alarme})` : ''}.`;

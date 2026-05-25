@@ -27,8 +27,8 @@ import { SearchBottomSheet } from '../components/SearchBottomSheet';
 const TIPOS_NOTIF = [
   { id: 'ignitionOn', label: 'Ignição Ligada', icon: 'power-plug' },
   { id: 'ignitionOff', label: 'Ignição Desligada', icon: 'power-plug-off' },
-  { id: 'geofenceEnter', label: 'Entrada na Cerca', icon: 'map-marker-radius' },
-  { id: 'geofenceExit', label: 'Saída da Cerca', icon: 'map-marker-remove' },
+  { id: 'geofenceEnter', label: 'Entrada na Zona de Segurança', icon: 'map-marker-radius' },
+  { id: 'geofenceExit', label: 'Saída da Zona de Segurança', icon: 'map-marker-remove' },
   { id: 'overspeed', label: 'Excesso de Velocidade', icon: 'speedometer' },
   { id: 'powerCut', label: 'Alimentação Cortada', icon: 'flash' },
   { id: 'alarm', label: 'Alarme', icon: 'bell-ring' },

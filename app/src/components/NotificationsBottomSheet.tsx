@@ -14,8 +14,8 @@ import type { TrackingDevice } from '../tracking/trackingTypes';
 const EVENTO_TYPES = [
   { tipo: 'ignitionOn', label: 'Ignição Ligada', color: '#27ae60', icon: 'key' },
   { tipo: 'ignitionOff', label: 'Ignição Desligada', color: '#e67e22', icon: 'power-off' },
-  { tipo: 'geofenceEnter', label: 'Entrada na Cerca', color: '#27ae60', icon: 'map-marker-check' },
-  { tipo: 'geofenceExit', label: 'Saída da Cerca', color: '#e67e22', icon: 'map-marker-minus' },
+  { tipo: 'geofenceEnter', label: 'Entrada na Zona de Segurança', color: '#27ae60', icon: 'map-marker-check' },
+  { tipo: 'geofenceExit', label: 'Saída da Zona de Segurança', color: '#e67e22', icon: 'map-marker-minus' },
   { tipo: 'overspeed', label: 'Excesso de Velocidade', color: '#e74c3c', icon: 'speedometer' },
   { tipo: 'powerCut', label: 'Alimentação Cortada', color: '#e74c3c', icon: 'car-battery' },
   { tipo: 'alarm', label: 'Alarme', color: '#e74c3c', icon: 'bell-ring' },

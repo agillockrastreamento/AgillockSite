@@ -114,6 +114,7 @@ async function getGeofenceMeta(traccarId?: number | null) {
     where: { traccarId },
     select: {
       id: true,
+      nome: true,
       origemTipo: true,
       clienteId: true,
       notificarCliente: true,
@@ -122,6 +123,7 @@ async function getGeofenceMeta(traccarId?: number | null) {
   }).catch(() => null);
   const meta = geocerca ? {
     origemId: geocerca.id,
+    geofenceNome: geocerca.nome,
     origemTipo: geocerca.origemTipo,
     clienteId: geocerca.clienteId,
     notificarCliente: geocerca.notificarCliente,
@@ -546,6 +548,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         endereco: enderecoEvento,
         alarme: (norm as any).alarme ?? null,
         geofenceId: evt.geofenceId ?? null,
+        geofenceNome: (evt as any).geofenceNome ?? null,
         origemTipo: (evt as any).origemTipo ?? null,
         origemId: (evt as any).origemId ?? null,
         clienteId: (evt as any).clienteId ?? null,

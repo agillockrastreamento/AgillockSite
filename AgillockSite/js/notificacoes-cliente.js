@@ -4,8 +4,8 @@
   const TIPOS_NOTIF = [
     { id: 'ignitionOn',    label: 'Ignição Ligada',              icon: 'fa-key',                  iconClass: 'ic-ignition' },
     { id: 'ignitionOff',   label: 'Ignição Desligada',           icon: 'fa-power-off',            iconClass: 'ic-ignition' },
-    { id: 'geofenceEnter', label: 'Entrada na Cerca',            icon: 'fa-sign-in',              iconClass: 'ic-geofence' },
-    { id: 'geofenceExit',  label: 'Saída da Cerca',              icon: 'fa-sign-out',             iconClass: 'ic-geofence' },
+    { id: 'geofenceEnter', label: 'Entrada na Zona de Segurança', icon: 'fa-sign-in',              iconClass: 'ic-geofence' },
+    { id: 'geofenceExit',  label: 'Saída da Zona de Segurança',   icon: 'fa-sign-out',             iconClass: 'ic-geofence' },
     { id: 'overspeed',     label: 'Excesso de Velocidade',       icon: 'fa-tachometer',           iconClass: 'ic-speed' },
     { id: 'powerCut',      label: 'Alimentação Cortada',         icon: 'fa-bolt',                 iconClass: 'ic-power' },
     { id: 'alarm',         label: 'Alarme',                      icon: 'fa-exclamation-triangle', iconClass: 'ic-alarm' },

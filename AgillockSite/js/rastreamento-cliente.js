@@ -98,8 +98,8 @@ function _restaurarFocoCliente() {
 const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'ignitionOn',    label: 'Ignição Ligada',              css: 'tipo-ignition' },
   { tipo: 'ignitionOff',   label: 'Ignição Desligada',           css: 'tipo-ignition' },
-  { tipo: 'geofenceEnter', label: 'Entrada na Cerca',            css: 'tipo-geofence' },
-  { tipo: 'geofenceExit',  label: 'Saída da Cerca',              css: 'tipo-geofence' },
+  { tipo: 'geofenceEnter', label: 'Entrada na Zona de Segurança', css: 'tipo-geofence' },
+  { tipo: 'geofenceExit',  label: 'Saída da Zona de Segurança',   css: 'tipo-geofence' },
   { tipo: 'overspeed',     label: 'Excesso de Velocidade',       css: 'tipo-overspeed' },
   { tipo: 'powerCut',      label: 'Alimentação Cortada',         css: 'tipo-alarm' },
   { tipo: 'alarm',         label: 'Alarme',                      css: 'tipo-alarm' },
