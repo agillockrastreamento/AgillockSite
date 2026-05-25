@@ -114,8 +114,10 @@
       return (v.nome || '').toLowerCase().indexOf(qAtual) !== -1 ||
         (v.placa || '').toLowerCase().indexOf(qAtual) !== -1 ||
         (v.identificador || '').toLowerCase().indexOf(qAtual) !== -1 ||
+        (v.marca || '').toLowerCase().indexOf(qAtual) !== -1 ||
+        (v.modeloVeiculo || '').toLowerCase().indexOf(qAtual) !== -1 ||
         ((v.cliente && v.cliente.nome) || '').toLowerCase().indexOf(qAtual) !== -1;
-    }).slice(0, 8);
+    });
 
     if (!filtrados.length) {
       el.innerHTML = '<div style="padding:12px;text-align:center;color:#aaa;font-size:12px">Nenhum resultado.</div>';

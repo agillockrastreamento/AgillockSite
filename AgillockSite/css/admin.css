@@ -1018,9 +1018,12 @@ html.rastr-bar-fechada #al-rastr-bar {
 #al-rastr-menu-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
 /* Campo de busca — escopado dentro da barra global para não afetar outras páginas */
 #al-rastr-bar #topbar-busca-wrap {
-    flex: 1;
-    max-width: 320px;
-    position: relative;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100% - 56px);
+    max-width: 420px;
 }
 #al-rastr-bar #filtro {
     width: 100%;
@@ -1118,6 +1121,16 @@ html.al-rastr-ativa.rastr-bar-fechada .modal-dialog { margin-top: 0; }
     html.al-rastr-ativa.rastr-bar-fechada .admin-content { padding-top: 72px; }
     #al-rastr-menu-btn { display: flex; }
     #topbar-busca-toggle { transform: translateX(-50%); }
+    /* No mobile o botão de menu ocupa a esquerda: a busca volta ao fluxo flex */
+    #al-rastr-bar #topbar-busca-wrap {
+        position: relative;
+        left: auto;
+        top: auto;
+        transform: none;
+        flex: 1;
+        width: auto;
+        max-width: none;
+    }
 }
 @media (max-width: 991px) and (min-width: 768px) {
     html.al-rastr-ativa .admin-sidebar { top: 40px; height: calc(100vh - 40px); }

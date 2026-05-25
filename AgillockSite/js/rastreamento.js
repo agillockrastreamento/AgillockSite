@@ -2499,8 +2499,10 @@ function renderBuscaResultados() {
     v.nome.toLowerCase().includes(filtro) ||
     (v.placa && v.placa.toLowerCase().includes(filtro)) ||
     (v.identificador && v.identificador.toLowerCase().includes(filtro)) ||
+    (v.marca && v.marca.toLowerCase().includes(filtro)) ||
+    (v.modeloVeiculo && v.modeloVeiculo.toLowerCase().includes(filtro)) ||
     (v.cliente?.nome.toLowerCase().includes(filtro))
-  ).slice(0, 8);
+  );
 
   if (!filtrados.length) {
     el.innerHTML = '<div style="padding:12px;text-align:center;color:#aaa;font-size:12px">Nenhum resultado.</div>';
