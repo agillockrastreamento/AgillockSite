@@ -1033,8 +1033,9 @@ html.dark-theme #al-rastr-menu-btn:hover { background: rgba(255,255,255,.08); co
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: calc(100% - 56px);
-    max-width: 680px;
+    /* reserva ~240px de cada lado p/ não cobrir os contadores à direita */
+    width: calc(100% - 480px);
+    max-width: 560px;
 }
 #al-rastr-bar #filtro {
     width: 100%;
