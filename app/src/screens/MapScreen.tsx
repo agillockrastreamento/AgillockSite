@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -44,7 +44,6 @@ import {
 import { apiRequest } from '../services/api/apiClient';
 import {
   getGeofences,
-  deleteGeofence,
   parseCircleArea,
   parsePolygonArea,
   type Geofence,
@@ -198,8 +197,6 @@ export function MapScreen() {
   const [showFences, setShowFences] = useState(false);
   const [showTracks, setShowTracks] = useState(false);
   const [geofences, setGeofences] = useState<Geofence[]>([]);
-  // Incrementado ao remover cerca pelo mapa, para o card recarregar suas cercas.
-  const [geofenceRefreshKey, setGeofenceRefreshKey] = useState(0);
   const [tracks, setTracks] = useState<{ deviceId: string; coords: { latitude: number; longitude: number }[] }[]>([]);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [quickSheetMode, setQuickSheetMode] = useState<QuickSheetMode>('peek');
@@ -855,25 +852,6 @@ export function MapScreen() {
     getGeofences().then(setGeofences).catch(() => {});
   }, []);
 
-  const handleGeofencePress = useCallback(async (geofence: Geofence) => {
-    const confirmed = await confirm.show({
-      title: 'Remover Cerca',
-      message: `Deseja remover a cerca "${geofence.name}"?`,
-      confirmLabel: 'Remover',
-      destructive: true,
-    });
-    if (!confirmed) return;
-    try {
-      await deleteGeofence(geofence.id);
-      setGeofences(current => current.filter(g => g.id !== geofence.id));
-      // Sinaliza ao card do veículo focado para recarregar o estado "Cerca Ativa".
-      setGeofenceRefreshKey(k => k + 1);
-      toast.show({ message: 'Cerca removida!', type: 'success' });
-    } catch {
-      toast.show({ message: 'Não foi possível remover esta cerca.', type: 'error' });
-    }
-  }, [confirm, toast]);
-
   const handleWebSocketMessage = useCallback(
     (position: import('../tracking/trackingWebSocket').WsPosition, dispositivoId: string) => {
       setDevices((current) => updateDeviceFromMessage(current, dispositivoId, position));
@@ -1064,25 +1042,6 @@ export function MapScreen() {
         {showFences && filteredGeofences.map((geofence) => {
           const parsed = parseCircleArea(geofence.area);
           if (!parsed) return null;
-          const center = { latitude: parsed.latitude, longitude: parsed.longitude };
-          return (
-            <Marker
-              key={`fence-tap-${geofence.id}`}
-              coordinate={center}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
-              onPress={() => handleGeofencePress(geofence)}
-            >
-              <View style={styles.geofenceTapTarget}>
-                <Icon source="circle-outline" size={14} color="#2980b9" />
-              </View>
-            </Marker>
-          );
-        })}
-
-        {showFences && filteredGeofences.map((geofence) => {
-          const parsed = parseCircleArea(geofence.area);
-          if (!parsed) return null;
           return (
             <Circle
               key={`fence-circle-${geofence.id}`}
@@ -1100,29 +1059,14 @@ export function MapScreen() {
           // mas precisa desenhar polígonos vindos do web/admin igual ao site.
           const pts = parsePolygonArea(geofence.area);
           if (!pts) return null;
-          const centroide = {
-            latitude: pts.reduce((s, p) => s + p.latitude, 0) / pts.length,
-            longitude: pts.reduce((s, p) => s + p.longitude, 0) / pts.length,
-          };
           return (
-            <Fragment key={`fence-poly-${geofence.id}`}>
-              <Polygon
-                coordinates={pts}
-                strokeWidth={2}
-                strokeColor="rgba(41,128,185,0.8)"
-                fillColor="rgba(41,128,185,0.15)"
-              />
-              <Marker
-                coordinate={centroide}
-                anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={false}
-                onPress={() => handleGeofencePress(geofence)}
-              >
-                <View style={styles.geofenceTapTarget}>
-                  <Icon source="circle-outline" size={14} color="#2980b9" />
-                </View>
-              </Marker>
-            </Fragment>
+            <Polygon
+              key={`fence-poly-${geofence.id}`}
+              coordinates={pts}
+              strokeWidth={2}
+              strokeColor="rgba(41,128,185,0.8)"
+              fillColor="rgba(41,128,185,0.15)"
+            />
           );
         })}
 
@@ -1319,7 +1263,6 @@ export function MapScreen() {
               onRemovePhoto={handleRemovePhoto}
               isUploading={isPhotoUploading}
               onGeofenceCreated={handleGeofenceCreated}
-              geofenceRefreshKey={geofenceRefreshKey}
               onGeofenceDeleted={() => {
                 if (showFences && canVerCerca) getGeofences().then(setGeofences).catch(() => {});
               }}
@@ -1498,17 +1441,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 11,
     fontWeight: '800',
-  },
-  geofenceTapTarget: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(41,128,185,0.6)',
-    elevation: 2,
   },
   trackLoadingBadge: {
     position: 'absolute',

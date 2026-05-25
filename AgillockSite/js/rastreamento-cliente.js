@@ -2944,23 +2944,16 @@ function _criarCamadaCerca(cerca) {
   const parsed = _parsearAreaTraccar(cerca.area);
   if (!parsed) return null;
   const cor = '#27ae60';
-  const opcoes = { color: cor, weight: 2, fillOpacity: 0.08, fillColor: cor };
+  // A cerca é apenas um overlay visual: não recebe eventos de clique/toque
+  // (a exclusão é feita pelo card do dispositivo e pela tela de geocercas).
+  const opcoes = { color: cor, weight: 2, fillOpacity: 0.08, fillColor: cor, interactive: false };
   let camada;
   if (parsed.tipo === 'circle') {
     camada = L.circle([parsed.lat, parsed.lng], { ...opcoes, radius: parsed.raio });
   } else {
     camada = L.polygon(parsed.coords, opcoes);
   }
-  
-  camada.bindTooltip(`<b>${cerca.name || 'Cerca'}</b><br>Clique para remover`, { className: 'cerca-tooltip', sticky: true });
-  
-  camada.on('mouseover', function () { this.setStyle({ fillOpacity: 0.2, weight: 3 }); });
-  camada.on('mouseout', function () { this.setStyle({ fillOpacity: 0.08, weight: 2 }); });
 
-  camada.on('click', function (e) {
-    L.DomEvent.stopPropagation(e);
-    if (confirm(`Remover a cerca "${cerca.name}"?`)) removerCerca(cerca.id);
-  });
   return camada;
 }
 

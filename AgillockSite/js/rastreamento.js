@@ -1667,31 +1667,20 @@ function _criarCamadaCerca(cerca) {
   if (!geo) return null;
   let camada;
   const cor = '#27ae60';
+  // A cerca é apenas um overlay visual: não recebe eventos de clique/toque
+  // (a exclusão é feita pelo card do dispositivo e pela tela de geocercas).
   if (geo.tipo === 'circulo') {
     camada = L.circle([geo.lat, geo.lng], {
       radius: geo.raio, color: cor, fillColor: cor,
-      fillOpacity: 0.08, weight: 2, dashArray: '6,4',
+      fillOpacity: 0.08, weight: 2, dashArray: '6,4', interactive: false,
     });
   } else {
     camada = L.polygon(geo.pontos, {
       color: cor, fillColor: cor,
-      fillOpacity: 0.08, weight: 2, dashArray: '6,4',
+      fillOpacity: 0.08, weight: 2, dashArray: '6,4', interactive: false,
     });
   }
-  
-  camada.bindTooltip(`<b>${cerca.name || 'Cerca'}</b><br>Clique para remover`, { sticky: true, className: 'cerca-tooltip' });
-  
-  // Efeito de hover
-  camada.on('mouseover', function () { this.setStyle({ fillOpacity: 0.2, weight: 3 }); });
-  camada.on('mouseout', function () { this.setStyle({ fillOpacity: 0.08, weight: 2 }); });
 
-  camada.on('click', function (e) {
-    L.DomEvent.stopPropagation(e);
-    if (confirm(`Remover cerca "${cerca.name || cerca.id}"?`)) {
-      removerCerca(cerca.id);
-    }
-  });
-  
   return camada;
 }
 
