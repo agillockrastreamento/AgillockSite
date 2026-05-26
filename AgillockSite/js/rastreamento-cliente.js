@@ -2395,10 +2395,11 @@ function _renderOciosoHojeCliente(id) {
   const el = document.getElementById(`dcard-ocioso-hoje-${id}`);
   if (!el) return;
   const min = _ociosoHojeClienteCache[id];
-  if (min == null) { el.innerHTML = ''; return; }
+  // Só exibe o banner quando houve tempo ocioso (esconde também enquanto carrega).
+  if (!min) { el.innerHTML = ''; return; }
   const rotulo = `${min} ${min === 1 ? 'MINUTO' : 'MINUTOS'} DE MOTOR OCIOSO`;
   el.innerHTML = `
-    <div style="margin-top:10px;background:#f0ad4e;color:#fff;border-radius:6px;padding:8px 6px;text-align:center;font-weight:700;font-size:11px;text-transform:uppercase;box-shadow:0 2px 4px rgba(0,0,0,.15);line-height:1.3">
+    <div style="margin-top:8px;color:#f0ad4e;text-align:center;font-weight:700;font-size:11px;text-transform:uppercase;line-height:1.3">
       <i class="fa fa-clock-o"></i> ${rotulo}
     </div>`;
 }

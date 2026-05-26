@@ -2738,10 +2738,11 @@ function _renderOciosoHojeAdmin(dispositivoId) {
   const alvo = document.getElementById(`dcard-ocioso-hoje-${dispositivoId}`);
   if (!alvo) return;
   const min = _ociosoHojeCache[dispositivoId];
-  if (min == null) { alvo.innerHTML = ''; return; }
+  // Só exibe o banner quando houve tempo ocioso (esconde também enquanto carrega).
+  if (!min) { alvo.innerHTML = ''; return; }
   const rotulo = `${min} ${min === 1 ? 'MINUTO' : 'MINUTOS'} DE MOTOR OCIOSO`;
   alvo.innerHTML = `
-    <div style="margin-top:10px;background:#f0ad4e;color:#fff;border-radius:6px;padding:8px 6px;text-align:center;font-weight:700;font-size:11px;text-transform:uppercase;box-shadow:0 2px 4px rgba(0,0,0,.15);line-height:1.3">
+    <div style="margin-top:8px;color:#f0ad4e;text-align:center;font-weight:700;font-size:11px;text-transform:uppercase;line-height:1.3">
       <i class="fa fa-clock-o"></i> ${rotulo}
     </div>`;
   _posicionarBotaoTrayAtributos();
