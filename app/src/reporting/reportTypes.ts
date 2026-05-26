@@ -9,10 +9,20 @@ export interface ReportPosition {
   deviceId?: string;
 }
 
+export interface OciosoSegmento {
+  inicio: string;
+  fim: string;
+  latitude: number;
+  longitude: number;
+  duracaoMin: number;
+  deviceId?: number | string;
+}
+
 export interface HistoricoResponse {
   dispositivo?: string;
   total?: number;
   posicoes: ReportPosition[];
+  ociosos?: OciosoSegmento[];
 }
 
 export interface Viagem {

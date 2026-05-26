@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { ActivityIndicator, Icon, Portal } from 'react-native-paper';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Icon } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { BottomSheet } from './BottomSheet';
@@ -556,52 +556,50 @@ export function NotificationsBottomSheet({
           />
         )}
 
-        <Portal>
-          <Modal
-            visible={typePickerVisible}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setTypePickerVisible(false)}
-          >
+        {/* Overlay "Filtrar por tipo" — renderizado dentro do próprio BottomSheet
+            (View absoluta), em vez de um Modal aninhado. Evita o cenário frágil de
+            "modal sobre modal" no iOS, onde o segundo Modal pode não abrir. Os
+            "checkboxes" são ícones do Material + Pressable (multiplataforma). */}
+        {typePickerVisible ? (
+          <View style={styles.typeOverlay}>
             <Pressable
-              style={styles.modalBackdrop}
+              style={styles.typeOverlayBackdrop}
               onPress={() => setTypePickerVisible(false)}
-            >
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Filtrar por tipo</Text>
-                <Pressable style={styles.applyBtn} onPress={applyTypeFilter}>
-                  <Text style={styles.applyBtnText}>Aplicar</Text>
-                </Pressable>
-                <ScrollView style={styles.typeList} showsVerticalScrollIndicator={false}>
-                  {EVENTO_TYPES.map((t) => (
-                    <Pressable
-                      key={t.tipo}
-                      style={styles.typeItem}
-                      onPress={() => handleTypeToggle(t.tipo)}
-                    >
-                      <Icon
-                        source={
-                          selectedTypes.has(t.tipo)
-                            ? 'checkbox-marked'
-                            : 'checkbox-blank-outline'
-                        }
-                        size={20}
-                        color={selectedTypes.has(t.tipo) ? t.color : colors.textMuted}
-                      />
-                      <View
-                        style={[styles.typeColorDot, { backgroundColor: t.color }]}
-                      />
-                      <Icon source={t.icon} size={16} color={t.color} />
-                      <Text style={[styles.typeItemText, { color: t.color }]}>
-                        {t.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            </Pressable>
-          </Modal>
-        </Portal>
+            />
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Filtrar por tipo</Text>
+              <Pressable style={styles.applyBtn} onPress={applyTypeFilter}>
+                <Text style={styles.applyBtnText}>Aplicar</Text>
+              </Pressable>
+              <ScrollView style={styles.typeList} showsVerticalScrollIndicator={false}>
+                {EVENTO_TYPES.map((t) => (
+                  <Pressable
+                    key={t.tipo}
+                    style={styles.typeItem}
+                    onPress={() => handleTypeToggle(t.tipo)}
+                  >
+                    <Icon
+                      source={
+                        selectedTypes.has(t.tipo)
+                          ? 'checkbox-marked'
+                          : 'checkbox-blank-outline'
+                      }
+                      size={20}
+                      color={selectedTypes.has(t.tipo) ? t.color : colors.textMuted}
+                    />
+                    <View
+                      style={[styles.typeColorDot, { backgroundColor: t.color }]}
+                    />
+                    <Icon source={t.icon} size={16} color={t.color} />
+                    <Text style={[styles.typeItemText, { color: t.color }]}>
+                      {t.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        ) : null}
 
         <SearchBottomSheet
           visible={searchSheetVisible}
@@ -894,11 +892,24 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  typeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  typeOverlayBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     width: '80%',

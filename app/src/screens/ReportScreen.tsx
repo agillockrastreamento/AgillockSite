@@ -38,12 +38,14 @@ import type {
   Evento,
   ExportType,
   HistoricoResponse,
+  OciosoSegmento,
   Parada,
   ReportPeriodo,
   ReportTab,
   Resumo,
   Viagem,
 } from '../reporting/reportTypes';
+import { IDLE_ALERT_LIMIT_MIN, useIdleAlertBitmap } from '../reporting/idleAlert';
 import { getTrackingSnapshot } from '../tracking/trackingService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
@@ -247,6 +249,22 @@ function RouteTab({
     [paradas],
   );
 
+  // Pontos onde o motor ficou ocioso (ligado + parado) acima do limite.
+  const idleMarkers = useMemo(
+    () =>
+      (historico?.ociosos ?? [])
+        .filter((o: OciosoSegmento) => Number(o.duracaoMin) > IDLE_ALERT_LIMIT_MIN)
+        .map((o) => ({
+          lat: Number(o.latitude),
+          lon: Number(o.longitude),
+          label: `${fmtHora(o.inicio)} - ${fmtHora(o.fim)} · ${fmtDuracao(o.duracaoMin)}`,
+        }))
+        .filter((o) => Number.isFinite(o.lat) && Number.isFinite(o.lon)),
+    [historico],
+  );
+
+  const { bitmap: idleBitmap, offscreen: idleOffscreen } = useIdleAlertBitmap();
+
   // Capture vehicle icon bitmap for map markers
   useEffect(() => {
     setVehicleBitmap(null);
@@ -383,6 +401,7 @@ function RouteTab({
   return (
     <View style={{ flex: 1 }}>
       {offscreenPool}
+      {idleOffscreen}
       <View style={styles.routeContainer}>
         <MapView
           ref={mapRef}
@@ -453,6 +472,17 @@ function RouteTab({
               />
             ),
           )}
+          {idleMarkers.map((o, i) => (
+            <Marker
+              key={`idle-${i}`}
+              coordinate={{ latitude: o.lat, longitude: o.lon }}
+              title="Motor ocioso"
+              description={o.label}
+              anchor={{ x: 0.5, y: 1 }}
+              zIndex={5}
+              {...(idleBitmap ? { image: { uri: idleBitmap } } : { pinColor: '#f0ad4e' })}
+            />
+          ))}
           {playerActive && playerPos ? (
             vehicleBitmap ? (
               <MarkerAnimated

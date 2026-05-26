@@ -89,9 +89,19 @@ function Speedometer({ speed, limit }: { speed: number; limit: number }) {
   const ey = (45 - 30 * Math.sin(ang)).toFixed(1);
   const cor = limit && v > limit ? '#e74c3c' : v > 80 ? '#f39c12' : '#27ae60';
   const tr = '#e9ecef';
+  // O react-native-svg às vezes desenha o arco com a geometria errada no
+  // primeiro paint (a listra fica "fora" do velocímetro) e só se ajusta quando
+  // o `d` muda. Forçamos um remount do Path no próximo frame para redesenhar.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const arcD = `M 10 45 A 30 30 0 ${f > 0.5 ? 1 : 0} 1 ${ex} ${ey}`;
   const arc = f > 0.01 ? (
     <Path
-      d={`M 10 45 A 30 30 0 ${f > 0.5 ? 1 : 0} 1 ${ex} ${ey}`}
+      key={`${ready ? 1 : 0}-${arcD}`}
+      d={arcD}
       fill="none"
       stroke={cor}
       strokeWidth="7"
@@ -198,6 +208,8 @@ export function MainVehicleCard({
     tempo: string;
     viagens: string;
   } | null>(null);
+  // Tempo de motor ocioso (ligado + parado) hoje, em minutos.
+  const [ociosoMin, setOciosoMin] = useState<number | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [recurrences, setRecurrences] = useState<any[]>(device._recorrencias || []);
@@ -236,6 +248,20 @@ export function MainVehicleCard({
       });
     } catch {
       setSummary({ km: '—', velMax: '—', tempo: '—', viagens: '0' });
+    }
+  }, [device.dispositivoId]);
+
+  const fetchOcioso = useCallback(async () => {
+    try {
+      const agora = new Date();
+      const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString();
+      const fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59).toISOString();
+      const data = await apiRequest<{ totalMinutos?: number }>(
+        `/cliente/rastreamento/dispositivos/${device.dispositivoId}/ocioso?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`
+      );
+      setOciosoMin(Number(data?.totalMinutos) || 0);
+    } catch {
+      setOciosoMin(0);
     }
   }, [device.dispositivoId]);
 
@@ -278,9 +304,10 @@ export function MainVehicleCard({
     // (resgate usa JWT de role RESGATE) para evitar 401 que desautentica a sessão.
     if (modoResgate) return;
     fetchSummary();
+    fetchOcioso();
     fetchRecurrences();
     fetchRecorrenciasData();
-  }, [modoResgate, fetchSummary, fetchRecurrences, fetchRecorrenciasData]);
+  }, [modoResgate, fetchSummary, fetchOcioso, fetchRecurrences, fetchRecorrenciasData]);
 
   useEffect(() => {
     if (modoResgate) return;
@@ -738,6 +765,11 @@ export function MainVehicleCard({
                 <SummaryItem label="Viagens" value={summary.viagens} />
               </View>
             )}
+            {ociosoMin ? (
+              <Text style={styles.ociosoText}>
+                {ociosoMin} {ociosoMin === 1 ? 'MINUTO' : 'MINUTOS'} DE MOTOR OCIOSO
+              </Text>
+            ) : null}
             <Pressable style={styles.verMaisBtn} onPress={onVerMais}>
               <Icon source="history" size={14} color="#fff" />
               <Text style={styles.verMaisText}>Ver Histórico</Text>
@@ -1097,6 +1129,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  ociosoText: {
+    marginTop: spacing.sm,
+    color: '#f0ad4e',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    textTransform: 'uppercase',
   },
   verMaisBtn: {
     marginTop: spacing.md,

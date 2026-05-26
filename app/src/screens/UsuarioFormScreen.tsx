@@ -319,7 +319,16 @@ export function UsuarioFormScreen() {
                   style={styles.permRow}
                   onPress={() => toggleDispositivo(d.id)}
                 >
-                  <Switch value={marcado} onValueChange={() => toggleDispositivo(d.id)} />
+                  {/* Switch é apenas visual; o toque é tratado pelo Pressable da linha
+                      (evita toggle duplo no Android). Cores explícitas p/ consistência iOS/Android. */}
+                  <View pointerEvents="none">
+                    <Switch
+                      value={marcado}
+                      trackColor={{ false: colors.border, true: colors.primary }}
+                      thumbColor="#fff"
+                      ios_backgroundColor={colors.border}
+                    />
+                  </View>
                   <Text style={styles.permLabel}>
                     {nome}
                     {sub}
@@ -338,7 +347,14 @@ export function UsuarioFormScreen() {
             return (
               <View key={tela} style={styles.permGrupo}>
                 <Pressable style={styles.permGrupoHeader} onPress={() => togglePermissao(tela, 'ver')}>
-                  <Switch value={ativa} onValueChange={() => togglePermissao(tela, 'ver')} />
+                  <View pointerEvents="none">
+                    <Switch
+                      value={ativa}
+                      trackColor={{ false: colors.border, true: colors.primary }}
+                      thumbColor="#fff"
+                      ios_backgroundColor={colors.border}
+                    />
+                  </View>
                   <Text style={styles.permGrupoLabel}>{grupo.label}</Text>
                 </Pressable>
                 {ativa
@@ -348,10 +364,14 @@ export function UsuarioFormScreen() {
                         style={styles.permRowChild}
                         onPress={() => togglePermissao(tela, key)}
                       >
-                        <Switch
-                          value={!!permissoes[tela]?.[key]}
-                          onValueChange={() => togglePermissao(tela, key)}
-                        />
+                        <View pointerEvents="none">
+                          <Switch
+                            value={!!permissoes[tela]?.[key]}
+                            trackColor={{ false: colors.border, true: colors.primary }}
+                            thumbColor="#fff"
+                            ios_backgroundColor={colors.border}
+                          />
+                        </View>
                         <Text style={styles.permLabel}>{label}</Text>
                       </Pressable>
                     ))

@@ -78,7 +78,6 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const MAIN_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.60);
 const MAIN_CARD_PEEK_HEIGHT = 76; // mostra apenas alça + header (nome/placa + X)
 const MAP_PREFERENCES_KEY = 'agillock_map_preferences_v1';
-const MAPA_ATIVO_KEY = 'agillock_mapa_ativo_v1';
 const CLUSTER_PX = 40;
 const SPIDER_RADIUS_PX = 55;
 
@@ -264,23 +263,17 @@ export function MapScreen() {
     ).catch(() => {});
   }, [showLabels, showFences, showTracks]);
 
+  // O app sempre abre no Mapa 1 — não restauramos nem persistimos o último mapa
+  // visto (decisão de produto). O flag apenas libera os efeitos que dependem de
+  // troca de mapa pelo usuário; mantido assíncrono (microtask) para não disparar
+  // no mount inicial.
   useEffect(() => {
     let cancelled = false;
-    AsyncStorage.getItem(MAPA_ATIVO_KEY)
-      .then((raw) => {
-        if (cancelled) return;
-        const n = Number(raw);
-        if (n === 2) setMapaAtivo(2);
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) mapaAtivoHydrated.current = true; });
+    Promise.resolve().then(() => {
+      if (!cancelled) mapaAtivoHydrated.current = true;
+    });
     return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => {
-    if (!mapaAtivoHydrated.current) return;
-    AsyncStorage.setItem(MAPA_ATIVO_KEY, String(mapaAtivo)).catch(() => {});
-  }, [mapaAtivo]);
 
   // Quando o mapa ativo muda, fecha o card se o veículo selecionado pertencer ao outro mapa
   // e reposiciona o zoom para os veículos do novo mapa.

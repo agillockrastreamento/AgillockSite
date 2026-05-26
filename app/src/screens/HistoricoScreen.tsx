@@ -16,6 +16,8 @@ import { apiRequest } from '../services/api/apiClient';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import type { RootStackParamList } from '../navigation/routes';
+import { IDLE_ALERT_LIMIT_MIN, useIdleAlertBitmap } from '../reporting/idleAlert';
+import type { OciosoSegmento } from '../reporting/reportTypes';
 
 type RouteProps = NativeStackScreenProps<RootStackParamList, 'Historico'>['route'];
 
@@ -96,6 +98,8 @@ export function HistoricoScreen() {
   const [period, setPeriod] = useState<Period>('hoje');
   const [viagens, setViagens] = useState<Viagem[]>([]);
   const [positions, setPositions] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [ociosos, setOciosos] = useState<OciosoSegmento[]>([]);
+  const { bitmap: idleBitmap, offscreen: idleOffscreen } = useIdleAlertBitmap();
   const [selectedTrip, setSelectedTrip] = useState<number | null>(null);
   const [tripPositions, setTripPositions] = useState<{ latitude: number; longitude: number }[]>([]);
   const [isLoadingTrip, setIsLoadingTrip] = useState(false);
@@ -118,13 +122,18 @@ export function HistoricoScreen() {
         apiRequest<Viagem[]>(
           `/cliente/rastreamento/dispositivos/${dispositivoId}/viagens?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
         ).catch(() => [] as Viagem[]),
-        apiRequest<{ posicoes: { latitude: number; longitude: number }[] }>(
+        apiRequest<{ posicoes: { latitude: number; longitude: number }[]; ociosos?: OciosoSegmento[] }>(
           `/cliente/rastreamento/dispositivos/${dispositivoId}/historico?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-        ).catch(() => ({ posicoes: [] })),
+        ).catch(() => ({ posicoes: [], ociosos: [] })),
       ]);
       setViagens(tripsData ?? []);
       const pos = (histData?.posicoes ?? []).filter(isValidCoordinate);
       setPositions(pos);
+      setOciosos(
+        (histData?.ociosos ?? []).filter(
+          (o) => Number(o.duracaoMin) > IDLE_ALERT_LIMIT_MIN && isValidCoordinate(o),
+        ),
+      );
       if (pos.length > 1) {
         setTimeout(() => {
           mapRef.current?.fitToCoordinates(pos, {
@@ -185,7 +194,18 @@ export function HistoricoScreen() {
             </Marker>
           </>
         )}
+        {ociosos.map((o, i) => (
+          <Marker
+            key={`idle-${i}`}
+            coordinate={{ latitude: o.latitude, longitude: o.longitude }}
+            title="Motor ocioso"
+            description={`${fmtTime(o.inicio)} - ${fmtTime(o.fim)} · ${fmtDur(o.duracaoMin)}`}
+            anchor={{ x: 0.5, y: 1 }}
+            {...(idleBitmap ? { image: { uri: idleBitmap } } : { pinColor: '#f0ad4e' })}
+          />
+        ))}
       </MapView>
+      {idleOffscreen}
       {positions.length === 0 && !isLoading && (
         <View style={styles.mapEmpty} pointerEvents="none">
           <Icon source="map-marker-off-outline" size={32} color={colors.textMuted} />
