@@ -263,6 +263,84 @@ export function calcularMetricasPeriodo(posicoes: TraccarPosition[]): MetricasPe
   return { distanciaMetros, horasMotorMs, velocidadeMaximaNos: temVelocidade ? velocidadeMaximaNos : null };
 }
 
+export interface SegmentoOcioso {
+  inicio: string;       // ISO
+  fim: string;          // ISO
+  latitude: number;
+  longitude: number;
+  duracaoMs: number;
+}
+
+// Considera o veículo "parado" (para fins de ociosidade) quando o atributo
+// `motion` indica parado. Se o protocolo do rastreador não enviar `motion`,
+// usamos a velocidade como fallback (< 3 km/h ≈ parado).
+function posicaoParada(posicao: TraccarPosition): boolean {
+  const motion = posicao.attributes?.motion;
+  if (typeof motion === 'boolean') return motion === false;
+  const kmh = Number(posicao.speed) * 1.852;
+  return Number.isFinite(kmh) ? kmh < 3 : true;
+}
+
+// Tempo ocioso = motor ligado (ignição) com o veículo parado. Retorna o total
+// (ms) e os segmentos contíguos de ociosidade — usados para marcar os pontos
+// ociosos no mapa do relatório. Cada segmento aponta para o local onde o
+// veículo ficou parado com o motor ligado.
+export function calcularOciosidade(posicoes: TraccarPosition[]): { totalMs: number; segmentos: SegmentoOcioso[] } {
+  if (posicoes.length < 2) return { totalMs: 0, segmentos: [] };
+
+  const ordenadas = [...posicoes].sort((a, b) => {
+    const ta = parsePositionTime(a)?.getTime() ?? 0;
+    const tb = parsePositionTime(b)?.getTime() ?? 0;
+    return ta - tb;
+  });
+
+  let totalMs = 0;
+  const segmentos: SegmentoOcioso[] = [];
+  let atual: { inicioMs: number; fimMs: number; latitude: number; longitude: number; duracaoMs: number } | null = null;
+
+  const fecharSegmento = () => {
+    if (!atual) return;
+    segmentos.push({
+      inicio: new Date(atual.inicioMs).toISOString(),
+      fim: new Date(atual.fimMs).toISOString(),
+      latitude: atual.latitude,
+      longitude: atual.longitude,
+      duracaoMs: atual.duracaoMs,
+    });
+    atual = null;
+  };
+
+  for (let i = 1; i < ordenadas.length; i += 1) {
+    const anterior = ordenadas[i - 1];
+    const tAnterior = parsePositionTime(anterior);
+    const tAtual = parsePositionTime(ordenadas[i]);
+    if (!tAnterior || !tAtual) { fecharSegmento(); continue; }
+
+    const deltaMs = tAtual.getTime() - tAnterior.getTime();
+    if (deltaMs <= 0 || deltaMs > MAX_ENGINE_INTERVAL_MS) { fecharSegmento(); continue; }
+
+    const ocioso = anterior.attributes?.ignition === true && posicaoParada(anterior);
+    if (!ocioso) { fecharSegmento(); continue; }
+
+    totalMs += deltaMs;
+    if (!atual) {
+      atual = {
+        inicioMs: tAnterior.getTime(),
+        fimMs: tAtual.getTime(),
+        latitude: anterior.latitude,
+        longitude: anterior.longitude,
+        duracaoMs: deltaMs,
+      };
+    } else {
+      atual.fimMs = tAtual.getTime();
+      atual.duracaoMs += deltaMs;
+    }
+  }
+  fecharSegmento();
+
+  return { totalMs, segmentos };
+}
+
 function aplicarVelocidadeMaximaPeriodo<T extends { maxSpeed: number }>(
   base: T,
   metricas: MetricasPeriodo,

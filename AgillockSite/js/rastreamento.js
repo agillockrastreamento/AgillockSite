@@ -60,6 +60,8 @@ const _detalheDispositivoPendentes = {};
 const _detalheAtributosThrottle = {};
 const _resumoHojeCache = {};
 const _resumoHojePendentes = {};
+const _ociosoHojeCache = {};
+const _ociosoHojePendentes = {};
 const _manutencoesAdminCache = {};
 const _manutencoesAdminPendentes = {};
 const _manutencoesDataAdminCache = {};
@@ -2731,6 +2733,42 @@ function _carregarResumoHojeAdmin(dispositivoId) {
     });
 }
 
+// Banner "X MINUTOS DE MOTOR OCIOSO" — tempo de motor ligado com o veículo parado.
+function _renderOciosoHojeAdmin(dispositivoId) {
+  const alvo = document.getElementById(`dcard-ocioso-hoje-${dispositivoId}`);
+  if (!alvo) return;
+  const min = _ociosoHojeCache[dispositivoId];
+  if (min == null) { alvo.innerHTML = ''; return; }
+  const rotulo = `${min} ${min === 1 ? 'MINUTO' : 'MINUTOS'} DE MOTOR OCIOSO`;
+  alvo.innerHTML = `
+    <div style="margin-top:10px;background:#f0ad4e;color:#fff;border-radius:6px;padding:8px 6px;text-align:center;font-weight:700;font-size:11px;text-transform:uppercase;box-shadow:0 2px 4px rgba(0,0,0,.15);line-height:1.3">
+      <i class="fa fa-clock-o"></i> ${rotulo}
+    </div>`;
+  _posicionarBotaoTrayAtributos();
+}
+
+function _carregarOciosoHojeAdmin(dispositivoId) {
+  if (_ociosoHojeCache[dispositivoId] != null) {
+    _renderOciosoHojeAdmin(dispositivoId);
+    return;
+  }
+  if (_ociosoHojePendentes[dispositivoId]) return;
+  _ociosoHojePendentes[dispositivoId] = true;
+  const { inicio, fim } = _intervaloHoje();
+  window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/ocioso?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`)
+    .then(data => {
+      _ociosoHojeCache[dispositivoId] = Number(data?.totalMinutos) || 0;
+      _renderOciosoHojeAdmin(dispositivoId);
+    })
+    .catch(() => {
+      _ociosoHojeCache[dispositivoId] = 0;
+      _renderOciosoHojeAdmin(dispositivoId);
+    })
+    .finally(() => {
+      delete _ociosoHojePendentes[dispositivoId];
+    });
+}
+
 // ── Card do dispositivo (flutuante sobre o mapa) ──────────────────────────────
 
 function _buildManutencoesAdminHtml(dispositivoId) {
@@ -3054,6 +3092,7 @@ function mostrarCardDispositivo(id) {
         <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
           <div class= "dcard-section-title-title">RESUMO DE HOJE</div>
           <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
+          <div id="dcard-ocioso-hoje-${id}"></div>
           <div style="margin-top:10px">
             <a href="${_urlDetalheRastreamentoAdmin(v.dispositivoId)}" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;width:100%;text-align:center;">
               <i class="fa fa-history"></i> Ver Mais
@@ -3067,6 +3106,7 @@ function mostrarCardDispositivo(id) {
   _aplicarEstadoTrayAtributos();
   _posicionarBotaoTrayAtributos();
   _carregarResumoHojeAdmin(id);
+  _carregarOciosoHojeAdmin(id);
   _carregarManutencoesCardAdmin(id);
   _carregarManutencoesDataCardAdmin(id);
 

@@ -45,6 +45,8 @@ let modoFoco = false;
 const _geocodeCache = {};
 const _resumoHojeClienteCache = {};
 const _resumoHojeClientePendentes = {};
+const _ociosoHojeClienteCache = {};
+const _ociosoHojeClientePendentes = {};
 const CLIENT_FOCUS_STORAGE_KEY = 'rastreamento_cliente_foco';
 const _focusOffsetPx = 0;
 const _eventPopupOffsetPx = 60;
@@ -2388,6 +2390,41 @@ function _carregarResumoHojeCliente(id) {
     });
 }
 
+// Banner "X MINUTOS DE MOTOR OCIOSO" — tempo de motor ligado com o veículo parado.
+function _renderOciosoHojeCliente(id) {
+  const el = document.getElementById(`dcard-ocioso-hoje-${id}`);
+  if (!el) return;
+  const min = _ociosoHojeClienteCache[id];
+  if (min == null) { el.innerHTML = ''; return; }
+  const rotulo = `${min} ${min === 1 ? 'MINUTO' : 'MINUTOS'} DE MOTOR OCIOSO`;
+  el.innerHTML = `
+    <div style="margin-top:10px;background:#f0ad4e;color:#fff;border-radius:6px;padding:8px 6px;text-align:center;font-weight:700;font-size:11px;text-transform:uppercase;box-shadow:0 2px 4px rgba(0,0,0,.15);line-height:1.3">
+      <i class="fa fa-clock-o"></i> ${rotulo}
+    </div>`;
+}
+
+function _carregarOciosoHojeCliente(id) {
+  if (_ociosoHojeClienteCache[id] != null) {
+    _renderOciosoHojeCliente(id);
+    return;
+  }
+  if (_ociosoHojeClientePendentes[id]) return;
+  _ociosoHojeClientePendentes[id] = true;
+  const { inicio, fim } = _intervaloHojeCliente();
+  AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/ocioso?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`)
+    .then(data => {
+      _ociosoHojeClienteCache[id] = Number(data?.totalMinutos) || 0;
+      _renderOciosoHojeCliente(id);
+    })
+    .catch(() => {
+      _ociosoHojeClienteCache[id] = 0;
+      _renderOciosoHojeCliente(id);
+    })
+    .finally(() => {
+      delete _ociosoHojeClientePendentes[id];
+    });
+}
+
 function _carregarKmConfig(id) {
   const v = veiculosMap[id]; if (!v) return;
   if (v._recorrenciasCarregadas) return;
@@ -2539,6 +2576,7 @@ function mostrarCardDispositivo(id) {
       <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
         <div class= "dcard-section-title-title">RESUMO DE HOJE</div>
         <div id="dcard-resumo-hoje-${id}"><div style="font-size:11px;color:#999;text-align:center;padding:6px 0">Carregando...</div></div>
+        <div id="dcard-ocioso-hoje-${id}"></div>
         <div style="margin-top:10px">
           <button onclick="abrirOverlay('${id}', 'historico')" class="btn btn-xs btn-warning" style="font-weight:700;padding:7px 4px;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.15);border:none;text-transform:uppercase;font-size:10px;width:100%;text-align:center;">
             <i class="fa fa-history"></i> Ver Mais
@@ -2554,6 +2592,7 @@ function mostrarCardDispositivo(id) {
   _ajustarAlturaCardDispositivo();
   if (p && !hasCached) geocodificarCoordenadas(p.latitude, p.longitude, addrId);
   _carregarResumoHojeCliente(id);
+  _carregarOciosoHojeCliente(id);
 
   // Verifica cercas para ativar o botão visualmente (só se tem permissão)
   if (!window.AL_CLIENTE?.can || window.AL_CLIENTE.can('rastreamento.verCerca')) {

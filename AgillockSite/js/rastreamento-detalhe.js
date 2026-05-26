@@ -7,6 +7,7 @@ let marcadorInicio = null;
 let marcadorFim = null;
 let marcadorAtual = null;
 let marcadoresParadaLayer = null;
+let marcadoresOciosoLayer = null;
 let routePlayerControl = null;
 let routePlayerMarker = null;
 let routePlayerTimer = null;
@@ -289,7 +290,7 @@ async function carregarDados() {
     window._veiculoDetalhe = veiculo || resHistorico.dispositivo || {};
 
     renderInfoVeiculo(veiculo, resHistorico.dispositivo);
-    renderMapa(historicoCache, veiculo?.posicao, paradas || []);
+    renderMapa(historicoCache, veiculo?.posicao, paradas || [], resHistorico.ociosos || []);
     renderStats(viagens || []);
     renderViagens(viagens || []);
   } catch (err) {
@@ -342,11 +343,12 @@ function limparMapa() {
     if (l) map.removeLayer(l);
   });
   if (marcadoresParadaLayer) marcadoresParadaLayer.clearLayers();
+  if (marcadoresOciosoLayer) marcadoresOciosoLayer.clearLayers();
   polylineRota = polylineDestaque = marcadorInicio = marcadorFim = marcadorAtual = null;
   setRoutePlayerPath([]);
 }
 
-function renderMapa(posicoes, posicaoAtual, paradas) {
+function renderMapa(posicoes, posicaoAtual, paradas, ociosos) {
   const validas = posicoes.filter(p => p.valida !== false && p.latitude && p.longitude);
   setRoutePlayerPath(validas);
 
@@ -400,6 +402,7 @@ function renderMapa(posicoes, posicaoAtual, paradas) {
   }
 
   renderMarcadoresParada(paradas || []);
+  renderMarcadoresOcioso(ociosos || []);
   map.fitBounds(polylineRota.getBounds().pad(0.15));
 }
 
@@ -424,6 +427,34 @@ function renderMarcadoresParada(paradas) {
     L.marker([lat, lng], { icon: criarIconeParada(), zIndexOffset: 700 })
       .bindPopup(`<b>Parada</b><br>${fmtHora(p.inicio || p.startTime)} - ${fmtHora(p.fim || p.endTime)}<br>${fmtDuracao(duracao)}`)
       .addTo(marcadoresParadaLayer);
+  });
+}
+
+// Limite (minutos) a partir do qual a ociosidade vira alerta no mapa.
+const OCIOSO_LIMITE_MIN = 5;
+
+function criarIconeOcioso() {
+  return L.divIcon({
+    className: 'ocioso-marker-icon',
+    html: '<i class="fa fa-exclamation-triangle" style="color:#f0ad4e;font-size:26px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff,0 1px 2px rgba(0,0,0,.5)"></i>',
+    iconSize: [28, 28],
+    iconAnchor: [14, 24],
+    popupAnchor: [0, -22],
+  });
+}
+
+// Marca os pontos onde o motor ficou ocioso (ligado e parado) acima do limite.
+function renderMarcadoresOcioso(ociosos) {
+  if (!marcadoresOciosoLayer) marcadoresOciosoLayer = L.layerGroup().addTo(map);
+  marcadoresOciosoLayer.clearLayers();
+  (ociosos || []).forEach(function (o) {
+    if (!(Number(o.duracaoMin) > OCIOSO_LIMITE_MIN)) return;
+    const lat = Number(o.latitude);
+    const lng = Number(o.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    L.marker([lat, lng], { icon: criarIconeOcioso(), zIndexOffset: 800 })
+      .bindPopup(`<b>Motor ocioso</b><br>${fmtHora(o.inicio)} - ${fmtHora(o.fim)}<br>${fmtDuracao(o.duracaoMin)}`)
+      .addTo(marcadoresOciosoLayer);
   });
 }
 

@@ -34,6 +34,7 @@ import {
   aplicarResumoComMedidores,
   aplicarViagensComMedidores,
   aplicarParadasComMedidores,
+  calcularOciosidade,
 } from '../services/medidores.service';
 
 const router = Router();
@@ -271,10 +272,21 @@ router.get('/dispositivos/:id/historico', requireRoles('ADMIN', 'COLABORADOR'), 
 
   const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate);
 
+  // Segmentos ociosos (motor ligado + parado) para marcar os pontos no mapa do histórico.
+  const ociosos = calcularOciosidade(historico).segmentos.map(s => ({
+    deviceId: traccarDevice.id,
+    inicio: s.inicio,
+    fim: s.fim,
+    latitude: s.latitude,
+    longitude: s.longitude,
+    duracaoMin: Math.round(s.duracaoMs / 60000),
+  }));
+
   res.json({
     dispositivo: { id: dispositivo.id, nome: dispositivo.nome, placa: dispositivo.placa },
     total: historico.length,
     posicoes: historico.map(p => decorarPosicaoComMedidores(dispositivo, p)),
+    ociosos,
   });
 });
 
@@ -413,6 +425,40 @@ router.get('/dispositivos/:id/resumo', requireRoles('ADMIN', 'COLABORADOR'), asy
     velocidadeMedia: Math.round(r.averageSpeed * 1.852),
     velocidadeMaxima: Math.round(r.maxSpeed * 1.852),
     horasMotor: Math.round((r.engineHours || 0) / 3600000 * 10) / 10,
+  });
+});
+
+// ── GET /api/rastreamento/dispositivos/:id/ocioso ─────────────────────────────
+// Tempo de motor ocioso (ligado com o veículo parado) no período.
+router.get('/dispositivos/:id/ocioso', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+
+  const dispositivo = await prisma.dispositivo.findUnique({
+    where: { id },
+    select: { id: true, identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado com o rastreador.' }); return; }
+
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to) : new Date();
+
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
+  const { totalMs, segmentos } = calcularOciosidade(historico);
+
+  res.json({
+    totalMinutos: Math.round(totalMs / 60000),
+    segmentos: segmentos.map(s => ({
+      inicio: s.inicio,
+      fim: s.fim,
+      latitude: s.latitude,
+      longitude: s.longitude,
+      duracaoMin: Math.round(s.duracaoMs / 60000),
+    })),
   });
 });
 
@@ -923,7 +969,19 @@ router.get('/relatorios/batch/historico', requireRoles('ADMIN', 'COLABORADOR'), 
     const localPorIdentificador = new Map(dispositivosLocal.map(d => [d.identificador, d]));
 
     const historico = await traccarGetPositionHistory(ids, fromDate, toDate);
-    
+
+    // Segmentos ociosos (motor ligado + parado) por dispositivo, para marcar no mapa do relatório.
+    const ociosos = ids.flatMap(deviceId =>
+      calcularOciosidade(historico.filter(p => p.deviceId === deviceId)).segmentos.map(s => ({
+        deviceId,
+        inicio: s.inicio,
+        fim: s.fim,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        duracaoMin: Math.round(s.duracaoMs / 60000),
+      })),
+    );
+
     res.json({
       dispositivos: dispositivosLocal,
       posicoes: historico.map(p => ({
@@ -933,6 +991,7 @@ router.get('/relatorios/batch/historico', requireRoles('ADMIN', 'COLABORADOR'), 
           p,
         ),
       })),
+      ociosos,
     });
   } catch (err: unknown) {
     res.status(502).json({ error: `Erro ao buscar histórico: ${err}` });

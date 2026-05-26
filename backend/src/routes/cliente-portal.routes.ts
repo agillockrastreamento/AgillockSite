@@ -42,6 +42,7 @@ import {
   aplicarResumoComMedidores,
   aplicarViagensComMedidores,
   aplicarParadasComMedidores,
+  calcularOciosidade,
 } from '../services/medidores.service';
 import { CLIENTE_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
@@ -425,10 +426,21 @@ router.get('/rastreamento/dispositivos/:id/historico', async (req: ClienteReques
   const toDate = to ? new Date(to) : new Date();
   const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate);
 
+  // Segmentos ociosos (motor ligado + parado) para marcar os pontos no mapa do relatório.
+  const ociosos = calcularOciosidade(historico).segmentos.map(s => ({
+    deviceId: traccarDevice.id,
+    inicio: s.inicio,
+    fim: s.fim,
+    latitude: s.latitude,
+    longitude: s.longitude,
+    duracaoMin: Math.round(s.duracaoMs / 60000),
+  }));
+
   res.json({
     dispositivo: { id: dispositivo.id, nome: dispositivo.nome, placa: dispositivo.placa, categoria: dispositivo.categoria },
     total: historico.length,
     posicoes: historico.map(p => decorarPosicaoComMedidores(dispositivo, p)),
+    ociosos,
   });
 });
 
@@ -669,6 +681,42 @@ router.get('/rastreamento/dispositivos/:id/resumo', async (req: ClienteRequest, 
   });
 });
 
+// ── GET /api/cliente/rastreamento/dispositivos/:id/ocioso ────────────────────
+// Tempo de motor ocioso (ligado com o veículo parado) no período.
+router.get('/rastreamento/dispositivos/:id/ocioso', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'id');
+  const from = query(req.query.from);
+  const to = query(req.query.to);
+
+  if (await verificarBloqueio(clienteId)) { res.status(403).json({ error: 'acesso_bloqueado' }); return; }
+
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: { id: dispositivoId, ativo: true, ...whereDispositivosDoCliente(req) },
+    select: { id: true, identificador: true },
+  });
+  if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' }); return; }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (!traccarDevice) { res.status(404).json({ error: 'Dispositivo não sincronizado.' }); return; }
+
+  const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to) : new Date();
+  const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
+  const { totalMs, segmentos } = calcularOciosidade(historico);
+
+  res.json({
+    totalMinutos: Math.round(totalMs / 60000),
+    segmentos: segmentos.map(s => ({
+      inicio: s.inicio,
+      fim: s.fim,
+      latitude: s.latitude,
+      longitude: s.longitude,
+      duracaoMin: Math.round(s.duracaoMs / 60000),
+    })),
+  });
+});
+
 router.get('/rastreamento/relatorios/batch/historico', async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const { from, to } = req.query as { from?: string; to?: string };
@@ -681,6 +729,19 @@ router.get('/rastreamento/relatorios/batch/historico', async (req: ClienteReques
     const localPorIdentificador = new Map(dispositivos.map(d => [d.identificador, d]));
     const identificadorPorTraccarId = new Map(traccarDevices.map(d => [d.id, d.uniqueId]));
     const historico = await traccarGetPositionHistory(traccarIds, new Date(from), new Date(to));
+
+    // Segmentos ociosos (motor ligado + parado) por dispositivo, para marcar no mapa do relatório.
+    const ociosos = traccarIds.flatMap(deviceId =>
+      calcularOciosidade(historico.filter(p => p.deviceId === deviceId)).segmentos.map(s => ({
+        deviceId,
+        inicio: s.inicio,
+        fim: s.fim,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        duracaoMin: Math.round(s.duracaoMs / 60000),
+      })),
+    );
+
     res.json({
       dispositivos,
       posicoes: historico.map(p => ({
@@ -690,6 +751,7 @@ router.get('/rastreamento/relatorios/batch/historico', async (req: ClienteReques
           p,
         ),
       })),
+      ociosos,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
