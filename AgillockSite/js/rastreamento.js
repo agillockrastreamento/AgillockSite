@@ -2733,17 +2733,19 @@ function _carregarResumoHojeAdmin(dispositivoId) {
     });
 }
 
-// Banner "X MINUTOS DE MOTOR OCIOSO" — tempo de motor ligado com o veículo parado.
+// Cards de motor ocioso (motor ligado + veículo parado) — pontos com mais de
+// 5 min ociosos e tempo total ocioso de hoje.
 function _renderOciosoHojeAdmin(dispositivoId) {
   const alvo = document.getElementById(`dcard-ocioso-hoje-${dispositivoId}`);
   if (!alvo) return;
-  const min = _ociosoHojeCache[dispositivoId];
-  // Só exibe o banner quando houve tempo ocioso (esconde também enquanto carrega).
-  if (!min) { alvo.innerHTML = ''; return; }
-  const rotulo = `${min} ${min === 1 ? 'MINUTO' : 'MINUTOS'} DE MOTOR OCIOSO`;
+  const dados = _ociosoHojeCache[dispositivoId];
+  // Enquanto carrega (cache indefinido) não renderiza nada.
+  if (!dados) { alvo.innerHTML = ''; return; }
+  const min = dados.minutos;
   alvo.innerHTML = `
-    <div style="margin-top:8px;color:#f0ad4e;text-align:center;font-weight:700;font-size:11px;text-transform:uppercase;line-height:1.3">
-      <i class="fa fa-clock-o"></i> ${rotulo}
+    <div class="dcard-summary-grid">
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${dados.paradas}</div><div class="dcard-summary-lbl">Pontos Ocioso &gt; 5min</div></div>
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${min ? `${min} min` : '—'}</div><div class="dcard-summary-lbl">Tempo Motor Ocioso</div></div>
     </div>`;
   _posicionarBotaoTrayAtributos();
 }
@@ -2758,11 +2760,13 @@ function _carregarOciosoHojeAdmin(dispositivoId) {
   const { inicio, fim } = _intervaloHoje();
   window.AL.apiGet(`/api/rastreamento/dispositivos/${dispositivoId}/ocioso?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`)
     .then(data => {
-      _ociosoHojeCache[dispositivoId] = Number(data?.totalMinutos) || 0;
+      const segs = Array.isArray(data?.segmentos) ? data.segmentos : [];
+      const paradas = segs.filter(s => (Number(s.duracaoMin) || 0) > 5).length;
+      _ociosoHojeCache[dispositivoId] = { minutos: Number(data?.totalMinutos) || 0, paradas };
       _renderOciosoHojeAdmin(dispositivoId);
     })
     .catch(() => {
-      _ociosoHojeCache[dispositivoId] = 0;
+      _ociosoHojeCache[dispositivoId] = { minutos: 0, paradas: 0 };
       _renderOciosoHojeAdmin(dispositivoId);
     })
     .finally(() => {

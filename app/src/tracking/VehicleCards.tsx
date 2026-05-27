@@ -208,8 +208,9 @@ export function MainVehicleCard({
     tempo: string;
     viagens: string;
   } | null>(null);
-  // Tempo de motor ocioso (ligado + parado) hoje, em minutos.
+  // Motor ocioso (ligado + parado) hoje: tempo total (min) e pontos com >5min.
   const [ociosoMin, setOciosoMin] = useState<number | null>(null);
+  const [ociosoParadas, setOciosoParadas] = useState<number | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [recurrences, setRecurrences] = useState<any[]>(device._recorrencias || []);
@@ -256,12 +257,15 @@ export function MainVehicleCard({
       const agora = new Date();
       const inicio = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).toISOString();
       const fim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59).toISOString();
-      const data = await apiRequest<{ totalMinutos?: number }>(
+      const data = await apiRequest<{ totalMinutos?: number; segmentos?: { duracaoMin?: number }[] }>(
         `/cliente/rastreamento/dispositivos/${device.dispositivoId}/ocioso?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`
       );
       setOciosoMin(Number(data?.totalMinutos) || 0);
+      const segs = Array.isArray(data?.segmentos) ? data.segmentos : [];
+      setOciosoParadas(segs.filter(s => (Number(s.duracaoMin) || 0) > 5).length);
     } catch {
       setOciosoMin(0);
+      setOciosoParadas(0);
     }
   }, [device.dispositivoId]);
 
@@ -763,13 +767,10 @@ export function MainVehicleCard({
                 <SummaryItem label="Vel. Máxima" value={summary.velMax} />
                 <SummaryItem label="Em Movimento" value={summary.tempo} />
                 <SummaryItem label="Viagens" value={summary.viagens} />
+                <SummaryItem label="Pontos Ocioso > 5min" value={ociosoParadas == null ? '—' : String(ociosoParadas)} />
+                <SummaryItem label="Tempo Motor Ocioso" value={ociosoMin ? `${ociosoMin} min` : '—'} />
               </View>
             )}
-            {ociosoMin ? (
-              <Text style={styles.ociosoText}>
-                {ociosoMin} {ociosoMin === 1 ? 'MINUTO' : 'MINUTOS'} DE MOTOR OCIOSO
-              </Text>
-            ) : null}
             <Pressable style={styles.verMaisBtn} onPress={onVerMais}>
               <Icon source="history" size={14} color="#fff" />
               <Text style={styles.verMaisText}>Ver Histórico</Text>
@@ -1129,14 +1130,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.textMuted,
     marginTop: 2,
-  },
-  ociosoText: {
-    marginTop: spacing.sm,
-    color: '#f0ad4e',
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
-    textTransform: 'uppercase',
   },
   verMaisBtn: {
     marginTop: spacing.md,

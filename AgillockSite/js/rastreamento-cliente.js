@@ -2390,17 +2390,19 @@ function _carregarResumoHojeCliente(id) {
     });
 }
 
-// Banner "X MINUTOS DE MOTOR OCIOSO" — tempo de motor ligado com o veículo parado.
+// Cards de motor ocioso (motor ligado + veículo parado) — pontos com mais de
+// 5 min ociosos e tempo total ocioso de hoje.
 function _renderOciosoHojeCliente(id) {
   const el = document.getElementById(`dcard-ocioso-hoje-${id}`);
   if (!el) return;
-  const min = _ociosoHojeClienteCache[id];
-  // Só exibe o banner quando houve tempo ocioso (esconde também enquanto carrega).
-  if (!min) { el.innerHTML = ''; return; }
-  const rotulo = `${min} ${min === 1 ? 'MINUTO' : 'MINUTOS'} DE MOTOR OCIOSO`;
+  const dados = _ociosoHojeClienteCache[id];
+  // Enquanto carrega (cache indefinido) não renderiza nada.
+  if (!dados) { el.innerHTML = ''; return; }
+  const min = dados.minutos;
   el.innerHTML = `
-    <div style="margin-top:8px;color:#f0ad4e;text-align:center;font-weight:700;font-size:11px;text-transform:uppercase;line-height:1.3">
-      <i class="fa fa-clock-o"></i> ${rotulo}
+    <div class="dcard-summary-grid">
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${dados.paradas}</div><div class="dcard-summary-lbl">Pontos Ocioso &gt; 5min</div></div>
+      <div class="dcard-summary-stat"><div class="dcard-summary-val">${min ? `${min} min` : '—'}</div><div class="dcard-summary-lbl">Tempo Motor Ocioso</div></div>
     </div>`;
 }
 
@@ -2414,11 +2416,13 @@ function _carregarOciosoHojeCliente(id) {
   const { inicio, fim } = _intervaloHojeCliente();
   AL_CLIENTE.apiGet(`/api/cliente/rastreamento/dispositivos/${id}/ocioso?from=${encodeURIComponent(inicio)}&to=${encodeURIComponent(fim)}`)
     .then(data => {
-      _ociosoHojeClienteCache[id] = Number(data?.totalMinutos) || 0;
+      const segs = Array.isArray(data?.segmentos) ? data.segmentos : [];
+      const paradas = segs.filter(s => (Number(s.duracaoMin) || 0) > 5).length;
+      _ociosoHojeClienteCache[id] = { minutos: Number(data?.totalMinutos) || 0, paradas };
       _renderOciosoHojeCliente(id);
     })
     .catch(() => {
-      _ociosoHojeClienteCache[id] = 0;
+      _ociosoHojeClienteCache[id] = { minutos: 0, paradas: 0 };
       _renderOciosoHojeCliente(id);
     })
     .finally(() => {
