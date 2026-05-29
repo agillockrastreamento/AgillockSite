@@ -59,7 +59,13 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F5A623"
+        }
+      ],
       [
         "expo-image-picker",
         {
