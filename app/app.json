@@ -30,6 +30,7 @@
     },
     "android": {
       "package": "br.com.agillock.cliente",
+      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyB9TMJqElRRY2DV2cADIj-Lo-2iqCQ_W5Y"

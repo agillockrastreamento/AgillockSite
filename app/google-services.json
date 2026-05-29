@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "828483658123",
+    "project_id": "agillock",
+    "storage_bucket": "agillock.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:828483658123:android:fd8bf2f24df7e004064f8e",
+        "android_client_info": {
+          "package_name": "br.com.agillock.cliente"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCB4tTWY2nPSuXSUTtU_wXqfGfOSCaYnPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
