@@ -884,11 +884,7 @@ export function MapScreen() {
 
   const handleUploadPhoto = useCallback(async () => {
     if (!selectedDevice) return;
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      toast.show({ message: 'Permita acesso às fotos para escolher a imagem do veículo.', type: 'error' });
-      return;
-    }
+    // O seletor de fotos do sistema (Android/iOS) não exige permissão de mídia.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,

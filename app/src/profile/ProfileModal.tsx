@@ -123,15 +123,7 @@ export function ProfileModal({
   }, [initialProfile, onProfileUpdated, toast, visible]);
 
   async function handlePickAvatar() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      toast.show({
-        message: 'Permita acesso às fotos para escolher o avatar.',
-        type: 'error',
-      });
-      return;
-    }
-
+    // O seletor de fotos do sistema (Android/iOS) não exige permissão de mídia.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,

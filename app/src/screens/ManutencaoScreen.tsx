@@ -362,11 +362,7 @@ export function ManutencaoScreen() {
   };
 
   const pickFotos = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      toast.show({ message: 'Permita acesso às fotos para anexar imagens.', type: 'error' });
-      return;
-    }
+    // O seletor de fotos do sistema (Android/iOS) não exige permissão de mídia.
     const remaining = 5 - form.fotos.length;
     if (remaining <= 0) {
       toast.show({ message: 'Máximo de 5 fotos por registro.', type: 'error' });
