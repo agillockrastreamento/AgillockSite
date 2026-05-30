@@ -29,6 +29,8 @@ export type TrackingDevice = {
   nome: string;
   placa: string | null;
   categoria: string | null;
+  /** Apelido do veículo definido pelo cliente (via web). Opcional. */
+  apelidoCliente?: string | null;
   imagemUrlCliente: string | null;
   marca: string | null;
   modeloVeiculo: string | null;

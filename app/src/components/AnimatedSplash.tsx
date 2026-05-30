@@ -3,7 +3,7 @@ import { Animated, Image, StyleSheet, View } from 'react-native';
 
 import { colors } from '../theme/colors';
 
-const splashImage = require('../../assets/agillock_new_symbol.png');
+const splashImage = require('../../assets/agillock_symbol_amber.png');
 
 type Props = {
   onFinish?: () => void;

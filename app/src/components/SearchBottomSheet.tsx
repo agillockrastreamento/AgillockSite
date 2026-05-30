@@ -31,17 +31,22 @@ function SearchCard({
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
-      <View style={[styles.cardPhoto, { backgroundColor: statusColor + '20' }]}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.photo} />
-        ) : (
-          <VehicleIcon
-            categoria={device.categoria}
-            color={statusColor}
-            course={device.posicao?.curso}
-            size={54}
-          />
-        )}
+      <View style={styles.cardPhotoCol}>
+        <View style={[styles.cardPhoto, { backgroundColor: statusColor + '20' }]}>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.photo} />
+          ) : (
+            <VehicleIcon
+              categoria={device.categoria}
+              color={statusColor}
+              course={device.posicao?.curso}
+              size={54}
+            />
+          )}
+        </View>
+        {device.apelidoCliente ? (
+          <Text style={styles.cardApelido} numberOfLines={1}>{device.apelidoCliente}</Text>
+        ) : null}
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardName} numberOfLines={1}>
@@ -59,7 +64,7 @@ export function SearchBottomSheet({
   visible,
   devices,
   title = 'Pesquisar veículo',
-  searchPlaceholder = 'Buscar por nome ou placa...',
+  searchPlaceholder = 'Buscar por nome, placa ou apelido...',
   onClose,
   onSelectDevice,
 }: SearchBottomSheetProps) {
@@ -72,7 +77,8 @@ export function SearchBottomSheet({
     return devices.filter(
       (d) =>
         d.nome.toLowerCase().includes(q) ||
-        (d.placa?.toLowerCase().includes(q) ?? false),
+        (d.placa?.toLowerCase().includes(q) ?? false) ||
+        (d.apelidoCliente?.toLowerCase().includes(q) ?? false),
     );
   }, [devices, query]);
 
@@ -190,6 +196,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  cardPhotoCol: {
+    width: 60,
+    alignItems: 'center',
+    gap: 3,
+  },
   cardPhoto: {
     width: 60,
     height: 60,
@@ -197,6 +208,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  cardApelido: {
+    maxWidth: 64,
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   photo: {
     width: 60,

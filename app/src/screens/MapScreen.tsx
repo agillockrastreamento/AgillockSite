@@ -1065,6 +1065,10 @@ export function MapScreen() {
 
         {showTracks && tracks.map((track) => {
           if (!track.coords || track.coords.length < 2) return null;
+          // Com um veículo focado, mostra o rastro apenas dele; sem foco, mostra de todos.
+          if (mainCardVisible && selectedDevice && track.deviceId !== selectedDevice.dispositivoId) {
+            return null;
+          }
           return (
             <Polyline
               key={track.deviceId}
@@ -1243,6 +1247,11 @@ export function MapScreen() {
                 {selectedDevice.nome}{selectedDevice.placa ? ` — ${selectedDevice.placa}` : ''}
               </Text>
             </Pressable>
+            {selectedDevice.apelidoCliente ? (
+              <Text style={styles.mainCardApelido} numberOfLines={1}>
+                {selectedDevice.apelidoCliente}
+              </Text>
+            ) : null}
             <IconButton icon="close" size={22} onPress={closeMainCard} />
           </View>
           <ScrollView
@@ -1648,6 +1657,13 @@ const styles = StyleSheet.create({
   mainCardTitle: {
     color: colors.text,
     fontSize: 15,
+    fontWeight: '800',
+  },
+  mainCardApelido: {
+    maxWidth: 120,
+    marginRight: spacing.xs,
+    color: colors.primary,
+    fontSize: 13,
     fontWeight: '800',
   },
 });

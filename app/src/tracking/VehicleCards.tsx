@@ -152,7 +152,12 @@ export function QuickVehicleCard({
       style={[styles.quickCard, selected && styles.quickCardSelected]}
       onPress={onPress}
     >
-      <VehiclePhoto device={device} size={60} />
+      <View style={styles.quickPhotoCol}>
+        <VehiclePhoto device={device} size={60} />
+        {device.apelidoCliente ? (
+          <Text style={styles.apelidoText} numberOfLines={1}>{device.apelidoCliente}</Text>
+        ) : null}
+      </View>
       <View style={styles.quickBody}>
         <Text style={styles.quickName} numberOfLines={1}>{device.nome}</Text>
         <Text style={styles.quickMeta} numberOfLines={1}>{device.placa ?? 'Sem placa'}</Text>
@@ -832,6 +837,18 @@ const styles = StyleSheet.create({
   quickCardSelected: {
     borderColor: colors.primary,
     backgroundColor: '#fff7e3',
+  },
+  quickPhotoCol: {
+    width: 60,
+    alignItems: 'center',
+    gap: 3,
+  },
+  apelidoText: {
+    maxWidth: 64,
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   quickBody: {
     flex: 1,
