@@ -25,8 +25,10 @@
         "NSLocationWhenInUseUsageDescription": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos.",
         "NSFaceIDUsageDescription": "A AgilLock usa o Face ID / Touch ID para permitir um login mais rápido e seguro.",
         "NSBluetoothAlwaysUsageDescription": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate.",
-        "NSBluetoothPeripheralUsageDescription": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate."
-      }
+        "NSBluetoothPeripheralUsageDescription": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "2"
     },
     "android": {
       "package": "br.com.agillock.cliente",
@@ -37,22 +39,26 @@
         }
       },
       "permissions": [
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE",
-        "USE_BIOMETRIC",
-        "USE_FINGERPRINT",
-        "BLUETOOTH_SCAN",
-        "BLUETOOTH_CONNECT"
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -91,7 +97,9 @@
         {
           "isBackgroundEnabled": false,
           "neverForLocation": false,
-          "modes": ["central"],
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate."
         }
       ]

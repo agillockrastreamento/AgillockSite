@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <!-- Anti-FOUC: aplica tema escuro antes de renderizar -->
+    <script>if (localStorage.getItem('al-theme') === 'dark') document.documentElement.classList.add('dark-theme');</script>
+
+    <meta charset="utf-8">
+    <link href="favicon.ico" rel="icon" type="image/x-icon">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Política de Privacidade do aplicativo AgilLock — saiba como tratamos seus dados pessoais conforme a LGPD.">
+    <meta name="robots" content="index, follow">
+
+    <title>Política de Privacidade — AgilLock</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 4.7 (CDN) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,600,700" rel="stylesheet">
+
+    <style>
+        :root {
+            --al-bg:          #ffffff;
+            --al-bg-alt:      #f8f8f8;
+            --al-text:        #333333;
+            --al-text-muted:  #666666;
+            --al-heading:     #222222;
+            --al-card-bg:     #ffffff;
+            --al-card-border: #e5e5e5;
+            --al-accent:      #f5a623;
+            --al-shadow:      0 4px 18px rgba(0,0,0,0.07);
+        }
+        html.dark-theme {
+            --al-bg:          #111111;
+            --al-bg-alt:      #181818;
+            --al-text:        #d8d8d8;
+            --al-text-muted:  #9a9a9a;
+            --al-heading:     #f0f0f0;
+            --al-card-bg:     #1c1c1c;
+            --al-card-border: #2a2a2a;
+            --al-accent:      #ffcc00;
+            --al-shadow:      0 4px 18px rgba(0,0,0,0.4);
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Montserrat', Arial, sans-serif;
+            background-color: var(--al-bg);
+            color: var(--al-text);
+            margin: 0;
+            line-height: 1.7;
+            transition: background-color .3s ease, color .3s ease;
+        }
+
+        /* Cabeçalho */
+        .pp-header {
+            background: #111111;
+            text-align: center;
+            padding: 28px 16px;
+            position: relative;
+        }
+        .pp-header img { height: 54px; width: auto; }
+        .btn-tema {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: transparent;
+            border: 1px solid rgba(255,204,0,0.6);
+            color: #ffcc00;
+            border-radius: 22px;
+            padding: 6px 14px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all .25s ease;
+        }
+        .btn-tema:hover { background: rgba(255,204,0,0.12); }
+
+        /* Conteúdo */
+        .pp-wrap {
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 40px 20px 80px;
+        }
+        .pp-card {
+            background: var(--al-card-bg);
+            border: 1px solid var(--al-card-border);
+            border-radius: 12px;
+            box-shadow: var(--al-shadow);
+            padding: 36px 34px;
+        }
+        .pp-wrap h1 {
+            color: var(--al-heading);
+            font-weight: 700;
+            font-size: 28px;
+            margin: 0 0 6px;
+        }
+        .pp-updated {
+            color: var(--al-text-muted);
+            font-size: 14px;
+            margin-bottom: 28px;
+            display: block;
+        }
+        .pp-wrap h2 {
+            color: var(--al-heading);
+            font-weight: 700;
+            font-size: 19px;
+            margin: 34px 0 12px;
+            padding-left: 12px;
+            border-left: 4px solid var(--al-accent);
+        }
+        .pp-wrap h3 {
+            color: var(--al-heading);
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0 8px;
+        }
+        .pp-wrap p, .pp-wrap li { color: var(--al-text); font-size: 15px; }
+        .pp-wrap ul { padding-left: 22px; }
+        .pp-wrap li { margin-bottom: 7px; }
+        .pp-wrap a { color: var(--al-accent); text-decoration: none; }
+        .pp-wrap a:hover { text-decoration: underline; }
+        .pp-wrap strong { color: var(--al-heading); }
+
+        /* Tabela de permissões */
+        .pp-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0;
+            font-size: 14px;
+        }
+        .pp-table th, .pp-table td {
+            border: 1px solid var(--al-card-border);
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .pp-table th { background: var(--al-bg-alt); color: var(--al-heading); }
+
+        .pp-note {
+            background: var(--al-bg-alt);
+            border: 1px solid var(--al-card-border);
+            border-left: 4px solid var(--al-accent);
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+        .pp-back {
+            display: inline-block;
+            margin-bottom: 22px;
+            color: var(--al-text-muted);
+            font-size: 14px;
+        }
+        .pp-contact { line-height: 2; }
+        @media (max-width: 600px) {
+            .pp-card { padding: 24px 18px; }
+            .pp-wrap h1 { font-size: 23px; }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="pp-header">
+        <img src="img/logo_agillock_white_new.png" alt="AgilLock">
+        <button class="btn-tema" id="btnTema" type="button"><i class="fa fa-moon-o"></i> Tema</button>
+    </header>
+
+    <div class="pp-wrap">
+        <a href="index.html" class="pp-back"><i class="fa fa-angle-left"></i> Voltar ao site</a>
+
+        <div class="pp-card">
+            <h1>Política de Privacidade</h1>
+            <span class="pp-updated">Última atualização: 29 de maio de 2026</span>
+
+            <p>Esta Política de Privacidade descreve como o aplicativo <strong>AgilLock</strong> (“aplicativo”, “nós”)
+            coleta, usa, armazena e protege os dados pessoais dos usuários (“você”), em conformidade com a
+            <strong>Lei Geral de Proteção de Dados — LGPD (Lei nº 13.709/2018)</strong>. Ao utilizar o aplicativo,
+            você concorda com as práticas aqui descritas.</p>
+
+            <div class="pp-note">
+                <strong>Controlador dos dados:</strong> LEANDRO PONTES PIMENTA LTDA — CNPJ 28.424.364/0001-05,
+                que opera sob a marca AgilLock. Em caso de dúvidas, utilize os canais na seção
+                <a href="#contato">Contato</a>.
+            </div>
+
+            <h2>1. Quais dados coletamos</h2>
+
+            <h3>Dados de cadastro e conta</h3>
+            <ul>
+                <li>Nome, e-mail e senha de acesso;</li>
+                <li>CPF ou CNPJ, telefone e dados de identificação (pessoa física ou jurídica);</li>
+                <li>Foto de perfil (quando enviada por você).</li>
+            </ul>
+
+            <h3>Dados de veículos e rastreamento</h3>
+            <ul>
+                <li>Placas e informações dos veículos vinculados à sua conta;</li>
+                <li>Posições de GPS, histórico de trajetos, velocidade, status de ignição e alertas/eventos;</li>
+                <li>Fotos de veículos e comprovantes que você optar por enviar.</li>
+            </ul>
+
+            <h3>Dados de localização do dispositivo</h3>
+            <p>Usamos a localização do seu dispositivo <strong>somente enquanto o app está em uso</strong>, para
+            centralizar o mapa e facilitar a visualização dos veículos próximos. Não rastreamos sua localização em
+            segundo plano.</p>
+
+            <h3>Dados financeiros</h3>
+            <ul>
+                <li>Boletos, carnês, parcelas e informações de cobrança relacionadas aos serviços contratados.</li>
+            </ul>
+
+            <h3>Dados técnicos e de notificação</h3>
+            <ul>
+                <li>Identificador de notificações push (token do dispositivo) para envio de alertas;</li>
+                <li>Informações técnicas do dispositivo necessárias ao funcionamento e à segurança do serviço.</li>
+            </ul>
+
+            <h2>2. Permissões do dispositivo e finalidade</h2>
+            <p>O aplicativo solicita as permissões abaixo, sempre com finalidade específica. Você pode revogá-las
+            a qualquer momento nas configurações do seu dispositivo.</p>
+            <table class="pp-table">
+                <thead>
+                    <tr><th>Permissão</th><th>Para que usamos</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Localização (em uso)</td><td>Centralizar o mapa e mostrar veículos próximos</td></tr>
+                    <tr><td>Câmera</td><td>Enviar fotos de perfil, de veículos e de comprovantes</td></tr>
+                    <tr><td>Fotos / Galeria</td><td>Selecionar imagens para perfil, veículos ou comprovantes</td></tr>
+                    <tr><td>Bluetooth</td><td>Localizar tags Bluetooth de veículos em operações de resgate</td></tr>
+                    <tr><td>Biometria (Face ID / Touch ID / digital)</td><td>Login mais rápido e seguro</td></tr>
+                    <tr><td>Notificações</td><td>Enviar alertas e avisos importantes</td></tr>
+                </tbody>
+            </table>
+
+            <div class="pp-note">
+                <strong>Biometria:</strong> a autenticação por Face ID, Touch ID ou impressão digital é processada
+                <strong>localmente pelo seu dispositivo</strong>. Os seus dados biométricos <strong>não são
+                transmitidos nem armazenados</strong> em nossos servidores.
+            </div>
+
+            <h2>3. Como usamos os dados</h2>
+            <ul>
+                <li>Autenticar seu acesso e manter sua conta segura;</li>
+                <li>Prestar o serviço de rastreamento, monitoramento e gestão da frota;</li>
+                <li>Exibir mapas, histórico, relatórios e enviar alertas/notificações;</li>
+                <li>Gerenciar cobranças, boletos e carnês;</li>
+                <li>Cumprir obrigações legais e prevenir fraudes.</li>
+            </ul>
+
+            <h2>4. Base legal (LGPD)</h2>
+            <p>Tratamos seus dados com base em: execução de contrato, cumprimento de obrigação legal/regulatória,
+            legítimo interesse para segurança e prevenção a fraudes e, quando aplicável, no seu consentimento
+            (por exemplo, ao conceder permissões de câmera, localização e notificações).</p>
+
+            <h2>5. Compartilhamento de dados</h2>
+            <p>Não vendemos seus dados pessoais. Podemos compartilhá-los apenas com:</p>
+            <ul>
+                <li>Provedores de infraestrutura e do serviço de GPS necessários ao funcionamento do app;</li>
+                <li>Serviços de envio de notificações push (Apple Push Notification service e Google Firebase Cloud Messaging);</li>
+                <li>Instituições e meios de pagamento, para emissão e liquidação de boletos;</li>
+                <li>Autoridades competentes, quando exigido por lei ou ordem judicial.</li>
+            </ul>
+
+            <h2>6. Armazenamento e segurança</h2>
+            <p>Adotamos medidas técnicas e organizacionais para proteger seus dados, incluindo conexões
+            criptografadas (HTTPS/TLS), armazenamento seguro de credenciais no dispositivo (armazenamento seguro
+            do sistema operacional) e controles de acesso. Apesar dos esforços, nenhum método de transmissão ou
+            armazenamento é 100% seguro.</p>
+
+            <h2>7. Retenção dos dados</h2>
+            <p>Mantemos seus dados pelo tempo necessário para prestar os serviços e cumprir obrigações legais.
+            Após esse período, os dados são eliminados ou anonimizados.</p>
+
+            <h2>8. Seus direitos</h2>
+            <p>Conforme a LGPD, você pode, a qualquer momento, solicitar:</p>
+            <ul>
+                <li>Confirmação da existência de tratamento e acesso aos seus dados;</li>
+                <li>Correção de dados incompletos, inexatos ou desatualizados;</li>
+                <li>Anonimização, bloqueio ou eliminação de dados desnecessários;</li>
+                <li>Portabilidade dos dados;</li>
+                <li>Revogação do consentimento e informação sobre compartilhamento.</li>
+            </ul>
+            <p>Para exercer seus direitos, entre em contato pelos canais da seção <a href="#contato">Contato</a>.</p>
+
+            <h2>9. Exclusão de conta e dados</h2>
+            <p>Você pode solicitar a exclusão da sua conta e dos dados pessoais associados a qualquer momento,
+            enviando um pedido para <a href="mailto:agillockrastreamento@gmail.com">agillockrastreamento@gmail.com</a>
+            com o assunto “Exclusão de conta”. Confirmaremos a solicitação e eliminaremos os dados, ressalvadas as
+            informações que devam ser mantidas por obrigação legal.</p>
+
+            <h2>10. Menores de idade</h2>
+            <p>O aplicativo não é destinado a menores de 18 anos e não coletamos intencionalmente dados de menores
+            sem o consentimento dos responsáveis.</p>
+
+            <h2>11. Cookies (site)</h2>
+            <p>Nosso site pode utilizar armazenamento local (por exemplo, para lembrar a preferência de tema). O
+            aplicativo móvel não utiliza cookies de rastreamento publicitário.</p>
+
+            <h2>12. Alterações nesta política</h2>
+            <p>Podemos atualizar esta Política periodicamente. A data de “Última atualização” no topo indica a
+            versão vigente. Recomendamos a revisão periódica desta página.</p>
+
+            <h2 id="contato">13. Contato</h2>
+            <p>Para dúvidas, solicitações ou para exercer seus direitos:</p>
+            <p class="pp-contact">
+                <i class="fa fa-envelope"></i> <a href="mailto:agillockrastreamento@gmail.com">agillockrastreamento@gmail.com</a><br>
+                <i class="fa fa-phone"></i> (85) 4101-0103<br>
+                <i class="fa fa-whatsapp"></i> <a href="https://wa.me/558541010103" target="_blank" rel="noopener">WhatsApp (85) 4101-0103</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('btnTema');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                var dark = document.documentElement.classList.toggle('dark-theme');
+                localStorage.setItem('al-theme', dark ? 'dark' : 'light');
+            });
+        })();
+    </script>
+</body>
+
+</html>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +15,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 
 import { useAuth } from '../auth/AuthProvider';
+import { environment } from '../config/environment';
 import { ApiError } from '../services/api/apiClient';
 import { AppTextInput } from '../components/AppTextInput';
 import { colors } from '../theme/colors';
@@ -110,6 +112,15 @@ export function LoginScreen() {
       } finally {
         setIsSubmitting(false);
       }
+    }
+  }
+
+  async function handlePrivacyPolicy() {
+    const url = `${environment.publicSiteUrl}/politica-de-privacidade.html`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      toast.show({ message: 'Não foi possível abrir a política de privacidade.', type: 'error' });
     }
   }
 
@@ -233,6 +244,13 @@ export function LoginScreen() {
             <Text style={styles.copyright}>
               © 2026 AgilLock — Gestão de Rastreamento
             </Text>
+            <Pressable
+              accessibilityRole="link"
+              onPress={handlePrivacyPolicy}
+              hitSlop={8}
+            >
+              <Text style={styles.privacyLink}>Política de Privacidade</Text>
+            </Pressable>
           </View>
         </View>
       </ScrollView>
@@ -330,5 +348,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     textAlign: 'center',
+  },
+  privacyLink: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+    marginTop: spacing.xs,
   },
 });
