@@ -44,3 +44,11 @@ expo-start*.log
 CLAUDE.md
 
 agillock-firebase-adminsdk-fbsvc-eb7019f388.json
+
+# Assets de marketing (arquivos grandes: prints, vídeos e artes geradas)
+printsevideos/
+store/out/
+
+# Python (scripts de geração de artes)
+__pycache__/
+*.pyc
