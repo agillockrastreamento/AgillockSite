@@ -1,0 +1,44 @@
+# .easignore — controla o que é enviado para o EAS Build.
+# IMPORTANTE: quando este arquivo existe, o EAS usa ELE no lugar do .gitignore,
+# então precisa listar TODO o conteúdo que não deve subir (não só os extras).
+
+# Dependências (o EAS reinstala a partir do package.json)
+node_modules/
+
+# Expo / saídas de build local
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Pastas nativas geradas (o EAS faz prebuild)
+/ios
+/android
+.kotlin/
+
+# Assets de marketing e scripts de geração (grandes — não fazem parte do app)
+printsevideos/
+store/
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Credenciais e chaves (o EAS gerencia remotamente)
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+agillock-firebase-adminsdk-fbsvc-eb7019f388.json
+
+# Logs, temporários e ambiente local
+*.log
+.metro-health-check*
+.env*.local
+*.tsbuildinfo
+.DS_Store
+
+# Doc do agente
+CLAUDE.md
