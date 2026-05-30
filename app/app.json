@@ -19,13 +19,7 @@
         "googleMapsApiKey": "AIzaSyDeyQ7JG_9nWLG2TmfR7WejJfYPjMgr5VA"
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "A AgilLock usa a câmera para permitir o envio de fotos de perfil e fotos dos veículos vinculados à sua conta.",
-        "NSPhotoLibraryUsageDescription": "A AgilLock acessa suas fotos apenas quando você escolhe uma imagem para perfil, veículo ou comprovantes dentro do app.",
-        "NSPhotoLibraryAddUsageDescription": "A AgilLock pode salvar arquivos exportados por você, como relatórios e comprovantes, quando essa ação for solicitada no app.",
-        "NSLocationWhenInUseUsageDescription": "A AgilLock usa sua localização enquanto o app está em uso para centralizar o mapa e facilitar a visualização dos veículos próximos.",
         "NSFaceIDUsageDescription": "A AgilLock usa o Face ID / Touch ID para permitir um login mais rápido e seguro.",
-        "NSBluetoothAlwaysUsageDescription": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate.",
-        "NSBluetoothPeripheralUsageDescription": "A AgilLock usa Bluetooth para localizar tags Bluetooth de veículos durante operações de resgate.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "buildNumber": "3"
@@ -39,15 +33,12 @@
         }
       },
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.BLUETOOTH_SCAN",
-        "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN"
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -73,7 +64,8 @@
         "expo-image-picker",
         {
           "photosPermission": "A AgilLock acessa suas fotos apenas quando você escolhe uma imagem para perfil, veículo ou comprovantes dentro do app.",
-          "cameraPermission": "A AgilLock usa a câmera para permitir o envio de fotos de perfil e fotos dos veículos vinculados à sua conta."
+          "cameraPermission": "A AgilLock usa a câmera para permitir o envio de fotos de perfil e fotos dos veículos vinculados à sua conta.",
+          "microphonePermission": false
         }
       ],
       [
