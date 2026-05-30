@@ -32,7 +32,7 @@ SCREENS = [
      "Acompanhe sua frota", "em tempo real", "Localização ao vivo no mapa, a qualquer hora"),
     ("Screenshot_2026-05-30-09-31-53-574_br.com.agillock.cliente.jpg",
      "Alertas e notificações", "instantâneas", "Saiba na hora de cada evento importante"),
-    ("Screenshot_2026-05-30-09-20-20-571_br.com.agillock.cliente.jpg",
+    ("historicoatualizado.jpg",
      "Histórico de trajetos", "e rotas", "Reveja por onde seus veículos passaram"),
     ("Screenshot_2026-05-30-09-19-27-183_br.com.agillock.cliente.jpg",
      "Relatórios completos", "na palma da mão", "Exporte e analise os dados da frota"),
