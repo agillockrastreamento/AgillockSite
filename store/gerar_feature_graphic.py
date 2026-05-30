@@ -10,7 +10,7 @@ HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 from gerar_lojas import load_screen, phone_frame, f, SCREENS  # noqa: E402
 
-ASSETS = os.path.join(HERE, "..", "assets")
+ASSETS = os.path.join(HERE, "..", "app", "assets")
 OUT = os.path.join(HERE, "out", "feature_graphic_1024x500.png")
 AMBER = (245, 166, 35)
 W, H = 1024, 500

@@ -15,7 +15,7 @@ HERE = os.path.dirname(__file__)
 RAW = os.path.join(HERE, "..", "printsevideos")
 FONTS = os.path.join(HERE, "fonts")
 OUTDIR = os.path.join(HERE, "out")
-ASSETS = os.path.join(HERE, "..", "assets")
+ASSETS = os.path.join(HERE, "..", "app", "assets")
 
 AMBER = (245, 166, 35)
 WHITE = (255, 255, 255)

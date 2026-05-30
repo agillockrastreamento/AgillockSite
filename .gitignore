@@ -29,3 +29,9 @@ backend/cert/*.pfx
 backend/uploads/
 
 FotosReferencia/
+
+# Assets de marketing do app (movidos para fora de app/ para não inflarem o EAS Build)
+/printsevideos/
+/store/out/
+**/__pycache__/
+*.pyc

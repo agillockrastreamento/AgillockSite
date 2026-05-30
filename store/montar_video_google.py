@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFilter
 HERE = os.path.dirname(__file__)
 RAW = os.path.join(HERE, "..", "printsevideos")
 FONTS = os.path.join(HERE, "fonts")
-ASSETS = os.path.join(HERE, "..", "assets")
+ASSETS = os.path.join(HERE, "..", "app", "assets")
 OUTDIR = os.path.join(HERE, "out")
 SRC = os.path.join(RAW, "Screenrecorder-2026-05-30-09-24-56-725.mp4")
 OUT = os.path.join(OUTDIR, "google_promo_editado_1080x2400.mp4")
