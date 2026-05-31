@@ -22,7 +22,7 @@
         "NSFaceIDUsageDescription": "A AgilLock usa o Face ID / Touch ID para permitir um login mais rápido e seguro.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "3"
+      "buildNumber": "4"
     },
     "android": {
       "package": "br.com.agillock.cliente",
@@ -46,7 +46,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "versionCode": 5
+      "versionCode": 6
     },
     "web": {
       "favicon": "./assets/favicon.png"
