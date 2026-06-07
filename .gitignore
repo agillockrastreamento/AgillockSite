@@ -3,6 +3,9 @@ Ajustes.txt
 EscopoAlteracoesSite.txt
 AcessoMonitorando.me.txt
 
+# Dados pessoais do sistema anterior (planilhas de clientes/dispositivos) — nunca commitar
+DadosDoSistemaAnterior/
+
 # Claude Code — memórias e configurações locais
 .claude/
 CLAUDE.md

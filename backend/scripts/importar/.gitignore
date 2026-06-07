@@ -1,0 +1,4 @@
+# Dados derivados das planilhas e relatorios da importacao.
+# NUNCA commitar: senhas-clientes.csv contem senhas provisorias e
+# os JSON contem dados pessoais de clientes.
+data/
