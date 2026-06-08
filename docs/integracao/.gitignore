@@ -1,0 +1,2 @@
+# PDF é artefato gerado a partir do .md (via gerar-pdf.py) — não versionar.
+*.pdf
