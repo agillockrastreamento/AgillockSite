@@ -252,10 +252,8 @@
         return val;
       }
 
-      function buildTitle(pMenor, pMaior) {
-        var pctLabel = percentual === '12'
-          ? String(pMenor).replace('.', ',') + '%'
-          : String(pMaior).replace('.', ',') + '%';
+      function buildTitle() {
+        var pctLabel = String(percentual).replace('.', ',') + '%';
         var titulo = 'Comissão ' + pctLabel + ' — ' + info.label + ' — ' + fmtMesPT(mes);
         document.getElementById('page-title').textContent = titulo;
       }
@@ -392,17 +390,9 @@
                  (mes ? '&mes=' + mes : '') +
                  (adminVendId ? '&vendedorId=' + adminVendId : '');
 
-        Promise.all([
-          AL.apiGet(qs),
-          AL.apiGet('/api/configuracoes'),
-        ]).then(function (results) {
-          var data = results[0];
-          configs  = results[1];
+        buildTitle();
 
-          var pMenor = configs ? Number(configs.percentualMenor) : 12.5;
-          var pMaior = configs ? Number(configs.percentualMaior) : 18;
-          buildTitle(pMenor, pMaior);
-
+        AL.apiGet(qs).then(function (data) {
           todosItens = data.itens || [];
           renderTabela(todosItens);
         }).catch(function (err) {

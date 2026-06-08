@@ -47,4 +47,52 @@ router.put('/', requireRoles('ADMIN'), async (req: AuthRequest, res: Response): 
   res.json(config);
 });
 
+// ─── Tabela de comissões por valor exato (RegraComissao) ──────────────────────
+
+// GET /api/configuracoes/regras — lista as regras de comissão
+router.get('/regras', requireRoles('ADMIN', 'VENDEDOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
+  const regras = await prisma.regraComissao.findMany({ orderBy: { valor: 'asc' } });
+  res.json(regras);
+});
+
+// PUT /api/configuracoes/regras — substitui a lista inteira de regras (somente ADMIN)
+// Body: { regras: [{ valor: number, percentual: number }, ...] }
+router.put('/regras', requireRoles('ADMIN'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const lista = Array.isArray(req.body?.regras) ? req.body.regras : null;
+  if (!lista) {
+    res.status(400).json({ error: 'Envie um array "regras".' });
+    return;
+  }
+
+  const vistos = new Set<number>();
+  const data: { valor: number; percentual: number }[] = [];
+  for (const r of lista) {
+    const valor = Number(r?.valor);
+    const percentual = Number(r?.percentual);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      res.status(400).json({ error: 'Valor de referência inválido (deve ser maior que zero).' });
+      return;
+    }
+    if (!Number.isFinite(percentual) || percentual < 0 || percentual > 100) {
+      res.status(400).json({ error: 'Percentual inválido (deve estar entre 0 e 100).' });
+      return;
+    }
+    const cents = Math.round(valor * 100);
+    if (vistos.has(cents)) {
+      res.status(400).json({ error: `Valor de referência duplicado: R$ ${valor.toFixed(2)}.` });
+      return;
+    }
+    vistos.add(cents);
+    data.push({ valor, percentual });
+  }
+
+  await prisma.$transaction([
+    prisma.regraComissao.deleteMany({}),
+    ...(data.length > 0 ? [prisma.regraComissao.createMany({ data })] : []),
+  ]);
+
+  const regras = await prisma.regraComissao.findMany({ orderBy: { valor: 'asc' } });
+  res.json(regras);
+});
+
 export default router;

@@ -404,6 +404,8 @@ model PagamentoComissao {
 
 model Configuracoes {
   id                    String   @id @default("1")
+  // Campos legados de comissão por faixa (menor/maior). Mantidos para
+  // compatibilidade histórica — o cálculo atual usa a tabela RegraComissao.
   percentualMenor       Decimal  @default(12.50) @db.Decimal(5, 2)
   percentualMaior       Decimal  @default(18.00) @db.Decimal(5, 2)
   valorReferencia       Decimal  @default(50.00) @db.Decimal(10, 2)
@@ -414,6 +416,19 @@ model Configuracoes {
   representanteTelefone String?
   representanteCpf      String?
   updatedAt             DateTime @updatedAt
+}
+
+// Tabela de comissões por valor exato de cobrança.
+// Regra: "tudo que for = a X recebe X% de comissão".
+// Uma cobrança cujo valor não corresponda exatamente a nenhuma regra
+// NÃO gera comissão (0%).
+model RegraComissao {
+  id         String   @id @default(uuid())
+  valor      Decimal  @db.Decimal(10, 2) // valor exato da cobrança (R$)
+  percentual Decimal  @db.Decimal(5, 2)  // % de comissão aplicado
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model ClienteLogin {

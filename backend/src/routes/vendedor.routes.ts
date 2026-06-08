@@ -8,6 +8,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { COMPROVANTES_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
+import { comissaoPorPercentual, RegraLike } from '../utils/comissao';
 
 // ─── Configuração multer (upload de comprovantes) ─────────────────────────────
 const uploadDir = COMPROVANTES_UPLOADS_DIR;
@@ -108,36 +109,20 @@ function parseMes(mes: string | undefined): { inicio: Date; fim: Date; mesStr: s
   };
 }
 
-// Calcula comissão teórica de um boleto (para modos "atrasado" e "futuro")
-function calcularComissaoTeorica(
-  valor: number,
-  placasUnificadas: Array<{ valorPlaca: unknown }>,
-  configs: { valorReferencia: unknown; percentualMenor: unknown; percentualMaior: unknown },
-  dispositivosUnificados: Array<{ valorDispositivo: unknown }> = []
-) {
-  const ref = Number(configs.valorReferencia);
-  const pMenor = Number(configs.percentualMenor);
-  const pMaior = Number(configs.percentualMaior);
-  let valor12 = 0;
-  let valor18 = 0;
+const r2 = (n: number) => Math.round(n * 100) / 100;
 
-  const totalUnificados = placasUnificadas.length + dispositivosUnificados.length;
-  if (totalUnificados > 0) {
-    for (const bp of placasUnificadas) {
-      const v = Number(bp.valorPlaca);
-      if (v >= ref) valor18 += Math.round(v * pMaior) / 100;
-      else valor12 += Math.round(v * pMenor) / 100;
-    }
-    for (const bd of dispositivosUnificados) {
-      const v = Number(bd.valorDispositivo);
-      if (v >= ref) valor18 += Math.round(v * pMaior) / 100;
-      else valor12 += Math.round(v * pMenor) / 100;
-    }
-  } else {
-    if (valor >= ref) valor18 = Math.round(valor * pMaior) / 100;
-    else valor12 = Math.round(valor * pMenor) / 100;
-  }
-  return { valor12, valor18 };
+// Converte um Map<percentual, valor> num array ordenado por percentual,
+// pronto para o frontend renderizar um card por percentual.
+function mapParaArray(m: Map<number, number>): Array<{ percentual: number; valor: number }> {
+  return Array.from(m.entries())
+    .map(([percentual, valor]) => ({ percentual, valor: r2(valor) }))
+    .filter((e) => e.valor > 0)
+    .sort((a, b) => a.percentual - b.percentual);
+}
+
+// Compara dois percentuais com tolerância de centésimos (Decimal(5,2)).
+function mesmoPercentual(a: number, b: number): boolean {
+  return Math.round(a * 100) === Math.round(b * 100);
 }
 
 // ─── GET /api/vendedor/carteira ───────────────────────────────────────────────
@@ -154,11 +139,14 @@ router.get('/carteira', async (req: AuthRequest, res: Response): Promise<void> =
     data: { status: 'ATRASADO' },
   });
 
-  const configs = await prisma.configuracoes.findUnique({ where: { id: '1' } });
+  const regras: RegraLike[] = await prisma.regraComissao.findMany({ where: { ativo: true } });
+
+  // Acumula um valor de comissão num mapa percentual → total.
+  const acc = (m: Map<number, number>, percentual: number, valor: number) =>
+    m.set(percentual, (m.get(percentual) || 0) + valor);
 
   // ── Garantido: comissões registradas de boletos pagos no mês ──────────────
-  let garantido12 = 0;
-  let garantido18 = 0;
+  const garantidoMap = new Map<number, number>();
   {
     const comissoes = await prisma.comissaoVendedor.findMany({
       where: {
@@ -169,22 +157,17 @@ router.get('/carteira', async (req: AuthRequest, res: Response): Promise<void> =
         ],
       },
     });
-    const limitePercentual = Number(configs?.percentualMenor ?? 12.5);
     for (const c of comissoes) {
-      const percentual = Number(c.percentualAplicado);
-      const valor = Number(c.valorComissao);
-      if (percentual <= limitePercentual) garantido12 += valor;
-      else garantido18 += valor;
+      acc(garantidoMap, Number(c.percentualAplicado), Number(c.valorComissao));
     }
   }
 
-  // ── Atrasado: comissão teórica de boletos em atraso com vencimento no mês ─
-  let atrasado12 = 0;
-  let atrasado18 = 0;
-  if (configs) {
+  // Helper para somar comissão teórica de boletos por status.
+  const totalTeorico = async (status: 'ATRASADO' | 'PENDENTE'): Promise<Map<number, number>> => {
+    const m = new Map<number, number>();
     const boletos = await prisma.boleto.findMany({
       where: {
-        status: 'ATRASADO',
+        status,
         vencimento: { gte: inicio, lt: fim },
         OR: [
           { placa: { vendedorId }, placasUnificadas: { none: {} } },
@@ -199,58 +182,23 @@ router.get('/carteira', async (req: AuthRequest, res: Response): Promise<void> =
       },
     });
     for (const b of boletos) {
-      const { valor12, valor18 } = calcularComissaoTeorica(Number(b.valor), b.placasUnificadas, configs, b.dispositivosUnificados);
-      atrasado12 += valor12;
-      atrasado18 += valor18;
+      const porPct = comissaoPorPercentual(Number(b.valor), b.placasUnificadas, regras, b.dispositivosUnificados);
+      for (const [pct, v] of porPct) acc(m, pct, v);
     }
-  }
+    return m;
+  };
 
-  // ── Futuro: comissão teórica de boletos pendentes com vencimento no mês ───
-  let futuro12 = 0;
-  let futuro18 = 0;
-  if (configs) {
-    const boletos = await prisma.boleto.findMany({
-      where: {
-        status: 'PENDENTE',
-        vencimento: { gte: inicio, lt: fim },
-        OR: [
-          { placa: { vendedorId }, placasUnificadas: { none: {} } },
-          { placasUnificadas: { some: { placa: { vendedorId } } } },
-          { dispositivo: { vendedorId } },
-          { dispositivosUnificados: { some: { dispositivo: { vendedorId } } } },
-        ],
-      },
-      include: {
-        placasUnificadas: { where: { placa: { vendedorId } }, select: { valorPlaca: true } },
-        dispositivosUnificados: { where: { dispositivo: { vendedorId } }, select: { valorDispositivo: true } },
-      },
-    });
-    for (const b of boletos) {
-      const { valor12, valor18 } = calcularComissaoTeorica(Number(b.valor), b.placasUnificadas, configs, b.dispositivosUnificados);
-      futuro12 += valor12;
-      futuro18 += valor18;
-    }
-  }
+  const atrasadoMap = await totalTeorico('ATRASADO');
+  const futuroMap   = await totalTeorico('PENDENTE');
 
-  const r = (n: number) => Math.round(n * 100) / 100;
+  const totalDe = (m: Map<number, number>) =>
+    r2(Array.from(m.values()).reduce((s, v) => s + v, 0));
 
   res.json({
     mes: mesStr,
-    garantido: {
-      total: r(garantido12 + garantido18),
-      pct12: r(garantido12),
-      pct18: r(garantido18),
-    },
-    atrasado: {
-      total: r(atrasado12 + atrasado18),
-      pct12: r(atrasado12),
-      pct18: r(atrasado18),
-    },
-    futuro: {
-      total: r(futuro12 + futuro18),
-      pct12: r(futuro12),
-      pct18: r(futuro18),
-    },
+    garantido: { total: totalDe(garantidoMap), porPercentual: mapParaArray(garantidoMap) },
+    atrasado:  { total: totalDe(atrasadoMap),  porPercentual: mapParaArray(atrasadoMap) },
+    futuro:    { total: totalDe(futuroMap),    porPercentual: mapParaArray(futuroMap) },
   });
 });
 
@@ -261,7 +209,7 @@ router.get('/carteira/detalhes', async (req: AuthRequest, res: Response): Promis
   const toggle = (query(req.query.toggle) || 'garantido') as 'garantido' | 'atrasado' | 'futuro';
   const { inicio, fim, mesStr } = parseMes(query(req.query.mes));
   const busca = query(req.query.busca);
-  const percentualFiltro = query(req.query.percentual); // "12" ou "18"
+  const percentualFiltro = query(req.query.percentual); // percentual exato (ex.: "40")
 
   // Mover boletos vencidos para ATRASADO (somente os de dias anteriores a hoje)
   const _inicioDiaHoje2 = new Date(); _inicioDiaHoje2.setHours(0, 0, 0, 0);
@@ -270,8 +218,7 @@ router.get('/carteira/detalhes', async (req: AuthRequest, res: Response): Promis
     data: { status: 'ATRASADO' },
   });
 
-  const configs = await prisma.configuracoes.findUnique({ where: { id: '1' } });
-  const limitePercentual = Number(configs?.percentualMenor ?? 12.5);
+  const regras: RegraLike[] = await prisma.regraComissao.findMany({ where: { ativo: true } });
 
   type ItemCarteira = {
     boletoId: string;
@@ -315,7 +262,7 @@ router.get('/carteira/detalhes', async (req: AuthRequest, res: Response): Promis
       return db2.getTime() - da.getTime();
     });
 
-    // Agrupa por boletoId (ou commissionId para orfãs) + tier de percentual (menor/maior).
+    // Agrupa por boletoId (ou commissionId para orfãs) + percentual aplicado.
     const porTier = new Map<string, ItemCarteira>();
     for (const c of comissoes) {
       if (!c.boleto) {
@@ -341,8 +288,7 @@ router.get('/carteira/detalhes', async (req: AuthRequest, res: Response): Promis
       }
       const b = c.boleto;
       const percentual = Number(c.percentualAplicado);
-      const isMinor = percentual <= limitePercentual;
-      const key = `${b.id}:${isMinor ? 'menor' : 'maior'}`;
+      const key = `${b.id}:${Math.round(percentual * 100)}`;
       const isUnificado = b.placasUnificadas.length > 0 || b.dispositivosUnificados.length > 0;
       let placaNome: string;
       if (isUnificado) {
@@ -403,34 +349,29 @@ router.get('/carteira/detalhes', async (req: AuthRequest, res: Response): Promis
       orderBy: { vencimento: 'asc' },
     });
 
-    if (configs) {
-      for (const b of boletos) {
-        const { valor12, valor18 } = calcularComissaoTeorica(Number(b.valor), b.placasUnificadas, configs, b.dispositivosUnificados);
-        const isUnificado = b.placasUnificadas.length > 0 || b.dispositivosUnificados.length > 0;
-        let placaNome: string;
-        if (isUnificado) {
-          placaNome = 'Boleto Unificado';
-        } else if (b.dispositivo) {
-          placaNome = b.dispositivo.placa ? `${b.dispositivo.nome} — ${b.dispositivo.placa}` : b.dispositivo.nome;
-        } else {
-          placaNome = b.placa?.placa || '—';
-        }
-        const base = {
-          boletoId: b.id,
-          cliente: b.carne.cliente.nome,
-          telefone: b.carne.cliente.telefone,
-          placa: placaNome,
-          vencimento: b.vencimento,
-          dataPagamento: null as Date | null,
-          valorBoleto: Number(b.valor),
-          linkBoleto: b.linkBoleto,
-        };
-        if (valor12 > 0) {
-          itens.push({ ...base, comissao: valor12, percentual: Number(configs.percentualMenor) });
-        }
-        if (valor18 > 0) {
-          itens.push({ ...base, comissao: valor18, percentual: Number(configs.percentualMaior) });
-        }
+    for (const b of boletos) {
+      const porPct = comissaoPorPercentual(Number(b.valor), b.placasUnificadas, regras, b.dispositivosUnificados);
+      const isUnificado = b.placasUnificadas.length > 0 || b.dispositivosUnificados.length > 0;
+      let placaNome: string;
+      if (isUnificado) {
+        placaNome = 'Boleto Unificado';
+      } else if (b.dispositivo) {
+        placaNome = b.dispositivo.placa ? `${b.dispositivo.nome} — ${b.dispositivo.placa}` : b.dispositivo.nome;
+      } else {
+        placaNome = b.placa?.placa || '—';
+      }
+      const base = {
+        boletoId: b.id,
+        cliente: b.carne.cliente.nome,
+        telefone: b.carne.cliente.telefone,
+        placa: placaNome,
+        vencimento: b.vencimento,
+        dataPagamento: null as Date | null,
+        valorBoleto: Number(b.valor),
+        linkBoleto: b.linkBoleto,
+      };
+      for (const [pct, valor] of porPct) {
+        if (valor > 0) itens.push({ ...base, comissao: valor, percentual: pct });
       }
     }
   }
@@ -444,9 +385,8 @@ router.get('/carteira/detalhes', async (req: AuthRequest, res: Response): Promis
     );
   }
   if (percentualFiltro) {
-    resultado = resultado.filter((i) =>
-      i.percentual <= limitePercentual ? percentualFiltro === '12' : percentualFiltro === '18'
-    );
+    const alvo = Number(percentualFiltro);
+    resultado = resultado.filter((i) => mesmoPercentual(i.percentual, alvo));
   }
 
   res.json({ mes: mesStr, toggle, total: resultado.length, itens: resultado });
@@ -465,14 +405,13 @@ router.get('/carteira/exportar', async (req: AuthRequest, res: Response): Promis
     data: { status: 'ATRASADO' },
   });
 
-  const configs = await prisma.configuracoes.findUnique({ where: { id: '1' } });
-  const limitePercentualE = Number(configs?.percentualMenor ?? 12.5);
-  const pMenorLabel = String(configs?.percentualMenor ?? 12.5).replace('.', ',');
-  const pMaiorLabel = String(configs?.percentualMaior ?? 18).replace('.', ',');
+  const regras: RegraLike[] = await prisma.regraComissao.findMany({ where: { ativo: true } });
+
+  const fmtPctCsv = (p: number) => String(p).replace('.', ',');
 
   const linhas: string[][] = [
     ['Cliente', 'Telefone', 'Dispositivo', 'Vencimento', 'Data Pagamento', 'Valor Boleto (R$)',
-     `Comissão ${pMenorLabel}%`, `Comissão ${pMaiorLabel}%`, 'Total'],
+     'Percentual (%)', 'Comissão (R$)'],
   ];
 
   if (toggle === 'garantido') {
@@ -497,30 +436,26 @@ router.get('/carteira/exportar', async (req: AuthRequest, res: Response): Promis
       },
     });
 
-    const porBoleto = new Map<string, { linha: string[]; comissao12: number; comissao18: number }>();
+    // Uma linha por (boleto, percentual), somando comissões do mesmo percentual.
+    type LinhaCsv = { base: string[]; percentual: number; comissao: number };
+    const porChave = new Map<string, LinhaCsv>();
     for (const c of comissoes) {
+      const percentual = Number(c.percentualAplicado);
       if (!c.boleto) {
         // Comissão órfã (cliente excluído)
-        const percentual = Number(c.percentualAplicado);
-        const isMinor = percentual <= limitePercentualE;
-        const key = c.id;
-        const existing = porBoleto.get(key);
-        if (existing) {
-          if (isMinor) existing.comissao12 += Number(c.valorComissao);
-          else existing.comissao18 += Number(c.valorComissao);
-        } else {
-          porBoleto.set(key, {
-            comissao12: isMinor ? Number(c.valorComissao) : 0,
-            comissao18: isMinor ? 0 : Number(c.valorComissao),
-            linha: [
-              '(cliente excluído)', '', '—',
-              c.dataPagamento?.toISOString().split('T')[0] || '',
-              c.dataPagamento?.toISOString().split('T')[0] || '',
-              Number(c.valorReferencia).toFixed(2),
-              '', '', '',
-            ],
-          });
-        }
+        const key = `${c.id}:${Math.round(percentual * 100)}`;
+        const existing = porChave.get(key);
+        if (existing) { existing.comissao += Number(c.valorComissao); continue; }
+        porChave.set(key, {
+          percentual,
+          comissao: Number(c.valorComissao),
+          base: [
+            '(cliente excluído)', '', '—',
+            c.dataPagamento?.toISOString().split('T')[0] || '',
+            c.dataPagamento?.toISOString().split('T')[0] || '',
+            Number(c.valorReferencia).toFixed(2),
+          ],
+        });
         continue;
       }
       const b = c.boleto;
@@ -532,33 +467,24 @@ router.get('/carteira/exportar', async (req: AuthRequest, res: Response): Promis
       } else {
         placa = b.placa?.placa || '—';
       }
-      const percentual = Number(c.percentualAplicado);
-      const isMinor = percentual <= limitePercentualE;
-      const existing = porBoleto.get(b.id);
-      if (existing) {
-        if (isMinor) existing.comissao12 += Number(c.valorComissao);
-        else existing.comissao18 += Number(c.valorComissao);
-      } else {
-        porBoleto.set(b.id, {
-          comissao12: isMinor ? Number(c.valorComissao) : 0,
-          comissao18: isMinor ? 0 : Number(c.valorComissao),
-          linha: [
-            b.carne.cliente.nome,
-            b.carne.cliente.telefone || '',
-            placa,
-            b.vencimento.toISOString().split('T')[0],
-            b.dataPagamento?.toISOString().split('T')[0] || '',
-            Number(b.valor).toFixed(2),
-            '', '', '', // comissao12, comissao18, total preenchidos abaixo
-          ],
-        });
-      }
+      const key = `${b.id}:${Math.round(percentual * 100)}`;
+      const existing = porChave.get(key);
+      if (existing) { existing.comissao += Number(c.valorComissao); continue; }
+      porChave.set(key, {
+        percentual,
+        comissao: Number(c.valorComissao),
+        base: [
+          b.carne.cliente.nome,
+          b.carne.cliente.telefone || '',
+          placa,
+          b.vencimento.toISOString().split('T')[0],
+          b.dataPagamento?.toISOString().split('T')[0] || '',
+          Number(b.valor).toFixed(2),
+        ],
+      });
     }
-    for (const { linha, comissao12, comissao18 } of porBoleto.values()) {
-      linha[6] = comissao12.toFixed(2);
-      linha[7] = comissao18.toFixed(2);
-      linha[8] = (comissao12 + comissao18).toFixed(2);
-      linhas.push(linha);
+    for (const { base, percentual, comissao } of porChave.values()) {
+      linhas.push([...base, fmtPctCsv(percentual), comissao.toFixed(2)]);
     }
   } else {
     // Atrasado ou Futuro
@@ -588,17 +514,18 @@ router.get('/carteira/exportar', async (req: AuthRequest, res: Response): Promis
         },
       },
     });
-    if (configs) {
-      for (const b of boletos) {
-        const { valor12, valor18 } = calcularComissaoTeorica(Number(b.valor), b.placasUnificadas, configs, b.dispositivosUnificados);
-        let identificador: string;
-        if (b.placasUnificadas.length > 0 || b.dispositivosUnificados.length > 0) {
-          identificador = 'Boleto Unificado';
-        } else if (b.dispositivo) {
-          identificador = b.dispositivo.placa ? `${b.dispositivo.nome} — ${b.dispositivo.placa}` : b.dispositivo.nome;
-        } else {
-          identificador = b.placa?.placa || '—';
-        }
+    for (const b of boletos) {
+      const porPct = comissaoPorPercentual(Number(b.valor), b.placasUnificadas, regras, b.dispositivosUnificados);
+      let identificador: string;
+      if (b.placasUnificadas.length > 0 || b.dispositivosUnificados.length > 0) {
+        identificador = 'Boleto Unificado';
+      } else if (b.dispositivo) {
+        identificador = b.dispositivo.placa ? `${b.dispositivo.nome} — ${b.dispositivo.placa}` : b.dispositivo.nome;
+      } else {
+        identificador = b.placa?.placa || '—';
+      }
+      for (const [pct, valor] of porPct) {
+        if (valor <= 0) continue;
         linhas.push([
           b.carne.cliente.nome,
           b.carne.cliente.telefone || '',
@@ -606,9 +533,8 @@ router.get('/carteira/exportar', async (req: AuthRequest, res: Response): Promis
           b.vencimento.toISOString().split('T')[0],
           '',
           Number(b.valor).toFixed(2),
-          valor12.toFixed(2),
-          valor18.toFixed(2),
-          (valor12 + valor18).toFixed(2),
+          fmtPctCsv(pct),
+          valor.toFixed(2),
         ]);
       }
     }

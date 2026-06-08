@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma';
+import { buscarPercentual, RegraLike } from '../utils/comissao';
 
 /**
  * Calcula e registra comissões para um boleto recém-pago.
@@ -7,9 +8,13 @@ import prisma from '../utils/prisma';
  * - Boleto individual: 1 comissão para o vendedor dono da placa
  * - Boleto unificado: 1 comissão por placa, cada uma para o vendedor dono daquela placa
  *   (um boleto unificado pode gerar comissões para múltiplos vendedores)
+ *
+ * Comissão por valor exato: o percentual aplicado vem da tabela RegraComissao
+ * ("tudo que for = a X recebe X%"). Valores sem regra correspondente NÃO geram
+ * comissão (0%).
  */
 export async function registrarComissoes(boletoId: string): Promise<void> {
-  const [boleto, configs] = await Promise.all([
+  const [boleto, regras] = await Promise.all([
     prisma.boleto.findUnique({
       where: { id: boletoId },
       include: {
@@ -23,16 +28,15 @@ export async function registrarComissoes(boletoId: string): Promise<void> {
         },
       },
     }),
-    prisma.configuracoes.findUnique({ where: { id: '1' } }),
+    prisma.regraComissao.findMany({ where: { ativo: true } }),
   ]);
 
-  if (!boleto || !configs) {
-    console.log(`[comissao] boletoId=${boletoId} — boleto ou configs não encontrados, abortando.`);
+  if (!boleto) {
+    console.log(`[comissao] boletoId=${boletoId} — boleto não encontrado, abortando.`);
     return;
   }
 
-  const { percentualMenor, percentualMaior, valorReferencia } = configs;
-  const refNum = Number(valorReferencia);
+  const regrasLike: RegraLike[] = regras;
 
   type ComissaoData = {
     vendedorId: string;
@@ -44,6 +48,23 @@ export async function registrarComissoes(boletoId: string): Promise<void> {
 
   const comissoes: ComissaoData[] = [];
 
+  // Monta uma comissão para um único valor, buscando o percentual na tabela de regras.
+  // Se não houver regra para o valor exato, não gera comissão.
+  const montar = (vendedorId: string, valorRef: number, label: string): void => {
+    const percentual = buscarPercentual(valorRef, regrasLike);
+    if (percentual === null) {
+      console.log(`[comissao]   ${label} valor=${valorRef.toFixed(2)} — sem regra correspondente, sem comissão`);
+      return;
+    }
+    comissoes.push({
+      vendedorId,
+      boletoId,
+      valorReferencia: valorRef,
+      percentualAplicado: percentual,
+      valorComissao: Math.round(valorRef * percentual) / 100,
+    });
+  };
+
   const totalUnificados = boleto.placasUnificadas.length + boleto.dispositivosUnificados.length;
 
   if (totalUnificados > 0) {
@@ -53,29 +74,13 @@ export async function registrarComissoes(boletoId: string): Promise<void> {
       const vendedorIdPlaca = bp.placa?.vendedorId;
       console.log(`[comissao]   placaId=${bp.placaId} vendedorId=${vendedorIdPlaca ?? 'null'}`);
       if (!vendedorIdPlaca) continue;
-      const valorRef = Number(bp.valorPlaca);
-      const percentual = valorRef >= refNum ? Number(percentualMaior) : Number(percentualMenor);
-      comissoes.push({
-        vendedorId: vendedorIdPlaca,
-        boletoId,
-        valorReferencia: valorRef,
-        percentualAplicado: percentual,
-        valorComissao: Math.round(valorRef * percentual) / 100,
-      });
+      montar(vendedorIdPlaca, Number(bp.valorPlaca), `placaId=${bp.placaId}`);
     }
     for (const bd of boleto.dispositivosUnificados) {
       const vendedorIdDisp = bd.dispositivo?.vendedorId;
       console.log(`[comissao]   dispositivoId=${bd.dispositivoId} vendedorId=${vendedorIdDisp ?? 'null'}`);
       if (!vendedorIdDisp) continue;
-      const valorRef = Number(bd.valorDispositivo);
-      const percentual = valorRef >= refNum ? Number(percentualMaior) : Number(percentualMenor);
-      comissoes.push({
-        vendedorId: vendedorIdDisp,
-        boletoId,
-        valorReferencia: valorRef,
-        percentualAplicado: percentual,
-        valorComissao: Math.round(valorRef * percentual) / 100,
-      });
+      montar(vendedorIdDisp, Number(bd.valorDispositivo), `dispositivoId=${bd.dispositivoId}`);
     }
   } else {
     // Boleto individual: comissão para o vendedor dono da placa ou do dispositivo
@@ -87,15 +92,7 @@ export async function registrarComissoes(boletoId: string): Promise<void> {
       console.log(`[comissao] sem vendedorId — sem comissão`);
       return;
     }
-    const valorRef = Number(boleto.valor);
-    const percentual = valorRef >= refNum ? Number(percentualMaior) : Number(percentualMenor);
-    comissoes.push({
-      vendedorId: vendedorEfetivo,
-      boletoId,
-      valorReferencia: valorRef,
-      percentualAplicado: percentual,
-      valorComissao: Math.round(valorRef * percentual) / 100,
-    });
+    montar(vendedorEfetivo, Number(boleto.valor), 'individual');
   }
 
   if (comissoes.length > 0) {

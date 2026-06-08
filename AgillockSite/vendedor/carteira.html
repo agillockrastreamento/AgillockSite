@@ -243,23 +243,8 @@
           </div>
         </div>
 
-        <!-- Cards de percentual -->
-        <div class="row">
-          <div class="col-sm-6" style="margin-bottom:16px;">
-            <div class="pct-card" id="card-pct12">
-              <div class="pct-legenda" id="pct12-legenda">Comissão —%</div>
-              <div class="pct-valor" id="pct12-valor">R$ 0,00</div>
-              <div class="pct-hint"><i class="fa fa-search"></i> Ver detalhes</div>
-            </div>
-          </div>
-          <div class="col-sm-6" style="margin-bottom:16px;">
-            <div class="pct-card" id="card-pct18">
-              <div class="pct-legenda" id="pct18-legenda">Comissão —%</div>
-              <div class="pct-valor" id="pct18-valor">R$ 0,00</div>
-              <div class="pct-hint"><i class="fa fa-search"></i> Ver detalhes</div>
-            </div>
-          </div>
-        </div>
+        <!-- Cards de percentual (gerados dinamicamente, um por percentual) -->
+        <div class="row" id="pct-cards-row"></div>
 
         <!-- Mensagem sem dados -->
         <div id="sem-dados" class="sem-dados-box" style="display:none;">
@@ -617,8 +602,6 @@
       function renderCards() {
         var d   = cartData[activeToggle];
         var cor = CORES[activeToggle];
-        var pMenor = configs ? Number(configs.percentualMenor) : 12.5;
-        var pMaior = configs ? Number(configs.percentualMaior) : 18;
 
         // Card principal
         document.getElementById('ct-main-card').style.background = cor.bg;
@@ -627,18 +610,32 @@
         document.getElementById('cmc-label').textContent = cor.label;
         document.getElementById('cmc-sub').textContent   = cor.sub;
 
-        // Cards de percentual
-        document.getElementById('pct12-valor').textContent   = AL.fmtMoney(d.pct12);
-        document.getElementById('pct12-legenda').textContent = 'Comissão ' + fmtPct(pMenor) + '%';
-        document.getElementById('pct12-valor').style.color   = cor.bg;
+        // Cards de percentual — um por percentual presente nos dados
+        var row = document.getElementById('pct-cards-row');
+        row.innerHTML = '';
+        var lista = d.porPercentual || [];
+        lista.forEach(function (item) {
+          var col = document.createElement('div');
+          col.className = 'col-sm-6';
+          col.style.marginBottom = '16px';
 
-        document.getElementById('pct18-valor').textContent   = AL.fmtMoney(d.pct18);
-        document.getElementById('pct18-legenda').textContent = 'Comissão ' + fmtPct(pMaior) + '%';
-        document.getElementById('pct18-valor').style.color   = cor.bg;
+          var card = document.createElement('div');
+          card.className = 'pct-card';
+          card.innerHTML =
+            '<div class="pct-legenda">Comissão ' + fmtPct(item.percentual) + '%</div>' +
+            '<div class="pct-valor" style="color:' + cor.bg + ';">' + AL.fmtMoney(item.valor) + '</div>' +
+            '<div class="pct-hint"><i class="fa fa-search"></i> Ver detalhes</div>';
+          card.addEventListener('click', function () {
+            window.location.href = buildDetalhesUrl(item.percentual);
+          });
+
+          col.appendChild(card);
+          row.appendChild(col);
+        });
 
         // Sem dados
         document.getElementById('sem-dados').style.display =
-          (d.total === 0 && d.pct12 === 0 && d.pct18 === 0) ? '' : 'none';
+          (d.total === 0 && lista.length === 0) ? '' : 'none';
       }
 
       // Clique nos cards de percentual → detalhes
@@ -649,12 +646,6 @@
         if (nomeVendedor) url += '&nomeVendedor=' + encodeURIComponent(nomeVendedor);
         return url;
       }
-      document.getElementById('card-pct12').addEventListener('click', function () {
-        window.location.href = buildDetalhesUrl(12);
-      });
-      document.getElementById('card-pct18').addEventListener('click', function () {
-        window.location.href = buildDetalhesUrl(18);
-      });
 
       // ── Carregar dados ────────────────────────────────────────
       function setLoading(v) {
