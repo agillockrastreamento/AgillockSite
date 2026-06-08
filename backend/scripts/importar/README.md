@@ -95,6 +95,39 @@ Relatórios gerados (UTF-8 com BOM, abrem direto no Excel):
 
 ---
 
+---
+
+## Motoristas (vêm da API ao vivo, não de planilha)
+
+Não há planilha de motoristas — os dados são buscados da API do sistema anterior
+(Azul Monitor / Traccar em `monitorando.me`). O JSON `apiSistemaAnterior.json` é só
+a especificação OpenAPI, não os dados.
+
+### 1. Buscar da API (na sua máquina)
+
+```bash
+cd backend/scripts/importar
+MONITORANDO_USER=<email> MONITORANDO_PASS=<senha> python fetch-monitorando.py
+```
+
+Gera `data/motoristas.json` e `data/motoristas-vinculos.json`. Credenciais via env
+(nunca commitar). A API só expõe `nome` e `identificador` (sem CNH/telefone) e o
+vínculo motorista↔veículo só é recuperável pela última posição (`driverUniqueId`).
+
+### 2. Importar (dentro do container backend)
+
+```bash
+docker compose cp ./backend/scripts/importar backend:/app/scripts/importar
+docker compose exec backend npx tsx scripts/importar/import-motoristas.ts --dry-run
+docker compose exec backend npx tsx scripts/importar/import-motoristas.ts
+```
+
+Cria os Motorista (dedup por identificador), cria os drivers no Traccar e aplica os
+vínculos recuperáveis. Flags `--dry-run` / `--sem-traccar` iguais ao import principal.
+Relatório: `data/motoristas-vinculos-nao-resolvidos.csv`.
+
+---
+
 ## ⚠️ Importante — rastreadores e Traccar novo
 
 Como este é um Traccar **novo** (separado do sistema anterior), criar os devices
