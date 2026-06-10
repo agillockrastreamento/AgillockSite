@@ -12,11 +12,25 @@ let veiculosMap = {};
 let traccarIdParaDispositivoId = {};
 let boundsAjustados = false;
 const _spider = { markers: [], linhas: [], chave: null };
-const CACHE_KEY = 'rastr_cli_pos_v1';
+// Identificador do cliente logado — segrega os caches locais por cliente para
+// que um login não enxergue veículos/foco salvos pelo cliente anterior no mesmo navegador.
+const _CLIENTE_CACHE_ID = (() => {
+  try { return String((window.AL_CLIENTE && AL_CLIENTE.getUser() || {}).clienteId || ''); } catch { return ''; }
+})();
+function _chavePorCliente(base) { return _CLIENTE_CACHE_ID ? base + ':' + _CLIENTE_CACHE_ID : base; }
+// Remove as chaves antigas (sem segregação por cliente) de versões anteriores.
+if (_CLIENTE_CACHE_ID) {
+  try {
+    localStorage.removeItem('rastr_cli_pos_v1');
+    localStorage.removeItem('rastr_cli_mapa_ativo');
+    sessionStorage.removeItem('rastreamento_cliente_foco');
+  } catch {}
+}
+const CACHE_KEY = _chavePorCliente('rastr_cli_pos_v1');
 const CLUSTER_PX = 40;
 
 // ── Mapa ativo (1 ou 2) — agrupamento visual no portal cliente ───────────────
-const MAPA_STORAGE_KEY = 'rastr_cli_mapa_ativo';
+const MAPA_STORAGE_KEY = _chavePorCliente('rastr_cli_mapa_ativo');
 let mapaAtivo = (() => {
   try {
     const v = Number(localStorage.getItem(MAPA_STORAGE_KEY));
@@ -47,7 +61,7 @@ const _resumoHojeClienteCache = {};
 const _resumoHojeClientePendentes = {};
 const _ociosoHojeClienteCache = {};
 const _ociosoHojeClientePendentes = {};
-const CLIENT_FOCUS_STORAGE_KEY = 'rastreamento_cliente_foco';
+const CLIENT_FOCUS_STORAGE_KEY = _chavePorCliente('rastreamento_cliente_foco');
 const _focusOffsetPx = 0;
 const _eventPopupOffsetPx = 60;
 
@@ -1499,6 +1513,8 @@ async function carregarPosicoes() {
     });
 
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(lista)); } catch {}
+    // Se o card aberto pertencia a um veículo que não existe mais (ex.: cache antigo), fecha-o.
+    if (ativoId && !veiculosMap[ativoId]) fecharCardDispositivo();
     _atualizarVisibilidadeSeletor();
     renderMarcadores(); renderSidebar(); renderBarraVeiculos();
     if (!boundsAjustados) {
@@ -2755,12 +2771,13 @@ function svgVelocimetro(vel, limite) {
   if (vel == null) return '';
   const isDark = document.documentElement.classList.contains('dark-theme');
   const max = Math.max(limite || 120, 120);
-  const f = Math.min(vel / max, 1);
+  const f = Math.max(0, Math.min(vel / max, 1));
   const ang = Math.PI * (1 - f);
   const ex = (40 + 30 * Math.cos(ang)).toFixed(1), ey = (45 - 30 * Math.sin(ang)).toFixed(1);
   const cor = limite && vel > limite ? '#e74c3c' : vel > 80 ? '#f39c12' : '#27ae60';
   const tr = isDark ? '#2d3748' : '#e9ecef', nc = isDark ? '#f0f2f5' : '#333', lc = isDark ? '#adb5bd' : '#555';
-  const arc = f > 0.01 ? `<path d="M 10 45 A 30 30 0 ${f>0.5?1:0} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>` : '';
+  // large-arc-flag sempre 0: o arco varrido nunca passa de 180°; com 1 o SVG desenha fora do gauge.
+  const arc = f > 0.01 ? `<path d="M 10 45 A 30 30 0 0 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>` : '';
   return `<svg width="90" height="54" viewBox="0 0 90 54" style="display:block;margin:0"><path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="${tr}" stroke-width="7" stroke-linecap="round"/>${arc}<text x="40" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" fill="${nc}">${vel}</text><text x="40" y="50" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="${lc}">km/h</text></svg>`;
 }
 

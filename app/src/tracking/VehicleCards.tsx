@@ -83,7 +83,7 @@ function formatTimeAgo(timestamp: string | number | null | undefined) {
 function Speedometer({ speed, limit }: { speed: number; limit: number }) {
   const v = speed || 0;
   const lim = Math.max(limit || 120, 120);
-  const f = Math.min(v / lim, 1);
+  const f = Math.max(0, Math.min(v / lim, 1));
   const ang = Math.PI * (1 - f);
   const ex = (40 + 30 * Math.cos(ang)).toFixed(1);
   const ey = (45 - 30 * Math.sin(ang)).toFixed(1);
@@ -97,7 +97,9 @@ function Speedometer({ speed, limit }: { speed: number; limit: number }) {
     const id = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(id);
   }, []);
-  const arcD = `M 10 45 A 30 30 0 ${f > 0.5 ? 1 : 0} 1 ${ex} ${ey}`;
+  // large-arc-flag sempre 0: o arco varrido nunca passa de 180°; com 1 o SVG
+  // escolhe o centro espelhado e desenha o arco fora do velocímetro.
+  const arcD = `M 10 45 A 30 30 0 0 1 ${ex} ${ey}`;
   const arc = f > 0.01 ? (
     <Path
       key={`${ready ? 1 : 0}-${arcD}`}

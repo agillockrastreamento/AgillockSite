@@ -45,14 +45,14 @@ function svgVelocimetro(velocidade, limite) {
   const lblColor = '#555';
   const trackColor = '#e9ecef';
   const max = Math.max(limite || 120, 120);
-  const f = Math.min(velocidade / max, 1);
+  const f = Math.max(0, Math.min(velocidade / max, 1));
   const angRad = Math.PI * (1 - f);
   const ex = (40 + 30 * Math.cos(angRad)).toFixed(1);
   const ey = (45 - 30 * Math.sin(angRad)).toFixed(1);
-  const largeArc = f > 0.5 ? 1 : 0;
   const cor = limite && velocidade > limite ? '#e74c3c' : velocidade > 80 ? '#f39c12' : '#27ae60';
+  // large-arc-flag sempre 0: o arco varrido nunca passa de 180°; com 1 o SVG desenha fora do gauge.
   const arc = f > 0.01
-    ? `<path d="M 10 45 A 30 30 0 ${largeArc} 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>`
+    ? `<path d="M 10 45 A 30 30 0 0 1 ${ex} ${ey}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round"/>`
     : '';
   return `<svg width="80" height="50" viewBox="0 0 90 54" style="display:block;margin:4px auto 6px">
     <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="${trackColor}" stroke-width="7" stroke-linecap="round"/>
