@@ -32,14 +32,13 @@ type Boleto = {
   placa?: { placa?: string | null } | null;
 };
 
-type StatusFilter = 'TODOS' | 'PENDENTE' | 'ATRASADO' | 'PAGO' | 'CANCELADO';
+type StatusFilter = 'TODOS' | 'PENDENTE' | 'ATRASADO' | 'PAGO';
 
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: 'TODOS', label: 'Todos' },
   { key: 'PENDENTE', label: 'Pendente' },
   { key: 'ATRASADO', label: 'Atrasado' },
   { key: 'PAGO', label: 'Pago' },
-  { key: 'CANCELADO', label: 'Cancelado' },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -105,7 +104,8 @@ export function PagamentosScreen() {
     else setIsLoading(true);
     try {
       const data = await apiRequest<Boleto[]>('/cliente/boletos');
-      setBoletos(data ?? []);
+      // Boletos cancelados nunca são exibidos ao cliente
+      setBoletos((data ?? []).filter(b => b.status !== 'CANCELADO'));
     } catch {
       toast.show({ message: 'Erro ao carregar pagamentos.', type: 'error' });
     } finally {
@@ -153,12 +153,7 @@ export function PagamentosScreen() {
       </View>
 
       {/* Status filter tabs */}
-      <ScrollView
-        horizontal
-        style={styles.tabsScroll}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabsRow}
-      >
+      <View style={styles.tabsRow}>
         {STATUS_TABS.map(tab => {
           const count = tab.key === 'TODOS'
             ? boletos.length
@@ -183,7 +178,7 @@ export function PagamentosScreen() {
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
 
       {isLoading ? (
         <View style={styles.loading}>
@@ -359,11 +354,9 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 1,
   },
-  tabsScroll: {
-    flexGrow: 0,
-  },
   tabsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,

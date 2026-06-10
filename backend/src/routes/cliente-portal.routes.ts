@@ -943,10 +943,13 @@ router.get('/boletos', requireResponsavel, async (req: ClienteRequest, res: Resp
   const where: Record<string, unknown> = {
     carne: { clienteId },
   };
+  // Boletos cancelados nunca são exibidos ao cliente
   if (status === 'aberto') {
     where.status = { in: ['PENDENTE', 'ATRASADO'] };
-  } else if (status) {
+  } else if (status && status !== 'CANCELADO') {
     where.status = status;
+  } else {
+    where.status = { not: 'CANCELADO' };
   }
   if (dataVencDe || dataVencAte) {
     const venc: Record<string, Date> = {};
