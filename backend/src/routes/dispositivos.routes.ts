@@ -15,6 +15,7 @@ import {
   traccarGetDeviceByImei,
   type TraccarDeviceSyncData,
 } from '../services/traccar.service';
+import { notificarIaproVinculoDispositivo } from '../services/iapro.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -301,6 +302,11 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
     .then(td => syncTraccarAccumulators(td.id, dispositivo))
     .catch(err => console.error('[Traccar] Falha ao criar dispositivo:', err.message));
 
+  // Integração IAPRO: dispositivo já nasce vinculado a cliente → notifica (best-effort)
+  if (dispositivo.clienteId || clientesExtrasRaw) {
+    void notificarIaproVinculoDispositivo(dispositivo.id);
+  }
+
   res.status(201).json(mapDispositivoResponse(dispositivo));
 });
 
@@ -451,6 +457,11 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     }
   }
 
+  // Integração IAPRO: titularidade ou vínculos extras alterados → notifica (best-effort)
+  if ((clienteId !== undefined && clienteId) || clientesExtrasRaw !== undefined) {
+    void notificarIaproVinculoDispositivo(id);
+  }
+
   // Atualizar na Traccar — se não existir, cria (best-effort)
   const traccarData = buildTraccarDeviceSyncData(dispositivo);
   traccarGetDeviceByImei(existe.identificador)
@@ -533,6 +544,11 @@ router.patch('/:id/vincular', requireRoles('ADMIN', 'COLABORADOR'), async (req: 
     });
   }
 
+  // Integração IAPRO: vinculado a um cliente (responsável) → notifica (best-effort)
+  if (novoClienteId) {
+    void notificarIaproVinculoDispositivo(id);
+  }
+
   res.json(dispositivo);
 });
 
@@ -558,6 +574,9 @@ router.post('/:id/clientes', requireRoles('ADMIN', 'COLABORADOR'), async (req: A
     create: { dispositivoId, clienteId },
     update: {},
   });
+
+  // Integração IAPRO: vínculo extra com cliente → notifica (best-effort)
+  void notificarIaproVinculoDispositivo(dispositivoId);
 
   res.status(201).json({ dispositivoId, clienteId });
 });

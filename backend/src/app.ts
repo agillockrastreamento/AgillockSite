@@ -28,6 +28,8 @@ import clienteUsuariosRoutes from './routes/cliente-usuarios.routes';
 import usuariosResgateRoutes from './routes/usuarios-resgate.routes';
 import tagsBleRoutes from './routes/tags-ble.routes';
 import appResgateRoutes from './routes/app-resgate.routes';
+import integracaoIaproRoutes from './routes/integracao-iapro.routes';
+import iaproRoutes from './routes/iapro.routes';
 import { UPLOADS_DIR } from './utils/upload-paths';
 
 const app = express();
@@ -93,6 +95,8 @@ app.get('/api/health', (_req, res) => {
 // rotas genéricas (/api) depois para evitar que authMiddleware bloqueie rotas públicas
 app.use('/api/auth', authRoutes);
 app.use('/api/compartilhamento', compartilhamentoRoutes); // público — ANTES de routers com authMiddleware global
+app.use('/api/integracao/iapro', integracaoIaproRoutes);  // server-to-server IAPRO (API key própria)
+app.use('/api/iapro', iaproRoutes);                       // tela IAPRO do painel admin (JWT)
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/carnes', carnesRoutes);
 app.use('/api/boletos', boletosRoutes);

@@ -451,6 +451,37 @@
       }
     }
 
+    // ─── Item IAPRO no sidebar (ADMIN/COLABORADOR) com badge de veículos sem rastreador ──
+    if (sidebarUser && (sidebarUser.role === 'ADMIN' || sidebarUser.role === 'COLABORADOR')) {
+      var navIapro = sidebar.querySelector('.sidebar-nav');
+      if (navIapro && !navIapro.querySelector('a[href*="iapro.html"]')) {
+        var iaproPrefix = window.location.pathname.indexOf('/colaborador/') !== -1 ? '../admin/' : '';
+        var liIapro = document.createElement('li');
+        if (/(^|\/)iapro\.html$/.test(window.location.pathname)) liIapro.className = 'active';
+        liIapro.innerHTML = '<a href="' + iaproPrefix + 'iapro.html">' +
+          '<i class="fa fa-shield fa-fw"></i>' +
+          '<span style="flex:1">IAPRO</span>' +
+          '<span class="sidebar-badge" id="iapro-sidebar-badge" style="display:none;">0</span>' +
+        '</a>';
+        // Insere logo após o item "Clientes"
+        var itemClientes = Array.prototype.find.call(navIapro.children, function (li) {
+          var a = li.querySelector(':scope > a');
+          return a && /clientes\.html$/.test(a.getAttribute('href') || '');
+        });
+        if (itemClientes && itemClientes.nextSibling) navIapro.insertBefore(liIapro, itemClientes.nextSibling);
+        else navIapro.appendChild(liIapro);
+
+        // Badge: quantidade de veículos da IAPRO ainda sem rastreador instalado
+        apiGet('/api/iapro/badge').then(function (d) {
+          var badge = document.getElementById('iapro-sidebar-badge');
+          if (badge && d && d.semRastreamento > 0) {
+            badge.textContent = d.semRastreamento > 99 ? '99+' : String(d.semRastreamento);
+            badge.style.display = '';
+          }
+        }).catch(function () {});
+      }
+    }
+
     var LOGO_FULL = '../img/logo_agillock_white_new.png';
     var LOGO_ICON = '../favicon.ico';
     var logoImg   = sidebar.querySelector('.sidebar-brand img');

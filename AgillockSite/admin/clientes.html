@@ -200,6 +200,55 @@
     </div>
   </div>
 
+  <!-- ═══════════════ MODAL COMPARTILHAR COM A IAPRO ═══════════════ -->
+  <div class="modal fade" id="modal-iapro" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#1e2530;">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title" style="color:#fff;display:flex;align-items:center;gap:10px;">
+            <img src="../img/logo_iapro.jpeg" alt="IAPRO" style="height:24px;border-radius:4px;" />
+            Compartilhar dados com a IAPRO
+          </h4>
+        </div>
+        <div class="modal-body">
+          <div id="modal-iapro-alert"></div>
+
+          <!-- Passo 1: confirmação -->
+          <div id="iapro-step-1">
+            <p style="font-size:15px;">
+              Deseja compartilhar os dados do cliente <strong id="iapro-cliente-nome">—</strong> com a IAPRO?
+            </p>
+            <div class="alert alert-info" style="font-size:13px;">
+              <i class="fa fa-info-circle"></i>
+              Os dados do cliente e do veículo selecionado serão enviados à IAPRO.
+              Lá, a cotação existente desse veículo (localizada pela placa) será <strong>aprovada</strong>
+              e o <strong>contrato será gerado</strong> automaticamente.
+            </div>
+          </div>
+
+          <!-- Passo 2: escolha do veículo -->
+          <div id="iapro-step-2" style="display:none;">
+            <p style="font-size:14px;">De qual veículo deseja enviar os dados?</p>
+            <div class="form-group">
+              <label>Veículo *</label>
+              <select id="iapro-dispositivo" class="form-control">
+                <option value="">Carregando…</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary-al" id="btn-iapro-continuar">Continuar <i class="fa fa-arrow-right"></i></button>
+          <button type="button" class="btn btn-primary-al" id="btn-iapro-compartilhar" style="display:none;">
+            <i class="fa fa-share-alt"></i> Compartilhar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/jquery.js"></script>
   <script src="../js/bootstrap.min.js"></script>
   <script src="../js/config.js"></script>
@@ -278,7 +327,9 @@
         var numVeiculos = (c.dispositivos || []).length + ((c._count && c._count.dispositivosVinculados) ? c._count.dispositivosVinculados : 0);
         var acoes = '<button class="btn btn-xs btn-default btn-editar" data-id="' + c.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' +
           '<button class="btn btn-xs ' + (c.status === 'ATIVO' ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + c.id + '" data-status="' + c.status + '" title="' + (c.status === 'ATIVO' ? 'Inativar' : 'Ativar') + '">' +
-          '<i class="fa fa-power-off"></i></button>';
+          '<i class="fa fa-power-off"></i></button> ' +
+          '<button class="btn btn-xs btn-default btn-iapro" data-id="' + c.id + '" data-nome="' + c.nome + '" title="Compartilhar com a IAPRO" style="padding:1px 4px;">' +
+          '<img src="../img/logo_iapro.jpeg" alt="IAPRO" style="height:16px;border-radius:3px;vertical-align:middle;" /></button>';
         if (isAdmin) {
           acoes += ' <button class="btn btn-xs btn-danger btn-excluir" data-id="' + c.id + '" data-nome="' + c.nome + '" title="Excluir"><i class="fa fa-trash"></i></button>';
         }
@@ -320,6 +371,14 @@
         });
       });
 
+      // Compartilhar com a IAPRO
+      tbody.querySelectorAll('.btn-iapro').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          abrirModalIapro(this.dataset.id, this.dataset.nome);
+        });
+      });
+
       // Excluir
       if (isAdmin) {
         tbody.querySelectorAll('.btn-excluir').forEach(function (btn) {
@@ -355,6 +414,72 @@
     // ── Novo / Editar Cliente → página dedicada ───────────────
     document.getElementById('btn-novo-cliente').addEventListener('click', function () {
       window.location.href = 'cliente-form.html';
+    });
+
+    // ── Modal: compartilhar dados com a IAPRO (2 passos) ──────
+    var iaproClienteId = null;
+
+    function iaproAlert(msg, type) {
+      document.getElementById('modal-iapro-alert').innerHTML = msg
+        ? '<div class="alert alert-' + (type || 'danger') + '" style="font-size:13px;">' + msg + '</div>'
+        : '';
+    }
+
+    function iaproStep(step) {
+      document.getElementById('iapro-step-1').style.display = step === 1 ? '' : 'none';
+      document.getElementById('iapro-step-2').style.display = step === 2 ? '' : 'none';
+      document.getElementById('btn-iapro-continuar').style.display = step === 1 ? '' : 'none';
+      document.getElementById('btn-iapro-compartilhar').style.display = step === 2 ? '' : 'none';
+      iaproAlert('');
+    }
+
+    function abrirModalIapro(clienteId, nome) {
+      iaproClienteId = clienteId;
+      document.getElementById('iapro-cliente-nome').textContent = nome;
+      iaproStep(1);
+      $('#modal-iapro').modal('show');
+    }
+
+    // Passo 1 → 2: carrega os veículos (dispositivos) do cliente
+    document.getElementById('btn-iapro-continuar').addEventListener('click', function () {
+      iaproStep(2);
+      var sel = document.getElementById('iapro-dispositivo');
+      sel.innerHTML = '<option value="">Carregando…</option>';
+      AL.apiGet('/api/iapro/clientes/' + iaproClienteId + '/dispositivos').then(function (lista) {
+        if (!lista || !lista.length) {
+          sel.innerHTML = '<option value="">Nenhum veículo encontrado</option>';
+          iaproAlert('Este cliente não possui dispositivos/veículos vinculados na Ágil Lock.', 'warning');
+          return;
+        }
+        sel.innerHTML = '<option value="">Selecione o veículo…</option>' + lista.map(function (d) {
+          var rotulo = [d.placa, [d.marca, d.modeloVeiculo].filter(Boolean).join(' '), d.nome].filter(Boolean).join(' — ');
+          return '<option value="' + d.id + '">' + rotulo + '</option>';
+        }).join('');
+      }).catch(function (err) {
+        sel.innerHTML = '<option value="">Erro ao carregar</option>';
+        iaproAlert(err.message);
+      });
+    });
+
+    // Passo 2: envia para a IAPRO
+    document.getElementById('btn-iapro-compartilhar').addEventListener('click', function () {
+      var dispositivoId = document.getElementById('iapro-dispositivo').value;
+      if (!dispositivoId) { iaproAlert('Selecione o veículo.', 'warning'); return; }
+      var btn = this;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando…';
+      AL.apiPost('/api/iapro/compartilhar', { clienteId: iaproClienteId, dispositivoId: dispositivoId })
+        .then(function () {
+          $('#modal-iapro').modal('hide');
+          AL.showAlert('Dados compartilhados com a IAPRO — cotação aprovada e contrato gerado.', 'success');
+        })
+        .catch(function (err) {
+          iaproAlert(err.message);
+        })
+        .then(function () {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa fa-share-alt"></i> Compartilhar';
+        });
     });
   })();
   </script>

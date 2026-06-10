@@ -1,0 +1,7 @@
+# Override de porta para rodar o backend em 3002 no host quando a 3000 está ocupada
+# por outro projeto. Uso:
+#   docker compose -f docker-compose.dev.yml -f docker-compose.port-override.yml up -d
+services:
+  backend:
+    ports: !override
+      - "3002:3000"

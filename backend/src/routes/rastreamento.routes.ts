@@ -111,7 +111,7 @@ function formatarEnderecoNominatim(address: Record<string, unknown> = {}): strin
   return partes.join(', ');
 }
 
-async function reverseGeocode(lat: number, lon: number): Promise<string> {
+export async function reverseGeocode(lat: number, lon: number): Promise<string> {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
     throw new Error('Coordenadas inválidas.');
   }

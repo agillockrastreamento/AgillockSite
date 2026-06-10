@@ -109,6 +109,11 @@ model Cliente {
   origemCliente  String?
   socios         Json?
   status         StatusCliente @default(ATIVO)
+
+  // Integração IAPRO — cliente criado/sincronizado a partir de um contrato da IAPRO.
+  // Pagamentos desse cliente são feitos pela IAPRO (sem boletos na Ágil Lock).
+  origemIapro    Boolean @default(false)
+  iaproClienteId String? @unique
   cep            String?
   logradouro     String?
   numero         String?
@@ -131,6 +136,34 @@ model Cliente {
   contratos              Contrato[]
   logins                 ClienteLogin[]
   geocercas              Geocerca[]
+  iaproVeiculos          IaproVeiculo[]
+}
+
+// Veículo de um contrato da IAPRO sincronizado via API. Enquanto não houver um
+// Dispositivo (rastreador) vinculado, o veículo conta como "sem rastreamento" na
+// tela IAPRO do admin. Quando o dispositivo é vinculado ao cliente, dispositivoId
+// é preenchido e a IAPRO é notificada (rastreador instalado).
+model IaproVeiculo {
+  id              String   @id @default(uuid())
+  iaproVehicleId  String   @unique // id do Vehicle na IAPRO
+  iaproContractId String? // id do Contract na IAPRO
+  placa           String?
+  marca           String?
+  modelo          String?
+  cor             String?
+  ano             String?
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  dispositivoId String?
+  dispositivo   Dispositivo? @relation(fields: [dispositivoId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId])
+  @@index([placa])
 }
 
 model Placa {
@@ -296,6 +329,7 @@ model Dispositivo {
   loginsPermitidos         ClienteLoginPlaca[]
   tagsBle                  TagBLE[]
   usuariosResgate          UsuarioResgateDispositivo[]
+  iaproVeiculos            IaproVeiculo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

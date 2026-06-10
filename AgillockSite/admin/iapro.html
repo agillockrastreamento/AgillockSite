@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>IAPRO — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
+    #al-alert-container, .filter-bar, .iapro-cards { flex-shrink: 0; }
+    .table-responsive {
+      flex: 1; overflow-y: auto; border-radius: 8px; background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 0;
+    }
+    html.dark-theme .table-responsive { background: #141820; }
+    .admin-table thead th { position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
+
+    /* ── Cards de resumo ── */
+    .iapro-cards { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+    .iapro-card {
+      flex: 1; min-width: 160px; background: #fff; border-radius: 10px;
+      padding: 16px 18px; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      border-left: 4px solid #ccc;
+    }
+    html.dark-theme .iapro-card { background: #141820; }
+    .iapro-card .ic-label { font-size: 12px; color: #8a93a2; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+    .iapro-card .ic-value { font-size: 26px; font-weight: 700; margin-top: 4px; color: #2c3e50; }
+    html.dark-theme .iapro-card .ic-value { color: #e8ecf3; }
+    .iapro-card .ic-sub { font-size: 12px; color: #8a93a2; margin-top: 2px; }
+    .iapro-card.fatura { border-left-color: #da7532; background: linear-gradient(135deg, rgba(218,117,50,.10), transparent); }
+    .iapro-card.fatura .ic-value { color: #da7532; }
+    .iapro-card.ativos { border-left-color: #27ae60; }
+    .iapro-card.sem { border-left-color: #e6a817; }
+    .iapro-card.inativos { border-left-color: #7f8c8d; }
+
+    .filtro-datas { display: none; gap: 8px; margin-top: 8px; }
+    .filtro-datas.aberto { display: flex; }
+    .filtro-datas input { max-width: 170px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+<li class="sidebar-dropdown">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+          <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
+          <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li><a href="usuarios-resgate.html"><i class="fa fa-life-ring fa-fw"></i> Usuários Resgate</a></li>
+          <li><a href="geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <span id="user-nome" class="sidebar-user-nome">—</span>
+          <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+        </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <img src="../img/logo_iapro.jpeg" alt="IAPRO" style="height:30px;border-radius:6px;" onerror="this.style.display='none'" />
+        <h2 class="topbar-title">Clientes IAPRO</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Cards de resumo -->
+    <div class="iapro-cards">
+      <div class="iapro-card fatura">
+        <div class="ic-label"><i class="fa fa-file-text-o"></i> Fatura mensal — IAPRO → Ágil Lock</div>
+        <div class="ic-value" id="card-fatura">—</div>
+        <div class="ic-sub" id="card-fatura-sub">veículos ativos × R$ 39,90/placa</div>
+      </div>
+      <div class="iapro-card ativos">
+        <div class="ic-label">Veículos ativos</div>
+        <div class="ic-value" id="card-ativos">—</div>
+        <div class="ic-sub">com rastreador instalado</div>
+      </div>
+      <div class="iapro-card sem">
+        <div class="ic-label">Sem rastreamento</div>
+        <div class="ic-value" id="card-sem">—</div>
+        <div class="ic-sub">aguardando instalação</div>
+      </div>
+      <div class="iapro-card inativos">
+        <div class="ic-label">Inativos</div>
+        <div class="ic-value" id="card-inativos">—</div>
+        <div class="ic-sub" id="card-clientes">— clientes no total</div>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-5">
+          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por nome, CPF/CNPJ ou placa…" />
+        </div>
+        <div class="col-sm-3">
+          <select id="filtro-status" class="form-control">
+            <option value="">Todos os status</option>
+            <option value="ATIVO">Ativo</option>
+            <option value="INATIVO">Inativo</option>
+            <option value="SEM_RASTREAMENTO">Sem rastreamento</option>
+          </select>
+        </div>
+        <div class="col-sm-4">
+          <select id="filtro-periodo" class="form-control">
+            <option value="">Qualquer data</option>
+            <option value="hoje">Hoje</option>
+            <option value="ontem">Ontem</option>
+            <option value="7dias">Últimos 7 dias</option>
+            <option value="personalizado">Personalizado…</option>
+          </select>
+        </div>
+      </div>
+      <div class="filtro-datas" id="filtro-datas">
+        <input type="date" id="filtro-de" class="form-control" title="De" />
+        <input type="date" id="filtro-ate" class="form-control" title="Até" />
+        <button class="btn btn-primary-al" id="btn-aplicar-datas"><i class="fa fa-check"></i> Aplicar</button>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>CPF/CNPJ</th>
+            <th>Telefone</th>
+            <th>Placa</th>
+            <th>Veículo</th>
+            <th>Rastreamento</th>
+            <th>Dispositivo</th>
+            <th>Entrada</th>
+          </tr>
+        </thead>
+        <tbody id="iapro-tbody">
+          <tr><td colspan="8" class="text-center text-muted">Carregando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div><!-- /admin-content -->
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script src="../js/topbar-rastrear-global.js"></script>
+  <script>
+  (function () {
+    var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+    if (!currentUser) return;
+
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge ' + (currentUser.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    // ── Resumo (cards) ─────────────────────────────────────────
+    function loadResumo() {
+      AL.apiGet('/api/iapro/resumo').then(function (r) {
+        document.getElementById('card-fatura').textContent = AL.fmtMoney(r.faturaMensal);
+        document.getElementById('card-fatura-sub').textContent =
+          r.veiculosAtivos + ' veículo(s) ativo(s) × ' + AL.fmtMoney(r.valorPlaca) + ' por placa';
+        document.getElementById('card-ativos').textContent = r.veiculosAtivos;
+        document.getElementById('card-sem').textContent = r.veiculosSemRastreamento;
+        document.getElementById('card-inativos').textContent = r.veiculosInativos;
+        document.getElementById('card-clientes').textContent = r.totalClientes + ' cliente(s) IAPRO no total';
+      }).catch(function (err) { AL.showAlert(err.message); });
+    }
+
+    // ── Listagem ───────────────────────────────────────────────
+    function badgeRastreamento(estado) {
+      if (estado === 'ATIVO') return '<span class="al-badge badge-ativo">ATIVO</span>';
+      if (estado === 'SEM_RASTREAMENTO') return '<span class="al-badge badge-pendente">SEM RASTREADOR</span>';
+      return '<span class="al-badge badge-inativo">INATIVO</span>';
+    }
+
+    function loadLista() {
+      var params = [];
+      var busca = document.getElementById('filtro-busca').value.trim();
+      var status = document.getElementById('filtro-status').value;
+      var periodo = document.getElementById('filtro-periodo').value;
+      if (busca) params.push('busca=' + encodeURIComponent(busca));
+      if (status) params.push('status=' + encodeURIComponent(status));
+      if (periodo && periodo !== 'personalizado') params.push('periodo=' + encodeURIComponent(periodo));
+      if (periodo === 'personalizado') {
+        var de = document.getElementById('filtro-de').value;
+        var ate = document.getElementById('filtro-ate').value;
+        params.push('periodo=personalizado');
+        if (de) params.push('de=' + encodeURIComponent(de));
+        if (ate) params.push('ate=' + encodeURIComponent(ate));
+      }
+      var qs = params.length ? '?' + params.join('&') : '';
+      var tbody = document.getElementById('iapro-tbody');
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i> Carregando…</td></tr>';
+
+      AL.apiGet('/api/iapro/clientes' + qs).then(function (linhas) {
+        if (!linhas || !linhas.length) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nenhum cliente da IAPRO encontrado.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = linhas.map(function (l) {
+          var veiculo = [l.marca, l.modelo].filter(Boolean).join(' ') || '—';
+          if (l.cor) veiculo += ' • ' + l.cor;
+          var disp = l.dispositivo ? (l.dispositivo.nome + ' (' + l.dispositivo.identificador + ')') : '—';
+          return '<tr class="tr-iapro" data-cliente="' + l.cliente.id + '" style="cursor:pointer;">' +
+            '<td>' + l.cliente.nome + '</td>' +
+            '<td>' + AL.fmtCpfCnpj(l.cliente.cpfCnpj) + '</td>' +
+            '<td>' + (l.cliente.telefone || '—') + '</td>' +
+            '<td><strong>' + (l.placa || '—') + '</strong></td>' +
+            '<td>' + veiculo + '</td>' +
+            '<td>' + badgeRastreamento(l.estado) + '</td>' +
+            '<td>' + disp + '</td>' +
+            '<td>' + AL.fmtDate(l.createdAt) + '</td>' +
+          '</tr>';
+        }).join('');
+
+        tbody.querySelectorAll('.tr-iapro').forEach(function (tr) {
+          tr.addEventListener('click', function () {
+            window.location.href = 'cliente-detalhe.html?id=' + this.dataset.cliente;
+          });
+        });
+      }).catch(function (err) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">' + err.message + '</td></tr>';
+      });
+    }
+
+    // ── Filtros ────────────────────────────────────────────────
+    var _debounce = null;
+    document.getElementById('filtro-busca').addEventListener('input', function () {
+      clearTimeout(_debounce);
+      _debounce = setTimeout(loadLista, 400);
+    });
+    document.getElementById('filtro-status').addEventListener('change', loadLista);
+    document.getElementById('filtro-periodo').addEventListener('change', function () {
+      var personalizado = this.value === 'personalizado';
+      document.getElementById('filtro-datas').classList.toggle('aberto', personalizado);
+      if (!personalizado) loadLista();
+    });
+    document.getElementById('btn-aplicar-datas').addEventListener('click', loadLista);
+
+    loadResumo();
+    loadLista();
+  })();
+  </script>
+</body>
+</html>

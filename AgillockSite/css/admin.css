@@ -1734,3 +1734,24 @@ html.dark-theme .clientes-vend-inner .text-danger {
 html.dark-theme .sidebar-toggle {
     color: #e0e6f0 !important;
 }
+
+/* ══════════════════ Badge estilo notificação no sidebar (item IAPRO) ══════════════════ */
+.sidebar-nav li { position: relative; }
+.sidebar-badge {
+    background: #e74c3c;
+    color: #fff;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 3px 7px;
+    min-width: 18px;
+    text-align: center;
+}
+.admin-sidebar.collapsed .sidebar-nav li > a .sidebar-badge {
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    font-size: 10px !important;
+    padding: 2px 5px;
+}
