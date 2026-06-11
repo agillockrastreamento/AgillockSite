@@ -100,7 +100,7 @@ function getDirectionLabel(relAngle: number, distance: number): string {
 
 function getStateMessage(hasDistance: boolean, hasDirection: boolean, isScanning: boolean): string {
   if (!isScanning) return 'Toque em \u{1F50D} para começar';
-  if (!hasDistance) return 'Procurando tag…';
+  if (!hasDistance) return 'Procurando dispositivo…';
   if (!hasDirection) return 'Vire-se devagar para localizar';
   return '';
 }
@@ -645,8 +645,8 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         <View style={styles.alvoBox}>
           <Icon source="map-marker" size={18} color="#fff" />
           <Text style={styles.warningInlineText}>
-            Sem tag BLE associada — use "Buscar tags próximas" para rastrear uma
-            tag manualmente, ou a posição GPS no mapa.
+            Sem dispositivo BLE associado — use "Buscar dispositivos próximos" para rastrear um
+            dispositivo manualmente, ou a posição GPS no mapa.
           </Text>
         </View>
       ) : null}
@@ -655,7 +655,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
       {manualTargetId ? (
         <View style={styles.manualChip}>
           <Icon source="target" size={14} color="#ffd966" />
-          <Text style={styles.manualChipText}>Rastreando tag manual</Text>
+          <Text style={styles.manualChipText}>Rastreando dispositivo manual</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => setOutrasVisible(true)}
@@ -755,7 +755,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
           }}
         >
           <Icon source="radar" size={15} color="#fff" />
-          <Text style={styles.outrasToggleText}>Buscar tags próximas</Text>
+          <Text style={styles.outrasToggleText}>Buscar dispositivos próximos</Text>
         </Pressable>
       ) : null}
 
@@ -766,11 +766,11 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         <View style={styles.outrasBox}>
           <View style={styles.outrasHeader}>
             <Text style={styles.outrasTitle}>
-              Tags próximas ({outrasOrdenadas.length}) — toque para rastrear
+              Dispositivos próximos ({outrasOrdenadas.length}) — toque para rastrear
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Fechar lista de tags próximas"
+              accessibilityLabel="Fechar lista dos dispositivos próximos"
               onPress={() => setOutrasVisible(false)}
               hitSlop={8}
             >
@@ -779,7 +779,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
           </View>
           {outrasOrdenadas.length === 0 ? (
             <Text style={styles.outrasEmpty}>
-              {isScanning ? 'Procurando tags ao redor…' : 'Inicie a busca para escanear tags.'}
+              {isScanning ? 'Procurando dispositivos ao redor…' : 'Inicie a busca para escanear dispositivos.'}
             </Text>
           ) : (
             <ScrollView style={styles.outrasList} nestedScrollEnabled>

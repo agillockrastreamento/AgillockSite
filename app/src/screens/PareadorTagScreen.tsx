@@ -255,7 +255,7 @@ export function PareadorTagScreen() {
       {/* Scan e candidatas */}
       <View style={[styles.section, { flex: 1 }]}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Parear nova tag</Text>
+          <Text style={styles.sectionTitle}>Parear novo dispositivo</Text>
           <Pressable
             accessibilityRole="button"
             onPress={isScanning ? stopScan : startScan}
@@ -285,9 +285,9 @@ export function PareadorTagScreen() {
         {isScanning && candidatesOrdenados.length === 0 ? (
           <View style={styles.searchingBox}>
             <ActivityIndicator color={colors.primary} />
-            <Text style={styles.searchingText}>Procurando tags ao redor…</Text>
+            <Text style={styles.searchingText}>Procurando dispositivos ao redor…</Text>
             <Text style={styles.searchingHint}>
-              Aproxime o celular da tag para captar o sinal.
+              Aproxime o celular do dispositivo para captar o sinal.
             </Text>
           </View>
         ) : null}
@@ -301,7 +301,7 @@ export function PareadorTagScreen() {
               <View style={styles.idleBox}>
                 <Icon source="bluetooth-settings" size={32} color={colors.textMuted} />
                 <Text style={styles.idleText}>
-                  Toque em "Escanear" para começar a procurar tags próximas.
+                  Toque em "Escanear" para começar a procurar dispositivos próximos.
                 </Text>
               </View>
             ) : null
