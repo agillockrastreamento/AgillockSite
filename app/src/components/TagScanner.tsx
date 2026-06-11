@@ -4,6 +4,7 @@ import {
   Easing,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   Vibration,
@@ -27,7 +28,7 @@ import {
   type TrendDirection,
 } from '../ble/distanceEstimator';
 import {
-  DEVICE_INSTALL_ID,
+  getDeviceInstallId,
   isHighConfidence,
   type MatchConfidence,
   matchTagToScan,
@@ -130,6 +131,17 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
 
   const [outras, setOutras] = useState<Record<string, OutraTag>>({});
 
+  // Rastreio manual: o usuário toca numa tag da lista "Tags próximas" para
+  // rastreá-la diretamente, ignorando o matching automático. Recurso de
+  // recuperação quando o fingerprint da tag pareada não casa (tag sem nome,
+  // endereço BLE rotativo etc.) ou quando o veículo não tem tag associada.
+  const [manualTargetId, setManualTargetId] = useState<string | null>(null);
+  const manualTargetIdRef = useRef<string | null>(null);
+  manualTargetIdRef.current = manualTargetId;
+
+  // Painel "Tags próximas" — abre pelo botão de buscar tags
+  const [outrasVisible, setOutrasVisible] = useState(false);
+
   // Heading do telefone + heading estimada da tag
   const [deviceHeading, setDeviceHeading] = useState(0);
   const deviceHeadingRef = useRef(0);
@@ -176,8 +188,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     });
   }, []);
 
-  // ── Reset ao trocar de veículo ───────────────────────
-  useEffect(() => {
+  const resetTracking = useCallback(() => {
     alvoSmoother.reset();
     setAlvoRssi(null);
     setAlvoDistance(null);
@@ -189,7 +200,24 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     setOutras({});
     setEstimatedTagHeading(null);
     headingRssiRef.current.clear();
-  }, [veiculoAlvo?.id, alvoSmoother]);
+  }, [alvoSmoother]);
+
+  // ── Reset ao trocar de veículo ───────────────────────
+  useEffect(() => {
+    resetTracking();
+    setManualTargetId(null);
+    setOutrasVisible(false);
+  }, [veiculoAlvo?.id, resetTracking]);
+
+  const selecionarManual = useCallback((id: string) => {
+    resetTracking();
+    setManualTargetId(id);
+  }, [resetTracking]);
+
+  const cancelarManual = useCallback(() => {
+    resetTracking();
+    setManualTargetId(null);
+  }, [resetTracking]);
 
   // ── Heading do telefone ─────────────────────────────
   useEffect(() => {
@@ -390,6 +418,43 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     }
   }, []);
 
+  // ── Processa cada peripheral detectado pelo scan ────
+  const handleScannedDevice = useCallback((device: BleDevice) => {
+    lastAnyScanAtRef.current = Date.now();
+    const tag = veiculoAlvoRef.current?.tag ?? null;
+    const manualId = manualTargetIdRef.current;
+    const match = manualId
+      ? (device.id === manualId
+          ? { confidence: 'name-only' as MatchConfidence, device, trackingId: device.id }
+          : null)
+      : tag
+        ? matchTagToScan(tag, device)
+        : null;
+    if (match) {
+      consecutiveThrottlesRef.current = 0;
+      const txPower = tag?.txPowerCalibrado ?? -59;
+      const rawRssi = device.rssi ?? -100;
+      const smoothed = alvoSmoother.push(rawRssi);
+      const dist = rssiToDistance(smoothed, txPower, 2.5);
+      setAlvoRssi(Math.round(smoothed));
+      setAlvoDistance(dist);
+      setAlvoConfidence(match.confidence);
+      setAlvoTrackingId(match.trackingId);
+      setAlvoLastSeenAt(Date.now());
+      setTrend(classifyTrend(alvoSmoother.trend()));
+      updateEstimatedHeading(rawRssi);
+      return;
+    }
+    const id = device.id;
+    const name = (device.localName ?? device.name ?? `Sem nome · ${id.slice(-5)}`).trim();
+    const rssi = device.rssi ?? -100;
+    const distance = rssiToDistance(rssi, -59, 2.5);
+    setOutras((current) => ({
+      ...current,
+      [id]: { id, name, rssi, distance, lastSeenAt: Date.now() },
+    }));
+  }, [alvoSmoother, updateEstimatedHeading]);
+
   // ── Inicia scan ─────────────────────────────────────
   const startScan = useCallback(async () => {
     setPermissionError(null);
@@ -408,34 +473,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     lastAnyScanAtRef.current = Date.now();
 
     const stop = startBleScan(
-      (device: BleDevice) => {
-        lastAnyScanAtRef.current = Date.now();
-        const tag = veiculoAlvoRef.current?.tag ?? null;
-        const match = tag ? matchTagToScan(tag, device) : null;
-        if (match) {
-          consecutiveThrottlesRef.current = 0;
-          const txPower = tag?.txPowerCalibrado ?? -59;
-          const rawRssi = device.rssi ?? -100;
-          const smoothed = alvoSmoother.push(rawRssi);
-          const dist = rssiToDistance(smoothed, txPower, 2.5);
-          setAlvoRssi(Math.round(smoothed));
-          setAlvoDistance(dist);
-          setAlvoConfidence(match.confidence);
-          setAlvoTrackingId(match.trackingId);
-          setAlvoLastSeenAt(Date.now());
-          setTrend(classifyTrend(alvoSmoother.trend()));
-          updateEstimatedHeading(rawRssi);
-          return;
-        }
-        const id = device.id;
-        const name = (device.localName ?? device.name ?? `Sem nome · ${id.slice(-5)}`).trim();
-        const rssi = device.rssi ?? -100;
-        const distance = rssiToDistance(rssi, -59, 2.5);
-        setOutras((current) => ({
-          ...current,
-          [id]: { id, name, rssi, distance, lastSeenAt: Date.now() },
-        }));
-      },
+      handleScannedDevice,
       {
         onlyTags: true,
         onError: (msg) => {
@@ -471,34 +509,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
       // o slot interno do scanner BLE antes de tentar reabrir.
       setTimeout(() => {
         const newStop = startBleScan(
-          (device: BleDevice) => {
-            lastAnyScanAtRef.current = Date.now();
-            const tag = veiculoAlvoRef.current?.tag ?? null;
-            const match = tag ? matchTagToScan(tag, device) : null;
-            if (match) {
-              consecutiveThrottlesRef.current = 0;
-              const txPower = tag?.txPowerCalibrado ?? -59;
-              const rawRssi = device.rssi ?? -100;
-              const smoothed = alvoSmoother.push(rawRssi);
-              const dist = rssiToDistance(smoothed, txPower, 2.5);
-              setAlvoRssi(Math.round(smoothed));
-              setAlvoDistance(dist);
-              setAlvoConfidence(match.confidence);
-              setAlvoTrackingId(match.trackingId);
-              setAlvoLastSeenAt(Date.now());
-              setTrend(classifyTrend(alvoSmoother.trend()));
-              updateEstimatedHeading(rawRssi);
-              return;
-            }
-            const id = device.id;
-            const name = (device.localName ?? device.name ?? `Sem nome · ${id.slice(-5)}`).trim();
-            const rssi = device.rssi ?? -100;
-            const distance = rssiToDistance(rssi, -59, 2.5);
-            setOutras((current) => ({
-              ...current,
-              [id]: { id, name, rssi, distance, lastSeenAt: Date.now() },
-            }));
-          },
+          handleScannedDevice,
           {
             onlyTags: true,
             onError: (msg) => {
@@ -523,7 +534,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     };
     stopScanRef.current = stopAll;
     setIsScanning(true);
-  }, [alvoSmoother, updateEstimatedHeading]);
+  }, [handleScannedDevice]);
 
   const stopScan = useCallback(() => {
     stopScanRef.current?.();
@@ -555,7 +566,7 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     try {
       await apiRequest(`/tags/${tag.id}`, {
         method: 'PUT',
-        body: { iosPeripheralUuid: alvoTrackingId, iosDeviceId: DEVICE_INSTALL_ID },
+        body: { iosPeripheralUuid: alvoTrackingId, iosDeviceId: getDeviceInstallId() },
       });
       setCacheSaved(true);
     } catch {}
@@ -584,6 +595,11 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     [hasDistance, hasDirection, isScanning],
   );
 
+  const outrasOrdenadas = useMemo(
+    () => Object.values(outras).sort((a, b) => a.distance - b.distance),
+    [outras],
+  );
+
   // Background interpolado
   const bg = backgroundColorAnim.interpolate({
     inputRange: [0, 0.35, 0.6, 0.85, 1],
@@ -610,21 +626,6 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
     );
   }
 
-  // ── Sem tag ─────────────────────────────────────────
-  if (!veiculoAlvo.tag) {
-    return (
-      <View style={styles.containerIdle}>
-        <Text style={styles.titleTop} numberOfLines={1}>{veiculoAlvo.nome}</Text>
-        <View style={styles.alvoBox}>
-          <Icon source="map-marker" size={18} color="#fff" />
-          <Text style={styles.warningInlineText}>
-            Sem tag BLE — use a posição GPS no mapa para localizar.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <Animated.View style={[styles.container, { backgroundColor: bg }]}>
       {/* Título no topo (como na foto Find My) */}
@@ -636,6 +637,37 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
         <View style={styles.errorBox}>
           <Icon source="alert-circle" size={16} color="#ff6b6b" />
           <Text style={styles.errorText}>{permissionError}</Text>
+        </View>
+      ) : null}
+
+      {/* Veículo sem tag associada: a busca ainda funciona via seleção manual */}
+      {!veiculoAlvo.tag && !manualTargetId ? (
+        <View style={styles.alvoBox}>
+          <Icon source="map-marker" size={18} color="#fff" />
+          <Text style={styles.warningInlineText}>
+            Sem tag BLE associada — use "Buscar tags próximas" para rastrear uma
+            tag manualmente, ou a posição GPS no mapa.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Chip de rastreio manual ativo */}
+      {manualTargetId ? (
+        <View style={styles.manualChip}>
+          <Icon source="target" size={14} color="#ffd966" />
+          <Text style={styles.manualChipText}>Rastreando tag manual</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setOutrasVisible(true)}
+            hitSlop={8}
+          >
+            <Text style={styles.manualChipCancel}>buscar outra</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={cancelarManual} hitSlop={8}>
+            <Text style={styles.manualChipCancel}>
+              {veiculoAlvo.tag ? 'voltar à original' : 'cancelar'}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -711,6 +743,70 @@ export function TagScanner({ veiculoAlvo }: TagScannerProps) {
           <Text style={styles.idleText}>{stateMessage}</Text>
         )}
       </View>
+
+      {/* Botão que abre o painel de tags próximas (inicia o scan se preciso) */}
+      {!outrasVisible && !manualTargetId ? (
+        <Pressable
+          accessibilityRole="button"
+          style={styles.outrasToggleBtn}
+          onPress={() => {
+            if (!isScanning) startScan();
+            setOutrasVisible(true);
+          }}
+        >
+          <Icon source="radar" size={15} color="#fff" />
+          <Text style={styles.outrasToggleText}>Buscar tags próximas</Text>
+        </Pressable>
+      ) : null}
+
+      {/* Painel de tags próximas — toque para rastrear manualmente.
+          Garante que tudo o que aparece no pareador também aparece aqui,
+          mesmo quando o matching automático da tag pareada falha. */}
+      {outrasVisible ? (
+        <View style={styles.outrasBox}>
+          <View style={styles.outrasHeader}>
+            <Text style={styles.outrasTitle}>
+              Tags próximas ({outrasOrdenadas.length}) — toque para rastrear
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Fechar lista de tags próximas"
+              onPress={() => setOutrasVisible(false)}
+              hitSlop={8}
+            >
+              <Icon source="close" size={16} color="rgba(255,255,255,0.7)" />
+            </Pressable>
+          </View>
+          {outrasOrdenadas.length === 0 ? (
+            <Text style={styles.outrasEmpty}>
+              {isScanning ? 'Procurando tags ao redor…' : 'Inicie a busca para escanear tags.'}
+            </Text>
+          ) : (
+            <ScrollView style={styles.outrasList} nestedScrollEnabled>
+              {outrasOrdenadas.map((t) => (
+                <Pressable
+                  key={t.id}
+                  accessibilityRole="button"
+                  style={styles.outraRow}
+                  onPress={() => {
+                    selecionarManual(t.id);
+                    setOutrasVisible(false);
+                  }}
+                >
+                  <Icon source="bluetooth" size={14} color="rgba(255,255,255,0.6)" />
+                  <Text style={styles.outraName} numberOfLines={1}>{t.name}</Text>
+                  <Text style={styles.outraMeta}>
+                    {t.distance < 1
+                      ? `${Math.round(t.distance * 100)} cm`
+                      : `~${t.distance.toFixed(1).replace('.', ',')} m`}
+                    {' · '}{t.rssi} dBm
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      ) : null}
 
       {/* Rodapé com controles (igual foto Find My) */}
       <View style={styles.footer}>
@@ -1006,6 +1102,97 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#fff',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  manualChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,217,102,0.14)',
+    marginBottom: spacing.sm,
+  },
+  manualChipText: {
+    flex: 1,
+    color: '#ffd966',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  manualChipCancel: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
+  outrasToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    marginBottom: spacing.xs,
+  },
+  outrasToggleText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  outrasBox: {
+    maxHeight: 168,
+    marginBottom: spacing.xs,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+  },
+  outrasHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 4,
+  },
+  outrasTitle: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  outrasEmpty: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 11,
+    fontStyle: 'italic',
+    paddingVertical: 8,
+    textAlign: 'center',
+  },
+  outrasList: {
+    flexGrow: 0,
+  },
+  outraRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.12)',
+  },
+  outraName: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  outraMeta: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
     fontWeight: '600',
   },
 });

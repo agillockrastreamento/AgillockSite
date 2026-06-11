@@ -21,6 +21,18 @@ router.get(
   requireRoles('RESGATE'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     const userId = req.user!.userId;
+    const TAG_SELECT = {
+      id: true,
+      apelido: true,
+      mac: true,
+      nomeBleAdvertised: true,
+      manufacturerCompanyId: true,
+      manufacturerDataHex: true,
+      serviceUuids: true,
+      txPowerCalibrado: true,
+      iosPeripheralUuidCache: true,
+    } as const;
+
     const atribuicoes = await prisma.usuarioResgateDispositivo.findMany({
       where: { usuarioId: userId },
       select: {
@@ -38,21 +50,15 @@ router.get(
             cor: true,
             ano: true,
             enderecoMac: true,
+            // Fallback: tags pareadas no dispositivo, caso a atribuição não tenha tagId
+            tagsBle: {
+              select: TAG_SELECT,
+              orderBy: { createdAt: 'asc' as const },
+              take: 1,
+            },
           },
         },
-        tag: {
-          select: {
-            id: true,
-            apelido: true,
-            mac: true,
-            nomeBleAdvertised: true,
-            manufacturerCompanyId: true,
-            manufacturerDataHex: true,
-            serviceUuids: true,
-            txPowerCalibrado: true,
-            iosPeripheralUuidCache: true,
-          },
-        },
+        tag: { select: TAG_SELECT },
       },
     });
 
@@ -76,12 +82,14 @@ router.get(
 
     res.json(
       atribuicoes.map((a) => {
-        const d = a.dispositivo;
+        const { tagsBle, ...d } = a.dispositivo;
         const traccar = traccarByImei.get(d.identificador);
         const pos = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
         return {
           ...d,
-          tag: a.tag,
+          // tagId explícito na atribuição vence; sem ele, usa a primeira tag
+          // pareada no dispositivo (atribuições criadas antes do pareamento)
+          tag: a.tag ?? tagsBle[0] ?? null,
           // Campos compatíveis com o snapshot do cliente — posição fresca do Traccar
           telemetriaUltimaLatitude: pos?.latitude ?? null,
           telemetriaUltimaLongitude: pos?.longitude ?? null,

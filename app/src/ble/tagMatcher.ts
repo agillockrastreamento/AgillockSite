@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { BleDevice } from './bleManager';
 import type { RescueVehicleTag } from '../components/TagScanner';
 
@@ -15,7 +16,30 @@ export type MatchResult = {
   trackingId: string;
 };
 
-const DEVICE_INSTALL_ID = `${Platform.OS}-install`;
+const INSTALL_ID_KEY = '@agillock/ble/install_id';
+const LEGACY_INSTALL_ID = `${Platform.OS}-install`;
+
+// Identificador único POR INSTALAÇÃO do app — é a chave do cache de peripheral
+// UUID iOS no backend. A string fixa anterior ('ios-install') colidia entre
+// aparelhos: o UUID gravado pelo telefone do admin nunca batia no telefone da
+// equipe de resgate (peripheral UUID é aleatório por aparelho) e cada um
+// sobrescrevia o cache do outro.
+let deviceInstallId = LEGACY_INSTALL_ID; // fallback até o AsyncStorage responder
+AsyncStorage.getItem(INSTALL_ID_KEY)
+  .then((stored) => {
+    if (stored) {
+      deviceInstallId = stored;
+      return;
+    }
+    const novo = `${Platform.OS}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    deviceInstallId = novo;
+    return AsyncStorage.setItem(INSTALL_ID_KEY, novo);
+  })
+  .catch(() => {});
+
+export function getDeviceInstallId(): string {
+  return deviceInstallId;
+}
 
 function normalizeMac(mac: string | null | undefined): string {
   return String(mac ?? '').toUpperCase().replace(/[^0-9A-F]/g, '');
@@ -24,7 +48,8 @@ function normalizeMac(mac: string | null | undefined): string {
 function hasCachedUuidForThisDevice(tag: RescueVehicleTag, deviceId: string): boolean {
   const cache = tag.iosPeripheralUuidCache as Record<string, string> | undefined;
   if (!cache || typeof cache !== 'object') return false;
-  return cache[DEVICE_INSTALL_ID] === deviceId;
+  // Chave legada mantida: válida apenas no aparelho que pareou antes da correção
+  return cache[getDeviceInstallId()] === deviceId || cache[LEGACY_INSTALL_ID] === deviceId;
 }
 
 /**
@@ -65,6 +90,23 @@ export function matchTagToScan(tag: RescueVehicleTag, scanned: BleDevice): Match
     }
   }
 
+  // 4. Tag SEM nome advertised: manufacturer data é o único fingerprint restante.
+  // Essencial para tag pareada no iOS (sem MAC) que não anuncia nome — sem este
+  // caminho ela fica impossível de casar se o peripheral UUID mudar (endereço
+  // BLE rotativo) ou em outro aparelho. Exige prefixo mútuo de >= 8 hex (4 bytes)
+  // para reduzir falso positivo entre tags do mesmo fabricante.
+  if (!tag.nomeBleAdvertised && tag.manufacturerDataHex && scanned.manufacturerData) {
+    const scannedMfgHex = bufferBase64ToHex(scanned.manufacturerData);
+    const tagMfgHex = tag.manufacturerDataHex.toUpperCase();
+    const minLen = Math.min(scannedMfgHex.length, tagMfgHex.length);
+    if (
+      minLen >= 8 &&
+      (scannedMfgHex.startsWith(tagMfgHex) || tagMfgHex.startsWith(scannedMfgHex))
+    ) {
+      return { confidence: 'fingerprint', device: scanned, trackingId: scanned.id };
+    }
+  }
+
   return null;
 }
 
@@ -90,5 +132,3 @@ export function bufferBase64ToHex(b64: string | null | undefined): string {
 export function isHighConfidence(confidence: MatchConfidence): boolean {
   return confidence === 'exact-mac' || confidence === 'cached-uuid';
 }
-
-export { DEVICE_INSTALL_ID };

@@ -20,7 +20,7 @@ import {
   waitForBleReady,
 } from '../ble/bleManager';
 import { rssiToDistance } from '../ble/distanceEstimator';
-import { bufferBase64ToHex, DEVICE_INSTALL_ID } from '../ble/tagMatcher';
+import { bufferBase64ToHex, getDeviceInstallId } from '../ble/tagMatcher';
 import { apiRequest } from '../services/api/apiClient';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
@@ -167,7 +167,7 @@ export function PareadorTagScreen() {
           serviceUuids: serviceUuids.length ? serviceUuids : null,
           txPowerCalibrado: device.txPowerLevel ?? null,
           iosPeripheralUuid: !isAndroid ? device.id : null,
-          iosDeviceId: !isAndroid ? DEVICE_INSTALL_ID : null,
+          iosDeviceId: !isAndroid ? getDeviceInstallId() : null,
         },
       });
 

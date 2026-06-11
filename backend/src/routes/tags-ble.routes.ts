@@ -118,10 +118,12 @@ router.post(
   }
 );
 
-// PUT /api/tags/:id — atualiza fingerprint após (re)pareamento
+// PUT /api/tags/:id — atualiza fingerprint após (re)pareamento.
+// RESGATE também pode chamar, mas só para gravar o cache de peripheral UUID iOS
+// (o scanner salva o UUID do aparelho dele após casar por fingerprint).
 router.put(
   '/tags/:id',
-  requireRoles('ADMIN'),
+  requireRoles('ADMIN', 'RESGATE'),
   async (req: AuthRequest, res: Response): Promise<void> => {
     const id = param(req, 'id');
     const {
@@ -155,14 +157,22 @@ router.put(
       return;
     }
 
+    const isResgate = req.user!.role === 'RESGATE';
+    if (isResgate && (!iosPeripheralUuid || !iosDeviceId)) {
+      res.status(403).json({ error: 'Usuário de resgate só pode atualizar o cache de UUID iOS.' });
+      return;
+    }
+
     const data: Record<string, unknown> = {};
-    if (apelido !== undefined) data.apelido = apelido;
-    if (mac !== undefined) data.mac = mac;
-    if (nomeBleAdvertised !== undefined) data.nomeBleAdvertised = nomeBleAdvertised;
-    if (manufacturerCompanyId !== undefined) data.manufacturerCompanyId = manufacturerCompanyId;
-    if (manufacturerDataHex !== undefined) data.manufacturerDataHex = manufacturerDataHex;
-    if (serviceUuids !== undefined) data.serviceUuids = serviceUuids;
-    if (txPowerCalibrado !== undefined) data.txPowerCalibrado = txPowerCalibrado;
+    if (!isResgate) {
+      if (apelido !== undefined) data.apelido = apelido;
+      if (mac !== undefined) data.mac = mac;
+      if (nomeBleAdvertised !== undefined) data.nomeBleAdvertised = nomeBleAdvertised;
+      if (manufacturerCompanyId !== undefined) data.manufacturerCompanyId = manufacturerCompanyId;
+      if (manufacturerDataHex !== undefined) data.manufacturerDataHex = manufacturerDataHex;
+      if (serviceUuids !== undefined) data.serviceUuids = serviceUuids;
+      if (txPowerCalibrado !== undefined) data.txPowerCalibrado = txPowerCalibrado;
+    }
 
     // Atualiza cache iOS preservando outros devices
     if (iosPeripheralUuid && iosDeviceId) {
