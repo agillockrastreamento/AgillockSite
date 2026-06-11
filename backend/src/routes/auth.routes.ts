@@ -6,6 +6,49 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 
 const router = Router();
 
+// Formata dígitos como CPF (000.000.000-00) ou CNPJ (00.000.000/0000-00)
+function formatarCpfCnpj(digits: string): string {
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  }
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+}
+
+// Busca o ClienteLogin pelo identificador informado: e-mail ou CPF/CNPJ.
+// CPF/CNPJ resolve para o login responsável do cliente correspondente.
+async function buscarClienteLogin(identificador: string) {
+  const include = { cliente: { select: { id: true, nome: true, status: true } } };
+
+  const digits = identificador.replace(/\D/g, '');
+  const ehCpfCnpj = !identificador.includes('@') && (digits.length === 11 || digits.length === 14);
+
+  if (!ehCpfCnpj) {
+    return prisma.clienteLogin.findUnique({ where: { email: identificador }, include });
+  }
+
+  // cpfCnpj é salvo sem máscara pelos forms atuais, mas dados migrados podem ter máscara
+  const variantes = [digits, formatarCpfCnpj(digits)];
+
+  // 1) Login (sub-usuário) com CPF/CNPJ próprio cadastrado
+  const direto = await prisma.clienteLogin.findFirst({
+    where: { cpfCnpj: { in: variantes } },
+    orderBy: { ativo: 'desc' },
+    include,
+  });
+  if (direto) return direto;
+
+  // 2) CPF/CNPJ do cliente → login responsável. Busca direto pelo login:
+  // clientes duplicados sem login não atrapalham, e logins ativos têm prioridade.
+  return prisma.clienteLogin.findFirst({
+    where: {
+      tipo: 'responsavel',
+      cliente: { cpfCnpj: { in: variantes } },
+    },
+    orderBy: { ativo: 'desc' },
+    include,
+  });
+}
+
 // POST /api/auth/login — login unificado (admin/colaborador/vendedor/cliente)
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   const { email, senha } = req.body;
@@ -62,13 +105,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // 2. Tentar como ClienteLogin (portal do cliente)
-  const clienteLogin = await prisma.clienteLogin.findUnique({
-    where: { email },
-    include: {
-      cliente: { select: { id: true, nome: true, status: true } },
-    },
-  });
+  // 2. Tentar como ClienteLogin (portal do cliente) — por e-mail ou CPF/CNPJ
+  const clienteLogin = await buscarClienteLogin(email);
 
   if (clienteLogin) {
     if (!clienteLogin.ativo) {
@@ -158,13 +196,8 @@ router.post('/login-app', async (req: Request, res: Response): Promise<void> => 
     return;
   }
 
-  // 2. Tentar como ClienteLogin (portal do cliente)
-  const clienteLogin = await prisma.clienteLogin.findUnique({
-    where: { email },
-    include: {
-      cliente: { select: { id: true, nome: true, status: true } },
-    },
-  });
+  // 2. Tentar como ClienteLogin (portal do cliente) — por e-mail ou CPF/CNPJ
+  const clienteLogin = await buscarClienteLogin(email);
 
   if (clienteLogin) {
     if (!clienteLogin.ativo) {
@@ -258,12 +291,7 @@ router.post('/cliente', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const login = await prisma.clienteLogin.findUnique({
-    where: { email },
-    include: {
-      cliente: { select: { id: true, nome: true, status: true } },
-    },
-  });
+  const login = await buscarClienteLogin(email);
 
   if (!login || !login.ativo || login.cliente.status !== 'ATIVO') {
     res.status(401).json({ error: 'Credenciais inválidas ou acesso inativo.' });

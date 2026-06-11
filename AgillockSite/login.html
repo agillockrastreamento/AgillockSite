@@ -23,8 +23,8 @@
 
     <form id="login-form" autocomplete="off">
       <div class="form-group">
-        <label for="email">E-mail</label>
-        <input type="email" id="email" class="form-control" placeholder="seu@email.com" required autofocus />
+        <label for="email">E-mail ou CPF/CNPJ</label>
+        <input type="text" id="email" class="form-control" placeholder="seu@email.com ou CPF/CNPJ" required autofocus />
       </div>
 
       <div class="form-group" style="position:relative;">
@@ -71,6 +71,37 @@
         return;
       }
 
+      // Máscara inteligente: só dígitos → máscara de CPF/CNPJ; letra/@ → texto livre (e-mail)
+      function mascararCpfCnpj(v) {
+        v = String(v || '').replace(/\D/g, '').slice(0, 14);
+        if (v.length <= 11) {
+          v = v.replace(/(\d{3})(\d)/, '$1.$2');
+          v = v.replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
+          v = v.replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+        } else {
+          v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+          v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+          v = v.replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4');
+          v = v.replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, '$1.$2.$3/$4-$5');
+        }
+        return v;
+      }
+      document.getElementById('email').addEventListener('input', function () {
+        if (/[^\d.\-\/\s]/.test(this.value)) {
+          // Virou e-mail: se a máscara estava ativa, remove a pontuação que ela inseriu
+          if (this.dataset.mascarado === '1') this.value = this.value.replace(/[.\-\/\s]/g, '');
+          this.dataset.mascarado = '0';
+          return;
+        }
+        var digits = this.value.replace(/\D/g, '');
+        if (digits) {
+          this.value = mascararCpfCnpj(digits);
+          this.dataset.mascarado = '1';
+        } else {
+          this.dataset.mascarado = '0';
+        }
+      });
+
       // Toggle visibilidade da senha
       document.getElementById('toggle-senha').addEventListener('click', function () {
         var input = document.getElementById('senha');
@@ -86,7 +117,7 @@
         var email = document.getElementById('email').value.trim();
         var senha = document.getElementById('senha').value;
 
-        if (!email || !senha) { AL.showAlert('Preencha e-mail e senha.'); return; }
+        if (!email || !senha) { AL.showAlert('Preencha e-mail/CPF/CNPJ e senha.'); return; }
 
         document.getElementById('btn-texto').style.display   = 'none';
         document.getElementById('btn-spinner').style.display = 'inline';

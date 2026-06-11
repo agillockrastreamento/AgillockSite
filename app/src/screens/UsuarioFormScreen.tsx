@@ -17,6 +17,7 @@ import { apiRequest } from '../services/api/apiClient';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
+import { mascararCpfCnpj } from '../utils/cpfCnpj';
 import type { RootStackParamList } from '../navigation/routes';
 
 type Dispositivo = {
@@ -32,6 +33,7 @@ type Usuario = {
   nome: string | null;
   ativo: boolean;
   perfil: string | null;
+  cpfCnpj: string | null;
   permissoes: Record<string, Record<string, boolean>>;
   dispositivoIds: string[];
 };
@@ -101,6 +103,7 @@ export function UsuarioFormScreen() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [nome, setNome] = useState('');
   const [perfil, setPerfil] = useState('');
+  const [cpfCnpj, setCpfCnpj] = useState('');
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
   const [dispSelecionados, setDispSelecionados] = useState<Set<string>>(new Set());
   const [permissoes, setPermissoes] = useState<Record<Tela, Record<string, boolean>>>(permsVazias);
@@ -121,6 +124,7 @@ export function UsuarioFormScreen() {
           setEmail(user.email);
           setNome(user.nome ?? '');
           setPerfil(user.perfil ?? '');
+          setCpfCnpj(mascararCpfCnpj(user.cpfCnpj ?? ''));
           setDispSelecionados(new Set(user.dispositivoIds));
           const base = permsVazias();
           (Object.keys(base) as Tela[]).forEach((tela) => {
@@ -194,10 +198,16 @@ export function UsuarioFormScreen() {
       toast.show({ message: 'Senha mínima de 6 caracteres.', type: 'error' });
       return;
     }
+    const cpfCnpjDigits = cpfCnpj.replace(/\D/g, '');
+    if (cpfCnpjDigits && cpfCnpjDigits.length !== 11 && cpfCnpjDigits.length !== 14) {
+      toast.show({ message: 'CPF/CNPJ inválido — informe 11 (CPF) ou 14 (CNPJ) dígitos.', type: 'error' });
+      return;
+    }
     const payload: Record<string, unknown> = {
       nome: nome.trim(),
       email: email.trim(),
       perfil: perfil.trim() || null,
+      cpfCnpj: cpfCnpjDigits || null,
       permissoes,
       dispositivoIds: Array.from(dispSelecionados),
     };
@@ -292,6 +302,17 @@ export function UsuarioFormScreen() {
             placeholder="Ex: Locatário, Mecânico, Motorista"
             placeholderTextColor={colors.textMuted}
           />
+          <Text style={styles.label}>CPF/CNPJ (opcional)</Text>
+          <TextInput
+            value={cpfCnpj}
+            onChangeText={(text) => setCpfCnpj(mascararCpfCnpj(text))}
+            style={styles.input}
+            keyboardType="numeric"
+            maxLength={18}
+            placeholder="000.000.000-00"
+            placeholderTextColor={colors.textMuted}
+          />
+          <Text style={styles.hint}>Se informado, o usuário também poderá entrar com ele no login.</Text>
         </View>
 
         <View style={styles.card}>
@@ -434,6 +455,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textMuted,
     marginTop: spacing.xs,
+  },
+  hint: {
+    fontSize: 11,
+    color: colors.textMuted,
   },
   input: {
     backgroundColor: colors.background,

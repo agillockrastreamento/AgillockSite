@@ -21,6 +21,7 @@ import { AppTextInput } from '../components/AppTextInput';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
+import { mascararLoginIdentificador } from '../utils/cpfCnpj';
 
 const logo = require('../../assets/logo_agillock_new.png');
 
@@ -135,7 +136,7 @@ export function LoginScreen() {
 
     // Validações individuais
     if (!normalizedEmail) {
-      setEmailError('Informe um email válido.');
+      setEmailError('Informe o e-mail ou CPF/CNPJ.');
       hasError = true;
     }
     
@@ -182,11 +183,11 @@ export function LoginScreen() {
           </View>
           <View style={styles.formArea}>
             <AppTextInput
-              label="Email"
+              label="E-mail ou CPF/CNPJ"
               value={email}
               errorMessage={emailError}
               onChangeText={(text) => {
-                setEmail(text);
+                setEmail(mascararLoginIdentificador(text, email));
                 if (emailError) setEmailError('');
               }}
               keyboardType="email-address"
@@ -195,7 +196,7 @@ export function LoginScreen() {
               textContentType="username"
               returnKeyType="next"
               editable={!isSubmitting}
-              left={<TextInput.Icon icon="email-outline" color="#999" />}
+              left={<TextInput.Icon icon="account-outline" color="#999" />}
             />
             <AppTextInput
               label="Senha"

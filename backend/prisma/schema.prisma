@@ -469,6 +469,8 @@ model ClienteLogin {
   id               String   @id @default(cuid())
   clienteId        String
   email            String   @unique
+  // CPF/CNPJ opcional (somente dígitos) — permite que o sub-usuário entre com ele no login
+  cpfCnpj          String?
   senhaHash        String
   ativo            Boolean  @default(true)
   prefs            Json     @default("{}")

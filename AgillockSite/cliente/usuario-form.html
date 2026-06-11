@@ -367,10 +367,17 @@
             </div>
           </div>
 
-          <div class="uf-field">
-            <label class="uf-label">Perfil</label>
-            <input type="text" id="campo-perfil" class="uf-input" maxlength="60" placeholder="Locatário, Mecânico, Motorista..." />
-            <div class="uf-hint">Rótulo opcional para identificar o tipo do usuário.</div>
+          <div class="uf-row">
+            <div class="uf-field">
+              <label class="uf-label">Perfil</label>
+              <input type="text" id="campo-perfil" class="uf-input" maxlength="60" placeholder="Locatário, Mecânico, Motorista..." />
+              <div class="uf-hint">Rótulo opcional para identificar o tipo do usuário.</div>
+            </div>
+            <div class="uf-field">
+              <label class="uf-label">CPF/CNPJ</label>
+              <input type="text" id="campo-cpfcnpj" class="uf-input" maxlength="18" inputmode="numeric" placeholder="000.000.000-00" />
+              <div class="uf-hint">Opcional. Se informado, o usuário também poderá entrar com ele no login.</div>
+            </div>
           </div>
         </div>
 
@@ -560,6 +567,25 @@
         if (nomeInput) nomeInput.focus();
       }, 50);
 
+      // Máscara progressiva de CPF/CNPJ
+      function mascararCpfCnpj(v) {
+        v = String(v || '').replace(/\D/g, '').slice(0, 14);
+        if (v.length <= 11) {
+          v = v.replace(/(\d{3})(\d)/, '$1.$2');
+          v = v.replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
+          v = v.replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+        } else {
+          v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+          v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+          v = v.replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4');
+          v = v.replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, '$1.$2.$3/$4-$5');
+        }
+        return v;
+      }
+      document.getElementById('campo-cpfcnpj').addEventListener('input', function () {
+        this.value = mascararCpfCnpj(this.value);
+      });
+
       // Toggle "ver" da tela mostra/esconde permissões filhas
       document.querySelectorAll('input[type=checkbox][data-acao="ver"]').forEach(function (chk) {
         chk.addEventListener('change', function () {
@@ -620,6 +646,7 @@
         document.getElementById('campo-nome').value = u.nome || '';
         document.getElementById('campo-email').value = u.email || '';
         document.getElementById('campo-perfil').value = u.perfil || '';
+        document.getElementById('campo-cpfcnpj').value = mascararCpfCnpj(u.cpfCnpj || '');
         (u.dispositivoIds || []).forEach(function (id) {
           var chk = document.querySelector('#veiculos-grid input[data-disp-id="' + id + '"]');
           if (chk) chk.checked = true;
@@ -663,10 +690,14 @@
         var email = document.getElementById('campo-email').value.trim();
         var senha = document.getElementById('campo-senha').value;
         var perfil = document.getElementById('campo-perfil').value.trim();
+        var cpfCnpj = document.getElementById('campo-cpfcnpj').value.replace(/\D/g, '');
         if (!nome) return AL_CLIENTE.showAlert('Informe o nome.');
         if (!email) return AL_CLIENTE.showAlert('Informe o email.');
         if (!modoEdicao && !senha) return AL_CLIENTE.showAlert('Informe a senha.');
         if (senha && senha.length < 6) return AL_CLIENTE.showAlert('A senha deve ter pelo menos 6 caracteres.');
+        if (cpfCnpj && cpfCnpj.length !== 11 && cpfCnpj.length !== 14) {
+          return AL_CLIENTE.showAlert('CPF/CNPJ inválido — informe 11 (CPF) ou 14 (CNPJ) dígitos.');
+        }
 
         var dispositivoIds = Array.from(document.querySelectorAll('#veiculos-grid input[type=checkbox]:checked'))
           .map(function (c) { return c.value; });
@@ -675,6 +706,7 @@
           nome: nome,
           email: email,
           perfil: perfil || null,
+          cpfCnpj: cpfCnpj || null,
           permissoes: coletarPermissoes(),
           dispositivoIds: dispositivoIds,
         };

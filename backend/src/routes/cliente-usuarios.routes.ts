@@ -45,6 +45,7 @@ router.get('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Res
       nome: true,
       ativo: true,
       perfil: true,
+      cpfCnpj: true,
       permissoes: true,
       createdAt: true,
       updatedAt: true,
@@ -75,6 +76,7 @@ router.get('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res:
       nome: true,
       ativo: true,
       perfil: true,
+      cpfCnpj: true,
       permissoes: true,
       createdAt: true,
       updatedAt: true,
@@ -99,6 +101,7 @@ interface PayloadUsuario {
   senha?: string;
   nome?: string | null;
   perfil?: string | null;
+  cpfCnpj?: string | null;
   permissoes?: unknown;
   dispositivoIds?: string[];
 }
@@ -111,7 +114,35 @@ function validarPayload(body: PayloadUsuario, exigirSenha: boolean): string | nu
   if (body.senha && body.senha.length < 6) {
     return 'A senha deve ter pelo menos 6 caracteres.';
   }
+  if (body.cpfCnpj) {
+    const digits = String(body.cpfCnpj).replace(/\D/g, '');
+    if (digits.length !== 11 && digits.length !== 14) {
+      return 'CPF/CNPJ inválido — informe 11 (CPF) ou 14 (CNPJ) dígitos.';
+    }
+  }
   return null;
+}
+
+// Normaliza o cpfCnpj do payload: dígitos, ou null para limpar, ou undefined se ausente
+function normalizarCpfCnpj(valor: string | null | undefined): string | null | undefined {
+  if (valor === undefined) return undefined;
+  const digits = String(valor ?? '').replace(/\D/g, '');
+  return digits || null;
+}
+
+// CPF/CNPJ do sub-usuário não pode colidir com outro login nem com o CPF/CNPJ de um
+// cliente (que já identifica o login responsável dele) — evita ambiguidade no login.
+async function cpfCnpjEmUso(digits: string, ignorarLoginId?: string): Promise<boolean> {
+  const login = await prisma.clienteLogin.findFirst({
+    where: { cpfCnpj: digits, ...(ignorarLoginId ? { id: { not: ignorarLoginId } } : {}) },
+    select: { id: true },
+  });
+  if (login) return true;
+  const cliente = await prisma.cliente.findFirst({
+    where: { cpfCnpj: digits },
+    select: { id: true },
+  });
+  return !!cliente;
 }
 
 async function validarDispositivos(
@@ -156,6 +187,12 @@ router.post('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Re
     return;
   }
 
+  const cpfCnpj = normalizarCpfCnpj(body.cpfCnpj) ?? null;
+  if (cpfCnpj && (await cpfCnpjEmUso(cpfCnpj))) {
+    res.status(409).json({ error: 'Este CPF/CNPJ já está em uso no sistema.' });
+    return;
+  }
+
   const senhaHash = await bcrypt.hash(body.senha!, 10);
   const permissoes = normalizarPermissoes(body.permissoes);
 
@@ -167,6 +204,7 @@ router.post('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Re
       tipo: 'vinculado',
       nome: body.nome?.trim() ?? null,
       perfil: body.perfil ?? null,
+      cpfCnpj,
       permissoes: permissoes as unknown as object,
       criadoPorLoginId,
       placasPermitidas: {
@@ -174,7 +212,7 @@ router.post('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Re
       },
     },
     select: {
-      id: true, email: true, nome: true, ativo: true, perfil: true,
+      id: true, email: true, nome: true, ativo: true, perfil: true, cpfCnpj: true,
       permissoes: true, createdAt: true,
       placasPermitidas: { select: { dispositivoId: true } },
     },
@@ -228,11 +266,18 @@ router.put('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res:
     }
   }
 
+  const cpfCnpj = normalizarCpfCnpj(body.cpfCnpj);
+  if (cpfCnpj && (await cpfCnpjEmUso(cpfCnpj, id))) {
+    res.status(409).json({ error: 'Este CPF/CNPJ já está em uso no sistema.' });
+    return;
+  }
+
   const data: Record<string, unknown> = {};
   if (body.email) data.email = body.email;
   if (body.senha) data.senhaHash = await bcrypt.hash(body.senha, 10);
   if (body.nome !== undefined) data.nome = body.nome?.trim() || null;
   if (body.perfil !== undefined) data.perfil = body.perfil ?? null;
+  if (cpfCnpj !== undefined) data.cpfCnpj = cpfCnpj;
   if (body.permissoes !== undefined) {
     data.permissoes = normalizarPermissoes(body.permissoes) as unknown as object;
   }
@@ -252,7 +297,7 @@ router.put('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res:
   const atualizado = await prisma.clienteLogin.findUnique({
     where: { id },
     select: {
-      id: true, email: true, nome: true, ativo: true, perfil: true,
+      id: true, email: true, nome: true, ativo: true, perfil: true, cpfCnpj: true,
       permissoes: true, updatedAt: true,
       placasPermitidas: { select: { dispositivoId: true } },
     },
