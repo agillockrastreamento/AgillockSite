@@ -632,6 +632,10 @@
           return true;
         });
 
+        // Vinculados (ou sob responsabilidade do cliente) aparecem primeiro;
+        // dentro de cada grupo mantém a ordem alfabética da API (sort estável)
+        lista.sort(function (a, b) { return (b.vinculado ? 1 : 0) - (a.vinculado ? 1 : 0); });
+
         var listDiv = document.getElementById('disp-lista');
         if (!lista.length) {
           listDiv.innerHTML = '<p class="text-muted text-center" style="padding:20px 0;">Nenhum dispositivo encontrado.</p>';
