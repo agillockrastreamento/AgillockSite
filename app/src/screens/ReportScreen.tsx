@@ -339,12 +339,16 @@ function RouteTab({
   useEffect(() => {
     const pos = valid[playerIndex];
     if (!pos || !playerActive) return;
-    animCoordinate.timing({
-      latitude: pos.latitude,
-      longitude: pos.longitude,
-      duration: PLAYER_TICK_MS,
-      useNativeDriver: false,
-    } as any).start();
+    // No iOS o marcador é movido por estado (ver render) — AnimatedRegion
+    // desloca o marcador para fora da rota com a New Architecture
+    if (Platform.OS !== 'ios') {
+      animCoordinate.timing({
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        duration: PLAYER_TICK_MS,
+        useNativeDriver: false,
+      } as any).start();
+    }
     mapRef.current?.animateCamera(
       { center: { latitude: pos.latitude, longitude: pos.longitude } },
       { duration: PLAYER_TICK_MS - 10 },
@@ -484,25 +488,27 @@ function RouteTab({
             />
           ))}
           {playerActive && playerPos ? (
-            vehicleBitmap ? (
-              <MarkerAnimated
-                key="player-pos"
-                coordinate={animCoordinate as any}
+            Platform.OS === 'ios' ? (
+              // iOS: coordenada por estado — o Google Maps SDK anima a mudança
+              // de posição implicitamente; AnimatedRegion quebra com Fabric
+              <Marker
+                key={`player-pos-${vehicleBitmap ? 'img' : 'pin'}`}
+                coordinate={{ latitude: playerPos.latitude, longitude: playerPos.longitude }}
                 zIndex={10}
                 rotation={playerPos.curso ?? 0}
                 anchor={{ x: 0.5, y: 0.5 }}
-                image={{ uri: vehicleBitmap }}
                 tracksViewChanges={false}
+                {...(vehicleBitmap ? { image: { uri: vehicleBitmap } } : { pinColor: markerColor })}
               />
             ) : (
               <MarkerAnimated
-                key="player-pos"
+                key={`player-pos-${vehicleBitmap ? 'img' : 'pin'}`}
                 coordinate={animCoordinate as any}
                 zIndex={10}
                 rotation={playerPos.curso ?? 0}
                 anchor={{ x: 0.5, y: 0.5 }}
-                pinColor={markerColor}
                 tracksViewChanges={false}
+                {...(vehicleBitmap ? { image: { uri: vehicleBitmap } } : { pinColor: markerColor })}
               />
             )
           ) : null}

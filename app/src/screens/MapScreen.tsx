@@ -941,7 +941,9 @@ export function MapScreen() {
             const bitmapUri = getBitmap(device);
             return (
               <Marker
-                key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}`}
+                // O bitmap na key força remontagem quando o ícone muda — o prop
+                // `image` do Marker não é reaplicado em atualizações (Android)
+                key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}-${bitmapUri ?? 'pending'}`}
                 coordinate={coord}
                 image={bitmapUri ? { uri: bitmapUri } : undefined}
                 anchor={{ x: 0.5, y: 0.5 }}
@@ -988,13 +990,14 @@ export function MapScreen() {
             const isSpider = isCluster && spiderClusterKey === group.key;
 
             if (isCluster && !isSpider) {
+              const clusterUri = getClusterBitmap(group.devices.length);
               return [
                 <ClusterMarker
-                  key={`cluster-${group.key}`}
+                  key={`cluster-${group.key}-${clusterUri ?? 'pending'}`}
                   lat={group.lat}
                   lng={group.lng}
                   count={group.devices.length}
-                  bitmapUri={getClusterBitmap(group.devices.length)}
+                  bitmapUri={clusterUri}
                   onPress={() => openSpider(group.key)}
                 />,
               ];
