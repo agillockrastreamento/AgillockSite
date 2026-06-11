@@ -380,6 +380,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
           velocidade: Math.round(pos.speed * 1.852),
           endereco: pos.address,
           ignicao: norm.ignicao,
+          emMovimento: norm.emMovimento,
           alarme: norm.alarme,
           _skipIgnition: hasNativeIgnition,
           _skipAlarm: hasNativeAlarm,

@@ -401,6 +401,9 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   textMessage: 'Mensagem recebida',
   driverChanged: 'Motorista alterado',
   media: 'Mídia recebida',
+  veiculoMovimento: 'Veículo em movimento',
+  motorOcioso: 'Motor ocioso',
+  semAtualizacao: 'Veículo sem atualização',
 };
 
 // Normaliza os attributes de uma posição para um formato consistente,

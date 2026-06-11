@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import http from 'http';
 import app from './app';
-import { initTraccarWebSocket } from './services/traccar.ws';
+import { initTraccarWebSocket, broadcastTrackingEvents } from './services/traccar.ws';
 import FinanceiroNotificationService from './services/financeiro-notification.service';
 import ContratoClicksignSyncService from './services/contrato-clicksign-sync.service';
 import NotificationService from './services/notification.service';
@@ -36,6 +36,18 @@ function agendarRecorrenciasData() {
 }
 
 agendarRecorrenciasData();
+
+// Verifica veículos sem atualização de posição há 3h+ (primeira checagem 2 min após o boot, depois a cada 30 min)
+function agendarSemAtualizacao(delayMs: number) {
+  setTimeout(() => {
+    NotificationService.verificarDispositivosSemAtualizacao()
+      .then(evts => { if (evts.length) broadcastTrackingEvents(evts); })
+      .catch(err => console.error('[Scheduler] Erro ao verificar veículos sem atualização:', err))
+      .finally(() => agendarSemAtualizacao(30 * 60 * 1000));
+  }, delayMs);
+}
+
+agendarSemAtualizacao(2 * 60 * 1000);
 
 httpServer.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);

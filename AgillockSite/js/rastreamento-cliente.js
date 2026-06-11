@@ -121,6 +121,9 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'alarm',         label: 'Alarme',                      css: 'tipo-alarm' },
   { tipo: 'deviceLocked',  label: 'Veículo Bloqueado',           css: 'tipo-alarm' },
   { tipo: 'deviceUnlocked',label: 'Veículo Desbloqueado',        css: 'tipo-ignition' },
+  { tipo: 'veiculoMovimento', label: 'Veículo em Movimento',     css: 'tipo-geofence' },
+  { tipo: 'motorOcioso',   label: 'Motor Ocioso',                css: 'tipo-manutencao-alerta' },
+  { tipo: 'semAtualizacao',label: 'Veículo sem Atualização',     css: 'tipo-alarm' },
   { tipo: 'kmExcedida',    label: 'Km Excedida (Período)',       css: 'tipo-overspeed' },
   { tipo: 'kmReduzida',    label: 'Km Reduzida (Período)',       css: 'tipo-geofence' },
   { tipo: 'manutencaoAlerta',        label: 'Alerta de Manutenção',        css: 'tipo-manutencao-alerta'   },
@@ -809,6 +812,9 @@ function renderEventosLista() {
       case 'boletoVencendoHoje': return { cls: 'warning', color: '#f1c40f', icon: 'fa-clock-o' };
       case 'boletoAtrasado': return { cls: 'danger', color: '#e74c3c', icon: 'fa-exclamation-triangle' };
       case 'pagamentoRecebido': return { cls: 'success', color: '#27ae60', icon: 'fa-check-circle' };
+      case 'veiculoMovimento': return { cls: 'success', color: '#27ae60', icon: 'fa-location-arrow' };
+      case 'motorOcioso': return { cls: 'warning', color: '#e67e22', icon: 'fa-hourglass-half' };
+      case 'semAtualizacao': return { cls: 'danger', color: '#e74c3c', icon: 'fa-wifi' };
       default: return { cls: 'info', color: '#2980b9', icon: 'fa-bell' };
     }
   };

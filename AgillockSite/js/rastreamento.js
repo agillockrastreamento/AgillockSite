@@ -325,6 +325,9 @@ const TIPOS_EVENTO_ADMIN = [
   { tipo: 'powerCut',       label: 'Alimentação Cortada',        css: 'tipo-alarm' },
   { tipo: 'deviceLocked',   label: 'Veículo Bloqueado',          css: 'tipo-alarm' },
   { tipo: 'deviceUnlocked', label: 'Veículo Desbloqueado',       css: 'tipo-ignition' },
+  { tipo: 'veiculoMovimento', label: 'Veículo em Movimento',     css: 'tipo-geofence' },
+  { tipo: 'motorOcioso',    label: 'Motor Ocioso',               css: 'tipo-fuel'     },
+  { tipo: 'semAtualizacao', label: 'Veículo sem Atualização',    css: 'tipo-alarm'    },
   { tipo: 'deviceFuelDrop', label: 'Queda de Combustível',       css: 'tipo-fuel'     },
   { tipo: 'deviceFuelIncrease', label: 'Aumento de Combustível', css: 'tipo-fuel'     },
   { tipo: 'geofenceEnter',  label: 'Entrada na Zona de Segurança',   css: 'tipo-geofence' },
@@ -806,6 +809,9 @@ function renderEventosLista() {
       case 'geofenceExit': case 'manutencaoAlerta': return { color: '#e67e22', icon: tipo === 'manutencaoAlerta' ? 'fa-wrench' : 'fa-sign-out' };
       case 'manutencaoAtrasada': return { color: '#e74c3c', icon: 'fa-exclamation-triangle' };
       case 'manutencaoFeita': return { color: '#27ae60', icon: 'fa-check-circle' };
+      case 'veiculoMovimento': return { color: '#27ae60', icon: 'fa-location-arrow' };
+      case 'motorOcioso': return { color: '#e67e22', icon: 'fa-hourglass-half' };
+      case 'semAtualizacao': return { color: '#e74c3c', icon: 'fa-wifi' };
       default: return { color: '#2980b9', icon: 'fa-bell' };
     }
   };

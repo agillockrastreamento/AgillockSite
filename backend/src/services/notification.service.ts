@@ -5,6 +5,12 @@ import ExpoPushService from './expo-push.service';
 
 type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null; clienteId?: string | null };
 
+const MOTOR_OCIOSO_LIMITE_MS = 5 * 60 * 1000;          // 5 min parado com motor ligado
+const MOVIMENTO_COOLDOWN_MS = 5 * 60 * 1000;           // intervalo mínimo entre alertas de movimento
+const MOVIMENTO_VELOCIDADE_MINIMA_KMH = 5;             // fallback quando o atributo motion não vem
+const PARADO_VELOCIDADE_MAXIMA_KMH = 3;                // mesma régua do calcularOciosidade (relatórios)
+const SEM_ATUALIZACAO_LIMITE_MS = 3 * 60 * 60 * 1000;  // 3 horas sem posição
+
 function _inicioDiaSaoPaulo(offsetDias = 0): Date {
   const dataSp = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   const inicio = new Date(`${dataSp}T00:00:00-03:00`);
@@ -26,6 +32,10 @@ class NotificationService {
   private _lastAlarmAt = new Map<string, number>();        // Cooldown de alarme por dispositivo
   private _lastAdminEventAt = new Map<string, number>();   // Dedup de eventos admin por dispositivo+tipo
   private _adminPrefsCache: { data: { userId: string; prefs: unknown }[]; at: number } | null = null;
+  private _lastMotionState = new Map<string, boolean>();   // Último estado de movimento por dispositivo
+  private _lastMovementAt = new Map<string, number>();     // Cooldown de alerta de movimento por dispositivo
+  private _idleState = new Map<string, { desde: number; notificado: boolean }>(); // Motor ocioso por dispositivo
+  private _semAtualizacaoNotificadoEm = new Map<string, number>(); // Dedup em memória de "sem atualização"
 
   private async resolverEnderecoEvento(dados: any): Promise<string | null> {
     if (dados.endereco) return dados.endereco;
@@ -66,6 +76,53 @@ class NotificationService {
         }
       }
 
+      // 1b. Verificar início de movimento (mesmo com ignição desligada)
+      const ignicaoAtual = dados.ignicao
+        ?? this._lastIgnitionState.get(`${dispositivo.id}_ignicao`)
+        ?? dispositivo.telemetriaUltimaIgnicao
+        ?? null;
+      const emMovimento: boolean | null = (dados.emMovimento !== null && dados.emMovimento !== undefined)
+        ? dados.emMovimento === true
+        : (dados.velocidade !== null && dados.velocidade !== undefined
+          ? dados.velocidade >= MOVIMENTO_VELOCIDADE_MINIMA_KMH
+          : null);
+
+      let iniciouMovimento = false;
+      if (emMovimento !== null) {
+        const estadoAnteriorMovimento = this._lastMotionState.get(dispositivo.id);
+        this._lastMotionState.set(dispositivo.id, emMovimento);
+        if (emMovimento && estadoAnteriorMovimento === false) {
+          const agoraMov = Date.now();
+          if (agoraMov - (this._lastMovementAt.get(dispositivo.id) || 0) > MOVIMENTO_COOLDOWN_MS) {
+            this._lastMovementAt.set(dispositivo.id, agoraMov);
+            iniciouMovimento = true;
+            console.log(`[Notif] Início de movimento detectado para ${identificador} (ignição: ${ignicaoAtual})`);
+          }
+        }
+      }
+
+      // 1c. Verificar motor ocioso (ignição ligada + parado por mais de 5 minutos)
+      let detectouOcioso = false;
+      let ociosoMinutos = 0;
+      const parado: boolean | null = (dados.emMovimento !== null && dados.emMovimento !== undefined)
+        ? dados.emMovimento === false
+        : (dados.velocidade !== null && dados.velocidade !== undefined
+          ? dados.velocidade < PARADO_VELOCIDADE_MAXIMA_KMH
+          : null);
+      if (ignicaoAtual === true && parado === true) {
+        const estadoOcioso = this._idleState.get(dispositivo.id);
+        if (!estadoOcioso) {
+          this._idleState.set(dispositivo.id, { desde: Date.now(), notificado: false });
+        } else if (!estadoOcioso.notificado && Date.now() - estadoOcioso.desde >= MOTOR_OCIOSO_LIMITE_MS) {
+          estadoOcioso.notificado = true;
+          detectouOcioso = true;
+          ociosoMinutos = Math.round((Date.now() - estadoOcioso.desde) / 60_000);
+          console.log(`[Notif] Motor ocioso detectado para ${identificador} (${ociosoMinutos} min)`);
+        }
+      } else if (ignicaoAtual === false || parado === false) {
+        this._idleState.delete(dispositivo.id);
+      }
+
       for (const cliente of clientesMap.values()) {
         const clienteLogin = cliente.login;
         if (!clienteLogin || !clienteLogin.ativo) continue;
@@ -73,6 +130,20 @@ class NotificationService {
         // Processar Mudança de Ignição para este cliente
         if (mudouIgnicao && tipoIgn && !dados._skipIgnition) {
           const result = await this.processarEvento(identificador, tipoIgn, dados, clienteLogin.id);
+          if (result) eventosDetectados.push(result);
+        }
+
+        // Processar Início de Movimento para este cliente
+        if (iniciouMovimento) {
+          const dadosMovimento = { ...dados, ignicao: ignicaoAtual };
+          const result = await this.processarEvento(identificador, 'veiculoMovimento', dadosMovimento, clienteLogin.id);
+          if (result) eventosDetectados.push(result);
+        }
+
+        // Processar Motor Ocioso para este cliente
+        if (detectouOcioso) {
+          const dadosOcioso = { ...dados, ociosoMinutos };
+          const result = await this.processarEvento(identificador, 'motorOcioso', dadosOcioso, clienteLogin.id);
           if (result) eventosDetectados.push(result);
         }
 
@@ -122,6 +193,58 @@ class NotificationService {
       }
     } catch (error: any) {
       console.error(`[Notif] Erro ao verificar eventos de posição para ${identificador}:`, error.message);
+    }
+    return eventosDetectados;
+  }
+
+  // Varre dispositivos sem posição há mais de 3 horas e dispara "semAtualizacao"
+  // uma única vez por período offline (reseta quando o veículo volta a atualizar).
+  async verificarDispositivosSemAtualizacao(): Promise<any[]> {
+    const eventosDetectados: any[] = [];
+    try {
+      const limite = new Date(Date.now() - SEM_ATUALIZACAO_LIMITE_MS);
+      const dispositivos = await prisma.dispositivo.findMany({
+        where: { ativo: true, telemetriaUltimaPosicaoEm: { lt: limite } },
+        select: {
+          id: true,
+          identificador: true,
+          traccarId: true,
+          telemetriaUltimaPosicaoEm: true,
+          telemetriaUltimaLatitude: true,
+          telemetriaUltimaLongitude: true,
+        },
+      });
+
+      for (const dispositivo of dispositivos) {
+        const ultimaPosicaoEm = dispositivo.telemetriaUltimaPosicaoEm!;
+
+        // Dedup em memória (cobre clientes só com canal e-mail, que não geram registro no banco)
+        const notificadoEm = this._semAtualizacaoNotificadoEm.get(dispositivo.id);
+        if (notificadoEm && notificadoEm >= ultimaPosicaoEm.getTime()) continue;
+
+        // Dedup persistente: já existe evento criado depois da última posição?
+        const jaNotificado = await prisma.eventoNotificacao.findFirst({
+          where: { dispositivoId: dispositivo.id, tipoEvento: 'semAtualizacao', createdAt: { gt: ultimaPosicaoEm } },
+          select: { id: true },
+        });
+        this._semAtualizacaoNotificadoEm.set(dispositivo.id, Date.now());
+        if (jaNotificado) continue;
+
+        const horasSemAtualizacao = Math.floor((Date.now() - ultimaPosicaoEm.getTime()) / 3_600_000);
+        console.log(`[Notif] Veículo sem atualização há ${horasSemAtualizacao}h: ${dispositivo.identificador}`);
+        const dados = {
+          traccarDeviceId: dispositivo.traccarId,
+          latitude: dispositivo.telemetriaUltimaLatitude,
+          longitude: dispositivo.telemetriaUltimaLongitude,
+          velocidade: null,
+          horasSemAtualizacao,
+          ultimaAtualizacaoEm: ultimaPosicaoEm.toISOString(),
+        };
+        const result = await this.processarEvento(dispositivo.identificador, 'semAtualizacao', dados);
+        if (result) eventosDetectados.push(result);
+      }
+    } catch (error: any) {
+      console.error('[Notif] Erro ao verificar dispositivos sem atualização:', error?.message || error);
     }
     return eventosDetectados;
   }
@@ -928,6 +1051,9 @@ class NotificationService {
       alarm:         'Alarme',
       deviceLocked:  'Veículo Bloqueado',
       deviceUnlocked:'Veículo Desbloqueado',
+      veiculoMovimento: 'Veículo em Movimento',
+      motorOcioso:   'Motor Ocioso',
+      semAtualizacao: 'Veículo sem Atualização',
       kmExcedida:    'Quilometragem Excedida',
       kmReduzida:       'Quilometragem Reduzida',
       trocaOleo:        'Troca de Óleo',
@@ -963,6 +1089,18 @@ class NotificationService {
       case 'alarm':         return `Alarme: O veículo ${nome} ${p} acionou um alerta${dados.alarme ? ` (${dados.alarme})` : ''}.`;
       case 'deviceLocked':  return `Bloqueio: O motor do veículo ${nome} ${p} foi bloqueado remotamente.`;
       case 'deviceUnlocked':return `Desbloqueio: O motor do veículo ${nome} ${p} foi desbloqueado remotamente.`;
+      case 'veiculoMovimento': {
+        const ignicaoOff = dados.ignicao === false ? ' com a ignição desligada' : '';
+        return `Veículo em Movimento: O veículo ${nome} ${p} começou a se movimentar${ignicaoOff}.`;
+      }
+      case 'motorOcioso': {
+        const minutos = dados.ociosoMinutos && dados.ociosoMinutos > 5 ? dados.ociosoMinutos : 5;
+        return `Motor Ocioso: O veículo ${nome} ${p} está parado com o motor ligado há mais de ${minutos} minutos.`;
+      }
+      case 'semAtualizacao': {
+        const horas = dados.horasSemAtualizacao && dados.horasSemAtualizacao > 3 ? dados.horasSemAtualizacao : 3;
+        return `Veículo sem Atualização: O veículo ${nome} ${p} está há mais de ${horas} horas sem enviar atualização de posição.`;
+      }
       default:              return `Evento: ${tipo} no veículo ${nome} ${p}`;
     }
   }
