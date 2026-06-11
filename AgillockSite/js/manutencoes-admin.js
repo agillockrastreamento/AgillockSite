@@ -279,7 +279,8 @@
     document.getElementById('wrap-filtro-dispositivo').style.display = 'block';
     try {
       const data = await AL.apiGet('/api/manutencoes-admin/clientes/' + loginId + '/dispositivos');
-      dispositivos = data || [];
+      // Dispositivos com manutenção desativada não devem aparecer no select/pesquisa
+      dispositivos = (data || []).filter(d => d.manutencaoAtiva !== false);
       sel.innerHTML = '<option value="">Selecione um dispositivo...</option>' +
         dispositivos.map(d => `<option value="${d.id}">${d.nome}${d.placa ? ' (' + d.placa + ')' : ''}</option>`).join('');
       renderPickerDispositivo('');

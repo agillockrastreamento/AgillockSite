@@ -282,11 +282,14 @@ export function ManutencaoScreen() {
   const loadDispositivos = useCallback(async () => {
     try {
       const data = await apiRequest<any[]>('/cliente/rastreamento/posicoes');
-      const devs: Dispositivo[] = (data ?? []).map((d: any) => ({
-        ...d,
-        dispositivoId: d.dispositivoId ?? d.id,
-        manutencaoAtiva: d.manutencaoAtiva !== false,
-      }));
+      // Veículos com manutenção desativada não devem aparecer no seletor/busca
+      const devs: Dispositivo[] = (data ?? [])
+        .map((d: any) => ({
+          ...d,
+          dispositivoId: d.dispositivoId ?? d.id,
+          manutencaoAtiva: d.manutencaoAtiva !== false,
+        }))
+        .filter((d: Dispositivo) => d.manutencaoAtiva);
       setDispositivos(devs);
       if (!selectedId) {
         if (devs.length === 1) {

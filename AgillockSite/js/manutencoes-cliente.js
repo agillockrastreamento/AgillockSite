@@ -230,7 +230,8 @@
   async function carregarVeiculos() {
     try {
       const data = await AL_CLIENTE.apiGet('/api/cliente/rastreamento/posicoes');
-      veiculos = data || [];
+      // Veículos com manutenção desativada não devem aparecer no select/pesquisa
+      veiculos = (data || []).filter(v => v.manutencaoAtiva !== false);
       const sel = document.getElementById('filtro-dispositivo');
       sel.innerHTML = '<option value="">Selecione um veículo...</option>' +
         veiculos.map(v =>
