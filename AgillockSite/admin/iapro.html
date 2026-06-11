@@ -255,11 +255,15 @@
           var veiculo = [l.marca, l.modelo].filter(Boolean).join(' ') || '—';
           if (l.cor) veiculo += ' • ' + l.cor;
           var disp = l.dispositivo ? (l.dispositivo.nome + ' (' + l.dispositivo.identificador + ')') : '—';
+          // Veículo 0km da IAPRO ainda não emplacado — a placa chega depois, quando definida lá.
+          var placaHtml = l.placa
+            ? '<strong>' + l.placa + '</strong>'
+            : '<span class="al-badge badge-inativo" title="Veículo 0km ainda sem placa">VEÍCULO 0KM</span>';
           return '<tr class="tr-iapro" data-cliente="' + l.cliente.id + '" style="cursor:pointer;">' +
             '<td>' + l.cliente.nome + '</td>' +
             '<td>' + AL.fmtCpfCnpj(l.cliente.cpfCnpj) + '</td>' +
             '<td>' + (l.cliente.telefone || '—') + '</td>' +
-            '<td><strong>' + (l.placa || '—') + '</strong></td>' +
+            '<td>' + placaHtml + '</td>' +
             '<td>' + veiculo + '</td>' +
             '<td>' + badgeRastreamento(l.estado) + '</td>' +
             '<td>' + disp + '</td>' +
