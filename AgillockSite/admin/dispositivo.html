@@ -375,6 +375,19 @@
         <p style="margin-top:10px;font-size:13px;color:#888;margin-bottom:0;">Quando ativo, poderá registrar manutenções e configurar recorrências. <strong style="color:#c0850e;">Ao desativar, todas as recorrências programadas deste dispositivo serão canceladas automaticamente.</strong></p>
       </div>
 
+      <!-- Card IAPRO -->
+      <div class="card-section">
+        <h5><img src="../img/logo_iapro.jpeg" alt="IAPRO" style="height:18px;border-radius:4px;vertical-align:-3px;margin-right:6px;" onerror="this.style.display='none'" /> IAPRO</h5>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="d-exibir-iapro" checked />
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="d-exibir-iapro-label" style="font-size:13px;font-weight:600;">Exibir no mapa da IAPRO</span>
+        </div>
+        <p style="margin-top:10px;font-size:13px;color:#888;margin-bottom:0;">Quando o cliente é da IAPRO, este dispositivo aparece no Mapa de Veículos da IAPRO somente se estiver marcado. Desmarque para veículos do cliente que não são protegidos pela IAPRO.</p>
+      </div>
+
       <!-- Card Imagem -->
       <div class="card-section">
         <h5><i class="fa fa-image"></i> Imagem</h5>
@@ -606,6 +619,11 @@
       document.getElementById('d-manutencao-ativa-label').textContent = this.checked ? 'Manutenções ativas' : 'Manutenções desativadas';
     });
 
+    // ── Toggle IAPRO ──────────────────────────────────────────────────────
+    document.getElementById('d-exibir-iapro').addEventListener('change', function() {
+      document.getElementById('d-exibir-iapro-label').textContent = this.checked ? 'Exibir no mapa da IAPRO' : 'Oculto no mapa da IAPRO';
+    });
+
     // ── Busca de clientes ─────────────────────────────────────────────────
     var clienteTimer = null;
     document.getElementById('d-cliente-busca').addEventListener('input', function() {
@@ -798,6 +816,9 @@
       var manutAtiva = d.manutencaoAtiva !== false;
       document.getElementById('d-manutencao-ativa').checked = manutAtiva;
       document.getElementById('d-manutencao-ativa-label').textContent = manutAtiva ? 'Manutenções ativas' : 'Manutenções desativadas';
+      var exibirIapro = d.exibirNoMapaIapro !== false;
+      document.getElementById('d-exibir-iapro').checked = exibirIapro;
+      document.getElementById('d-exibir-iapro-label').textContent = exibirIapro ? 'Exibir no mapa da IAPRO' : 'Oculto no mapa da IAPRO';
       // Imagem existente
       if (d.imagemUrl) {
         document.getElementById('img-preview-wrap').innerHTML =
@@ -857,6 +878,7 @@
       formData.append('senha', document.getElementById('d-senha').value.trim());
       formData.append('ignorarOdometro', document.getElementById('d-ignorar-odometro').checked ? 'true' : 'false');
       formData.append('manutencaoAtiva', document.getElementById('d-manutencao-ativa').checked ? 'true' : 'false');
+      formData.append('exibirNoMapaIapro', document.getElementById('d-exibir-iapro').checked ? 'true' : 'false');
       formData.append('mapa', document.getElementById('d-mapa').value || '1');
       formData.append('clienteId', document.getElementById('d-cliente-id').value);
       formData.append('clientesExtras', JSON.stringify(clientesExtras.map(function(c){ return c.id; })));

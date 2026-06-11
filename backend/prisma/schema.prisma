@@ -308,6 +308,10 @@ model Dispositivo {
   // Tag BLE (para localização auxiliar via Bluetooth durante operações de resgate)
   enderecoMac String?
 
+  // Integração IAPRO: quando o cliente é da IAPRO, controla se ESTE dispositivo aparece
+  // no Mapa de Veículos da IAPRO (cliente pode ter veículos que não são protegidos lá).
+  exibirNoMapaIapro Boolean @default(true)
+
   clienteId   String?
   cliente     Cliente? @relation(fields: [clienteId], references: [id])
   vendedorId  String?

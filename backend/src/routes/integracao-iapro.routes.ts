@@ -36,6 +36,8 @@ router.get('/posicoes', async (_req: Request, res: Response): Promise<void> => {
     prisma.dispositivo.findMany({
       where: {
         ativo: true,
+        // Switch "IAPRO" na tela do dispositivo: só entram no mapa da IAPRO os marcados.
+        exibirNoMapaIapro: true,
         OR: [
           { cliente: { origemIapro: true } },
           { clientesVinculados: { some: { cliente: { origemIapro: true } } } },

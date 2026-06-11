@@ -45,6 +45,7 @@ const DISPOSITIVO_SELECT = {
   imagemUrl: true, valorPadrao: true,
   mapa: true,
   enderecoMac: true,
+  exibirNoMapaIapro: true,
   clienteId: true, vendedorId: true, criadoPorId: true,
   createdAt: true, updatedAt: true,
 };
@@ -209,7 +210,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
     modeloRastreador, telefoneRastreador, iccid, operadora,
     placa, marca, modeloVeiculo, cor, ano, renavam, chassi, combustivel, localInstalacao, instalador,
     consumo, limiteVelocidade, senha, ignorarOdometro, manutencaoAtiva,
-    odometro, enderecoMac, mapa,
+    odometro, enderecoMac, mapa, exibirNoMapaIapro,
     valorPadrao, clienteId, vendedorId,
   } = req.body;
 
@@ -272,6 +273,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem'), 
       valorPadrao: valorPadrao ? Number(valorPadrao) : null,
       mapa: mapaNumero,
       enderecoMac: enderecoMac ? String(enderecoMac).toUpperCase().trim() : null,
+      exibirNoMapaIapro: exibirNoMapaIapro === undefined ? true : (exibirNoMapaIapro === 'true' || exibirNoMapaIapro === true),
       clienteId: clienteId || null,
       vendedorId: vendedorId || null,
       criadoPorId: req.user!.userId,
@@ -329,7 +331,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
     modeloRastreador, telefoneRastreador, iccid, operadora,
     placa, marca, modeloVeiculo, cor, ano, renavam, chassi, combustivel, localInstalacao, instalador,
     consumo, limiteVelocidade, senha, ignorarOdometro, manutencaoAtiva,
-    odometro, enderecoMac, mapa,
+    odometro, enderecoMac, mapa, exibirNoMapaIapro,
     valorPadrao, clienteId, vendedorId,
   } = req.body;
   const odometroKm = parseOptionalKm(odometro);
@@ -400,6 +402,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
       ...(manutencaoAtiva !== undefined ? { manutencaoAtiva: manutencaoAtiva === 'true' || manutencaoAtiva === true } : {}),
       ...(odometro !== undefined ? { odometroSistemaMetros: odometroKm != null ? Math.round(odometroKm * 1000) : null } : {}),
       ...(enderecoMac !== undefined ? { enderecoMac: enderecoMac ? String(enderecoMac).toUpperCase().trim() : null } : {}),
+      ...(exibirNoMapaIapro !== undefined ? { exibirNoMapaIapro: exibirNoMapaIapro === 'true' || exibirNoMapaIapro === true } : {}),
       ...(req.file ? { imagemUrl: novaImagemUrl } : {}),
       ...(valorPadrao !== undefined ? { valorPadrao: valorPadrao ? Number(valorPadrao) : null } : {}),
       ...(mapaNumeroPut !== undefined ? { mapa: mapaNumeroPut } : {}),
