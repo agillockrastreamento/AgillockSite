@@ -48,6 +48,9 @@ router.get('/posicoes', async (_req: Request, res: Response): Promise<void> => {
         telefoneRastreador: true, operadora: true, mapa: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { select: { id: true, nome: true, iaproClienteId: true } },
+        clientesVinculados: {
+          select: { cliente: { select: { id: true, nome: true, iaproClienteId: true } } },
+        },
       },
     }),
     traccarGetDevices(),
@@ -97,7 +100,16 @@ router.get('/posicoes', async (_req: Request, res: Response): Promise<void> => {
       telefoneRastreador: d.telefoneRastreador,
       operadora: d.operadora,
       limiteVelocidade: d.limiteVelocidade,
-      cliente: d.cliente ? { id: d.cliente.id, nome: d.cliente.nome, iaproClienteId: d.cliente.iaproClienteId } : null,
+      // Cliente exibido: o responsável principal — mas se ele não for da IAPRO e houver um
+      // cliente da IAPRO entre os vínculos extras do dispositivo, usa esse (é o caso de
+      // dispositivo de frota/terceiro compartilhado com o cliente protegido pela IAPRO).
+      cliente: (() => {
+        const principal = d.cliente;
+        if (principal?.iaproClienteId) return { id: principal.id, nome: principal.nome, iaproClienteId: principal.iaproClienteId };
+        const vinculadoIapro = d.clientesVinculados?.map((cv) => cv.cliente).find((c) => c?.iaproClienteId) ?? null;
+        const escolhido = vinculadoIapro ?? principal;
+        return escolhido ? { id: escolhido.id, nome: escolhido.nome, iaproClienteId: escolhido.iaproClienteId } : null;
+      })(),
       traccarId: traccar?.id ?? null,
       status: traccar?.status ?? 'unknown',
       lastUpdate: traccar?.lastUpdate ?? null,
