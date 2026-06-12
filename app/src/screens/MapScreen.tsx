@@ -5,6 +5,7 @@ import {
   Dimensions,
   Image,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -942,8 +943,12 @@ export function MapScreen() {
             return (
               <Marker
                 // O bitmap na key força remontagem quando o ícone muda — o prop
-                // `image` do Marker não é reaplicado em atualizações (Android)
-                key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}-${bitmapUri ?? 'pending'}`}
+                // `image` do Marker não é reaplicado em atualizações NO ANDROID.
+                // No iOS o `image` reaplica sozinho; forçar remontagem do marcador
+                // do Google Maps sob a New Architecture (Fabric) derruba o app
+                // (crash nativo ao remontar markers em massa). Por isso o bitmap
+                // só entra na key no Android.
+                key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}${Platform.OS === 'android' ? `-${bitmapUri ?? 'pending'}` : ''}`}
                 coordinate={coord}
                 image={bitmapUri ? { uri: bitmapUri } : undefined}
                 anchor={{ x: 0.5, y: 0.5 }}
@@ -993,7 +998,9 @@ export function MapScreen() {
               const clusterUri = getClusterBitmap(group.devices.length);
               return [
                 <ClusterMarker
-                  key={`cluster-${group.key}-${clusterUri ?? 'pending'}`}
+                  // Vide nota acima: no iOS a remontagem do marcador derruba o
+                  // app sob Fabric; o bitmap só entra na key no Android.
+                  key={`cluster-${group.key}${Platform.OS === 'android' ? `-${clusterUri ?? 'pending'}` : ''}`}
                   lat={group.lat}
                   lng={group.lng}
                   count={group.devices.length}
