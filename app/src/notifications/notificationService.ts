@@ -43,6 +43,7 @@ export type NotificationPreferencesResponse = {
     diaSemanaRenovacao: number | null;
   };
   kmTrocaOleo?: number | null;
+  semAtualizacaoHoras?: number | null;
 };
 
 export type SaveNotificationPreferencesPayload = {
@@ -58,6 +59,7 @@ export type SaveNotificationPreferencesPayload = {
     diaSemanaRenovacao: number;
   };
   kmTrocaOleo?: number | null;
+  semAtualizacaoHoras?: number | null;
 };
 
 export type KmConfigResponse = {

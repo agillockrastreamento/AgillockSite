@@ -9,7 +9,8 @@ const MOTOR_OCIOSO_LIMITE_MS = 5 * 60 * 1000;          // 5 min parado com motor
 const MOVIMENTO_COOLDOWN_MS = 5 * 60 * 1000;           // intervalo mínimo entre alertas de movimento
 const MOVIMENTO_VELOCIDADE_MINIMA_KMH = 5;             // fallback quando o atributo motion não vem
 const PARADO_VELOCIDADE_MAXIMA_KMH = 3;                // mesma régua do calcularOciosidade (relatórios)
-const SEM_ATUALIZACAO_LIMITE_MS = 3 * 60 * 60 * 1000;  // 3 horas sem posição
+const SEM_ATUALIZACAO_HORAS_PADRAO = 3;                // padrão quando o usuário não escolheu
+const SEM_ATUALIZACAO_HORAS_MIN = 1;                   // piso do limite (em horas) para limitar a varredura
 
 function _inicioDiaSaoPaulo(offsetDias = 0): Date {
   const dataSp = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
@@ -197,12 +198,40 @@ class NotificationService {
     return eventosDetectados;
   }
 
-  // Varre dispositivos sem posição há mais de 3 horas e dispara "semAtualizacao"
-  // uma única vez por período offline (reseta quando o veículo volta a atualizar).
+  // Calcula o MENOR limite (em horas) configurado para "semAtualizacao", considerando
+  // tanto as preferências de clientes quanto as do admin. É o limite usado para varrer
+  // o banco — cada destinatário ainda é filtrado pelo seu próprio limite mais adiante.
+  // Retorna null quando ninguém habilitou o tipo (nada a verificar).
+  private async _menorLimiteSemAtualizacaoHoras(): Promise<number | null> {
+    const limites: number[] = [];
+
+    const prefsCliente = await prisma.preferenciaNotificacao.findMany({
+      where: { tipoEvento: 'semAtualizacao', OR: [{ web: true }, { app: true }, { email: true }] },
+      select: { semAtualizacaoHoras: true },
+    });
+    for (const p of prefsCliente) limites.push(p.semAtualizacaoHoras ?? SEM_ATUALIZACAO_HORAS_PADRAO);
+
+    const adminPrefs = await this._getAdminPrefs();
+    for (const a of adminPrefs) {
+      const prefs = a.prefs as Record<string, unknown>;
+      if (prefs?.semAtualizacao) limites.push(Number(prefs.semAtualizacaoHoras) || SEM_ATUALIZACAO_HORAS_PADRAO);
+    }
+
+    if (limites.length === 0) return null;
+    return Math.max(SEM_ATUALIZACAO_HORAS_MIN, Math.min(...limites));
+  }
+
+  // Varre dispositivos sem posição e dispara "semAtualizacao". O limite de horas é
+  // escolha do usuário (por cliente/dispositivo) e do admin; a varredura usa o menor
+  // limite configurado e o filtro final por destinatário acontece em processarEvento.
+  // Dispara uma única vez por período offline (reseta quando o veículo volta a atualizar).
   async verificarDispositivosSemAtualizacao(): Promise<any[]> {
     const eventosDetectados: any[] = [];
     try {
-      const limite = new Date(Date.now() - SEM_ATUALIZACAO_LIMITE_MS);
+      const menorLimiteHoras = await this._menorLimiteSemAtualizacaoHoras();
+      if (menorLimiteHoras == null) return eventosDetectados; // ninguém habilitou o tipo
+
+      const limite = new Date(Date.now() - menorLimiteHoras * 3_600_000);
       const dispositivos = await prisma.dispositivo.findMany({
         where: { ativo: true, telemetriaUltimaPosicaoEm: { lt: limite } },
         select: {
@@ -217,21 +246,7 @@ class NotificationService {
 
       for (const dispositivo of dispositivos) {
         const ultimaPosicaoEm = dispositivo.telemetriaUltimaPosicaoEm!;
-
-        // Dedup em memória (cobre clientes só com canal e-mail, que não geram registro no banco)
-        const notificadoEm = this._semAtualizacaoNotificadoEm.get(dispositivo.id);
-        if (notificadoEm && notificadoEm >= ultimaPosicaoEm.getTime()) continue;
-
-        // Dedup persistente: já existe evento criado depois da última posição?
-        const jaNotificado = await prisma.eventoNotificacao.findFirst({
-          where: { dispositivoId: dispositivo.id, tipoEvento: 'semAtualizacao', createdAt: { gt: ultimaPosicaoEm } },
-          select: { id: true },
-        });
-        this._semAtualizacaoNotificadoEm.set(dispositivo.id, Date.now());
-        if (jaNotificado) continue;
-
         const horasSemAtualizacao = Math.floor((Date.now() - ultimaPosicaoEm.getTime()) / 3_600_000);
-        console.log(`[Notif] Veículo sem atualização há ${horasSemAtualizacao}h: ${dispositivo.identificador}`);
         const dados = {
           traccarDeviceId: dispositivo.traccarId,
           latitude: dispositivo.telemetriaUltimaLatitude,
@@ -240,6 +255,8 @@ class NotificationService {
           horasSemAtualizacao,
           ultimaAtualizacaoEm: ultimaPosicaoEm.toISOString(),
         };
+        // O dedup e o limite por destinatário são aplicados dentro de processarEvento
+        // (cliente) e _criarEventoAdmin (admin), pois cada um tem seu próprio limite.
         const result = await this.processarEvento(dispositivo.identificador, 'semAtualizacao', dados);
         if (result) eventosDetectados.push(result);
       }
@@ -386,7 +403,7 @@ class NotificationService {
                 tipoEvento: tipo,
               },
             },
-            select: { web: true, app: true, email: true, overspeedLimit: true },
+            select: { web: true, app: true, email: true, overspeedLimit: true, semAtualizacaoHoras: true },
           });
 
           if (!pref || (!pref.web && !pref.app && !pref.email)) {
@@ -397,10 +414,42 @@ class NotificationService {
           if (tipo === 'overspeed') {
             const limiteCliente = pref.overspeedLimit ?? 100;
             const velocidadeAtual = dados.velocidade ?? 0;
-            
+
             if (dados.velocidade !== null && velocidadeAtual <= limiteCliente) {
               console.log(`[Notif] Overspeed ignorado: ${velocidadeAtual} km/h <= limite ${limiteCliente} (cliente: ${cliente.nome})`);
               continue;
+            }
+          }
+
+          if (tipo === 'semAtualizacao') {
+            const limiteHoras = pref.semAtualizacaoHoras ?? SEM_ATUALIZACAO_HORAS_PADRAO;
+            const ultimaMs = dados.ultimaAtualizacaoEm ? new Date(dados.ultimaAtualizacaoEm).getTime() : null;
+            if (ultimaMs) {
+              const horasOffline = (Date.now() - ultimaMs) / 3_600_000;
+              // Ainda não atingiu o limite ESCOLHIDO por este cliente.
+              if (horasOffline < limiteHoras) {
+                continue;
+              }
+              // Dedup por período offline (1x por período). Reseta quando o veículo volta a
+              // atualizar (telemetriaUltimaPosicaoEm muda → ultimaMs maior).
+              const dedupKey = `${clienteLogin.id}_${dispositivo.id}`;
+              const notificadoEm = this._semAtualizacaoNotificadoEm.get(dedupKey);
+              const jaNotificadoMemoria = notificadoEm != null && notificadoEm >= ultimaMs;
+              // Dedup persistente (cobre reinício do servidor para canais web/app).
+              const jaNotificadoBanco = await prisma.eventoNotificacao.findFirst({
+                where: {
+                  clienteLoginId: clienteLogin.id,
+                  dispositivoId: dispositivo.id,
+                  tipoEvento: 'semAtualizacao',
+                  adminEvento: false, // não confundir com o evento âncora do admin (adminEvento:true)
+                  createdAt: { gt: new Date(ultimaMs) },
+                },
+                select: { id: true },
+              });
+              this._semAtualizacaoNotificadoEm.set(dedupKey, Date.now());
+              if (jaNotificadoMemoria || jaNotificadoBanco) {
+                continue;
+              }
             }
           }
 
@@ -1011,8 +1060,26 @@ class NotificationService {
 
     const tipoAdmin = _tipoPreferenciaAdmin(tipo);
     const adminPrefs = await this._getAdminPrefs();
-    const algumAdminHabilitou = adminPrefs.some(a => !!(a.prefs as Record<string, unknown>)?.[tipoAdmin]);
-    if (!algumAdminHabilitou) return;
+    const adminsHabilitados = adminPrefs.filter(a => !!(a.prefs as Record<string, unknown>)?.[tipoAdmin]);
+    if (adminsHabilitados.length === 0) return;
+
+    // "semAtualizacao": o tempo é escolha do admin. Usa o MENOR limite entre os admins
+    // que habilitaram e respeita 1 evento por período offline (em vez do cooldown de 1 min).
+    if (tipo === 'semAtualizacao') {
+      const ultimaMs = dados.ultimaAtualizacaoEm ? new Date(dados.ultimaAtualizacaoEm).getTime() : null;
+      if (ultimaMs) {
+        const limiteHoras = Math.min(
+          ...adminsHabilitados.map(a => Number((a.prefs as Record<string, unknown>)?.semAtualizacaoHoras) || SEM_ATUALIZACAO_HORAS_PADRAO),
+        );
+        const horasOffline = (Date.now() - ultimaMs) / 3_600_000;
+        if (horasOffline < limiteHoras) return;
+        const jaNotificado = await prisma.eventoNotificacao.findFirst({
+          where: { dispositivoId: dispositivo.id, tipoEvento: 'semAtualizacao', adminEvento: true, createdAt: { gt: new Date(ultimaMs) } },
+          select: { id: true },
+        });
+        if (jaNotificado) return;
+      }
+    }
 
     // Precisa de um clienteLoginId válido como âncora FK no schema
     const refCliente = Array.from(clientesMap.values()).find(c => c.login?.ativo);
@@ -1098,8 +1165,9 @@ class NotificationService {
         return `Motor Ocioso: O veículo ${nome} ${p} está parado com o motor ligado há mais de ${minutos} minutos.`;
       }
       case 'semAtualizacao': {
-        const horas = dados.horasSemAtualizacao && dados.horasSemAtualizacao > 3 ? dados.horasSemAtualizacao : 3;
-        return `Veículo sem Atualização: O veículo ${nome} ${p} está há mais de ${horas} horas sem enviar atualização de posição.`;
+        const horas = dados.horasSemAtualizacao && dados.horasSemAtualizacao >= 1 ? dados.horasSemAtualizacao : 1;
+        const unidade = horas === 1 ? 'hora' : 'horas';
+        return `Veículo sem Atualização: O veículo ${nome} ${p} está há mais de ${horas} ${unidade} sem enviar atualização de posição.`;
       }
       default:              return `Evento: ${tipo} no veículo ${nome} ${p}`;
     }

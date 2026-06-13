@@ -13,7 +13,7 @@
     { id: 'deviceUnlocked', label: 'Veículo Desbloqueado',        icon: 'fa-unlock',               iconClass: 'ic-lock' },
     { id: 'veiculoMovimento', label: 'Veículo em Movimento',      icon: 'fa-location-arrow',       iconClass: 'ic-geofence' },
     { id: 'motorOcioso',    label: 'Motor Ocioso (5min+)',        icon: 'fa-hourglass-half',       iconClass: 'ic-power' },
-    { id: 'semAtualizacao', label: 'Veículo sem Atualização (3h+)', icon: 'fa-wifi',               iconClass: 'ic-alarm' },
+    { id: 'semAtualizacao', label: 'Veículo sem Atualização',     icon: 'fa-wifi',               iconClass: 'ic-alarm' },
     { id: 'kmExcedida',     label: 'Km Excedida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'kmReduzida',     label: 'Km Reduzida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'manutencao',         label: 'Manutenções (Recorrências)', icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
@@ -237,6 +237,7 @@
       const data = await AL.apiGet(`/api/notificacoes-admin/clientes/${clienteLoginId}/preferencias/${dispositivoId}`);
       clientePreferencias = data?.preferencias || {};
       if (data?.overspeedLimit != null) clientePreferencias.overspeedLimit = data.overspeedLimit;
+      if (data?.semAtualizacaoHoras != null) clientePreferencias.semAtualizacaoHoras = data.semAtualizacaoHoras;
       renderGridCliente();
 
       document.getElementById('c-input-km-max').value  = data?.kmExcedida?.kmMaximo30Dias || '';
@@ -275,6 +276,8 @@
 
     document.getElementById('c-config-velocidade').style.display = 'block';
     document.getElementById('c-input-vel-limite').value = clientePreferencias.overspeedLimit || 100;
+    document.getElementById('c-config-sem-atualizacao').style.display = 'block';
+    document.getElementById('c-input-sem-atualizacao-horas').value = clientePreferencias.semAtualizacaoHoras || 3;
     document.getElementById('c-config-km-periodo').style.display = 'block';
   }
 
@@ -288,6 +291,7 @@
       dispositivoId: clienteDispositivoId,
       preferencias: {},
       overspeedLimit: parseInt(document.getElementById('c-input-vel-limite').value) || 100,
+      semAtualizacaoHoras: parseInt(document.getElementById('c-input-sem-atualizacao-horas').value) || 3,
       kmExcedida: {
         kmMaximo30Dias:  parseInt(document.getElementById('c-input-km-max').value) || null,
         diaRenovacaoMes: parseInt(document.getElementById('c-input-dia-mes').value) || null,
@@ -328,6 +332,8 @@
       const data = await AL.apiGet('/api/notificacoes-admin/admin-prefs');
       adminPrefs = data?.prefs || {};
       renderGridAdmin();
+      var inputHoras = document.getElementById('a-input-sem-atualizacao-horas');
+      if (inputHoras) inputHoras.value = adminPrefs.semAtualizacaoHoras || 3;
     } catch (err) {
       AL.showAlert('Erro ao carregar preferências admin: ' + err.message);
     }
@@ -365,6 +371,8 @@
     document.querySelectorAll('.notif-card[data-tipo-a]').forEach(card => {
       prefs[card.dataset.tipoA] = card.querySelector('.btn-channel').classList.contains('active');
     });
+    const inputHoras = document.getElementById('a-input-sem-atualizacao-horas');
+    prefs.semAtualizacaoHoras = (inputHoras && parseInt(inputHoras.value)) || 3;
 
     try {
       await AL.apiPost('/api/notificacoes-admin/admin-prefs', { prefs });

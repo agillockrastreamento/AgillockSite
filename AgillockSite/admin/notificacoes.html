@@ -507,6 +507,16 @@
             </div>
           </div>
 
+          <!-- Tempo sem atualização -->
+          <div id="c-config-sem-atualizacao" class="notif-speed-card" style="display:none;">
+            <h6><i class="fa fa-wifi" style="color:#c0392b;"></i> Veículo sem Atualização</h6>
+            <p class="help-text">Avisa quando o veículo ficar este tempo sem enviar atualização de posição. Defina a quantidade de horas para este cliente.</p>
+            <div class="notif-speed-input-wrap">
+              <input type="number" id="c-input-sem-atualizacao-horas" class="form-control" placeholder="3" min="1" max="168" style="width:90px;" />
+              <span class="notif-speed-unit"><i class="fa fa-clock-o"></i> horas</span>
+            </div>
+          </div>
+
           <!-- Km por período -->
           <div id="c-config-km-periodo" class="notif-speed-card" style="display:none;">
             <h6><i class="fa fa-road" style="color:#2980b9;"></i> Alerta de Quilometragem por Período</h6>
@@ -590,6 +600,16 @@
         </div>
 
         <div class="notif-grid" id="a-grid-notificacoes"></div>
+
+        <!-- Tempo sem atualização (admin) -->
+        <div id="a-config-sem-atualizacao" class="notif-speed-card" style="margin-top:16px;">
+          <h6><i class="fa fa-wifi" style="color:#c0392b;"></i> Veículo sem Atualização</h6>
+          <p class="help-text">Tempo (em horas) sem atualização de posição para você receber o alerta. Vale para o tipo "Veículo sem Atualização" das suas notificações.</p>
+          <div class="notif-speed-input-wrap">
+            <input type="number" id="a-input-sem-atualizacao-horas" class="form-control" placeholder="3" min="1" max="168" style="width:90px;" />
+            <span class="notif-speed-unit"><i class="fa fa-clock-o"></i> horas</span>
+          </div>
+        </div>
 
         <div style="display:flex;justify-content:flex-end;margin-top:4px;">
           <button class="btn btn-primary" id="a-btn-salvar" style="height:36px;padding:0 24px;font-size:13px;font-weight:700;border-radius:7px;">

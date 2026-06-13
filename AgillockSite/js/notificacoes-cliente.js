@@ -13,7 +13,7 @@
     { id: 'deviceUnlocked',label: 'Veículo Desbloqueado',        icon: 'fa-unlock',               iconClass: 'ic-lock' },
     { id: 'veiculoMovimento', label: 'Veículo em Movimento',     icon: 'fa-location-arrow',       iconClass: 'ic-geofence' },
     { id: 'motorOcioso',   label: 'Motor Ocioso (5min+)',        icon: 'fa-hourglass-half',       iconClass: 'ic-power' },
-    { id: 'semAtualizacao',label: 'Veículo sem Atualização (3h+)', icon: 'fa-wifi',               iconClass: 'ic-alarm' },
+    { id: 'semAtualizacao',label: 'Veículo sem Atualização',     icon: 'fa-wifi',               iconClass: 'ic-alarm' },
     { id: 'kmExcedida',    label: 'Km Excedida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'kmReduzida',    label: 'Km Reduzida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'manutencao',         label: 'Manutenções (Recorrências)', icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
@@ -163,6 +163,7 @@
       const data = await AL_CLIENTE.apiGet(`/api/cliente/notificacoes/preferencias/${dispositivoId}`);
       preferenciasAtivas = data?.preferencias || {};
       if (data?.overspeedLimit != null) preferenciasAtivas.overspeedLimit = data.overspeedLimit;
+      if (data?.semAtualizacaoHoras != null) preferenciasAtivas.semAtualizacaoHoras = data.semAtualizacaoHoras;
       renderGrid();
 
       // Fill km excedida config
@@ -209,6 +210,8 @@
     // Mostrar seções de configuração específicas
     document.getElementById('config-velocidade').style.display = 'block';
     document.getElementById('input-vel-limite').value = preferenciasAtivas.overspeedLimit || 100;
+    document.getElementById('config-sem-atualizacao').style.display = 'block';
+    document.getElementById('input-sem-atualizacao-horas').value = preferenciasAtivas.semAtualizacaoHoras || 3;
     document.getElementById('config-km-periodo').style.display = 'block';
   }
 
@@ -227,6 +230,7 @@
       dispositivoId: dispositivoIdAtivo,
       preferencias: {},
       overspeedLimit: parseInt(document.getElementById('input-vel-limite').value) || 100,
+      semAtualizacaoHoras: parseInt(document.getElementById('input-sem-atualizacao-horas').value) || 3,
       kmExcedida: {
         kmMaximo30Dias: parseInt(document.getElementById('input-km-max').value) || null,
         diaRenovacaoMes: parseInt(document.getElementById('input-dia-mes').value) || null,

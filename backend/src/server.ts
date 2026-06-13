@@ -37,7 +37,8 @@ function agendarRecorrenciasData() {
 
 agendarRecorrenciasData();
 
-// Verifica veículos sem atualização de posição há 3h+ (primeira checagem 2 min após o boot, depois a cada 30 min)
+// Verifica veículos sem atualização de posição (limite de horas é escolha do usuário/admin;
+// primeira checagem 2 min após o boot, depois a cada 30 min)
 function agendarSemAtualizacao(delayMs: number) {
   setTimeout(() => {
     NotificationService.verificarDispositivosSemAtualizacao()

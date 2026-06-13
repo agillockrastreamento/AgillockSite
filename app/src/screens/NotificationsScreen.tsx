@@ -36,7 +36,7 @@ const TIPOS_NOTIF = [
   { id: 'deviceUnlocked', label: 'Veículo Desbloqueado', icon: 'lock-open' },
   { id: 'veiculoMovimento', label: 'Veículo em Movimento', icon: 'navigation-variant' },
   { id: 'motorOcioso', label: 'Motor Ocioso (5min+)', icon: 'timer-sand' },
-  { id: 'semAtualizacao', label: 'Veículo sem Atualização (3h+)', icon: 'wifi-off' },
+  { id: 'semAtualizacao', label: 'Veículo sem Atualização', icon: 'wifi-off' },
   { id: 'kmExcedida', label: 'Km Excedida (Período)', icon: 'chart-line-variant' },
   { id: 'kmReduzida', label: 'Km Reduzida (Período)', icon: 'chart-line-variant' },
   { id: 'trocaOleo', label: 'Troca de Óleo', icon: 'oil' },
@@ -68,6 +68,7 @@ export function NotificationsScreen() {
   // Local form state
   const [formPrefs, setFormPrefs] = useState<{ [key: string]: { web: boolean; app: boolean; email: boolean } }>({});
   const [overspeedLimit, setOverspeedLimit] = useState(100);
+  const [semAtualizacaoHoras, setSemAtualizacaoHoras] = useState('3');
   const [kmMaximo, setKmMaximo] = useState('');
   const [diaMes, setDiaMes] = useState('');
   const [kmMinimo, setKmMinimo] = useState('');
@@ -120,6 +121,7 @@ export function NotificationsScreen() {
       setFormPrefs(mergedPrefs);
       setPreferencias(prefsData);
       setOverspeedLimit(prefsData.overspeedLimit || 100);
+      setSemAtualizacaoHoras((prefsData.semAtualizacaoHoras ?? 3).toString());
       setKmMaximo(prefsData.kmExcedida?.kmMaximo30Dias?.toString() || '');
       setDiaMes(prefsData.kmExcedida?.diaRenovacaoMes?.toString() || '');
       setKmMinimo(prefsData.kmReduzida?.kmMinimo7Dias?.toString() || '');
@@ -182,6 +184,7 @@ export function NotificationsScreen() {
         dispositivoId: dispositivoIdAtivo,
         preferencias: prefsToSave,
         overspeedLimit,
+        semAtualizacaoHoras: parseInt(semAtualizacaoHoras) || 3,
         kmExcedida: {
           kmMaximo30Dias: kmMaximo ? parseInt(kmMaximo) : null,
           diaRenovacaoMes: diaMes ? parseInt(diaMes) : null,
@@ -329,6 +332,27 @@ export function NotificationsScreen() {
                         dense
                       />
                       <Text style={styles.speedUnit}>km/h</Text>
+                    </View>
+                  </Card.Content>
+                </Card>
+
+                {/* Sem Atualização */}
+                <Card style={styles.configCard} mode="outlined">
+                  <Card.Content style={styles.configCardContent}>
+                    <Text style={styles.configTitle}>Veículo sem Atualização</Text>
+                    <Text style={styles.configHelp}>
+                      Avisa quando o veículo ficar este tempo sem enviar atualização de posição. Defina a quantidade de horas.
+                    </Text>
+                    <View style={styles.speedInputWrap}>
+                      <TextInput
+                        mode="outlined"
+                        value={semAtualizacaoHoras}
+                        onChangeText={setSemAtualizacaoHoras}
+                        keyboardType="numeric"
+                        style={styles.speedInput}
+                        dense
+                      />
+                      <Text style={styles.speedUnit}>horas</Text>
                     </View>
                   </Card.Content>
                 </Card>

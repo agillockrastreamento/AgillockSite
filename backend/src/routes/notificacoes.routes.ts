@@ -107,6 +107,9 @@ router.get('/preferencias/:dispositivoId', clienteAuthMiddleware, async (req: an
       if (p.tipoEvento === 'trocaOleo') {
         result.kmTrocaOleo = p.kmTrocaOleo;
       }
+      if (p.tipoEvento === 'semAtualizacao') {
+        result.semAtualizacaoHoras = p.semAtualizacaoHoras;
+      }
     });
 
     res.json(result);
@@ -118,7 +121,7 @@ router.get('/preferencias/:dispositivoId', clienteAuthMiddleware, async (req: an
 // Salvar preferências
 router.post('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
   try {
-    const { dispositivoId, preferencias, overspeedLimit, kmExcedida, kmReduzida, kmTrocaOleo } = req.body;
+    const { dispositivoId, preferencias, overspeedLimit, kmExcedida, kmReduzida, kmTrocaOleo, semAtualizacaoHoras } = req.body;
     const clienteLoginId = req.cliente.sub;
 
     await prisma.$transaction(
@@ -135,6 +138,9 @@ router.post('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
         }
         if (tipo === 'trocaOleo') {
           extra.kmTrocaOleo = kmTrocaOleo ?? null;
+        }
+        if (tipo === 'semAtualizacao') {
+          extra.semAtualizacaoHoras = semAtualizacaoHoras ?? 3;
         }
 
         return prisma.preferenciaNotificacao.upsert({

@@ -310,7 +310,8 @@ model Dispositivo {
 
   // Integração IAPRO: quando o cliente é da IAPRO, controla se ESTE dispositivo aparece
   // no Mapa de Veículos da IAPRO (cliente pode ter veículos que não são protegidos lá).
-  exibirNoMapaIapro Boolean @default(true)
+  // Padrão desativado: só aparece no mapa da IAPRO quando o admin ativar explicitamente.
+  exibirNoMapaIapro Boolean @default(false)
 
   clienteId   String?
   cliente     Cliente? @relation(fields: [clienteId], references: [id])
@@ -555,6 +556,7 @@ model PreferenciaNotificacao {
   kmMinimo7Dias      Int?
   diaSemanaRenovacao Int?
   kmTrocaOleo        Int?
+  semAtualizacaoHoras Int?    @default(3) // Horas sem posição p/ disparar "semAtualizacao" (escolha do usuário)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

@@ -71,6 +71,8 @@ async function main() {
   check('mensagem ocioso com minutos', msgOci.startsWith('Motor Ocioso:') && msgOci.includes('7 minutos'));
   const msgSem = svc.gerarMensagem('semAtualizacao', 'Carro Teste', null, { horasSemAtualizacao: 5 });
   check('mensagem sem atualização com horas', msgSem.startsWith('Veículo sem Atualização:') && msgSem.includes('5 horas'));
+  const msgSem1 = svc.gerarMensagem('semAtualizacao', 'Carro Teste', null, { horasSemAtualizacao: 1 });
+  check('mensagem sem atualização no singular (1 hora)', msgSem1.includes('1 hora') && !msgSem1.includes('1 horas'));
   check('label veiculoMovimento', svc.getLabelTipo('veiculoMovimento') === 'Veículo em Movimento');
   check('label motorOcioso', svc.getLabelTipo('motorOcioso') === 'Motor Ocioso');
   check('label semAtualizacao', svc.getLabelTipo('semAtualizacao') === 'Veículo sem Atualização');

@@ -142,6 +142,7 @@ router.get('/clientes/:clienteLoginId/preferencias/:dispositivoId', async (req, 
       if (p.tipoEvento === 'kmExcedida')  result.kmExcedida = { kmMaximo30Dias: p.kmMaximo30Dias, diaRenovacaoMes: p.diaRenovacaoMes };
       if (p.tipoEvento === 'kmReduzida')  result.kmReduzida = { kmMinimo7Dias: p.kmMinimo7Dias, diaSemanaRenovacao: p.diaSemanaRenovacao };
       if (p.tipoEvento === 'trocaOleo')   result.kmTrocaOleo = p.kmTrocaOleo;
+      if (p.tipoEvento === 'semAtualizacao') result.semAtualizacaoHoras = p.semAtualizacaoHoras;
     });
 
     res.json(result);
@@ -155,7 +156,7 @@ router.get('/clientes/:clienteLoginId/preferencias/:dispositivoId', async (req, 
 router.post('/clientes/:clienteLoginId/preferencias', async (req, res) => {
   try {
     const { clienteLoginId } = req.params;
-    const { dispositivoId, preferencias, overspeedLimit, kmExcedida, kmReduzida, kmTrocaOleo } = req.body;
+    const { dispositivoId, preferencias, overspeedLimit, kmExcedida, kmReduzida, kmTrocaOleo, semAtualizacaoHoras } = req.body;
 
     await prisma.$transaction(
       Object.keys(preferencias).map(tipo => {
@@ -164,6 +165,7 @@ router.post('/clientes/:clienteLoginId/preferencias', async (req, res) => {
         if (tipo === 'kmExcedida') { extra.kmMaximo30Dias = kmExcedida?.kmMaximo30Dias ?? null; extra.diaRenovacaoMes = kmExcedida?.diaRenovacaoMes ?? null; }
         if (tipo === 'kmReduzida') { extra.kmMinimo7Dias = kmReduzida?.kmMinimo7Dias ?? null; extra.diaSemanaRenovacao = kmReduzida?.diaSemanaRenovacao ?? null; }
         if (tipo === 'trocaOleo')  extra.kmTrocaOleo = kmTrocaOleo ?? null;
+        if (tipo === 'semAtualizacao') extra.semAtualizacaoHoras = semAtualizacaoHoras ?? 3;
         return prisma.preferenciaNotificacao.upsert({
           where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: tipo } },
           update: { web: preferencias[tipo].web, app: preferencias[tipo].app, email: preferencias[tipo].email, ...extra },
