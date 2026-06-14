@@ -1814,8 +1814,8 @@ function atualizarMarcador(did) {
     .dark-theme .evt-tipo-item { color: #c9d1d9; }
     .dark-theme .evt-tipo-item:hover { background: #2d3748; }
     .card-veiculo .cv-apelido-row { position: absolute; left: 20px; right: 20px; bottom: 4px; min-height: 17px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-    .card-veiculo .cv-apelido-text { margin-top: 4px; min-width: 0; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 1.2; color: #4b5563; font-weight: 700; text-align: center; }
-    .dark-theme .card-veiculo .cv-apelido-text { color: #d7dde6; }
+    .card-veiculo .cv-apelido-text { margin-top: 4px; min-width: 0; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 1.2; color: #fab32c; font-weight: 700; text-align: center; }
+    .dark-theme .card-veiculo .cv-apelido-text { color: #fab32c; }
     .card-veiculo .btn-editar-apelido { position: absolute; right: 6px; bottom: 4px; z-index: 6; width: 18px; height: 18px; border: 0; border-radius: 50%; background: #fab32c; color: #fff; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 9px; opacity: 0; transition: opacity .2s, background .15s; }
     .card-veiculo:hover .btn-editar-apelido { opacity: 1; }
     .card-veiculo .btn-editar-apelido:hover { background: #e0a025; }
@@ -2201,6 +2201,15 @@ function salvarApelidoCard() {
       if (veiculosMap[did]) veiculosMap[did].apelidoCliente = data.apelidoCliente || '';
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(Object.values(veiculosMap))); } catch (e) {}
       atualizarCardBarra(did);
+      // Reflete no card focado, se ele estiver aberto para este dispositivo.
+      if (did === ativoId) {
+        const apEl = document.querySelector('#device-detail-card .dcard-apelido');
+        if (apEl) {
+          const ap = _getCardApelido(did);
+          apEl.textContent = ap;
+          apEl.style.display = ap ? '' : 'none';
+        }
+      }
       $('#modal-apelido-card').modal('hide');
       AL_CLIENTE.showAlert('Identificação atualizada.', 'success');
     })
@@ -2555,6 +2564,8 @@ function mostrarCardDispositivo(id) {
     ? `<img src="${API_BASE}${v.imagemUrlCliente}" style="width:100%;height:130px;object-fit:cover;display:block;border-radius:12px 12px 0 0" onerror="this.style.display='none'" />`
     : '';
 
+  const apelidoFocado = _getCardApelido(v.dispositivoId);
+
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
   const horasHtml = `
     <div class="dcard-section dcard-val" style="font-size:10px">
@@ -2573,6 +2584,7 @@ function mostrarCardDispositivo(id) {
         <div class="v-nome" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           ${v.nome}
           ${v.placa ? `<span class="v-placa" style="margin:0">${v.placa}</span>` : ''}
+          <span class="dcard-apelido" style="color:#fab32c;font-weight:700;font-size:12px;${apelidoFocado ? '' : 'display:none'}">${apelidoFocado ? esc(apelidoFocado) : ''}</span>
         </div>
       </div>
       <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
