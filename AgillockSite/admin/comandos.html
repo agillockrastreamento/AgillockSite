@@ -88,7 +88,7 @@
 
     /* Lista de dispositivos selecionáveis */
     .disp-lista {
-      max-height: 300px;
+      max-height: 420px;
       overflow-y: auto;
       border: 1px solid #e8e8e8;
       border-radius: 8px;
@@ -107,6 +107,8 @@
     .disp-item:last-child { border-bottom: none; }
     .disp-item:hover { background: #fafafa; }
     html.dark-theme .disp-item:hover { background: #252535; }
+    .disp-item.selecionado { background: #fff8ec; }
+    html.dark-theme .disp-item.selecionado { background: #2c2a1e; }
     .disp-item input[type="checkbox"] { margin: 0; flex-shrink: 0; }
     .disp-item .disp-nome { flex: 1; font-weight: 500; }
     .disp-item .disp-imei { color: #aaa; font-size: 11px; font-family: monospace; }
@@ -181,7 +183,7 @@
       </div>
     </div>
 
-    <div style="max-width:800px">
+    <div>
 
       <!-- Seletor de dispositivos -->
       <div class="cmd-card">
@@ -230,6 +232,7 @@
       <div class="cmd-card">
         <h4 style="margin:0 0 14px;font-size:14px;font-weight:700">
           <i class="fa fa-bolt" style="color:#fab32c"></i> Comandos
+          <span id="cmd-count" style="font-weight:500;color:#888;font-size:12px"></span>
         </h4>
         <div class="cmd-btn-grid" id="cmd-grid">
           <div id="cmd-placeholder" style="grid-column:1/-1;padding:16px 0;color:#aaa;font-size:13px;text-align:center">
@@ -242,6 +245,7 @@
       <div class="cmd-card">
         <h4 style="margin:0 0 14px;font-size:14px;font-weight:700">
           <i class="fa fa-terminal" style="color:#2980b9"></i> Comando personalizado
+          <span id="cmd-count-custom" style="font-weight:500;color:#888;font-size:12px"></span>
         </h4>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
           <div style="flex:1;min-width:200px">

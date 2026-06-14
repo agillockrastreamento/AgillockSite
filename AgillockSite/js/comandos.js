@@ -140,7 +140,7 @@ function renderLista() {
 
   filtrados.forEach(d => {
     const item = document.createElement('label');
-    item.className = 'disp-item';
+    item.className = 'disp-item' + (selecionadas.has(d.dispositivoId) ? ' selecionado' : '');
     const online = d.status === 'online';
     item.innerHTML =
       `<input type="checkbox" value="${d.dispositivoId}" ${selecionadas.has(d.dispositivoId) ? 'checked' : ''}>` +
@@ -151,6 +151,7 @@ function renderLista() {
     item.querySelector('input').addEventListener('change', function () {
       if (this.checked) selecionadas.add(this.value);
       else selecionadas.delete(this.value);
+      item.classList.toggle('selecionado', this.checked);
       atualizarSelecionados();
       sincronizarChkTodos(dispositivosFiltrados());
     });
@@ -184,8 +185,10 @@ function idsSelecionados() {
 
 async function atualizarSelecionados() {
   const ids = idsSelecionados();
-  document.getElementById('contador-selecionados').textContent =
-    ids.length + ' selecionado(s)';
+  const rotulo = ids.length + ' selecionado(s)';
+  document.getElementById('contador-selecionados').textContent = rotulo;
+  document.getElementById('cmd-count').textContent = ' — ' + rotulo;
+  document.getElementById('cmd-count-custom').textContent = ' — ' + rotulo;
   document.getElementById('btn-enviar-custom').disabled = ids.length === 0;
 
   if (ids.length === 0) {
