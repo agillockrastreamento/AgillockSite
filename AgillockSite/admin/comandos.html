@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../css/bootstrap.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
   <style>
     .cmd-card {
@@ -84,6 +85,44 @@
     .log-ok   { color: #27ae60; }
     .log-err  { color: #e74c3c; }
     .log-info { color: #2980b9; }
+
+    /* Lista de dispositivos selecionáveis */
+    .disp-lista {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+    }
+    html.dark-theme .disp-lista { border-color: #3a3a5c; }
+    .disp-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #f2f2f2;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    html.dark-theme .disp-item { border-color: #2a2a3e; color: #c9d1d9; }
+    .disp-item:last-child { border-bottom: none; }
+    .disp-item:hover { background: #fafafa; }
+    html.dark-theme .disp-item:hover { background: #252535; }
+    .disp-item input[type="checkbox"] { margin: 0; flex-shrink: 0; }
+    .disp-item .disp-nome { flex: 1; font-weight: 500; }
+    .disp-item .disp-imei { color: #aaa; font-size: 11px; font-family: monospace; }
+    .disp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .disp-dot.online  { background: #27ae60; }
+    .disp-dot.offline { background: #bbb; }
+    .disp-vazio { padding: 16px; text-align: center; color: #aaa; font-size: 13px; }
+
+    .select2-container { max-width: 100%; }
+    html.dark-theme .select2-container--default .select2-selection--single {
+      background-color: #252535; border-color: #3a3a5c;
+    }
+    html.dark-theme .select2-container--default .select2-selection--single .select2-selection__rendered { color: #c9d1d9; }
+    html.dark-theme .select2-dropdown { background-color: #1e2530; border-color: #3a3a5c; color: #adb5bd; }
+    html.dark-theme .select2-results__option--highlighted[aria-selected] { background-color: #2980b9; color: #fff; }
+    html.dark-theme .select2-search__field { background-color: #252535; color: #c9d1d9; border-color: #3a3a5c; }
   </style>
 </head>
 <body>
@@ -144,14 +183,46 @@
 
     <div style="max-width:800px">
 
-      <!-- Seletor de dispositivo -->
+      <!-- Seletor de dispositivos -->
       <div class="cmd-card">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <label style="font-weight:600;margin:0;white-space:nowrap"><i class="fa fa-microchip"></i> Dispositivo:</label>
-          <select id="sel-dispositivo" class="form-control input-sm" style="max-width:300px">
-            <option value="">Selecionar dispositivo...</option>
-          </select>
-          <span id="status-dispositivo" style="font-size:12px;color:#aaa"></span>
+        <h4 style="margin:0 0 14px;font-size:14px;font-weight:700">
+          <i class="fa fa-microchip" style="color:#2980b9"></i> Dispositivos
+        </h4>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <div style="flex:1;min-width:220px">
+            <label style="font-size:12px;color:#888;margin-bottom:4px">Filtrar por cliente</label>
+            <select id="filtro-cliente" class="form-control input-sm" style="width:100%">
+              <option value="">Todos os clientes</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <label style="font-size:12px;color:#888;margin-bottom:4px">Buscar por nome, placa ou IMEI</label>
+            <input type="text" id="filtro-busca" class="form-control input-sm" placeholder="Digite nome, placa ou IMEI..." />
+          </div>
+          <div style="flex:0 0 230px;min-width:200px">
+            <label style="font-size:12px;color:#888;margin-bottom:4px">Dígitos do IMEI</label>
+            <div style="display:flex;gap:6px">
+              <select id="filtro-imei-op" class="form-control input-sm" style="flex:0 0 105px">
+                <option value="lte">até (≤)</option>
+                <option value="eq">igual (=)</option>
+                <option value="gt">maior (&gt;)</option>
+                <option value="lt">menor (&lt;)</option>
+              </select>
+              <input type="number" id="filtro-imei-qtd" class="form-control input-sm" min="1" step="1" placeholder="Ex: 11" style="flex:1" />
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <label style="margin:0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="chk-todos" style="margin:0" /> Selecionar todos (filtrados)
+          </label>
+          <span id="contador-selecionados" style="font-size:12px;color:#888">0 selecionado(s)</span>
+        </div>
+
+        <div id="lista-dispositivos" class="disp-lista">
+          <div class="disp-vazio"><i class="fa fa-spinner fa-spin"></i> Carregando dispositivos...</div>
         </div>
       </div>
 
@@ -162,7 +233,7 @@
         </h4>
         <div class="cmd-btn-grid" id="cmd-grid">
           <div id="cmd-placeholder" style="grid-column:1/-1;padding:16px 0;color:#aaa;font-size:13px;text-align:center">
-            <i class="fa fa-info-circle"></i> Selecione um dispositivo para ver os comandos disponíveis.
+            <i class="fa fa-info-circle"></i> Selecione um ou mais dispositivos para ver os comandos disponíveis.
           </div>
         </div>
       </div>
@@ -208,6 +279,7 @@
 
   <script src="../js/jquery.js"></script>
   <script src="../js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/auth-guard.js"></script>
   <script src="../js/topbar-rastrear-global.js"></script>

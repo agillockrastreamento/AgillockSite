@@ -508,6 +508,64 @@ router.post('/dispositivos/:id/comandos', requireRoles('ADMIN', 'COLABORADOR'), 
   }
 });
 
+// ── POST /api/rastreamento/comandos/lote ──────────────────────────────────────
+// Envia o mesmo comando para vários dispositivos de uma vez.
+// Retorna um resultado por dispositivo (ok/erro) — sucesso parcial é normal.
+router.post('/comandos/lote', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { dispositivoIds, tipo, atributos } = req.body as {
+    dispositivoIds: string[]; tipo: string; atributos?: Record<string, unknown>;
+  };
+
+  if (!tipo) { res.status(400).json({ error: 'Campo "tipo" é obrigatório.' }); return; }
+  if (!Array.isArray(dispositivoIds) || dispositivoIds.length === 0) {
+    res.status(400).json({ error: 'Informe ao menos um dispositivo.' });
+    return;
+  }
+
+  const dispositivos = await prisma.dispositivo.findMany({
+    where: { id: { in: dispositivoIds } },
+    select: { id: true, nome: true, placa: true, identificador: true },
+  });
+
+  // Uma única busca de dispositivos no Traccar para mapear IMEI → traccarId,
+  // evitando uma requisição por dispositivo.
+  const traccarDevices = await traccarGetDevices().catch(() => null);
+  if (!traccarDevices) { res.status(502).json({ error: 'Servidor de rastreamento indisponível.' }); return; }
+  const traccarByImei = new Map(traccarDevices.map(d => [d.uniqueId, d]));
+
+  const nomeDispositivo = (d: { nome: string; placa: string | null }) =>
+    d.nome + (d.placa ? ` (${d.placa})` : '');
+
+  type ResultadoLote = { dispositivoId: string; nome: string; ok: boolean; erro?: string };
+
+  async function enviarUm(d: typeof dispositivos[number]): Promise<ResultadoLote> {
+    const nome = nomeDispositivo(d);
+    const td = traccarByImei.get(d.identificador);
+    if (!td) return { dispositivoId: d.id, nome, ok: false, erro: 'Não sincronizado com o rastreador.' };
+    try {
+      await traccarSendCommand(td.id, tipo, atributos || {});
+      return { dispositivoId: d.id, nome, ok: true };
+    } catch (err: unknown) {
+      return { dispositivoId: d.id, nome, ok: false, erro: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  // Envia em blocos para não disparar centenas de requisições simultâneas ao Traccar.
+  const LOTE = 10;
+  const resultados: ResultadoLote[] = [];
+  for (let i = 0; i < dispositivos.length; i += LOTE) {
+    const bloco = dispositivos.slice(i, i + LOTE);
+    resultados.push(...await Promise.all(bloco.map(enviarUm)));
+  }
+
+  res.json({
+    total: resultados.length,
+    sucesso: resultados.filter(r => r.ok).length,
+    falha: resultados.filter(r => !r.ok).length,
+    resultados,
+  });
+});
+
 // ── GET /api/rastreamento/dispositivos/:id/detalhe ────────────────────────────
 router.patch('/dispositivos/:id/medidores', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
