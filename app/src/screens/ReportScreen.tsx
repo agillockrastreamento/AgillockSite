@@ -399,11 +399,13 @@ function RouteTab({
   useEffect(() => {
     const pos = valid[playerIndex];
     if (!pos || !playerActive) return;
-    ensureAngleBitmap(pos.curso ?? 0);
-    // iOS: marcador movido por estado (igual ao MapScreen, que funciona no
-    // iPhone). AnimatedRegion desloca o marcador no iOS sob Fabric — só o Android
-    // o usa, para interpolar suavemente entre os pontos GPS.
+    // iOS: NÃO captura bitmap por ângulo durante o playback nem troca a URI do
+    // `image` do marcador a cada tick (era a regressão que derrubava o app sob
+    // Fabric — captureRef em rajada + reload de imagem do Marker ~12x/seg). Usa
+    // um único bitmap estático, movido por estado. Android mantém a rotação por
+    // ângulo + AnimatedRegion (não crasha lá).
     if (Platform.OS !== 'ios') {
+      ensureAngleBitmap(pos.curso ?? 0);
       animCoordinate.timing({
         latitude: pos.latitude,
         longitude: pos.longitude,
@@ -418,7 +420,14 @@ function RouteTab({
   }, [playerIndex, playerActive, valid, ensureAngleBitmap]);
 
   const playerPos = valid[playerIndex] ?? null;
-  const playerBitmap = playerPos ? getPlayerBitmap(playerPos.curso ?? 0) : null;
+  // iOS usa um único bitmap estático (sem rotação/troca de URI → sem crash).
+  // Android usa o bitmap por ângulo (rotação embutida) capturado em runtime.
+  const playerBitmap =
+    Platform.OS === 'ios'
+      ? vehicleBitmap
+      : playerPos
+        ? getPlayerBitmap(playerPos.curso ?? 0)
+        : null;
 
   const offscreenPool = (
     <View style={styles.offscreenPool} pointerEvents="none">
@@ -555,15 +564,20 @@ function RouteTab({
             // Sem prop `rotation`: o curso já vem desenhado no bitmap (igual ao
             // MapScreen), evitando o deslocamento do marcador no iOS/Fabric.
             Platform.OS === 'ios' ? (
+              // iOS/Fabric: NUNCA trocar a key em runtime — remontar o <Marker> do
+              // Google Maps derruba o app. Key estável + tracksViewChanges enquanto
+              // o bitmap não chega; o prop `image` reaplica sozinho no iOS (in-place).
               <Marker
-                key={`player-pos-${playerBitmap ? 'img' : 'pin'}`}
+                key="player-pos"
                 coordinate={{ latitude: playerPos.latitude, longitude: playerPos.longitude }}
                 zIndex={10}
                 anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={false}
+                tracksViewChanges={!playerBitmap}
                 {...(playerBitmap ? { image: { uri: playerBitmap } } : { pinColor: markerColor })}
               />
             ) : (
+              // Android: o `image` não reaplica em update — a key troca 1x (pin→img)
+              // para remontar e exibir o bitmap. Remontar no Android é seguro.
               <MarkerAnimated
                 key={`player-pos-${playerBitmap ? 'img' : 'pin'}`}
                 coordinate={animCoordinate as any}
