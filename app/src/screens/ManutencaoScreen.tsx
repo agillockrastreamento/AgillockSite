@@ -278,6 +278,9 @@ export function ManutencaoScreen() {
   const [isSavingRecData, setIsSavingRecData] = useState(false);
   const [showDatePickerRef, setShowDatePickerRef] = useState(false);
   const [showDatePickerRegistro, setShowDatePickerRegistro] = useState(false);
+  // Qual sheet abrir após o chooser fechar (evita modal-sobre-modal no iOS, que
+  // trava a apresentação do 2º e congela a tela).
+  const pendingRecSheetRef = useRef<null | 'km' | 'data'>(null);
 
   const loadDispositivos = useCallback(async () => {
     try {
@@ -348,6 +351,29 @@ export function ManutencaoScreen() {
     const dev = dispositivos.find(d => d.dispositivoId === selectedId);
     if (dev && !dev.manutencaoAtiva) setActiveTab('registros');
   }, [selectedId, dispositivos]);
+
+  // Abre o sheet escolhido SÓ depois que o chooser fechar. No iOS apresentar um
+  // Modal enquanto outro ainda está fechando trava a tela; aguardamos a animação
+  // de fechamento do BottomSheet (~200ms) desmontar antes de abrir o próximo.
+  useEffect(() => {
+    if (chooserVisible || !pendingRecSheetRef.current) return;
+    const target = pendingRecSheetRef.current;
+    pendingRecSheetRef.current = null;
+    const open = () => {
+      if (target === 'km') {
+        resetRecorrenciaForm();
+        setAddRecModalVisible(true);
+      } else {
+        resetRecDataForm();
+        setAddRecDataModalVisible(true);
+      }
+    };
+    if (Platform.OS === 'ios') {
+      const t = setTimeout(open, 320);
+      return () => clearTimeout(t);
+    }
+    open();
+  }, [chooserVisible]);
 
   const resetRegistroForm = () => {
     setEditingRegistroId(null);
@@ -1128,9 +1154,8 @@ export function ManutencaoScreen() {
             accessibilityRole="button"
             style={styles.chooserOption}
             onPress={() => {
+              pendingRecSheetRef.current = 'km';
               setChooserVisible(false);
-              resetRecorrenciaForm();
-              setAddRecModalVisible(true);
             }}
           >
             <View style={[styles.chooserIconWrap, { backgroundColor: '#fff7e3' }]}>
@@ -1147,9 +1172,8 @@ export function ManutencaoScreen() {
             accessibilityRole="button"
             style={styles.chooserOption}
             onPress={() => {
+              pendingRecSheetRef.current = 'data';
               setChooserVisible(false);
-              resetRecDataForm();
-              setAddRecDataModalVisible(true);
             }}
           >
             <View style={[styles.chooserIconWrap, { backgroundColor: '#e8f4fd' }]}>
