@@ -11,6 +11,27 @@ export type PendingClusterCapture = {
   count: number;
 };
 
+// Ícone do cluster (reutilizado na captura do Android e como filho no iOS).
+export function ClusterIcon({ count }: { count: number }) {
+  return (
+    <Svg width={64} height={64} viewBox="0 0 64 64">
+      <SvgCircle cx={32} cy={35} r={25} fill="rgba(0,0,0,0.22)" />
+      <SvgCircle cx={32} cy={32} r={24} fill="#ffffff" />
+      <SvgCircle cx={32} cy={32} r={21} fill="#8e44ad" />
+      <SvgText
+        x={32}
+        y={37}
+        textAnchor="middle"
+        fontSize={16}
+        fontWeight="700"
+        fill="#ffffff"
+      >
+        {String(count)}
+      </SvgText>
+    </Svg>
+  );
+}
+
 function ClusterCapture({
   count,
   onReady,
@@ -36,21 +57,7 @@ function ClusterCapture({
 
   return (
     <View ref={viewRef} collapsable={false} style={styles.captureItem}>
-      <Svg width={64} height={64} viewBox="0 0 64 64">
-        <SvgCircle cx={32} cy={35} r={25} fill="rgba(0,0,0,0.22)" />
-        <SvgCircle cx={32} cy={32} r={24} fill="#ffffff" />
-        <SvgCircle cx={32} cy={32} r={21} fill="#8e44ad" />
-        <SvgText
-          x={32}
-          y={37}
-          textAnchor="middle"
-          fontSize={16}
-          fontWeight="700"
-          fill="#ffffff"
-        >
-          {String(count)}
-        </SvgText>
-      </Svg>
+      <ClusterIcon count={count} />
     </View>
   );
 }
@@ -72,7 +79,7 @@ export function ClusterCapturePool({
   );
 }
 
-export function useClusterBitmaps(counts: number[]) {
+export function useClusterBitmaps(counts: number[], enabled = true) {
   const [bitmaps, setBitmaps] = useState<ReadonlyMap<number, string>>(clusterBitmapCache);
   const [pending, setPending] = useState<PendingClusterCapture[]>([]);
   const pendingCountsRef = useRef(new Set<number>());
@@ -80,6 +87,7 @@ export function useClusterBitmaps(counts: number[]) {
   const distinctCounts = useMemo(() => Array.from(new Set(counts)), [counts]);
 
   useEffect(() => {
+    if (!enabled) return;
     const toAdd: PendingClusterCapture[] = [];
     for (const count of distinctCounts) {
       if (!clusterBitmapCache.has(count) && !pendingCountsRef.current.has(count)) {
@@ -90,7 +98,7 @@ export function useClusterBitmaps(counts: number[]) {
     if (toAdd.length > 0) {
       setPending((prev) => [...prev, ...toAdd]);
     }
-  }, [distinctCounts]);
+  }, [distinctCounts, enabled]);
 
   const onReady = useCallback((count: number, uri: string) => {
     clusterBitmapCache.set(count, uri);

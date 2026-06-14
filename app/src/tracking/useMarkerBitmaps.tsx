@@ -114,13 +114,20 @@ export function OffscreenCapturePool({
 // Per-device last-known bitmap URI (module-level, persists across re-mounts)
 const lastBitmapByDevice = new Map<string, string>();
 
-export function useMarkerBitmaps(devices: TrackingDevice[], showLabels: boolean) {
+export function useMarkerBitmaps(
+  devices: TrackingDevice[],
+  showLabels: boolean,
+  enabled = true,
+) {
   const [bitmaps, setBitmaps] = useState<ReadonlyMap<string, string>>(bitmapCache);
   const [pending, setPending] = useState<PendingCapture[]>([]);
   const pendingKeysRef = useRef(new Set<string>());
 
-  // Queue any new icon configurations for capture
+  // Queue any new icon configurations for capture.
+  // No iOS os marcadores renderizam o ícone como filho (sem bitmap), então não
+  // capturamos nada — evita captureRef em massa (custo/crash sob Fabric).
   useEffect(() => {
+    if (!enabled) return;
     const toAdd: PendingCapture[] = [];
     for (const device of devices) {
       const color = getMarkerColor(device);
@@ -135,7 +142,7 @@ export function useMarkerBitmaps(devices: TrackingDevice[], showLabels: boolean)
     if (toAdd.length > 0) {
       setPending((prev) => [...prev, ...toAdd]);
     }
-  }, [devices, showLabels]);
+  }, [devices, showLabels, enabled]);
 
   const onReady = useCallback((key: string, uri: string) => {
     bitmapCache.set(key, uri);

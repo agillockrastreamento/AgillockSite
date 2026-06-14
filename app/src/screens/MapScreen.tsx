@@ -51,8 +51,9 @@ import {
 } from '../tracking/geofenceService';
 import type { TrackingAccessStatus, TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
+import { IconMarker } from '../tracking/IconMarker';
 import { useMarkerBitmaps, OffscreenCapturePool } from '../tracking/useMarkerBitmaps';
-import { useClusterBitmaps, ClusterCapturePool } from '../tracking/useClusterBitmaps';
+import { useClusterBitmaps, ClusterCapturePool, ClusterIcon } from '../tracking/useClusterBitmaps';
 import {
   formatSpeed,
   getStatusColor,
@@ -72,6 +73,8 @@ const DEFAULT_REGION = {
   latitudeDelta: 24,
   longitudeDelta: 24,
 };
+
+const isIOS = Platform.OS === 'ios';
 
 const MAP_TYPES: MapType[] = ['standard', 'satellite', 'terrain', 'hybrid'];
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -137,6 +140,20 @@ function ClusterMarker({
   bitmapUri: string | undefined;
   onPress(): void;
 }) {
+  // iOS: ícone como filho + re-snapshot via tracksViewChanges (sem bitmap/key).
+  if (isIOS) {
+    return (
+      <IconMarker
+        signature={`cluster-${count}`}
+        coordinate={{ latitude: lat, longitude: lng }}
+        anchor={{ x: 0.5, y: 0.5 }}
+        zIndex={500}
+        onPress={onPress}
+      >
+        <ClusterIcon count={count} />
+      </IconMarker>
+    );
+  }
   return (
     <Marker
       coordinate={{ latitude: lat, longitude: lng }}
@@ -228,7 +245,9 @@ export function MapScreen() {
   // Track last centered position to avoid redundant map moves
   const lastCenteredKey = useRef('');
 
-  const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, showLabels);
+  // No iOS o ícone é renderizado como filho do Marker (sem bitmap) — desliga a
+  // captura para não rodar captureRef em massa (custo/crash sob Fabric).
+  const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, showLabels, !isIOS);
 
   useEffect(() => {
     let cancelled = false;
@@ -430,7 +449,7 @@ export function MapScreen() {
     getClusterBitmap,
     pending: clusterPending,
     onReady: onClusterReady,
-  } = useClusterBitmaps(clusterCounts);
+  } = useClusterBitmaps(clusterCounts, !isIOS);
 
   const spiderPositions = useMemo(() => {
     if (!spiderClusterKey) return null;
@@ -939,16 +958,61 @@ export function MapScreen() {
             coord: LatLng,
             isSpiderMarker: boolean,
           ) => {
+            const color = getMarkerColor(device);
+            const curso = device.posicao?.curso ?? 0;
+            const label = device.placa ?? device.nome ?? '';
+            const markerContent = (
+              <View style={styles.markerContainer}>
+                <View style={styles.markerWrap}>
+                  <VehicleIcon
+                    categoria={device.categoria}
+                    color={color}
+                    course={curso}
+                    size={58}
+                  />
+                </View>
+                {showLabels ? (
+                  <View style={styles.markerLabelWrap}>
+                    <View style={styles.markerLabelPointer} />
+                    <View style={styles.markerLabel}>
+                      <Text style={styles.markerLabelText} numberOfLines={1}>
+                        {label}
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            );
+
+            // iOS/Fabric: NUNCA remontar o Marker via key (derruba o app) nem
+            // confiar no prop `image` (não reaplica). Renderiza o ícone como
+            // filho e re-snapshota via tracksViewChanges quando o conteúdo muda
+            // (cor/curso/label/etiqueta) — assim rotação, cor e etiqueta
+            // atualizam na hora.
+            if (isIOS) {
+              return (
+                <IconMarker
+                  key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}`}
+                  signature={`${color}|${Math.round(curso / 10)}|${label}|${showLabels ? 1 : 0}`}
+                  coordinate={coord}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                  zIndex={isSpiderMarker ? 1000 : 100}
+                  onPress={() => {
+                    if (isSpiderMarker) closeSpiderFromMarker();
+                    focusDevice(device, true);
+                  }}
+                >
+                  {markerContent}
+                </IconMarker>
+              );
+            }
+
+            // Android: o `image` não reaplica em update — o bitmap entra na key
+            // para remontar quando o ícone muda (remontar é seguro no Android).
             const bitmapUri = getBitmap(device);
             return (
               <Marker
-                // O bitmap na key força remontagem quando o ícone muda — o prop
-                // `image` do Marker não é reaplicado em atualizações NO ANDROID.
-                // No iOS o `image` reaplica sozinho; forçar remontagem do marcador
-                // do Google Maps sob a New Architecture (Fabric) derruba o app
-                // (crash nativo ao remontar markers em massa). Por isso o bitmap
-                // só entra na key no Android.
-                key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}${Platform.OS === 'android' ? `-${bitmapUri ?? 'pending'}` : ''}`}
+                key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}-${bitmapUri ?? 'pending'}`}
                 coordinate={coord}
                 image={bitmapUri ? { uri: bitmapUri } : undefined}
                 anchor={{ x: 0.5, y: 0.5 }}
@@ -959,28 +1023,7 @@ export function MapScreen() {
                   focusDevice(device, true);
                 }}
               >
-                {!bitmapUri ? (
-                  <View style={styles.markerContainer}>
-                    <View style={styles.markerWrap}>
-                      <VehicleIcon
-                        categoria={device.categoria}
-                        color={getMarkerColor(device)}
-                        course={device.posicao?.curso}
-                        size={58}
-                      />
-                    </View>
-                    {showLabels ? (
-                      <View style={styles.markerLabelWrap}>
-                        <View style={styles.markerLabelPointer} />
-                        <View style={styles.markerLabel}>
-                          <Text style={styles.markerLabelText} numberOfLines={1}>
-                            {device.placa ?? device.nome}
-                          </Text>
-                        </View>
-                      </View>
-                    ) : null}
-                  </View>
-                ) : null}
+                {!bitmapUri ? markerContent : null}
               </Marker>
             );
           };

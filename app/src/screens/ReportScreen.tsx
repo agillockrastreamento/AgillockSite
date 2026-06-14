@@ -45,10 +45,11 @@ import type {
   Resumo,
   Viagem,
 } from '../reporting/reportTypes';
-import { IDLE_ALERT_LIMIT_MIN, useIdleAlertBitmap } from '../reporting/idleAlert';
+import { IDLE_ALERT_LIMIT_MIN, IdleAlertSvg, useIdleAlertBitmap } from '../reporting/idleAlert';
 import { getTrackingSnapshot } from '../tracking/trackingService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
+import { IconMarker } from '../tracking/IconMarker';
 import {
   OffscreenCapturePool,
   makeCaptureKey,
@@ -206,6 +207,22 @@ function StatCard({ value, label }: { value: string; label: string }) {
 const ROUTE_MARKER_SIZE = 48;
 const SPEED_MULTIPLIERS = [1, 2, 4, 8] as const;
 const PLAYER_TICK_MS = 80;
+const isIOS = Platform.OS === 'ios';
+
+// Pino de parada ("P") reaproveitado na captura (Android) e como filho (iOS).
+function StopPinSvg() {
+  return (
+    <Svg width={28} height={36} viewBox="0 0 28 36">
+      <Path
+        d="M14 2 C7.4 2 2 7.4 2 14 C2 23 14 34 14 34 C14 34 26 23 26 14 C26 7.4 20.6 2 14 2 Z"
+        fill="#2f3640"
+      />
+      <SvgText x="14" y="18" fontSize={12} fill="white" textAnchor="middle" fontWeight="bold">
+        P
+      </SvgText>
+    </Svg>
+  );
+}
 
 function RouteTab({
   historico,
@@ -440,15 +457,7 @@ function RouteTab({
         />
       </View>
       <View ref={stopPinRef} collapsable={false} style={{ alignSelf: 'flex-start' }}>
-        <Svg width={28} height={36} viewBox="0 0 28 36">
-          <Path
-            d="M14 2 C7.4 2 2 7.4 2 14 C2 23 14 34 14 34 C14 34 26 23 26 14 C26 7.4 20.6 2 14 2 Z"
-            fill="#2f3640"
-          />
-          <SvgText x="14" y="18" fontSize={12} fill="white" textAnchor="middle" fontWeight="bold">
-            P
-          </SvgText>
-        </Svg>
+        <StopPinSvg />
       </View>
     </View>
   );
@@ -497,7 +506,17 @@ function RouteTab({
         >
           <Polyline coordinates={coords} strokeColor={colors.accent} strokeWidth={3} geodesic />
           {!playerActive && (
-            vehicleBitmap ? (
+            isIOS ? (
+              <IconMarker
+                signature={`inicio-${markerColor}-${device?.categoria ?? ''}`}
+                coordinate={{ latitude: first.latitude, longitude: first.longitude }}
+                title="Início"
+                description={fmtHora(first.fixTime)}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <VehicleIcon categoria={device?.categoria} color={markerColor} course={0} size={ROUTE_MARKER_SIZE} />
+              </IconMarker>
+            ) : vehicleBitmap ? (
               <Marker
                 coordinate={{ latitude: first.latitude, longitude: first.longitude }}
                 title="Início"
@@ -514,7 +533,17 @@ function RouteTab({
             )
           )}
           {!playerActive && (
-            vehicleBitmap ? (
+            isIOS ? (
+              <IconMarker
+                signature={`fim-${markerColor}-${device?.categoria ?? ''}`}
+                coordinate={{ latitude: last.latitude, longitude: last.longitude }}
+                title="Fim"
+                description={fmtHora(last.fixTime)}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <VehicleIcon categoria={device?.categoria} color={markerColor} course={0} size={ROUTE_MARKER_SIZE} />
+              </IconMarker>
+            ) : vehicleBitmap ? (
               <Marker
                 coordinate={{ latitude: last.latitude, longitude: last.longitude }}
                 title="Fim"
@@ -531,7 +560,18 @@ function RouteTab({
             )
           )}
           {stopMarkers.map((s, i) =>
-            stopBitmap ? (
+            isIOS ? (
+              <IconMarker
+                key={`stop-${i}`}
+                signature={`stop-${i}`}
+                coordinate={{ latitude: s.lat, longitude: s.lon }}
+                title={`Parada ${i + 1}`}
+                description={s.label}
+                anchor={{ x: 0.5, y: 1 }}
+              >
+                <StopPinSvg />
+              </IconMarker>
+            ) : stopBitmap ? (
               <Marker
                 key={`stop-${i}`}
                 coordinate={{ latitude: s.lat, longitude: s.lon }}
@@ -549,32 +589,52 @@ function RouteTab({
               />
             ),
           )}
-          {idleMarkers.map((o, i) => (
-            <Marker
-              key={`idle-${i}`}
-              coordinate={{ latitude: o.lat, longitude: o.lon }}
-              title="Motor ocioso"
-              description={o.label}
-              anchor={{ x: 0.5, y: 1 }}
-              zIndex={5}
-              {...(idleBitmap ? { image: { uri: idleBitmap } } : { pinColor: '#f0ad4e' })}
-            />
-          ))}
-          {playerActive && playerPos ? (
-            // Sem prop `rotation`: o curso já vem desenhado no bitmap (igual ao
-            // MapScreen), evitando o deslocamento do marcador no iOS/Fabric.
-            Platform.OS === 'ios' ? (
-              // iOS/Fabric: NUNCA trocar a key em runtime — remontar o <Marker> do
-              // Google Maps derruba o app. Key estável + tracksViewChanges enquanto
-              // o bitmap não chega; o prop `image` reaplica sozinho no iOS (in-place).
+          {idleMarkers.map((o, i) =>
+            isIOS ? (
+              <IconMarker
+                key={`idle-${i}`}
+                signature={`idle-${i}`}
+                coordinate={{ latitude: o.lat, longitude: o.lon }}
+                title="Motor ocioso"
+                description={o.label}
+                anchor={{ x: 0.5, y: 1 }}
+                zIndex={5}
+              >
+                <IdleAlertSvg size={32} />
+              </IconMarker>
+            ) : (
               <Marker
+                key={`idle-${i}`}
+                coordinate={{ latitude: o.lat, longitude: o.lon }}
+                title="Motor ocioso"
+                description={o.label}
+                anchor={{ x: 0.5, y: 1 }}
+                zIndex={5}
+                {...(idleBitmap ? { image: { uri: idleBitmap } } : { pinColor: '#f0ad4e' })}
+              />
+            ),
+          )}
+          {playerActive && playerPos ? (
+            isIOS ? (
+              // iOS/Fabric: NUNCA trocar a key em runtime nem confiar no prop
+              // `image` (não reaplica). Renderiza o VehicleIcon como filho — a
+              // rotação vem do SVG (course) e o re-snapshot via tracksViewChanges
+              // (IconMarker) reflete o giro a cada tick. anchor 0.5/0.5 + sem prop
+              // `rotation` mantém o ícone exatamente sobre a linha.
+              <IconMarker
                 key="player-pos"
+                signature={`player-${markerColor}-${Math.round((playerPos.curso ?? 0) / 5)}`}
                 coordinate={{ latitude: playerPos.latitude, longitude: playerPos.longitude }}
                 zIndex={10}
                 anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={!playerBitmap}
-                {...(playerBitmap ? { image: { uri: playerBitmap } } : { pinColor: markerColor })}
-              />
+              >
+                <VehicleIcon
+                  categoria={device?.categoria}
+                  color={markerColor}
+                  course={playerPos.curso ?? 0}
+                  size={ROUTE_MARKER_SIZE}
+                />
+              </IconMarker>
             ) : (
               // Android: o `image` não reaplica em update — a key troca 1x (pin→img)
               // para remontar e exibir o bitmap. Remontar no Android é seguro.
