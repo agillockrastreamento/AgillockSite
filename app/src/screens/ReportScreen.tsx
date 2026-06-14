@@ -50,11 +50,6 @@ import { getTrackingSnapshot } from '../tracking/trackingService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
 import { IconMarker } from '../tracking/IconMarker';
-import {
-  OffscreenCapturePool,
-  makeCaptureKey,
-  type PendingCapture,
-} from '../tracking/useMarkerBitmaps';
 import { SearchBottomSheet } from '../components/SearchBottomSheet';
 import { useAuth } from '../auth/AuthProvider';
 import { colors } from '../theme/colors';
@@ -209,6 +204,32 @@ const SPEED_MULTIPLIERS = [1, 2, 4, 8] as const;
 const PLAYER_TICK_MS = 80;
 const isIOS = Platform.OS === 'ios';
 
+// Variação de heading (graus) abaixo da qual mantemos o rumo anterior. Absorve o
+// ruído do GPS para o carro não ficar "dobrando" em linha reta.
+const HEADING_THRESHOLD = 12;
+
+type LatLngLite = { latitude: number; longitude: number };
+
+// Rumo (0–360, norte = 0) do ponto a → b. Null se forem praticamente o mesmo
+// ponto (veículo parado) — aí mantemos o rumo anterior.
+function bearingDeg(a: LatLngLite, b: LatLngLite): number | null {
+  const dLat = b.latitude - a.latitude;
+  const dLon = b.longitude - a.longitude;
+  if (Math.abs(dLat) < 1e-7 && Math.abs(dLon) < 1e-7) return null;
+  const φ1 = (a.latitude * Math.PI) / 180;
+  const φ2 = (b.latitude * Math.PI) / 180;
+  const Δλ = (dLon * Math.PI) / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+// Menor diferença angular (0–180) entre dois rumos.
+function angularDiff(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
 // Pino de parada ("P") reaproveitado na captura (Android) e como filho (iOS).
 function StopPinSvg() {
   return (
@@ -243,14 +264,6 @@ function RouteTab({
   const [playerActive, setPlayerActive] = useState(false);
   const [playerIndex, setPlayerIndex] = useState(0);
   const [playerSpeedMult, setPlayerSpeedMult] = useState(1);
-
-  // Bitmap do ícone do player COM o curso já desenhado dentro (como no MapScreen).
-  // No iOS/Fabric a prop `rotation` do Marker desloca o ícone para fora da rota;
-  // por isso a rotação é embutida no próprio bitmap e capturada por ângulo (cache).
-  const [angleBitmaps, setAngleBitmaps] = useState<Map<string, string>>(new Map());
-  const [anglePending, setAnglePending] = useState<PendingCapture[]>([]);
-  const anglePendingKeysRef = useRef(new Set<string>());
-  const lastAngleBitmapRef = useRef<string | null>(null);
 
   // AnimatedRegion interpola lat/lng nativamente entre cada par de pontos GPS
   const animCoordinate = useRef(
@@ -293,6 +306,29 @@ function RouteTab({
     [historico],
   );
 
+  // Rumo de cada ponto = direção do segmento da rota (a → b), suavizado para não
+  // tremer no ruído do GPS. Como segue a própria linha, o ícone aponta sempre na
+  // direção do trajeto e não "dobra" em reta nem antecipa a curva.
+  const headings = useMemo(() => {
+    const out: number[] = [];
+    let last = 0;
+    for (let i = 0; i < valid.length; i++) {
+      const prev = valid[Math.max(0, i - 1)]!;
+      const curr = valid[i]!;
+      const next = valid[Math.min(valid.length - 1, i + 1)]!;
+      // No primeiro ponto usa o segmento seguinte; nos demais, o que acabou de
+      // ser percorrido (prev → curr).
+      const raw = i === 0 ? bearingDeg(curr, next) : bearingDeg(prev, curr);
+      if (raw == null) {
+        out.push(last); // parado: mantém rumo
+        continue;
+      }
+      if (i === 0 || angularDiff(raw, last) > HEADING_THRESHOLD) last = raw;
+      out.push(last);
+    }
+    return out;
+  }, [valid]);
+
   const { bitmap: idleBitmap, offscreen: idleOffscreen } = useIdleAlertBitmap();
 
   // Capture vehicle icon bitmap for map markers
@@ -317,53 +353,6 @@ function RouteTab({
     }, 150);
     return () => clearTimeout(timer);
   }, []);
-
-  // ── Bitmap do player por ângulo (rotação embutida) ──────────────
-  // Ao trocar veículo/cor os bitmaps antigos não servem (cor/forma mudam).
-  useEffect(() => {
-    anglePendingKeysRef.current.clear();
-    setAngleBitmaps(new Map());
-    setAnglePending([]);
-    lastAngleBitmapRef.current = null;
-  }, [device?.categoria, markerColor]);
-
-  const onAngleReady = useCallback((key: string, uri: string) => {
-    anglePendingKeysRef.current.delete(key);
-    setAngleBitmaps((prev) => {
-      const next = new Map(prev);
-      next.set(key, uri);
-      return next;
-    });
-    setAnglePending((prev) => prev.filter((e) => e.key !== key));
-  }, []);
-
-  // Enfileira a captura do ícone para o curso atual (chave já arredonda o ângulo).
-  const ensureAngleBitmap = useCallback(
-    (curso: number) => {
-      const key = makeCaptureKey(device?.categoria, markerColor, curso, null, false);
-      if (angleBitmaps.has(key) || anglePendingKeysRef.current.has(key)) return;
-      anglePendingKeysRef.current.add(key);
-      setAnglePending((prev) => [
-        ...prev,
-        { key, categoria: device?.categoria, color: markerColor, course: curso, label: null, showLabel: false },
-      ]);
-    },
-    [angleBitmaps, device?.categoria, markerColor],
-  );
-
-  // Bitmap pronto para o curso atual; se ainda capturando, usa o último (sem flicker).
-  const getPlayerBitmap = useCallback(
-    (curso: number): string | null => {
-      const key = makeCaptureKey(device?.categoria, markerColor, curso, null, false);
-      const uri = angleBitmaps.get(key);
-      if (uri) {
-        lastAngleBitmapRef.current = uri;
-        return uri;
-      }
-      return lastAngleBitmapRef.current;
-    },
-    [angleBitmaps, device?.categoria, markerColor],
-  );
 
   // Fit map to route
   useEffect(() => {
@@ -416,13 +405,10 @@ function RouteTab({
   useEffect(() => {
     const pos = valid[playerIndex];
     if (!pos || !playerActive) return;
-    // iOS: NÃO captura bitmap por ângulo durante o playback nem troca a URI do
-    // `image` do marcador a cada tick (era a regressão que derrubava o app sob
-    // Fabric — captureRef em rajada + reload de imagem do Marker ~12x/seg). Usa
-    // um único bitmap estático, movido por estado. Android mantém a rotação por
-    // ângulo + AnimatedRegion (não crasha lá).
+    // Android: AnimatedRegion interpola a posição entre os pontos GPS (movimento
+    // suave). iOS move por estado (coordinate do playerPos) — o Google Maps SDK
+    // anima a mudança implicitamente, e AnimatedRegion quebra sob Fabric.
     if (Platform.OS !== 'ios') {
-      ensureAngleBitmap(pos.curso ?? 0);
       animCoordinate.timing({
         latitude: pos.latitude,
         longitude: pos.longitude,
@@ -434,17 +420,11 @@ function RouteTab({
       { center: { latitude: pos.latitude, longitude: pos.longitude } },
       { duration: PLAYER_TICK_MS - 10 },
     );
-  }, [playerIndex, playerActive, valid, ensureAngleBitmap]);
+  }, [playerIndex, playerActive, valid]);
 
   const playerPos = valid[playerIndex] ?? null;
-  // iOS usa um único bitmap estático (sem rotação/troca de URI → sem crash).
-  // Android usa o bitmap por ângulo (rotação embutida) capturado em runtime.
-  const playerBitmap =
-    Platform.OS === 'ios'
-      ? vehicleBitmap
-      : playerPos
-        ? getPlayerBitmap(playerPos.curso ?? 0)
-        : null;
+  // Rumo suavizado pelo segmento da rota (não o curso do GPS, que treme).
+  const playerHeading = headings[playerIndex] ?? 0;
 
   const offscreenPool = (
     <View style={styles.offscreenPool} pointerEvents="none">
@@ -487,7 +467,6 @@ function RouteTab({
     <View style={{ flex: 1 }}>
       {offscreenPool}
       {idleOffscreen}
-      <OffscreenCapturePool pending={anglePending} onReady={onAngleReady} />
       <View style={styles.routeContainer}>
         <MapView
           ref={mapRef}
@@ -616,35 +595,38 @@ function RouteTab({
           )}
           {playerActive && playerPos ? (
             isIOS ? (
-              // iOS/Fabric: NUNCA trocar a key em runtime nem confiar no prop
-              // `image` (não reaplica). Renderiza o VehicleIcon como filho — a
-              // rotação vem do SVG (course) e o re-snapshot via tracksViewChanges
-              // (IconMarker) reflete o giro a cada tick. anchor 0.5/0.5 + sem prop
-              // `rotation` mantém o ícone exatamente sobre a linha.
-              <IconMarker
+              // iOS/Fabric: ícone como FILHO (o prop `rotation` desloca o marcador
+              // para fora da linha no iOS). A rotação vem do SVG (heading do
+              // segmento, suavizado). `tracksViewChanges` fica LIGADO durante o
+              // playback — re-snapshot contínuo de um único marcador gira suave.
+              // anchor 0.5/0.5 + sem prop `rotation` mantém o ícone sobre a linha.
+              <Marker
                 key="player-pos"
-                signature={`player-${markerColor}-${Math.round((playerPos.curso ?? 0) / 5)}`}
                 coordinate={{ latitude: playerPos.latitude, longitude: playerPos.longitude }}
                 zIndex={10}
                 anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={playerActive}
               >
                 <VehicleIcon
                   categoria={device?.categoria}
                   color={markerColor}
-                  course={playerPos.curso ?? 0}
+                  course={playerHeading}
                   size={ROUTE_MARKER_SIZE}
                 />
-              </IconMarker>
+              </Marker>
             ) : (
-              // Android: o `image` não reaplica em update — a key troca 1x (pin→img)
-              // para remontar e exibir o bitmap. Remontar no Android é seguro.
+              // Android: bitmap estático (course=0) + `rotation` NATIVO (gira o
+              // próprio marcador, sem cortar/piscar) + AnimatedRegion (movimento
+              // suave). Usa o heading suavizado do segmento. A key troca 1x quando
+              // o bitmap chega (remontar é seguro no Android).
               <MarkerAnimated
-                key={`player-pos-${playerBitmap ? 'img' : 'pin'}`}
+                key={`player-pos-${vehicleBitmap ? 'img' : 'pin'}`}
                 coordinate={animCoordinate as any}
                 zIndex={10}
                 anchor={{ x: 0.5, y: 0.5 }}
+                rotation={playerHeading}
                 tracksViewChanges={false}
-                {...(playerBitmap ? { image: { uri: playerBitmap } } : { pinColor: markerColor })}
+                {...(vehicleBitmap ? { image: { uri: vehicleBitmap } } : { pinColor: markerColor })}
               />
             )
           ) : null}
