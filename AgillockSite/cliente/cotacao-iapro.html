@@ -14,7 +14,8 @@
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
   <style>
-    .cot-body { padding: 24px 28px; max-width: 760px; }
+    .cot-body { padding: 24px 28px; }
+    select.form-control { margin-bottom: 12px; }
     .cot-card {
       background: #fff; border: 1px solid #e8e8e8; border-radius: 12px;
       padding: 22px 24px; margin-bottom: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.04);
@@ -123,6 +124,8 @@
     .cot-val-adesao .cot-val-num { font-size:23px; font-weight:800; color:#17202a; }
     html.dark-theme .cot-val-adesao .cot-val-num { color:#f0f4fa; }
     .cot-val-foot { font-size:11px; color:#9aa7b8; margin-top:2px; }
+    .cot-val-old { font-size:14px; color:#9aa7b8; text-decoration:line-through; margin-bottom:2px; }
+    .cot-val-desc { font-size:11px; color:#27ae60; font-weight:600; margin-top:5px; line-height:1.3; }
     .cot-discount-badge { position:absolute; top:-11px; right:10px; background:#27ae60; color:#fff; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; }
 
     .cot-noprice { padding:16px; background:#f7f9fc; border-radius:12px; text-align:center; color:#7a8699; font-size:14px; margin-bottom:16px; line-height:1.5; }
@@ -213,7 +216,7 @@
             <div class="cot-intro-icon"><i class="fa fa-shield"></i></div>
             <div>
               <h4>Proteção veicular IAPRO</h4>
-              <p>Faça uma cotação da proteção para o seu veículo. Selecione um veículo já cadastrado ou informe outra placa.</p>
+              <p>Faça uma cotação da proteção: use um veículo já cadastrado, informe outra placa ou um veículo 0 km.</p>
             </div>
           </div>
         </div>
@@ -223,6 +226,7 @@
           <div class="cot-mode">
             <div class="cot-mode-btn active" id="mode-meu" data-mode="meu"><i class="fa fa-car"></i> Meu veículo</div>
             <div class="cot-mode-btn" id="mode-outra" data-mode="outra"><i class="fa fa-keyboard-o"></i> Outra placa</div>
+            <div class="cot-mode-btn" id="mode-zero" data-mode="zero"><i class="fa fa-star"></i> Veículo 0 km</div>
           </div>
 
           <!-- Meu veículo -->
@@ -238,6 +242,22 @@
           <div id="cot-outra-wrap" style="display:none;">
             <label class="cot-label">Placa do veículo</label>
             <input type="text" id="cot-placa-manual" class="form-control" maxlength="8" placeholder="ABC1D23" />
+          </div>
+
+          <!-- Veículo 0 km (selects da FIPE) -->
+          <div id="cot-zero-wrap" style="display:none;">
+            <label class="cot-label">Tipo de veículo</label>
+            <select id="fipe-tipo" class="form-control">
+              <option value="CARRO">Carro</option>
+              <option value="MOTO">Moto</option>
+              <option value="CAMINHAO">Caminhão</option>
+            </select>
+            <label class="cot-label">Marca</label>
+            <select id="fipe-marca" class="form-control"><option value="">Selecione...</option></select>
+            <label class="cot-label">Modelo</label>
+            <select id="fipe-modelo" class="form-control" disabled><option value="">Selecione a marca...</option></select>
+            <label class="cot-label">Ano</label>
+            <select id="fipe-ano" class="form-control" disabled><option value="">Selecione o modelo...</option></select>
           </div>
 
           <div style="margin-top:18px;">
@@ -347,7 +367,8 @@
 
       // ── Estado ──
       var modo = 'meu';
-      var cotacaoAtual = null; // { veiculo, preco, whatsappComercial, placa }
+      var cotacaoAtual = null; // { veiculo, preco, whatsappComercial, placa, zeroKm, sessionId }
+      var sessionIdAtual = null; // reaproveitado entre cotações da mesma página (evita duplicar no painel IAPRO)
 
       var elModeMeu = document.getElementById('mode-meu');
       var elModeOutra = document.getElementById('mode-outra');
@@ -359,6 +380,13 @@
       var elBtnCotar = document.getElementById('btn-cotar');
       var elResult = document.getElementById('cot-result');
       var elFormSection = document.getElementById('cot-form-section');
+      var elModeZero = document.getElementById('mode-zero');
+      var elZeroWrap = document.getElementById('cot-zero-wrap');
+      var elFipeTipo = document.getElementById('fipe-tipo');
+      var elFipeMarca = document.getElementById('fipe-marca');
+      var elFipeModelo = document.getElementById('fipe-modelo');
+      var elFipeAno = document.getElementById('fipe-ano');
+      var marcasCarregadas = false;
 
       function fmtBRL(n) {
         if (n == null || isNaN(n)) return '—';
@@ -370,17 +398,68 @@
         modo = m;
         elModeMeu.classList.toggle('active', m === 'meu');
         elModeOutra.classList.toggle('active', m === 'outra');
+        elModeZero.classList.toggle('active', m === 'zero');
         elMeuWrap.style.display = m === 'meu' ? 'block' : 'none';
         elOutraWrap.style.display = m === 'outra' ? 'block' : 'none';
+        elZeroWrap.style.display = m === 'zero' ? 'block' : 'none';
         esconderResultado();
+        if (m === 'zero' && !marcasCarregadas) carregarMarcas();
       }
       elModeMeu.addEventListener('click', function () { setModo('meu'); });
       elModeOutra.addEventListener('click', function () { setModo('outra'); });
+      elModeZero.addEventListener('click', function () { setModo('zero'); });
       elSelect.addEventListener('change', esconderResultado);
       elPlacaManual.addEventListener('input', function () {
         this.value = normalizaPlaca(this.value);
         esconderResultado();
       });
+
+      // ── FIPE (veículo 0 km) ──
+      function fillSelect(sel, itens, placeholder, disabled) {
+        sel.innerHTML = '<option value="">' + placeholder + '</option>';
+        (itens || []).forEach(function (it) {
+          var o = document.createElement('option');
+          o.value = it.codigo;
+          o.textContent = it.nome;
+          sel.appendChild(o);
+        });
+        sel.disabled = !!disabled;
+      }
+      function carregarMarcas() {
+        var tipo = elFipeTipo.value;
+        fillSelect(elFipeMarca, [], 'Carregando...', true);
+        fillSelect(elFipeModelo, [], 'Selecione a marca...', true);
+        fillSelect(elFipeAno, [], 'Selecione o modelo...', true);
+        AL_CLIENTE.apiGet('/api/cliente/cotacao-iapro/fipe/marcas?tipo=' + tipo)
+          .then(function (m) { marcasCarregadas = true; fillSelect(elFipeMarca, m, 'Selecione...', false); })
+          .catch(function (e) { fillSelect(elFipeMarca, [], 'Selecione...', false); AL_CLIENTE.showAlert(e.message || 'Erro ao carregar marcas.', 'danger'); });
+      }
+      function carregarModelos() {
+        var tipo = elFipeTipo.value, marca = elFipeMarca.value;
+        fillSelect(elFipeModelo, [], 'Carregando...', true);
+        fillSelect(elFipeAno, [], 'Selecione o modelo...', true);
+        if (!marca) { fillSelect(elFipeModelo, [], 'Selecione a marca...', true); return; }
+        AL_CLIENTE.apiGet('/api/cliente/cotacao-iapro/fipe/modelos?tipo=' + tipo + '&marca=' + encodeURIComponent(marca))
+          .then(function (m) { fillSelect(elFipeModelo, m, 'Selecione...', false); })
+          .catch(function (e) { AL_CLIENTE.showAlert(e.message || 'Erro ao carregar modelos.', 'danger'); });
+      }
+      function carregarAnos() {
+        var tipo = elFipeTipo.value, marca = elFipeMarca.value, modelo = elFipeModelo.value;
+        fillSelect(elFipeAno, [], 'Carregando...', true);
+        if (!marca || !modelo) { fillSelect(elFipeAno, [], 'Selecione o modelo...', true); return; }
+        AL_CLIENTE.apiGet('/api/cliente/cotacao-iapro/fipe/anos?tipo=' + tipo + '&marca=' + encodeURIComponent(marca) + '&modelo=' + encodeURIComponent(modelo))
+          .then(function (a) { fillSelect(elFipeAno, a, 'Selecione...', false); })
+          .catch(function (e) { AL_CLIENTE.showAlert(e.message || 'Erro ao carregar anos.', 'danger'); });
+      }
+      elFipeTipo.addEventListener('change', function () { esconderResultado(); carregarMarcas(); });
+      elFipeMarca.addEventListener('change', function () { esconderResultado(); carregarModelos(); });
+      elFipeModelo.addEventListener('change', function () { esconderResultado(); carregarAnos(); });
+      elFipeAno.addEventListener('change', esconderResultado);
+
+      function selecaoFipe() {
+        if (!elFipeMarca.value || !elFipeModelo.value || !elFipeAno.value) return null;
+        return { tipo: elFipeTipo.value, marca: elFipeMarca.value, modelo: elFipeModelo.value, ano: elFipeAno.value };
+      }
 
       function esconderResultado() {
         elResult.style.display = 'none';
@@ -416,22 +495,33 @@
 
       // ── Cotar ──
       elBtnCotar.addEventListener('click', function () {
-        var placa = placaSelecionada();
-        if (placa.length < 7) {
-          AL_CLIENTE.showAlert('Informe uma placa válida (7 caracteres).', 'danger');
-          return;
+        var endpoint, body, fipeSel = null, placa = '';
+        if (modo === 'zero') {
+          fipeSel = selecaoFipe();
+          if (!fipeSel) { AL_CLIENTE.showAlert('Selecione tipo, marca, modelo e ano.', 'danger'); return; }
+          endpoint = '/api/cliente/cotacao-iapro/cotar-zero';
+          body = { tipo: fipeSel.tipo, marca: fipeSel.marca, modelo: fipeSel.modelo, ano: fipeSel.ano, sessionId: sessionIdAtual };
+        } else {
+          placa = placaSelecionada();
+          if (placa.length < 7) { AL_CLIENTE.showAlert('Informe uma placa válida (7 caracteres).', 'danger'); return; }
+          endpoint = '/api/cliente/cotacao-iapro/cotar';
+          body = { placa: placa, sessionId: sessionIdAtual };
         }
         var original = elBtnCotar.innerHTML;
         elBtnCotar.disabled = true;
         elBtnCotar.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Cotando...';
 
-        AL_CLIENTE.apiPost('/api/cliente/cotacao-iapro/cotar', { placa: placa })
+        AL_CLIENTE.apiPost(endpoint, body)
           .then(function (data) {
-            cotacaoAtual = { veiculo: data.veiculo, preco: data.preco, whatsappComercial: data.whatsappComercial, placa: placa };
+            if (data.sessionId) sessionIdAtual = data.sessionId;
+            cotacaoAtual = {
+              veiculo: data.veiculo, preco: data.preco, whatsappComercial: data.whatsappComercial,
+              placa: placa, zeroKm: modo === 'zero', fipeSel: fipeSel, sessionId: data.sessionId || null,
+            };
             renderResultado();
           })
           .catch(function (err) {
-            AL_CLIENTE.showAlert(err.message || 'Não foi possível cotar a placa.', 'danger');
+            AL_CLIENTE.showAlert(err.message || 'Não foi possível fazer a cotação.', 'danger');
           })
           .finally(function () {
             elBtnCotar.disabled = false;
@@ -464,7 +554,7 @@
         document.getElementById('res-hero').textContent =
           'Pronto' + (primeiro ? ', ' + primeiro : '') + '! Sua proteção está aqui.';
         document.getElementById('res-solicitante').textContent = user.nome || 'Você';
-        document.getElementById('res-placa').textContent = v.placa;
+        document.getElementById('res-placa').textContent = v.placa || '0 km';
         document.getElementById('res-veicdesc').textContent =
           [v.marca, v.modelo, v.ano].filter(Boolean).join(' ') || '—';
 
@@ -476,12 +566,17 @@
 
         var valWrap = document.getElementById('res-valores-wrap');
         if (p) {
+          var desc = Number(p.descontoPct) || 0;
+          var mensalFinal = desc > 0 ? p.mensalidade * (1 - desc / 100) : p.mensalidade;
           valWrap.innerHTML =
             '<div class="cot-val-grid">' +
               '<div class="cot-val-card cot-val-mensal">' +
+                (desc > 0 ? '<span class="cot-discount-badge">' + Math.round(desc) + '% OFF</span>' : '') +
                 '<div class="cot-val-label">Mensalidade</div>' +
-                '<div class="cot-val-num">' + fmtBRL(p.mensalidade) + '</div>' +
+                (desc > 0 ? '<div class="cot-val-old">' + fmtBRL(p.mensalidade) + '</div>' : '') +
+                '<div class="cot-val-num">' + fmtBRL(mensalFinal) + '</div>' +
                 '<div class="cot-val-foot">por mês</div>' +
+                (desc > 0 ? '<div class="cot-val-desc">com desconto de pagamento até 1 dia antes do vencimento</div>' : '') +
               '</div>' +
               '<div class="cot-val-card cot-val-adesao">' +
                 '<div class="cot-val-label">Adesão</div>' +
@@ -513,13 +608,15 @@
           'Olá! Fiz uma cotação de proteção veicular IAPRO pelo portal Ágil Lock e gostaria de mais informações.',
           '',
           'Veículo: ' + [v.marca, v.modelo, v.ano].filter(Boolean).join(' '),
-          'Placa: ' + v.placa,
+          cotacaoAtual.zeroKm ? 'Condição: 0 km (sem placa)' : 'Placa: ' + v.placa,
         ];
         if (v.fipeFormatado) linhas.push('Valor FIPE: ' + v.fipeFormatado);
         // Só inclui valores quando há cotação fechada (preço dentro da faixa da tabela).
         if (p) {
+          var desc = Number(p.descontoPct) || 0;
+          var mensalFinal = desc > 0 ? p.mensalidade * (1 - desc / 100) : p.mensalidade;
           linhas.push('Adesão: ' + fmtBRL(p.adesao));
-          linhas.push('Mensalidade: ' + fmtBRL(p.mensalidade) + '/mês');
+          linhas.push('Mensalidade: ' + fmtBRL(mensalFinal) + '/mês' + (desc > 0 ? ' (com desconto de pontualidade)' : ''));
         }
         linhas.push('');
         linhas.push('Cliente: ' + (user.nome || '-'));
@@ -536,12 +633,16 @@
 
       function concluirWeb(btn) {
         if (!cotacaoAtual) return;
+        if (!cotacaoAtual.sessionId) {
+          AL_CLIENTE.showAlert('Não foi possível registrar a cotação na IAPRO. Verifique se o seu cadastro tem e-mail e cote novamente.', 'danger');
+          return;
+        }
         var botoes = elResult.querySelectorAll('.js-web');
         var original = btn.innerHTML;
         botoes.forEach(function (b) { b.disabled = true; });
         btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Abrindo...';
 
-        AL_CLIENTE.apiPost('/api/cliente/cotacao-iapro/concluir-web', { placa: cotacaoAtual.placa })
+        AL_CLIENTE.apiPost('/api/cliente/cotacao-iapro/contratar', { sessionId: cotacaoAtual.sessionId })
           .then(function (data) {
             if (data.placaJaCadastrada) {
               AL_CLIENTE.showAlert('Este veículo já possui cadastro na IAPRO. Fale com a administração para prosseguir.', 'info');

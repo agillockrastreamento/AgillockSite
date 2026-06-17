@@ -144,11 +144,10 @@ export interface VeiculoCotado {
 
 export interface ResultadoCotacao {
   veiculo: VeiculoCotado;
-  preco: {
-    adesao: number;
-    mensalidade: number;
-  } | null;
+  preco: PrecoCotacao | null;
   whatsappComercial: string | null;
+  /** Sessão criada na IAPRO (cotação já gravada no painel). null se não foi possível criar. */
+  sessionId: string | null;
 }
 
 // ─── Consultas ──────────────────────────────────────────────────────────────
@@ -182,11 +181,22 @@ export async function consultarPlaca(placa: string): Promise<VeiculoCotado> {
   };
 }
 
-/** Busca a tabela de preço (adesão + mensalidade) para o tipo/valor FIPE. */
+/**
+ * Busca a tabela de preço (adesão + mensalidade) para o tipo/valor FIPE.
+ * `descontoPct` = desconto de pontualidade da tabela (pagamento até 1 dia antes do vencimento).
+ */
+export interface PrecoCotacao {
+  adesao: number;
+  mensalidade: number;
+  descontoPct: number;
+  /** Id da tabela de preço (usado para gravar a cotação na IAPRO). */
+  fixedTableId: string | null;
+}
+
 export async function consultarPreco(
   vehicleType: string,
   fipeValor: number | null,
-): Promise<{ adesao: number; mensalidade: number } | null> {
+): Promise<PrecoCotacao | null> {
   const params = new URLSearchParams({ vehicleType: vehicleType || 'CARRO' });
   if (fipeValor && fipeValor > 0) params.set('fipeValue', String(fipeValor));
 
@@ -196,7 +206,12 @@ export async function consultarPreco(
   );
   const tabela = resp.ok ? resp.data?.data : null;
   if (!tabela) return null;
-  return { adesao: Number(tabela.adhesionValue), mensalidade: Number(tabela.monthlyValue) };
+  return {
+    adesao: Number(tabela.adhesionValue),
+    mensalidade: Number(tabela.monthlyValue),
+    descontoPct: Number(tabela.maxDiscountPct ?? 0) || 0,
+    fixedTableId: tabela.id ?? null,
+  };
 }
 
 /** Retorna o número de WhatsApp comercial da IAPRO (fallback: empresa → proteção). */
@@ -210,14 +225,167 @@ export async function consultarWhatsappComercial(): Promise<string | null> {
   return normalizarWhatsapp(s.commercialWhatsapp || s.companyWhatsapp || s.protectionWhatsapp);
 }
 
-/** Cotação completa de uma placa: veículo + preço + contato comercial. */
-export async function cotarPlaca(placa: string): Promise<ResultadoCotacao> {
+/**
+ * Cotação completa de uma placa: veículo + preço + contato comercial.
+ * Já GRAVA a cotação na IAPRO (aparece no painel) e devolve o sessionId.
+ */
+export async function cotarPlaca(
+  clienteId: string,
+  placa: string,
+  sessionIdExistente?: string,
+): Promise<ResultadoCotacao> {
   const veiculo = await consultarPlaca(placa);
   const [preco, whatsappComercial] = await Promise.all([
     consultarPreco(veiculo.tipo, veiculo.fipeValor).catch(() => null),
     consultarWhatsappComercial().catch(() => null),
   ]);
-  return { veiculo, preco, whatsappComercial };
+  const raw = veiculo._raw;
+  const sessionId = await orquestrarCotacao(clienteId, {
+    plate: veiculo.placa,
+    type: veiculo.tipo,
+    brand: raw.brand,
+    model: raw.model,
+    yearModel: raw.yearModel,
+    color: raw.color,
+    transmission: raw.transmission,
+    chassis: raw.chassis,
+    renavam: raw.renavam,
+    fipeCode: raw.fipeCode,
+    fipeValue: veiculo.fipeValor ?? undefined,
+    fipeBrandId: raw.fipeBrandId,
+    fipeModelId: raw.fipeModelId,
+    fipeYearCode: raw.fipeYearCode,
+    fipeBrandName: raw.fipeBrandName,
+    fipeModelName: raw.fipeModelName,
+    isZeroKm: false,
+  }, preco, sessionIdExistente).catch(() => null);
+  return { veiculo, preco, whatsappComercial, sessionId };
+}
+
+// ─── FIPE (veículo 0 km) ────────────────────────────────────────────────────
+
+export interface FipeOpcao {
+  codigo: string;
+  nome: string;
+}
+
+const TIPOS_VALIDOS = ['CARRO', 'MOTO', 'CAMINHAO'];
+export function normalizarTipo(tipo?: string): string {
+  const t = String(tipo || '').toUpperCase();
+  return TIPOS_VALIDOS.includes(t) ? t : 'CARRO';
+}
+
+export async function listarFipeMarcas(tipo: string): Promise<FipeOpcao[]> {
+  const resp = await chamarIapro<{ success: boolean; data?: FipeOpcao[] }>(
+    'GET',
+    `/public/fipe/brands?type=${encodeURIComponent(normalizarTipo(tipo))}`,
+  );
+  const arr = resp.ok && Array.isArray(resp.data?.data) ? resp.data!.data! : [];
+  return arr.map((m) => ({ codigo: String(m.codigo), nome: m.nome }));
+}
+
+export async function listarFipeModelos(tipo: string, brandId: string): Promise<FipeOpcao[]> {
+  const resp = await chamarIapro<{ success: boolean; data?: { codigo: number | string; nome: string }[] }>(
+    'GET',
+    `/public/fipe/brands/${encodeURIComponent(brandId)}/models?type=${encodeURIComponent(normalizarTipo(tipo))}`,
+  );
+  const arr = resp.ok && Array.isArray(resp.data?.data) ? resp.data!.data! : [];
+  return arr.map((m) => ({ codigo: String(m.codigo), nome: m.nome }));
+}
+
+export async function listarFipeAnos(tipo: string, brandId: string, modelId: string): Promise<FipeOpcao[]> {
+  const resp = await chamarIapro<{ success: boolean; data?: FipeOpcao[] }>(
+    'GET',
+    `/public/fipe/brands/${encodeURIComponent(brandId)}/models/${encodeURIComponent(modelId)}/years?type=${encodeURIComponent(normalizarTipo(tipo))}`,
+  );
+  const arr = resp.ok && Array.isArray(resp.data?.data) ? resp.data!.data! : [];
+  return arr.map((m) => ({ codigo: String(m.codigo), nome: m.nome }));
+}
+
+interface FipeValor {
+  valor: number | null;
+  valorFormatado: string | null;
+  fipeCode: string;
+  marca: string;
+  modelo: string;
+  ano: number | null;
+  mesRef: string | null;
+}
+
+/** Resolve o valor FIPE a partir da seleção (tipo/marca/modelo/ano) — fonte autoritativa do servidor. */
+export async function consultarFipeValor(
+  tipo: string,
+  brandId: string,
+  modelId: string,
+  yearCode: string,
+): Promise<FipeValor> {
+  const resp = await chamarIapro<{
+    success: boolean;
+    data?: { Valor: string; Marca: string; Modelo: string; AnoModelo: number; CodigoFipe: string; MesReferencia: string };
+  }>(
+    'GET',
+    `/public/fipe/value/${encodeURIComponent(brandId)}/${encodeURIComponent(modelId)}/${encodeURIComponent(yearCode)}?type=${encodeURIComponent(normalizarTipo(tipo))}`,
+  );
+  const d = resp.data?.data;
+  if (!resp.ok || !d) throw new Error('Não foi possível consultar o valor FIPE.');
+  return {
+    valor: parseValorFipe(d.Valor),
+    valorFormatado: d.Valor || null,
+    fipeCode: d.CodigoFipe || '',
+    marca: d.Marca || '',
+    modelo: d.Modelo || '',
+    ano: d.AnoModelo || null,
+    mesRef: d.MesReferencia || null,
+  };
+}
+
+/** Monta o VeiculoCotado a partir da seleção FIPE (0 km — sem placa). */
+function veiculoDeFipe(tipo: string, brandId: string, modelId: string, yearCode: string, fipe: FipeValor): VeiculoCotado {
+  const raw: PlacaIapro = {
+    plate: '', type: tipo, brand: fipe.marca, model: fipe.modelo, yearModel: fipe.ano || 0, yearManufacture: 0,
+    color: '', transmission: '', chassis: '', renavam: '', fipeCode: fipe.fipeCode,
+    fipeValue: fipe.valorFormatado, fipeDisplay: fipe.valorFormatado, fipeMonthRef: fipe.mesRef,
+    fipeBrandId: brandId, fipeModelId: modelId, fipeYearCode: yearCode,
+    fipeBrandName: fipe.marca, fipeModelName: fipe.modelo,
+  };
+  return {
+    placa: '', tipo, marca: fipe.marca, modelo: fipe.modelo, ano: fipe.ano, cor: '',
+    fipeValor: fipe.valor, fipeFormatado: fipe.valorFormatado, fipeMesReferencia: fipe.mesRef, _raw: raw,
+  };
+}
+
+/** Cotação de um veículo 0 km (sem placa) a partir da seleção FIPE. Grava na IAPRO e devolve sessionId. */
+export async function cotarZero(
+  clienteId: string,
+  tipo: string,
+  brandId: string,
+  modelId: string,
+  yearCode: string,
+  sessionIdExistente?: string,
+): Promise<ResultadoCotacao> {
+  const t = normalizarTipo(tipo);
+  const fipe = await consultarFipeValor(t, brandId, modelId, yearCode);
+  const veiculo = veiculoDeFipe(t, brandId, modelId, yearCode, fipe);
+  const [preco, whatsappComercial] = await Promise.all([
+    consultarPreco(t, fipe.valor).catch(() => null),
+    consultarWhatsappComercial().catch(() => null),
+  ]);
+  const sessionId = await orquestrarCotacao(clienteId, {
+    plate: '',
+    type: t,
+    brand: fipe.marca,
+    model: fipe.modelo,
+    yearModel: fipe.ano ?? undefined,
+    fipeCode: fipe.fipeCode,
+    fipeValue: fipe.valor ?? undefined,
+    fipeBrandId: brandId,
+    fipeModelId: modelId,
+    fipeYearCode: yearCode,
+    fipeBrandName: fipe.marca,
+    fipeModelName: fipe.modelo,
+    isZeroKm: true,
+  }, preco, sessionIdExistente).catch(() => null);
+  return { veiculo, preco, whatsappComercial, sessionId };
 }
 
 // ─── Veículos do cliente logado ─────────────────────────────────────────────
@@ -263,107 +431,176 @@ export async function listarVeiculosDoCliente(
     }));
 }
 
-// ─── Concluir na web: orquestra a sessão IAPRO até o pagamento da adesão ──────
-
-export interface ConcluirWebResultado {
-  url: string;
-  /** true quando a sessão foi orquestrada até a etapa de pagamento. */
-  orquestrada: boolean;
-  /** true quando a placa já tem contrato/dono na IAPRO (precisa falar com a administração). */
-  placaJaCadastrada?: boolean;
-}
+// ─── Gravar a cotação na IAPRO (aparece no painel) ──────────────────────────
 
 /**
- * Cria (ou não) a sessão de cotação na IAPRO e devolve a URL do site da cotação.
+ * Cria/atualiza a sessão de cotação na IAPRO e deixa em AGUARDANDO (aparece no painel
+ * "Cotação" com os valores). Passos: [start] → LINK_ETAPA_1 → LINK_ETAPA_1_OK (cliente) →
+ * LINK_ETAPA_2_OK (veículo) → AGUARDANDO (adesão/mensalidade/tabela).
  *
- * Caminho feliz: start → LINK_ETAPA_1 → LINK_ETAPA_1_OK (cliente) → LINK_ETAPA_2_OK (veículo)
- * → enter-contracting (LINK_PAGANDO_ADESAO). A URL `?cotacao=<sessionId>` faz o site da IAPRO
- * retomar direto na etapa 4 (pagamento da adesão).
- *
- * Fallbacks: se faltar e-mail do cliente, ou alguma etapa falhar, devolve a URL "limpa"
- * (/cotacao) para o cliente preencher manualmente.
+ * `sessionIdExistente` reaproveita a sessão da mesma página (evita duplicar no painel a cada
+ * nova cotação). Retorna o sessionId, ou null se não der para criar (ex.: cliente sem e-mail).
  */
-export async function concluirWeb(clienteId: string, placa: string): Promise<ConcluirWebResultado> {
-  const urlLimpa = `${iaproSiteUrl()}/cotacao`;
-
+async function orquestrarCotacao(
+  clienteId: string,
+  dadosVeiculo: Record<string, unknown>,
+  preco: PrecoCotacao | null,
+  sessionIdExistente?: string,
+): Promise<string | null> {
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
     select: { nome: true, email: true, telefone: true },
   });
-  if (!cliente) throw new Error('Cliente não encontrado.');
-
-  // Dados do veículo (autoritativos do servidor — não confiamos no payload do cliente).
-  const veiculo = await consultarPlaca(placa);
-
+  // Sem e-mail/nome não conseguimos criar/associar o cliente na IAPRO pelo fluxo público.
+  if (!cliente?.email || !cliente?.nome) return null;
   const whatsapp = (cliente.telefone || '').replace(/\D/g, '');
-  // Sem e-mail não conseguimos criar/associar o cliente na IAPRO pelo fluxo público.
-  if (!cliente.email || !cliente.nome) {
-    return { url: urlLimpa, orquestrada: false };
+
+  async function rodarPassos(sid: string): Promise<boolean> {
+    const stepPath = `/public/quotation-link/${sid}/step`;
+    const r1 = await chamarIapro('PATCH', stepPath, { status: 'LINK_ETAPA_1' });
+    if (!r1.ok) return false; // sessão inexistente/expirada → sinaliza para recriar
+    await chamarIapro('PATCH', stepPath, {
+      status: 'LINK_ETAPA_1_OK',
+      data: { name: cliente!.nome, email: cliente!.email, whatsapp, acceptedTerms: true },
+    });
+    await chamarIapro('PATCH', stepPath, { status: 'LINK_ETAPA_2_OK', data: dadosVeiculo });
+    await chamarIapro('PATCH', stepPath, {
+      status: 'AGUARDANDO',
+      ...(preco
+        ? { data: { adhesionValue: preco.adesao, monthlyValue: preco.mensalidade, planType: 'PREFIXADA', fixedTableId: preco.fixedTableId } }
+        : {}),
+    });
+    return true;
   }
 
   try {
-    // 1) start
+    if (sessionIdExistente && (await rodarPassos(sessionIdExistente))) {
+      return sessionIdExistente;
+    }
     const start = await chamarIapro<{ success: boolean; data?: { sessionId?: string } }>(
       'POST',
       '/public/quotation-link/start',
       {},
     );
-    const sessionId = start.data?.data?.sessionId;
-    if (!start.ok || !sessionId) return { url: urlLimpa, orquestrada: false };
+    const sid = start.data?.data?.sessionId;
+    if (!start.ok || !sid) return null;
+    await rodarPassos(sid);
+    return sid;
+  } catch {
+    return null;
+  }
+}
 
-    const stepPath = `/public/quotation-link/${sessionId}/step`;
+// ─── Contratar: envia os dados do cliente e vai ao pagamento da adesão (etapa 4) ──
 
-    // 2) LINK_ETAPA_1 — cria a cotação no painel
-    await chamarIapro('PATCH', stepPath, { status: 'LINK_ETAPA_1' });
+export interface ContratarResultado {
+  url: string;
+  /** true quando entrou na contratação (etapa de pagamento). */
+  orquestrada: boolean;
+  /** true quando a placa já tem contrato/dono na IAPRO (precisa falar com a administração). */
+  placaJaCadastrada?: boolean;
+}
 
-    // 3) LINK_ETAPA_1_OK — cria/associa o cliente
-    await chamarIapro('PATCH', stepPath, {
-      status: 'LINK_ETAPA_1_OK',
-      data: { name: cliente.nome, email: cliente.email, whatsapp, acceptedTerms: true },
-    });
+function digitsOnly(v?: string | null): string {
+  return v ? String(v).replace(/\D/g, '') : '';
+}
 
-    // 4) LINK_ETAPA_2_OK — cria/associa o veículo
-    const raw = veiculo._raw;
-    await chamarIapro('PATCH', stepPath, {
-      status: 'LINK_ETAPA_2_OK',
-      data: {
-        plate: veiculo.placa,
-        type: veiculo.tipo,
-        brand: raw.brand,
-        model: raw.model,
-        yearModel: raw.yearModel,
-        color: raw.color,
-        transmission: raw.transmission,
-        chassis: raw.chassis,
-        renavam: raw.renavam,
-        fipeCode: raw.fipeCode,
-        fipeValue: veiculo.fipeValor ?? undefined,
-        fipeBrandId: raw.fipeBrandId,
-        fipeModelId: raw.fipeModelId,
-        fipeYearCode: raw.fipeYearCode,
-        fipeBrandName: raw.fipeBrandName,
-        fipeModelName: raw.fipeModelName,
-        isZeroKm: false,
-      },
-    });
+/** AgilLock dataNascimento → 'YYYY-MM-DD' (aceita dd/mm/aaaa); senão undefined. */
+function paraDataIso(s?: string | null): string | undefined {
+  const t = (s || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  const m = t.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : undefined;
+}
 
-    // 5) enter-contracting — cria o contrato e move para o pagamento da adesão
+/** AgilLock estadoCivil (livre) → enum IAPRO; undefined se não reconhecer. */
+function paraEstadoCivil(s?: string | null): string | undefined {
+  const t = (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  if (t.includes('SOLTEIR')) return 'SOLTEIRO';
+  if (t.includes('CASAD')) return 'CASADO';
+  if (t.includes('DIVORC')) return 'DIVORCIADO';
+  if (t.includes('VIUV')) return 'VIUVO';
+  if (t.includes('UNIAO') || t.includes('ESTAVEL')) return 'UNIAO_ESTAVEL';
+  return undefined;
+}
+
+type ClienteCompleto = {
+  nome: string; email: string | null; telefone: string | null; cpfCnpj: string | null;
+  tipoPessoa: string | null; dataNascimento: string | null; rg: string | null; estadoCivil: string | null;
+  cep: string | null; logradouro: string | null; numero: string | null; complemento: string | null;
+  bairro: string | null; cidade: string | null; estado: string | null;
+};
+
+/** Mapeia o cliente da AgilLock para o payload de dados da contratação da IAPRO. */
+function mapearClienteParaIapro(c: ClienteCompleto): Record<string, unknown> {
+  const doc = digitsOnly(c.cpfCnpj);
+  const temEndereco = !!(c.cep || c.logradouro || c.cidade);
+  return {
+    name: c.nome,
+    email: c.email || undefined,
+    whatsapp: digitsOnly(c.telefone) || undefined,
+    phone: c.telefone || undefined,
+    cpf: doc.length === 11 ? doc : undefined,
+    cnpj: doc.length === 14 ? doc : undefined,
+    razaoSocial: doc.length === 14 ? c.nome : undefined,
+    rg: c.rg || undefined,
+    birthDate: paraDataIso(c.dataNascimento),
+    maritalStatus: paraEstadoCivil(c.estadoCivil),
+    ...(temEndereco
+      ? {
+          address: {
+            cep: c.cep || undefined,
+            logradouro: c.logradouro || undefined,
+            number: c.numero || undefined,
+            complement: c.complemento || undefined,
+            neighborhood: c.bairro || undefined,
+            city: c.cidade || undefined,
+            state: c.estado || undefined,
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * Contratar proteção: envia os dados que o cliente já tem na AgilLock (CPF, endereço, etc.)
+ * para a IAPRO (contracting-draft) e entra na contratação (enter-contracting → pagamento da
+ * adesão). Devolve a URL `?cotacao=<sessionId>` que retoma o site na etapa 4 (pagamento).
+ */
+export async function contratar(clienteId: string, sessionId: string): Promise<ContratarResultado> {
+  const urlLimpa = `${iaproSiteUrl()}/cotacao`;
+  if (!sessionId) return { url: urlLimpa, orquestrada: false };
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    select: {
+      nome: true, email: true, telefone: true, cpfCnpj: true, tipoPessoa: true,
+      dataNascimento: true, rg: true, estadoCivil: true,
+      cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
+    },
+  });
+  if (!cliente) throw new Error('Cliente não encontrado.');
+
+  const cotacaoUrl = `${iaproSiteUrl()}/cotacao?cotacao=${sessionId}`;
+  try {
+    // Envia os dados do cliente (best-effort — a IAPRO ignora campos inválidos/fora de enum).
+    await chamarIapro('PATCH', `/public/quotation-link/${sessionId}/contracting-draft`, mapearClienteParaIapro(cliente));
+
+    // Entra na contratação → status LINK_PAGANDO_ADESAO (etapa 4 pagamento da adesão).
     const enter = await chamarIapro<{ success: boolean; code?: string; message?: string }>(
       'POST',
       `/public/quotation-link/${sessionId}/enter-contracting`,
       {},
     );
-
     if (!enter.ok) {
       if (enter.status === 409 || enter.data?.code === 'PLATE_EXISTS') {
-        return { url: `${iaproSiteUrl()}/cotacao?cotacao=${sessionId}`, orquestrada: false, placaJaCadastrada: true };
+        return { url: cotacaoUrl, orquestrada: false, placaJaCadastrada: true };
       }
-      // Falhou ao entrar na contratação, mas a sessão existe — o site retoma pelo sessionId.
-      return { url: `${iaproSiteUrl()}/cotacao?cotacao=${sessionId}`, orquestrada: false };
+      if (enter.status === 404) return { url: urlLimpa, orquestrada: false };
+      return { url: cotacaoUrl, orquestrada: false };
     }
-
-    return { url: `${iaproSiteUrl()}/cotacao?cotacao=${sessionId}`, orquestrada: true };
+    return { url: cotacaoUrl, orquestrada: true };
   } catch {
-    return { url: urlLimpa, orquestrada: false };
+    return { url: cotacaoUrl, orquestrada: false };
   }
 }
