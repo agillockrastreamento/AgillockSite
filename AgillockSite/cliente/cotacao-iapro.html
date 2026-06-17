@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');
+    if(localStorage.getItem('al-sidebar-state')==='collapsed')document.documentElement.classList.add('al-sb-collapsed');
+  </script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Cotação Proteção Veicular — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    .cot-body { padding: 24px 28px; max-width: 760px; }
+    .cot-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 12px;
+      padding: 22px 24px; margin-bottom: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    html.dark-theme .cot-card { background: #1e2530; border-color: #2d3748; }
+
+    .cot-intro { display:flex; align-items:flex-start; gap:14px; }
+    .cot-intro-icon {
+      flex:0 0 auto; width:46px; height:46px; border-radius:12px;
+      background: rgba(250,179,44,.15); color:#e0941a;
+      display:flex; align-items:center; justify-content:center; font-size:22px;
+    }
+    .cot-intro h4 { margin:0 0 4px; font-weight:700; font-size:18px; }
+    .cot-intro p { margin:0; color:#7a8699; font-size:13px; }
+    html.dark-theme .cot-intro p { color:#8b97ab; }
+
+    .cot-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#888; margin-bottom:8px; display:block; }
+    html.dark-theme .cot-label { color:#6c7a8f; }
+
+    .cot-mode { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+    .cot-mode-btn {
+      flex:1; min-width:150px; padding:12px 14px; border-radius:10px; border:2px solid #e3e8ef;
+      background:#f7f9fc; cursor:pointer; font-weight:700; font-size:13px; color:#5a6678;
+      display:flex; align-items:center; justify-content:center; gap:8px; transition:.15s;
+    }
+    .cot-mode-btn.active { border-color:#fab32c; background:rgba(250,179,44,.12); color:#b9791a; }
+    html.dark-theme .cot-mode-btn { background:#252f3d; border-color:#33415a; color:#9aa7bb; }
+    html.dark-theme .cot-mode-btn.active { border-color:#fab32c; background:rgba(250,179,44,.16); color:#fab32c; }
+
+    .form-control { border-radius:8px; border:1px solid #dadfe6; font-size:14px; height:42px; }
+    html.dark-theme .form-control { background:#252535; border-color:#3a3a5c; color:#e0e6f0; }
+    html.dark-theme .form-control option { background:#252535; }
+    #cot-placa-manual { text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+
+    .cot-btn-primary {
+      background:#fab32c; color:#1f2328; border:none; border-radius:9px; font-weight:700;
+      padding:11px 22px; font-size:14px; transition:.15s;
+    }
+    .cot-btn-primary:hover { background:#e6a121; }
+    .cot-btn-primary:disabled { opacity:.55; cursor:not-allowed; }
+
+    /* Resultado */
+    #cot-result { display:none; }
+    .cot-veic { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+    .cot-veic-icon { flex:0 0 auto; width:50px; height:50px; border-radius:12px; background:rgba(41,128,185,.12); color:#2980b9; display:flex; align-items:center; justify-content:center; font-size:24px; }
+    .cot-veic h4 { margin:0 0 3px; font-weight:700; font-size:17px; }
+    .cot-veic .cot-veic-sub { color:#7a8699; font-size:13px; }
+    html.dark-theme .cot-veic .cot-veic-sub { color:#8b97ab; }
+    .cot-veic-placa { display:inline-block; background:#eef2f7; border-radius:6px; padding:2px 9px; font-weight:700; letter-spacing:1px; font-size:13px; margin-top:4px; }
+    html.dark-theme .cot-veic-placa { background:#2d3748; color:#e0e6f0; }
+
+    .cot-values { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 4px; }
+    .cot-value-box { flex:1; min-width:150px; background:#f7f9fc; border:1px solid #e8edf3; border-radius:10px; padding:14px 16px; }
+    html.dark-theme .cot-value-box { background:#222b38; border-color:#2d3748; }
+    .cot-value-box .cot-vb-label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#8a97a8; font-weight:700; }
+    .cot-value-box .cot-vb-val { font-size:22px; font-weight:700; margin-top:3px; color:#17202a; }
+    html.dark-theme .cot-value-box .cot-vb-val { color:#f0f4fa; }
+    .cot-value-box .cot-vb-val small { font-size:12px; font-weight:600; color:#8a97a8; }
+
+    .cot-fipe { font-size:13px; color:#7a8699; margin-top:10px; }
+    html.dark-theme .cot-fipe { color:#8b97ab; }
+
+    .cot-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:22px; }
+    .cot-action-btn {
+      flex:1; min-width:200px; padding:14px 18px; border-radius:11px; border:none; cursor:pointer;
+      font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center; gap:9px;
+      transition:.15s;
+    }
+    .cot-action-web { background:#2980b9; color:#fff; }
+    .cot-action-web:hover { background:#22689f; }
+    .cot-action-wa { background:#25d366; color:#fff; }
+    .cot-action-wa:hover { background:#1eb955; }
+    .cot-action-btn:disabled { opacity:.5; cursor:not-allowed; }
+
+    .cot-note { font-size:12px; color:#9aa7b8; margin-top:14px; line-height:1.5; }
+    html.dark-theme .cot-note { color:#7d8a9f; }
+    .cot-spin { display:inline-block; }
+
+    /* ── Resultado estilo "etapa 3" (marketing) ── */
+    .cot-hero { text-align:center; margin-bottom:18px; }
+    .cot-hero-icon { color:#27ae60; font-size:46px; margin-bottom:8px; }
+    .cot-hero h3 { font-size:23px; font-weight:800; margin:0 0 6px; color:#17202a; }
+    html.dark-theme .cot-hero h3 { color:#f0f4fa; }
+    .cot-hero p { color:#7a8699; font-size:13.5px; max-width:520px; margin:0 auto; line-height:1.5; }
+    html.dark-theme .cot-hero p { color:#8b97ab; }
+
+    .cot-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+    .cot-info-box { padding:12px 16px; background:#f7f9fc; border-radius:10px; font-size:13px; min-width:0; }
+    html.dark-theme .cot-info-box { background:#222b38; }
+    .cot-ib-label { color:#9aa7b8; font-size:12px; margin-bottom:4px; }
+    .cot-info-box strong { color:#17202a; word-break:break-word; }
+    html.dark-theme .cot-info-box strong { color:#f0f4fa; }
+    .cot-ib-sub { color:#7a8699; margin-top:2px; }
+    html.dark-theme .cot-ib-sub { color:#8b97ab; }
+    .cot-ib-plate { font-family:monospace; letter-spacing:2px; }
+
+    .cot-val-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+    .cot-val-card { position:relative; padding:18px 10px; border-radius:14px; text-align:center; min-width:0; }
+    .cot-val-mensal { background:rgba(250,179,44,.08); border:2px solid #fab32c; }
+    html.dark-theme .cot-val-mensal { background:rgba(250,179,44,.12); }
+    .cot-val-adesao { background:#f7f9fc; border:2px solid #e3e8ef; }
+    html.dark-theme .cot-val-adesao { background:#222b38; border-color:#2d3748; }
+    .cot-val-label { font-size:12px; color:#9aa7b8; margin-bottom:6px; }
+    .cot-val-mensal .cot-val-num { font-size:27px; font-weight:800; color:#d8920f; line-height:1.1; }
+    html.dark-theme .cot-val-mensal .cot-val-num { color:#fab32c; }
+    .cot-val-adesao .cot-val-num { font-size:23px; font-weight:800; color:#17202a; }
+    html.dark-theme .cot-val-adesao .cot-val-num { color:#f0f4fa; }
+    .cot-val-foot { font-size:11px; color:#9aa7b8; margin-top:2px; }
+    .cot-discount-badge { position:absolute; top:-11px; right:10px; background:#27ae60; color:#fff; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; }
+
+    .cot-noprice { padding:16px; background:#f7f9fc; border-radius:12px; text-align:center; color:#7a8699; font-size:14px; margin-bottom:16px; line-height:1.5; }
+    html.dark-theme .cot-noprice { background:#222b38; color:#9aa7b8; }
+
+    .cot-cta-hint { text-align:center; font-size:12px; color:#9aa7b8; margin-top:8px; }
+    .cot-section-title { font-size:18px; font-weight:700; text-align:center; margin:30px 0 4px; color:#17202a; }
+    html.dark-theme .cot-section-title { color:#f0f4fa; }
+    .cot-section-sub { text-align:center; font-size:13px; color:#7a8699; margin-bottom:18px; }
+    html.dark-theme .cot-section-sub { color:#8b97ab; }
+
+    .cot-cov-grid, .cot-dif-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; }
+    .cot-cov { padding:16px 14px; background:#f7f9fc; border-radius:12px; }
+    html.dark-theme .cot-cov { background:#222b38; }
+    .cot-cov i { color:#2980b9; font-size:20px; margin-bottom:6px; }
+    .cot-cov strong { display:block; font-size:13.5px; color:#17202a; margin-bottom:3px; }
+    html.dark-theme .cot-cov strong { color:#f0f4fa; }
+    .cot-cov span { font-size:12px; color:#7a8699; }
+    html.dark-theme .cot-cov span { color:#8b97ab; }
+    .cot-dif { text-align:center; padding:18px 14px; background:#f7f9fc; border-radius:12px; }
+    html.dark-theme .cot-dif { background:#222b38; }
+    .cot-dif i { color:#fab32c; font-size:20px; margin-bottom:8px; }
+    .cot-dif strong { display:block; font-size:14px; color:#17202a; margin-bottom:4px; }
+    html.dark-theme .cot-dif strong { color:#f0f4fa; }
+    .cot-dif span { font-size:12.5px; color:#7a8699; }
+    html.dark-theme .cot-dif span { color:#8b97ab; }
+
+    .cot-guarantee { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#f7f9fc; border-radius:8px; font-size:13px; margin-top:10px; color:#17202a; }
+    html.dark-theme .cot-guarantee { background:#222b38; color:#e0e6f0; }
+    .cot-guarantee i { color:#fab32c; flex-shrink:0; }
+
+    .cot-final { margin-top:28px; padding:22px; background:#f7f9fc; border-radius:16px; text-align:center; }
+    html.dark-theme .cot-final { background:#222b38; }
+    .cot-final h3 { font-size:18px; font-weight:800; margin:0 0 4px; color:#17202a; }
+    html.dark-theme .cot-final h3 { color:#f0f4fa; }
+    .cot-final p { font-size:13px; color:#7a8699; margin-bottom:16px; }
+    html.dark-theme .cot-final p { color:#8b97ab; }
+    .cot-action-btn[disabled] { opacity:.5; cursor:not-allowed; }
+    .cot-btn-novacot { width:100%; margin-top:12px; padding:12px; background:none; border:1px solid #dadfe6; border-radius:10px; color:#7a8699; font-size:14px; cursor:pointer; }
+    html.dark-theme .cot-btn-novacot { border-color:#33415a; color:#9aa7bb; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
+      <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> <span>Relatório</span></a></li>
+      <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> <span>Notificações</span></a></li>
+      <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> <span>Manutenções</span></a></li>
+      <li><a href="geocercas.html"><i class="fa fa-object-group fa-fw"></i> <span>Geocercas</span></a></li>
+      <li class="active"><a href="cotacao-iapro.html"><i class="fa fa-shield fa-fw"></i> <span>Cotação Proteção Veicular</span></a></li>
+      <li id="li-pagamentos" style="display:none;"><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+      <li id="li-usuarios" style="display:none;"><a href="usuarios.html"><i class="fa fa-users fa-fw"></i> <span>Usuários</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Main content -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Cotação Proteção Veicular</h2>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="cot-body">
+
+      <!-- Seção do formulário (intro + cotar) -->
+      <div id="cot-form-section">
+        <!-- Intro -->
+        <div class="cot-card">
+          <div class="cot-intro">
+            <div class="cot-intro-icon"><i class="fa fa-shield"></i></div>
+            <div>
+              <h4>Proteção veicular IAPRO</h4>
+              <p>Faça uma cotação da proteção para o seu veículo. Selecione um veículo já cadastrado ou informe outra placa.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulário -->
+        <div class="cot-card">
+          <div class="cot-mode">
+            <div class="cot-mode-btn active" id="mode-meu" data-mode="meu"><i class="fa fa-car"></i> Meu veículo</div>
+            <div class="cot-mode-btn" id="mode-outra" data-mode="outra"><i class="fa fa-keyboard-o"></i> Outra placa</div>
+          </div>
+
+          <!-- Meu veículo -->
+          <div id="cot-meu-wrap">
+            <label class="cot-label">Selecione o veículo</label>
+            <select id="cot-select" class="form-control"></select>
+            <div id="cot-sem-veiculos" style="display:none; font-size:13px; color:#9aa7b8; margin-top:8px;">
+              Você não possui veículos com placa cadastrada. Use a opção "Outra placa".
+            </div>
+          </div>
+
+          <!-- Outra placa -->
+          <div id="cot-outra-wrap" style="display:none;">
+            <label class="cot-label">Placa do veículo</label>
+            <input type="text" id="cot-placa-manual" class="form-control" maxlength="8" placeholder="ABC1D23" />
+          </div>
+
+          <div style="margin-top:18px;">
+            <button class="cot-btn-primary" id="btn-cotar"><i class="fa fa-search"></i> Cotar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resultado (estilo etapa 3) -->
+      <div class="cot-card" id="cot-result" style="display:none;">
+        <!-- Hero -->
+        <div class="cot-hero">
+          <div class="cot-hero-icon"><i class="fa fa-check-circle"></i></div>
+          <h3 id="res-hero">Pronto! Sua proteção está aqui.</h3>
+          <p>Confira a sua cotação e tudo o que você passa a ter ao proteger seu veículo com a IAPRO.</p>
+        </div>
+
+        <!-- Solicitante + Veículo -->
+        <div class="cot-info-grid">
+          <div class="cot-info-box">
+            <div class="cot-ib-label">Solicitante</div>
+            <strong id="res-solicitante">—</strong>
+          </div>
+          <div class="cot-info-box">
+            <div class="cot-ib-label">Veículo</div>
+            <strong class="cot-ib-plate" id="res-placa">—</strong>
+            <div class="cot-ib-sub" id="res-veicdesc"></div>
+          </div>
+        </div>
+
+        <!-- Valores ou "sob consulta" (dinâmico) -->
+        <div id="res-valores-wrap"></div>
+
+        <div class="cot-fipe" id="res-fipe"></div>
+
+        <!-- Ações principais (dinâmico) -->
+        <div id="res-acoes"></div>
+
+        <!-- Coberturas -->
+        <h3 class="cot-section-title">O que está incluso na sua proteção</h3>
+        <p class="cot-section-sub">Proteção completa para você dirigir tranquilo, todos os dias.</p>
+        <div class="cot-cov-grid">
+          <div class="cot-cov"><i class="fa fa-shield"></i><strong>Roubo e Furto</strong><span>Cobertura em caso de roubo ou furto do seu veículo.</span></div>
+          <div class="cot-cov"><i class="fa fa-car"></i><strong>Colisão e Acidentes</strong><span>Proteção contra colisão, capotagem e abalroamento.</span></div>
+          <div class="cot-cov"><i class="fa fa-fire"></i><strong>Incêndio</strong><span>Cobertura para danos causados por incêndio.</span></div>
+          <div class="cot-cov"><i class="fa fa-cloud"></i><strong>Fenômenos da Natureza</strong><span>Enchentes, granizo, queda de árvores e outros.</span></div>
+          <div class="cot-cov"><i class="fa fa-users"></i><strong>Danos a Terceiros</strong><span>Danos materiais e corporais a terceiros.</span></div>
+          <div class="cot-cov"><i class="fa fa-truck"></i><strong>Guincho e Reboque</strong><span>Reboque do seu veículo sempre que precisar.</span></div>
+          <div class="cot-cov"><i class="fa fa-headphones"></i><strong>Assistência 24h</strong><span>Atendimento e assistência 24 horas, todos os dias.</span></div>
+          <div class="cot-cov"><i class="fa fa-map-marker"></i><strong>Rastreamento</strong><span>Rastreamento e bloqueio para mais segurança.</span></div>
+        </div>
+
+        <!-- Diferenciais -->
+        <h3 class="cot-section-title">Por que escolher a IAPRO?</h3>
+        <p class="cot-section-sub">&nbsp;</p>
+        <div class="cot-dif-grid">
+          <div class="cot-dif"><i class="fa fa-check-circle"></i><strong>Análise simplificada</strong><span>Adesão sem burocracia e com aprovação rápida.</span></div>
+          <div class="cot-dif"><i class="fa fa-clock-o"></i><strong>Atendimento 24 horas</strong><span>Equipe pronta para te ajudar a qualquer momento.</span></div>
+          <div class="cot-dif"><i class="fa fa-wrench"></i><strong>Rede credenciada</strong><span>Oficinas e parceiros para o reparo do seu veículo.</span></div>
+          <div class="cot-dif"><i class="fa fa-trophy"></i><strong>Associação sólida</strong><span>Transparência e confiança para proteger o que é seu.</span></div>
+        </div>
+
+        <!-- Garantias rápidas -->
+        <div style="margin-top:24px;">
+          <div class="cot-guarantee"><i class="fa fa-clock-o"></i> Cotação válida por 48 horas</div>
+          <div class="cot-guarantee"><i class="fa fa-shield"></i> Proteção completa para seu veículo</div>
+          <div class="cot-guarantee"><i class="fa fa-check-circle"></i> Sem carência para assistência 24h</div>
+        </div>
+
+        <!-- CTA final -->
+        <div class="cot-final">
+          <h3>Garanta sua proteção agora</h3>
+          <p id="res-final-text">—</p>
+          <div id="res-final-acoes"></div>
+        </div>
+
+        <button class="cot-btn-novacot" id="btn-nova-cotacao"><i class="fa fa-refresh"></i> Fazer nova cotação</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var user = AL_CLIENTE.requireAuth();
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      if (user.tipo === 'responsavel') {
+        document.getElementById('li-pagamentos').style.display = 'block';
+        document.getElementById('li-usuarios').style.display = 'block';
+      }
+      AL_CLIENTE.initThemeToggle('btn-tema');
+      document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+
+      // ── Estado ──
+      var modo = 'meu';
+      var cotacaoAtual = null; // { veiculo, preco, whatsappComercial, placa }
+
+      var elModeMeu = document.getElementById('mode-meu');
+      var elModeOutra = document.getElementById('mode-outra');
+      var elMeuWrap = document.getElementById('cot-meu-wrap');
+      var elOutraWrap = document.getElementById('cot-outra-wrap');
+      var elSelect = document.getElementById('cot-select');
+      var elPlacaManual = document.getElementById('cot-placa-manual');
+      var elSemVeiculos = document.getElementById('cot-sem-veiculos');
+      var elBtnCotar = document.getElementById('btn-cotar');
+      var elResult = document.getElementById('cot-result');
+      var elFormSection = document.getElementById('cot-form-section');
+
+      function fmtBRL(n) {
+        if (n == null || isNaN(n)) return '—';
+        return Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      }
+      function normalizaPlaca(p) { return (p || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+      function setModo(m) {
+        modo = m;
+        elModeMeu.classList.toggle('active', m === 'meu');
+        elModeOutra.classList.toggle('active', m === 'outra');
+        elMeuWrap.style.display = m === 'meu' ? 'block' : 'none';
+        elOutraWrap.style.display = m === 'outra' ? 'block' : 'none';
+        esconderResultado();
+      }
+      elModeMeu.addEventListener('click', function () { setModo('meu'); });
+      elModeOutra.addEventListener('click', function () { setModo('outra'); });
+      elSelect.addEventListener('change', esconderResultado);
+      elPlacaManual.addEventListener('input', function () {
+        this.value = normalizaPlaca(this.value);
+        esconderResultado();
+      });
+
+      function esconderResultado() {
+        elResult.style.display = 'none';
+        elFormSection.style.display = 'block';
+        cotacaoAtual = null;
+      }
+
+      // ── Carrega veículos do cliente ──
+      AL_CLIENTE.apiGet('/api/cliente/cotacao-iapro/veiculos')
+        .then(function (veiculos) {
+          if (!Array.isArray(veiculos) || veiculos.length === 0) {
+            elSelect.style.display = 'none';
+            elSemVeiculos.style.display = 'block';
+            setModo('outra');
+            elModeMeu.style.display = 'none';
+            return;
+          }
+          elSelect.innerHTML = '';
+          veiculos.forEach(function (v) {
+            var opt = document.createElement('option');
+            opt.value = v.placa;
+            opt.textContent = (v.nome ? v.nome + ' — ' : '') + v.placa;
+            elSelect.appendChild(opt);
+          });
+        })
+        .catch(function (err) {
+          AL_CLIENTE.showAlert(err.message || 'Erro ao carregar veículos.', 'danger');
+        });
+
+      function placaSelecionada() {
+        return modo === 'meu' ? normalizaPlaca(elSelect.value) : normalizaPlaca(elPlacaManual.value);
+      }
+
+      // ── Cotar ──
+      elBtnCotar.addEventListener('click', function () {
+        var placa = placaSelecionada();
+        if (placa.length < 7) {
+          AL_CLIENTE.showAlert('Informe uma placa válida (7 caracteres).', 'danger');
+          return;
+        }
+        var original = elBtnCotar.innerHTML;
+        elBtnCotar.disabled = true;
+        elBtnCotar.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Cotando...';
+
+        AL_CLIENTE.apiPost('/api/cliente/cotacao-iapro/cotar', { placa: placa })
+          .then(function (data) {
+            cotacaoAtual = { veiculo: data.veiculo, preco: data.preco, whatsappComercial: data.whatsappComercial, placa: placa };
+            renderResultado();
+          })
+          .catch(function (err) {
+            AL_CLIENTE.showAlert(err.message || 'Não foi possível cotar a placa.', 'danger');
+          })
+          .finally(function () {
+            elBtnCotar.disabled = false;
+            elBtnCotar.innerHTML = original;
+          });
+      });
+
+      // Monta os botões de ação (há um conjunto no topo e outro no CTA final).
+      // Quando NÃO há preço (ex.: FIPE acima da faixa), não oferecemos "Contratar na web"
+      // (a etapa de pagamento da adesão não teria valor) — só o WhatsApp, sem valores.
+      function acoesHtml(temPreco, temWa, comHint) {
+        var html = '<div class="cot-actions">';
+        if (temPreco) {
+          html += '<button type="button" class="cot-action-btn cot-action-web js-web"><i class="fa fa-shield"></i> Contratar proteção</button>';
+        }
+        html += '<button type="button" class="cot-action-btn cot-action-wa js-wa"' +
+          (temWa ? '' : ' disabled title="WhatsApp comercial não configurado"') +
+          '><i class="fa fa-whatsapp"></i> Falar no WhatsApp</button>';
+        html += '</div>';
+        if (temPreco && comHint) html += '<div class="cot-cta-hint">Sem burocracia • Ativação rápida</div>';
+        return html;
+      }
+
+      function renderResultado() {
+        var v = cotacaoAtual.veiculo;
+        var p = cotacaoAtual.preco;
+        var temWa = !!cotacaoAtual.whatsappComercial;
+        var primeiro = (user.nome || '').trim().split(/\s+/)[0] || '';
+
+        document.getElementById('res-hero').textContent =
+          'Pronto' + (primeiro ? ', ' + primeiro : '') + '! Sua proteção está aqui.';
+        document.getElementById('res-solicitante').textContent = user.nome || 'Você';
+        document.getElementById('res-placa').textContent = v.placa;
+        document.getElementById('res-veicdesc').textContent =
+          [v.marca, v.modelo, v.ano].filter(Boolean).join(' ') || '—';
+
+        var fipeEl = document.getElementById('res-fipe');
+        fipeEl.innerHTML = v.fipeFormatado
+          ? '<i class="fa fa-tag"></i> Valor FIPE: <strong>' + v.fipeFormatado + '</strong>' +
+            (v.fipeMesReferencia ? ' (ref. ' + v.fipeMesReferencia + ')' : '')
+          : '';
+
+        var valWrap = document.getElementById('res-valores-wrap');
+        if (p) {
+          valWrap.innerHTML =
+            '<div class="cot-val-grid">' +
+              '<div class="cot-val-card cot-val-mensal">' +
+                '<div class="cot-val-label">Mensalidade</div>' +
+                '<div class="cot-val-num">' + fmtBRL(p.mensalidade) + '</div>' +
+                '<div class="cot-val-foot">por mês</div>' +
+              '</div>' +
+              '<div class="cot-val-card cot-val-adesao">' +
+                '<div class="cot-val-label">Adesão</div>' +
+                '<div class="cot-val-num">' + fmtBRL(p.adesao) + '</div>' +
+                '<div class="cot-val-foot">pagamento único</div>' +
+              '</div>' +
+            '</div>';
+        } else {
+          valWrap.innerHTML =
+            '<div class="cot-noprice">Para este veículo os valores são personalizados. ' +
+            'Fale com a nossa equipe pelo WhatsApp para preparar a sua proteção.</div>';
+        }
+
+        document.getElementById('res-acoes').innerHTML = acoesHtml(!!p, temWa, true);
+        document.getElementById('res-final-text').textContent = p
+          ? 'Esta cotação é válida por 48 horas. Contrate em poucos passos, sem sair daqui.'
+          : 'Fale com a nossa equipe pelo WhatsApp para preparar a sua proteção.';
+        document.getElementById('res-final-acoes').innerHTML = acoesHtml(!!p, temWa, false);
+
+        elFormSection.style.display = 'none';
+        elResult.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function montarMensagemWhatsapp() {
+        var v = cotacaoAtual.veiculo;
+        var p = cotacaoAtual.preco;
+        var linhas = [
+          'Olá! Fiz uma cotação de proteção veicular IAPRO pelo portal Ágil Lock e gostaria de mais informações.',
+          '',
+          'Veículo: ' + [v.marca, v.modelo, v.ano].filter(Boolean).join(' '),
+          'Placa: ' + v.placa,
+        ];
+        if (v.fipeFormatado) linhas.push('Valor FIPE: ' + v.fipeFormatado);
+        // Só inclui valores quando há cotação fechada (preço dentro da faixa da tabela).
+        if (p) {
+          linhas.push('Adesão: ' + fmtBRL(p.adesao));
+          linhas.push('Mensalidade: ' + fmtBRL(p.mensalidade) + '/mês');
+        }
+        linhas.push('');
+        linhas.push('Cliente: ' + (user.nome || '-'));
+        return linhas.join('\n');
+      }
+
+      // ── Ações (delegação — há botões no topo e no CTA final) ──
+      function concluirWhatsapp() {
+        if (!cotacaoAtual || !cotacaoAtual.whatsappComercial) return;
+        var url = 'https://wa.me/' + cotacaoAtual.whatsappComercial +
+          '?text=' + encodeURIComponent(montarMensagemWhatsapp());
+        window.open(url, '_blank');
+      }
+
+      function concluirWeb(btn) {
+        if (!cotacaoAtual) return;
+        var botoes = elResult.querySelectorAll('.js-web');
+        var original = btn.innerHTML;
+        botoes.forEach(function (b) { b.disabled = true; });
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Abrindo...';
+
+        AL_CLIENTE.apiPost('/api/cliente/cotacao-iapro/concluir-web', { placa: cotacaoAtual.placa })
+          .then(function (data) {
+            if (data.placaJaCadastrada) {
+              AL_CLIENTE.showAlert('Este veículo já possui cadastro na IAPRO. Fale com a administração para prosseguir.', 'info');
+            }
+            if (data.url) window.open(data.url, '_blank');
+          })
+          .catch(function (err) {
+            AL_CLIENTE.showAlert(err.message || 'Não foi possível abrir a cotação na web.', 'danger');
+          })
+          .finally(function () {
+            botoes.forEach(function (b) { b.disabled = false; });
+            btn.innerHTML = original;
+          });
+      }
+
+      elResult.addEventListener('click', function (e) {
+        var wa = e.target.closest ? e.target.closest('.js-wa') : null;
+        var web = e.target.closest ? e.target.closest('.js-web') : null;
+        if (wa && !wa.disabled) concluirWhatsapp();
+        else if (web && !web.disabled) concluirWeb(web);
+      });
+
+      document.getElementById('btn-nova-cotacao').addEventListener('click', function () {
+        esconderResultado();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    })();
+  </script>
+</body>
+</html>

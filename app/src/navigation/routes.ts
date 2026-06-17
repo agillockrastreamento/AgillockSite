@@ -19,6 +19,7 @@ export type ClienteDrawerParamList = {
   Relatorio: undefined;
   Notificacoes: undefined;
   Manutencao: undefined;
+  CotacaoIapro: undefined;
   Pagamentos: undefined;
   Usuarios: undefined;
 };

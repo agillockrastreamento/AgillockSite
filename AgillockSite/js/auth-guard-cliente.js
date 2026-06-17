@@ -158,7 +158,11 @@
       var base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
       var pad = base64.length % 4;
       if (pad) base64 += '==='.slice(0, 4 - pad);
-      return JSON.parse(atob(base64));
+      // Decodifica como UTF-8 (atob retorna bytes Latin1) — preserva acentos no nome.
+      var json = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(json);
     } catch (e) { return null; }
   }
 

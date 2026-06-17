@@ -25,6 +25,7 @@ import manutencoesAdminRoutes from './routes/manutencoes-admin.routes';
 import compartilhamentoRoutes from './routes/compartilhamento.routes';
 import clientePerfilRoutes from './routes/cliente-perfil.routes';
 import clienteUsuariosRoutes from './routes/cliente-usuarios.routes';
+import clienteCotacaoIaproRoutes from './routes/cliente-cotacao-iapro.routes';
 import usuariosResgateRoutes from './routes/usuarios-resgate.routes';
 import tagsBleRoutes from './routes/tags-ble.routes';
 import appResgateRoutes from './routes/app-resgate.routes';
@@ -118,6 +119,7 @@ app.use('/api/notificacoes-admin', notificacoesAdminRoutes); // Notificações a
 app.use('/api/cliente/manutencoes', manutencoesRoutes);      // Manutenções do cliente
 app.use('/api/manutencoes-admin', manutencoesAdminRoutes);   // Manutenções admin
 app.use('/api/cliente/perfil', clientePerfilRoutes); // Perfil do cliente
+app.use('/api/cliente/cotacao-iapro', clienteCotacaoIaproRoutes); // Cotação IAPRO — antes de clientePortalRoutes
 app.use('/api/cliente', clienteUsuariosRoutes); // Sub-usuários + /me/permissoes — antes de clientePortalRoutes
 app.use('/api/cliente', clientePortalRoutes);   // portal do cliente (JWT role=CLIENTE)
 app.use('/api', usuariosResgateRoutes); // CRUD admin de usuários de resgate

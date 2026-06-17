@@ -17,6 +17,7 @@ import type { ClientePerfil } from '../profile/profileTypes';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { ManutencaoScreen } from '../screens/ManutencaoScreen';
+import { CotacaoIaproScreen } from '../screens/CotacaoIaproScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { PagamentosScreen } from '../screens/PagamentosScreen';
@@ -45,6 +46,7 @@ const routeIcons: Record<keyof ClienteDrawerParamList, string> = {
   Relatorio: 'file-chart-outline',
   Notificacoes: 'bell-outline',
   Manutencao: 'wrench-outline',
+  CotacaoIapro: 'shield-car',
   Pagamentos: 'credit-card-outline',
   Usuarios: 'account-group-outline',
 };
@@ -295,6 +297,11 @@ function ClienteDrawer() {
           options={{ title: 'Manutenção' }}
         />
       ) : null}
+      <Drawer.Screen
+        name="CotacaoIapro"
+        component={CotacaoIaproScreen}
+        options={{ title: 'Cotação Proteção Veicular' }}
+      />
       {responsavel && canAccessPayments ? (
         <Drawer.Screen
           name="Pagamentos"
