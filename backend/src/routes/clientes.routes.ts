@@ -22,6 +22,7 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
           { nome: { contains: busca, mode: 'insensitive' } },
           { cpfCnpj: { contains: busca, mode: 'insensitive' } },
           { telefone: { contains: busca, mode: 'insensitive' } },
+          { email: { contains: busca, mode: 'insensitive' } },
           { placas: { some: { placa: { contains: busca, mode: 'insensitive' } } } },
         ],
       } : {}),
