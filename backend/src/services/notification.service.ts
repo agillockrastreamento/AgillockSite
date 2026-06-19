@@ -54,9 +54,10 @@ class NotificationService {
     const eventosDetectados: any[] = [];
     try {
       const clientesMap = new Map<string, { id: string; nome: string; login: { id: string; email: string; ativo: boolean } | null }>();
-      if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, dispositivo.cliente as any);
+      const _liftLogin = (c: any) => ({ ...c, login: Array.isArray(c.logins) && c.logins[0] ? c.logins[0] : (c.login || null) });
+      if (dispositivo.cliente) clientesMap.set(dispositivo.cliente.id, _liftLogin(dispositivo.cliente));
       for (const vinculo of dispositivo.clientesVinculados || []) {
-        if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, vinculo.cliente as any);
+        if (!clientesMap.has(vinculo.cliente.id)) clientesMap.set(vinculo.cliente.id, _liftLogin(vinculo.cliente));
       }
 
       // 1. Verificar Ignição (Nível de Dispositivo para todos os clientes)
