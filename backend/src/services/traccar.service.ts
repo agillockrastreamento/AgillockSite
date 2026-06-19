@@ -351,6 +351,7 @@ export interface TraccarPosition {
 // Rótulos em português para tipos de alarme enviados pelos dispositivos.
 // Universais — funcionam para qualquer protocolo suportado pelo Traccar.
 export const ALARM_LABELS: Record<string, string> = {
+  general: 'Alerta Genérico',
   sos: 'SOS / Pânico',
   powerCut: 'Corte de energia',
   vibration: 'Vibração',
