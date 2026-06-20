@@ -925,7 +925,7 @@ html.dark-theme .filter-bar { background: #1e2530; }
     .sidebar-brand       { padding: 11px 16px; }
     .sidebar-nav         { flex: 1; padding: 4px 0; margin-bottom: 0; }
     .sidebar-nav li a    { padding: 9px 16px; font-size: 13px; }
-    .sidebar-footer      { padding: 10px 16px 14px; background: #1e2530; }
+    .sidebar-footer      { padding: 10px 16px 80px; background: #1e2530; }
     .sidebar-user        { margin-bottom: 10px; }
 
     /* Scroll horizontal na tabela de boletos (detalhe do cliente) */
