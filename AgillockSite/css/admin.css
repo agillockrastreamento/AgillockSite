@@ -28,7 +28,8 @@ body.admin-body {
     left: 0;
     top: 0;
     width: 240px;
-    height: 100vh;
+    height: 100vh; /* Fallback */
+    height: 100dvh;
     background: #1e2530;
     display: flex;
     flex-direction: column;
@@ -891,7 +892,6 @@ html.dark-theme .filter-bar { background: #1e2530; }
     .admin-sidebar {
         transform: translateX(-240px);
         -webkit-overflow-scrolling: touch;
-        overflow-y: auto;
     }
     .admin-sidebar.open {
         transform: translateX(0);
@@ -921,11 +921,11 @@ html.dark-theme .filter-bar { background: #1e2530; }
     .admin-content  { height: var(--real-vh, 100dvh) !important; }
     .table-responsive { height: calc(var(--real-vh, 100dvh) * 0.65) !important; flex: none !important; }
 
-    /* Sidebar mais compacto — remove flex:1 do nav para footer ficar junto */
+    /* Sidebar mais compacto - Mantendo flex:1 para o footer ficar fixo no fundo */
     .sidebar-brand       { padding: 11px 16px; }
-    .sidebar-nav         { flex: none; padding: 4px 0; margin-bottom: 30px; }
+    .sidebar-nav         { flex: 1; padding: 4px 0; margin-bottom: 0; }
     .sidebar-nav li a    { padding: 9px 16px; font-size: 13px; }
-    .sidebar-footer      { padding: 10px 16px 14px; }
+    .sidebar-footer      { padding: 10px 16px 14px; background: #1e2530; }
     .sidebar-user        { margin-bottom: 10px; }
 
     /* Scroll horizontal na tabela de boletos (detalhe do cliente) */
