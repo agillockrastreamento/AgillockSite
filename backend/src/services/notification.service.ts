@@ -786,12 +786,12 @@ class NotificationService {
         rec.alerta0Enviado = true;
       }
 
-      // Post-due: every 50 km after the limit (red)
+      // Post-due: every 400 km after the limit (red), max 3 notifications
       if (kmPercorrido > intervalo) {
-        const blocos = Math.floor((kmPercorrido - intervalo) / 50);
+        const blocos = Math.floor((kmPercorrido - intervalo) / 400);
         const ultima = rec.ultimaAlertaPostDueKm ?? -1;
-        for (let i = 1; i <= blocos; i++) {
-          const kmAtrasado = i * 50;
+        for (let i = 1; i <= Math.min(blocos, 3); i++) {
+          const kmAtrasado = i * 400;
           if (ultima < kmAtrasado) {
             const mensagem = `Manutenção Atrasada: "${titulo}" no veículo ${nome}${pl} está ${kmAtrasado} km acima do intervalo recomendado (${intervalo} km). Realize o serviço urgente!`;
             eventosDetectados.push(...await this._notificarTargetsManutencao(targetsRecorrencia, dispositivo, 'manutencaoAtrasada', mensagem, rec.origem, rec.id));
