@@ -26,6 +26,7 @@ const WS_TRACCAR_URL = TRACCAR_URL.replace('http://', 'ws://').replace('https://
 interface FrontendClientContext {
   dispositivoIdsPermitidos: Set<string> | null;
   filtraBoletos: boolean; // vinculados não veem boletos
+  adminEventosIgnorados?: Set<string>; // eventos que o admin não quer ver
 }
 const frontendClients = new Map<WebSocket, FrontendClientContext>();
 
@@ -68,7 +69,7 @@ function filtrarPorContexto<T>(
 }
 
 function payloadParaContexto(payload: Record<string, unknown>, ctx: FrontendClientContext): Record<string, unknown> | null {
-  if (ctx.dispositivoIdsPermitidos === null && !ctx.filtraBoletos) return payload;
+  if (ctx.dispositivoIdsPermitidos === null && !ctx.filtraBoletos && !ctx.adminEventosIgnorados) return payload;
   const result: Record<string, unknown> = {};
   if (Array.isArray(payload.positions)) {
     const f = filtrarPorContexto(payload.positions as Array<{ deviceId?: number }>, ctx, (p) => p.deviceId ?? null);
@@ -80,6 +81,14 @@ function payloadParaContexto(payload: Record<string, unknown>, ctx: FrontendClie
   }
   if (Array.isArray(payload.events)) {
     let evts = payload.events as Array<{ deviceId?: number; type?: string; tipo?: string }>;
+    
+    if (ctx.adminEventosIgnorados && ctx.adminEventosIgnorados.size > 0) {
+      evts = evts.filter((e) => {
+        const t = (e.type || e.tipo || '').toString();
+        return !ctx.adminEventosIgnorados!.has(t);
+      });
+    }
+
     if (ctx.filtraBoletos) {
       // Eventos com prefixo 'boleto' (boletoAtrasado, boletoVencendoHoje, etc) não são para vinculados.
       evts = evts.filter((e) => {
@@ -138,10 +147,41 @@ async function getGeofenceMeta(traccarId?: number | null) {
 async function resolveContexto(token: string | null): Promise<FrontendClientContext> {
   // Sem token: sem filtro (compat com clientes legados / admin via outras rotas).
   if (!token) return { dispositivoIdsPermitidos: null, filtraBoletos: false };
-  // Tenta como token de admin/colaborador: passa tudo.
+  // Tenta como token de admin/colaborador: passa tudo, mas aplica filtro das suas preferências.
   try {
-    verifyToken(token);
-    return { dispositivoIdsPermitidos: null, filtraBoletos: false };
+    const decoded = verifyToken(token) as any;
+    let adminEventosIgnorados = new Set<string>();
+    
+    if (decoded && decoded.id) {
+      const adminPref = await prisma.adminPreferencia.findUnique({
+        where: { userId: decoded.id },
+        select: { prefs: true },
+      });
+      if (adminPref && adminPref.prefs) {
+        const prefs = adminPref.prefs as Record<string, unknown>;
+        if (prefs.ignitionOn === false) adminEventosIgnorados.add('ignitionOn');
+        if (prefs.ignitionOff === false) adminEventosIgnorados.add('ignitionOff');
+        if (prefs.geofenceEnter === false) adminEventosIgnorados.add('geofenceEnter');
+        if (prefs.geofenceExit === false) adminEventosIgnorados.add('geofenceExit');
+        if (prefs.overspeed === false) adminEventosIgnorados.add('overspeed');
+        if (prefs.powerCut === false) adminEventosIgnorados.add('powerCut');
+        if (prefs.alarm === false) adminEventosIgnorados.add('alarm');
+        if (prefs.deviceLocked === false) adminEventosIgnorados.add('deviceLocked');
+        if (prefs.deviceUnlocked === false) adminEventosIgnorados.add('deviceUnlocked');
+        if (prefs.veiculoMovimento === false) adminEventosIgnorados.add('veiculoMovimento');
+        if (prefs.motorOcioso === false) adminEventosIgnorados.add('motorOcioso');
+        if (prefs.semAtualizacao === false) adminEventosIgnorados.add('semAtualizacao');
+        if (prefs.boletoVencendoHoje === false) adminEventosIgnorados.add('boletoVencendoHoje');
+        if (prefs.boletoAtrasado === false) adminEventosIgnorados.add('boletoAtrasado');
+        if (prefs.pagamentoRecebido === false) adminEventosIgnorados.add('pagamentoRecebido');
+      }
+    }
+    
+    return { 
+      dispositivoIdsPermitidos: null, 
+      filtraBoletos: false,
+      adminEventosIgnorados: adminEventosIgnorados.size > 0 ? adminEventosIgnorados : undefined
+    };
   } catch {}
   // Tenta como token de cliente
   try {
