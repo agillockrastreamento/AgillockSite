@@ -595,11 +595,22 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         clienteId: (evt as any).clienteId ?? null,
         notificarCliente: (evt as any).notificarCliente,
       };
+      // Ignora eventos de alarme cujo tipo foi totalmente filtrado (ex.: parking)
+      if (evt.type === 'alarm' && !dados.alarme) continue;
       NotificationService.processarEvento(identificador, evt.type, dados).catch(err => {
         console.error('[Notificações] Erro ao processar evento:', err.message);
       });
     }
-    result.events = eventosComLocal;
+    // Remove eventos de alarme cujo tipo foi totalmente filtrado (ex.: parking)
+    // para que não apareçam nos mapas nem nas notificações do frontend.
+    const eventosFiltrados = eventosComLocal.filter(evt => {
+      if (evt.type !== 'alarm') return true;
+      const pos = (evt.positionId != null ? posicaoPorPositionId.get(evt.positionId) : undefined) ?? posicaoPorDeviceId.get(evt.deviceId);
+      if (!pos) return true;
+      const norm = normalizeAttributes(pos.attributes ?? {});
+      return !!norm.alarme;
+    });
+    result.events = eventosFiltrados;
   }
 
   if (Object.keys(result).length === 0) return null;

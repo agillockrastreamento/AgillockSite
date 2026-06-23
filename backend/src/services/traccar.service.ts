@@ -407,10 +407,18 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   semAtualizacao: 'Veículo sem atualização',
 };
 
+// Alarmes ignorados — removidos silenciosamente antes de atingir notificações,
+// mapas ou qualquer outra parte do sistema.
+const IGNORED_ALARMS = new Set(['parking']);
+
 // Normaliza os attributes de uma posição para um formato consistente,
 // independente do protocolo/fabricante do dispositivo.
 export function normalizeAttributes(attr: TraccarPosition['attributes']) {
-  const alarme_codigo = attr.alarm ?? null;
+  // Filtra alarmes ignorados (ex.: parking) antes de processar
+  const alarmeRaw = attr.alarm ?? null;
+  const alarme_codigo = alarmeRaw
+    ? alarmeRaw.split(',').map(a => a.trim()).filter(a => !IGNORED_ALARMS.has(a)).join(',') || null
+    : null;
   const horas_ms = attr.hours ?? null;
   return {
     ignicao: attr.ignition ?? null,
