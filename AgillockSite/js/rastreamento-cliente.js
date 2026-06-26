@@ -2370,12 +2370,13 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
   const _lapis = _editMed
     ? ` <button type="button" onclick="abrirModalMedidoresCliente('${v.dispositivoId}')" title="Editar odômetro e motor" style="border:none;background:none;color:#2980b9;padding:0 0 0 6px"><i class="fa fa-pencil"></i></button>`
     : '';
+  const _med = _editMed ? ' style="white-space:nowrap"' : '';
   if (p.odometro != null) {
     const km = Math.round(p.odometro / 1000).toLocaleString('pt-BR');
-    si.push(`<span><i class="fa fa-dashboard" style="color:#7f8c8d"></i> Odômetro: ${km} km${_lapis}</span>`);
+    si.push(`<span${_med}><i class="fa fa-dashboard" style="color:#7f8c8d"></i> Odômetro: ${km} km${_lapis}</span>`);
   }
   if (p.horas_motor != null) {
-    si.push(`<span><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h${_lapis}</span>`);
+    si.push(`<span${_med}><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h${_lapis}</span>`);
   }
 
   if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
@@ -2672,9 +2673,9 @@ function mostrarCardDispositivo(id) {
     </div>
     <div class="dcard-body">
       <div class="dcard-section-title">Informações do Dispositivo</div>
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:4px">
         <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">${buildStatusHtmlCliente(p, bat, batFa, batCor, v)}</div>
-        <div id="dcard-velocimetro" style="flex-shrink:0;margin-top:-4px">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
+        <div id="dcard-velocimetro" style="flex-shrink:0;margin-top:-4px;margin-right:-14px">${p?.velocidade != null ? svgVelocimetro(p.velocidade, v.limiteVelocidade) : ''}</div>
       </div>
       <div id="dcard-oleo-status" style="margin-bottom:6px">${buildOleoStatusHtml(p, v)}</div>
       <div id="dcard-data-status" style="margin-bottom:6px">${buildDataRecorrenciasHtml(v)}</div>
