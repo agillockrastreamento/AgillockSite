@@ -37,6 +37,8 @@ export type TrackingDevice = {
   cor: string | null;
   limiteVelocidade: number | null;
   podeGerenciarManutencao: boolean;
+  /** Habilita o cliente a editar odômetro/horímetro do dispositivo (definido pelo admin). */
+  podeEditarMedidores?: boolean;
   cliente: {
     id: string;
     nome: string;

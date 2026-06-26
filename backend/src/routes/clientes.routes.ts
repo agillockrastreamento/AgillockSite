@@ -233,6 +233,25 @@ router.patch('/:id/status', requireRoles('ADMIN', 'COLABORADOR'), async (req: Au
   res.json(cliente);
 });
 
+// PATCH /api/clientes/:id/medidores-permissao — Toggle permissão do cliente editar medidores
+router.patch('/:id/medidores-permissao', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+
+  const existe = await prisma.cliente.findUnique({ where: { id }, select: { id: true, podeEditarMedidores: true } });
+  if (!existe) {
+    res.status(404).json({ error: 'Cliente não encontrado.' });
+    return;
+  }
+
+  const cliente = await prisma.cliente.update({
+    where: { id },
+    data: { podeEditarMedidores: !existe.podeEditarMedidores },
+    select: { id: true, nome: true, podeEditarMedidores: true },
+  });
+
+  res.json(cliente);
+});
+
 // DELETE /api/clientes/:id
 router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   if (req.user!.role === 'COLABORADOR' && !req.user!.podeExcluirCliente) {

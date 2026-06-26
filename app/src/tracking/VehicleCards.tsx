@@ -4,6 +4,7 @@ import { ActivityIndicator, Icon, IconButton } from 'react-native-paper';
 import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
 import { GeofenceCreateModal } from '../components/GeofenceCreateModal';
+import { MedidoresEditModal } from './MedidoresEditModal';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { resolveUploadUrl } from '../profile/profileService';
@@ -226,6 +227,10 @@ export function MainVehicleCard({
   const [isCreatingGeofence, setIsCreatingGeofence] = useState(false);
   const [isSendingCommand, setIsSendingCommand] = useState(false);
   const [geofenceModalVisible, setGeofenceModalVisible] = useState(false);
+  const [medidoresModalVisible, setMedidoresModalVisible] = useState(false);
+  const [savingMedidores, setSavingMedidores] = useState(false);
+  // Força re-render após editar medidores (a posição é mutada no próprio objeto device).
+  const [, setMedidoresTick] = useState(0);
 
   const p = device.posicao;
   const statusColor = getStatusColor(device.status, p);
@@ -511,6 +516,32 @@ export function MainVehicleCard({
     }
   };
 
+  const saveMedidores = async (odometroKm: number | null, horimetroHoras: number) => {
+    setSavingMedidores(true);
+    try {
+      const data = await apiRequest<{ odometro?: number | null; horimetro?: number }>(
+        `/cliente/dispositivos/${device.dispositivoId}/medidores`,
+        { method: 'PATCH', body: { odometro: odometroKm, horimetro: horimetroHoras } }
+      );
+      // Reflete imediatamente no card (a posição é o mesmo objeto compartilhado com o estado pai;
+      // será sobrescrito no próximo update do WebSocket).
+      if (device.posicao) {
+        device.posicao.odometro = data?.odometro != null ? Math.round(data.odometro * 1000) : null;
+        device.posicao.horas_motor = data?.horimetro ?? device.posicao.horas_motor;
+      }
+      setMedidoresTick(t => t + 1);
+      setMedidoresModalVisible(false);
+      toast.show({ message: 'Medidores atualizados.', type: 'success' });
+    } catch (err) {
+      toast.show({
+        message: err instanceof Error ? err.message : 'Erro ao salvar medidores.',
+        type: 'error',
+      });
+    } finally {
+      setSavingMedidores(false);
+    }
+  };
+
   const maintenanceAlerts = recurrences.filter(r => {
     const odometroM = r.dispositivo?.odometroSistemaMetros ?? p?.odometro ?? null;
     if (odometroM == null) return false;
@@ -526,6 +557,16 @@ export function MainVehicleCard({
         deviceName={device.nome}
         onClose={() => setGeofenceModalVisible(false)}
         onConfirm={handleGeofenceConfirm}
+      />
+
+      <MedidoresEditModal
+        visible={medidoresModalVisible}
+        deviceName={device.nome}
+        odometroMetros={p?.odometro}
+        horasMotor={p?.horas_motor}
+        saving={savingMedidores}
+        onClose={() => setMedidoresModalVisible(false)}
+        onConfirm={saveMedidores}
       />
 
       {!modoResgate ? (
@@ -585,12 +626,22 @@ export function MainVehicleCard({
                 <Text style={styles.statusItemText}>
                   Odômetro: {Math.round(p.odometro / 1000).toLocaleString('pt-BR')} km
                 </Text>
+                {device.podeEditarMedidores && !modoResgate ? (
+                  <Pressable hitSlop={8} onPress={() => setMedidoresModalVisible(true)} style={styles.medidorEditBtn}>
+                    <Icon source="pencil" size={13} color={colors.primary} />
+                  </Pressable>
+                ) : null}
               </View>
             )}
             {p?.horas_motor != null && (
               <View style={styles.statusItem}>
                 <Icon source="clock-outline" size={14} color={colors.textMuted} />
                 <Text style={styles.statusItemText}>Motor: {p.horas_motor} h</Text>
+                {device.podeEditarMedidores && !modoResgate ? (
+                  <Pressable hitSlop={8} onPress={() => setMedidoresModalVisible(true)} style={styles.medidorEditBtn}>
+                    <Icon source="pencil" size={13} color={colors.primary} />
+                  </Pressable>
+                ) : null}
               </View>
             )}
             {p?.bloqueado != null && (
@@ -927,6 +978,9 @@ const styles = StyleSheet.create({
   statusItemText: {
     fontSize: 12,
     color: colors.textMuted,
+  },
+  medidorEditBtn: {
+    padding: 2,
   },
   speedometerWrap: {
     marginTop: -4,

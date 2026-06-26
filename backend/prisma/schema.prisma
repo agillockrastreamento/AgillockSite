@@ -110,6 +110,10 @@ model Cliente {
   socios         Json?
   status         StatusCliente @default(ATIVO)
 
+  // Quando true, o cliente pode editar o odômetro/horímetro dos seus dispositivos
+  // (mesmo modal do admin) pelo card flutuante do mapa (web) e bottom sheet (app).
+  podeEditarMedidores Boolean @default(false)
+
   // Integração IAPRO — cliente criado/sincronizado a partir de um contrato da IAPRO.
   // Pagamentos desse cliente são feitos pela IAPRO (sem boletos na Ágil Lock).
   origemIapro    Boolean @default(false)

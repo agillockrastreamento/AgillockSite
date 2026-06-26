@@ -17,6 +17,7 @@ import {
   traccarGetDevices,
   traccarGetDeviceByImei,
   traccarGetPositions,
+  traccarUpdateDeviceAccumulators,
   traccarGetPositionHistory,
   traccarGetTrips,
   traccarGetStops,
@@ -314,6 +315,13 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
     return;
   }
 
+  // Permissão (definida pelo admin) de o cliente editar odômetro/horímetro.
+  const clienteAtual = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    select: { podeEditarMedidores: true },
+  });
+  const podeEditarMedidores = clienteAtual?.podeEditarMedidores === true;
+
   // Busca dispositivos do cliente (responsável direto + vinculados)
   const [dispoResult, traccarResult] = await Promise.allSettled([
     prisma.dispositivo.findMany({
@@ -377,6 +385,9 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
       limiteVelocidade: d.limiteVelocidade,
       mapa: d.mapa,
       podeGerenciarManutencao: d.clienteId === clienteId,
+      // Só o cliente titular (responsável) do dispositivo pode editar os medidores,
+      // e apenas quando o admin habilitou a permissão para este cliente.
+      podeEditarMedidores: podeEditarMedidores && d.clienteId === clienteId,
       manutencaoAtiva: d.manutencaoAtiva,
       cliente: d.cliente,
       traccarId: traccar?.id ?? null,
@@ -1049,6 +1060,81 @@ router.patch('/dispositivos/:dispositivoId/apelido', requirePermission('rastream
   });
 
   res.json({ apelidoCliente: apelidoCliente || null });
+});
+
+// ── PATCH /api/cliente/dispositivos/:dispositivoId/medidores ──────────────────
+// Cliente edita odômetro/horímetro do próprio dispositivo (mesma lógica do admin),
+// desde que o admin tenha habilitado a permissão (cliente.podeEditarMedidores).
+router.patch('/dispositivos/:dispositivoId/medidores', async (req: ClienteRequest, res: Response): Promise<void> => {
+  const clienteId = req.cliente!.clienteId;
+  const dispositivoId = param(req, 'dispositivoId');
+  const { odometro, horimetro } = req.body as { odometro?: number | null; horimetro?: number | null };
+
+  if (await verificarBloqueio(clienteId)) {
+    res.status(403).json({ error: 'acesso_bloqueado' });
+    return;
+  }
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    select: { podeEditarMedidores: true },
+  });
+  if (!cliente?.podeEditarMedidores) {
+    res.status(403).json({ error: 'Sem permissão para editar os medidores.' });
+    return;
+  }
+
+  // Só o titular do dispositivo (responsável) pode editar — medidores são globais.
+  const dispositivo = await prisma.dispositivo.findFirst({
+    where: { id: dispositivoId, clienteId, ...whereDispositivosDoCliente(req) },
+    select: { id: true, identificador: true, ...DISPOSITIVO_MEDIDORES_SELECT },
+  });
+  if (!dispositivo) {
+    res.status(404).json({ error: 'Dispositivo não encontrado ou sem permissão.' });
+    return;
+  }
+
+  const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+  if (traccarDevice) {
+    try {
+      const posicoes = await traccarGetPositions([traccarDevice.id]);
+      const atual = posicoes[0];
+      if (atual) {
+        const atualizados = await sincronizarDispositivosComPosicoes([dispositivo], new Map([[dispositivo.identificador, atual]]));
+        Object.assign(dispositivo, atualizados.get(dispositivo.identificador) ?? dispositivo);
+      }
+    } catch {
+      // mantém o estado persistido
+    }
+  }
+
+  const data: Record<string, unknown> = {};
+  if (odometro !== undefined) {
+    data.odometroSistemaMetros = odometro == null ? null : Math.round(Number(odometro) * 1000);
+  }
+  if (horimetro !== undefined) {
+    data.horimetroSistemaSegundos = horimetro == null ? 0 : Math.max(0, Math.round(Number(horimetro) * 3600));
+  }
+
+  const atualizado = await prisma.dispositivo.update({
+    where: { id: dispositivoId },
+    data,
+    select: { id: true, odometroSistemaMetros: true, horimetroSistemaSegundos: true },
+  });
+
+  if (traccarDevice && atualizado.odometroSistemaMetros != null) {
+    traccarUpdateDeviceAccumulators(
+      traccarDevice.id,
+      atualizado.odometroSistemaMetros,
+      atualizado.horimetroSistemaSegundos * 1000,
+    ).catch(err => console.error('[Traccar] Falha ao sincronizar acumuladores:', err.message));
+  }
+
+  res.json({
+    id: atualizado.id,
+    odometro: atualizado.odometroSistemaMetros != null ? Math.round(atualizado.odometroSistemaMetros) / 1000 : null,
+    horimetro: Math.round((atualizado.horimetroSistemaSegundos / 3600) * 10) / 10,
+  });
 });
 
 // ── DELETE /api/cliente/dispositivos/:id/foto ─────────────────────────────────
