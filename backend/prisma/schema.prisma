@@ -721,6 +721,10 @@ model Geocerca {
   area             String    @db.Text
   tipo             String    @default("circulo")
   origemTipo       String // "ADMIN" | "CLIENTE"
+  // true = cerca individual criada pelo card/bottom sheet do mapa (controla o botão
+  // "Cerca" do veículo focado). false = criada pela tela de Geocercas (pode abranger
+  // vários dispositivos e NÃO ativa o botão individual).
+  criadaNoMapa     Boolean   @default(false)
   clienteId        String?
   visivelCliente   Boolean   @default(false)
   notificarCliente Boolean   @default(false)

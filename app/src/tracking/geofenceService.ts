@@ -7,6 +7,8 @@ export type Geofence = {
   area: string;
   // Mapas (1/2) dos dispositivos vinculados. Vazio = sem vínculo (aparece em qualquer mapa).
   mapas?: number[];
+  // true = cerca individual criada no mapa/card; false = criada na tela de Geocercas.
+  criadaNoMapa?: boolean;
 };
 
 export type DeviceGeofence = {

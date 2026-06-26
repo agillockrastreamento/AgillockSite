@@ -1263,7 +1263,7 @@ router.get('/rastreamento/cercas', requirePermission('rastreamento.verCerca'), a
       ],
     },
     select: {
-      traccarId: true, nome: true, descricao: true, area: true,
+      traccarId: true, nome: true, descricao: true, area: true, criadaNoMapa: true,
       // Mapas (1/2) dos dispositivos do cliente vinculados à cerca, para o
       // frontend exibir a cerca apenas no mapa ativo correspondente.
       dispositivos: {
@@ -1278,6 +1278,7 @@ router.get('/rastreamento/cercas', requirePermission('rastreamento.verCerca'), a
     name: g.nome,
     description: g.descricao ?? '',
     area: g.area,
+    criadaNoMapa: g.criadaNoMapa,
     mapas: [...new Set(g.dispositivos.map(d => (Number(d.dispositivo?.mapa) === 2 ? 2 : 1)))],
   })));
 });
@@ -1293,13 +1294,17 @@ router.get('/rastreamento/dispositivos/:dispositivoId/cercas', requirePermission
   });
   if (!dispositivo) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
+  // Apenas as cercas individuais que o próprio cliente criou no mapa controlam o
+  // botão "Cerca" do veículo focado. Cercas da tela de Geocercas (criadaNoMapa=false)
+  // e cercas ADMIN não ativam o botão — assim o cliente ainda consegue criar uma
+  // cerca individual mesmo com uma geocerca abrangente ativa.
   const geocercas = await prisma.geocerca.findMany({
     where: {
       ativa: true,
-      OR: [
-        { origemTipo: 'CLIENTE', clienteId, dispositivos: { some: { dispositivoId } } },
-        { origemTipo: 'ADMIN', visivelCliente: true, dispositivos: { some: { dispositivoId } } },
-      ],
+      origemTipo: 'CLIENTE',
+      clienteId,
+      criadaNoMapa: true,
+      dispositivos: { some: { dispositivoId } },
     },
     select: { traccarId: true, nome: true, descricao: true, area: true },
   });
@@ -1331,7 +1336,7 @@ router.post('/rastreamento/cercas', requirePermission('rastreamento.criarCerca')
         data: {
           traccarId: cerca.id, nome, area,
           tipo: area.toUpperCase().startsWith('CIRCLE') ? 'circulo' : 'poligono',
-          origemTipo: 'CLIENTE', clienteId,
+          origemTipo: 'CLIENTE', clienteId, criadaNoMapa: true,
           visivelCliente: false, notificarCliente: false,
         },
       });
@@ -1350,7 +1355,7 @@ router.post('/rastreamento/cercas', requirePermission('rastreamento.criarCerca')
       data: {
         traccarId: cerca.id, nome, area,
         tipo: area.toUpperCase().startsWith('CIRCLE') ? 'circulo' : 'poligono',
-        origemTipo: 'CLIENTE', clienteId,
+        origemTipo: 'CLIENTE', clienteId, criadaNoMapa: true,
         visivelCliente: false, notificarCliente: false,
       },
     });

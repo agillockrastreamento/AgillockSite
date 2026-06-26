@@ -1084,14 +1084,17 @@ export function MapScreen() {
         {showFences && filteredGeofences.map((geofence) => {
           const parsed = parseCircleArea(geofence.area);
           if (!parsed) return null;
+          // Cor por origem: cerca individual do mapa (azul) x tela de Geocercas (verde).
+          const stroke = geofence.criadaNoMapa ? 'rgba(41,128,185,0.8)' : 'rgba(39,174,96,0.8)';
+          const fill = geofence.criadaNoMapa ? 'rgba(41,128,185,0.15)' : 'rgba(39,174,96,0.15)';
           return (
             <Circle
               key={`fence-circle-${geofence.id}`}
               center={{ latitude: parsed.latitude, longitude: parsed.longitude }}
               radius={parsed.radius}
               strokeWidth={2}
-              strokeColor="rgba(41,128,185,0.8)"
-              fillColor="rgba(41,128,185,0.15)"
+              strokeColor={stroke}
+              fillColor={fill}
             />
           );
         })}
@@ -1101,13 +1104,15 @@ export function MapScreen() {
           // mas precisa desenhar polígonos vindos do web/admin igual ao site.
           const pts = parsePolygonArea(geofence.area);
           if (!pts) return null;
+          const stroke = geofence.criadaNoMapa ? 'rgba(41,128,185,0.8)' : 'rgba(39,174,96,0.8)';
+          const fill = geofence.criadaNoMapa ? 'rgba(41,128,185,0.15)' : 'rgba(39,174,96,0.15)';
           return (
             <Polygon
               key={`fence-poly-${geofence.id}`}
               coordinates={pts}
               strokeWidth={2}
-              strokeColor="rgba(41,128,185,0.8)"
-              fillColor="rgba(41,128,185,0.15)"
+              strokeColor={stroke}
+              fillColor={fill}
             />
           );
         })}

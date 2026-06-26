@@ -3104,7 +3104,8 @@ function _parsearAreaTraccar(area) {
 function _criarCamadaCerca(cerca) {
   const parsed = _parsearAreaTraccar(cerca.area);
   if (!parsed) return null;
-  const cor = '#27ae60';
+  // Cor por origem: cercas individuais do mapa (azul) x cercas da tela de Geocercas (verde).
+  const cor = cerca.criadaNoMapa ? '#2980b9' : '#27ae60';
   // A cerca é apenas um overlay visual: não recebe eventos de clique/toque
   // (a exclusão é feita pelo card do dispositivo e pela tela de geocercas).
   const opcoes = { color: cor, weight: 2, fillOpacity: 0.08, fillColor: cor, interactive: false };

@@ -1,0 +1,2 @@
+ALTER TABLE "Geocerca"
+ADD COLUMN "criadaNoMapa" BOOLEAN NOT NULL DEFAULT false;

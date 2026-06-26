@@ -702,7 +702,7 @@ router.get('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthReq
   try {
     const geocercas = await prisma.geocerca.findMany({
       where: { origemTipo: 'ADMIN', ativa: true, OR: [{ dataInicio: null }, { dataInicio: { lte: new Date() } }] },
-      select: { id: true, traccarId: true, nome: true, descricao: true, area: true },
+      select: { id: true, traccarId: true, nome: true, descricao: true, area: true, criadaNoMapa: true },
     });
     res.json(geocercas.map(g => ({
       id: g.traccarId,
@@ -710,6 +710,7 @@ router.get('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthReq
       name: g.nome,
       description: g.descricao ?? '',
       area: g.area,
+      criadaNoMapa: g.criadaNoMapa,
     })));
   } catch {
     res.json([]);
@@ -724,6 +725,9 @@ router.get('/dispositivos/:id/cercas', requireRoles('ADMIN', 'COLABORADOR'), asy
       where: {
         origemTipo: 'ADMIN',
         ativa: true,
+        // Somente cercas individuais criadas no mapa controlam o botão "Cerca"
+        // do veículo focado; as da tela de Geocercas não ativam o botão.
+        criadaNoMapa: true,
         OR: [{ dataInicio: null }, { dataInicio: { lte: new Date() } }],
         dispositivos: { some: { dispositivoId: id } },
       },
@@ -752,6 +756,7 @@ router.post('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthReq
         area,
         tipo: area.toUpperCase().startsWith('CIRCLE') ? 'circulo' : area.toUpperCase().startsWith('POLYGON') ? 'poligono' : 'linha',
         origemTipo: 'ADMIN',
+        criadaNoMapa: true,
         visivelCliente: false,
         notificarCliente: false,
       },
@@ -768,7 +773,7 @@ router.post('/cercas', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthReq
       }
     }
 
-    res.json({ ...cerca, geocercaLocalId: geocerca.id });
+    res.json({ ...cerca, geocercaLocalId: geocerca.id, criadaNoMapa: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Erro ao criar cerca: ${msg}` });
