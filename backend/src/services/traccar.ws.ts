@@ -38,6 +38,7 @@ const frontendClients = new Map<WebSocket, FrontendClientContext>();
 // grupos de manutenção/recorrência por data.
 export function tipoEventoParaPrefAdmin(tipo: string): string {
   if (tipo === 'deviceOverspeed') return 'overspeed';
+  if (tipo === 'commandQueued') return 'commandResult';
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
   if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'recorrenciaData';
   return tipo;
@@ -171,9 +172,11 @@ async function resolveContexto(token: string | null): Promise<FrontendClientCont
     const decoded = verifyToken(token) as any;
     let adminPrefs: Record<string, boolean> | undefined;
 
-    if (decoded && decoded.id) {
+    // O payload do JWT de admin/colaborador usa `userId` (ver utils/jwt.ts).
+    const adminUserId = decoded?.userId ?? decoded?.id;
+    if (adminUserId) {
       const adminPref = await prisma.adminPreferencia.findUnique({
-        where: { userId: decoded.id },
+        where: { userId: adminUserId },
         select: { prefs: true },
       });
       if (adminPref && adminPref.prefs) {

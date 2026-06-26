@@ -460,15 +460,34 @@ function _normalizarEventoAdmin(evt) {
 }
 
 function _tipoPreferenciaAdmin(tipo) {
+  if (tipo === 'deviceOverspeed') return 'overspeed';
+  if (tipo === 'commandQueued') return 'commandResult';
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
   if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'recorrenciaData';
   return tipo;
 }
 
+// O admin só tem preferências configuradas quando existe ao menos uma chave
+// booleana (a tela de notificações salva true/false para cada tipo). Chaves
+// auxiliares (al_last_notif_admin, al_clear_notif_admin, semAtualizacaoHoras…)
+// não contam.
+function _adminTemPrefsConfiguradas() {
+  for (const k in _adminNotifPrefs) {
+    if (typeof _adminNotifPrefs[k] === 'boolean') return true;
+  }
+  return false;
+}
+
+// Regra: o admin só recebe na área de eventos os tipos que ele HABILITOU
+// explicitamente (opt-in). Eventos marcados como "não para o admin"
+// (adminEvento === false) nunca aparecem. Se o admin nunca configurou nenhuma
+// preferência, mantém o comportamento legado de mostrar tudo (para não deixar o
+// painel vazio sem querer).
 function _eventoPermitidoParaAdmin(evt) {
-  if (!evt || evt.origemTipo !== 'CLIENTE') return true;
+  if (!evt) return true;
   if (evt.adminEvento === false) return false;
-  return !!_adminNotifPrefs[_tipoPreferenciaAdmin(evt.tipo)];
+  if (!_adminTemPrefsConfiguradas()) return true;
+  return _adminNotifPrefs[_tipoPreferenciaAdmin(evt.tipo)] === true;
 }
 
 function _intervaloPeriodoEventosAdmin(cutoff) {
@@ -719,7 +738,7 @@ async function carregarHistoricoEventos(periodo, de, ate) {
       e = _normalizarEventoAdmin(e);
       const time = new Date(e.serverTime || Date.now()).getTime();
       const tiposPermitidos = TIPOS_EVENTO_ADMIN_FILTRO.map(t => t.tipo);
-      if (_eventoLimpoAdmin(e) || !tiposPermitidos.includes(e.tipo)) return;
+      if (_eventoLimpoAdmin(e) || !_eventoPermitidoParaAdmin(e) || !tiposPermitidos.includes(e.tipo)) return;
       _eventos.push(e);
     });
     renderEventosLista();
