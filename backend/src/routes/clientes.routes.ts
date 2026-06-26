@@ -122,14 +122,14 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
     res.status(400).json({ error: 'O nome do cliente é obrigatório.' });
     return;
   }
-  if (!cep || !logradouro || !numero || !bairro || !cidade || !estado) {
-    res.status(400).json({ error: 'Endereço completo é obrigatório (CEP, logradouro, número, bairro, cidade e UF).' });
-    return;
-  }
 
   const cliente = await prisma.cliente.create({
     data: {
-      nome, cpfCnpj, telefone, email, notas,
+      nome,
+      cpfCnpj: cpfCnpj || null,
+      telefone: telefone || null,
+      email: email || null,
+      notas: notas || null,
       dataNascimento: dataNascimento || null,
       rg: rg || null,
       profissao: profissao || null,
@@ -140,7 +140,13 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
       origemCliente: origemCliente || null,
       socios: socios ?? null,
       vendedorId: vendedorId || null,
-      cep, logradouro, numero, complemento, bairro, cidade, estado,
+      cep: cep || null,
+      logradouro: logradouro || null,
+      numero: numero || null,
+      complemento: complemento || null,
+      bairro: bairro || null,
+      cidade: cidade || null,
+      estado: estado || null,
       criadoPorId: req.user!.userId,
     },
     include: {
@@ -173,10 +179,19 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
     return;
   }
 
+  if (!nome) {
+    res.status(400).json({ error: 'O nome do cliente é obrigatório.' });
+    return;
+  }
+
   const cliente = await prisma.cliente.update({
     where: { id },
     data: {
-      nome, cpfCnpj, telefone, email, notas,
+      nome,
+      cpfCnpj: cpfCnpj || null,
+      telefone: telefone || null,
+      email: email || null,
+      notas: notas || null,
       dataNascimento: dataNascimento || null,
       rg: rg || null,
       profissao: profissao || null,
@@ -187,7 +202,13 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
       origemCliente: origemCliente || null,
       socios: socios ?? null,
       vendedorId: vendedorId || null,
-      cep, logradouro, numero, complemento, bairro, cidade, estado,
+      cep: cep || null,
+      logradouro: logradouro || null,
+      numero: numero || null,
+      complemento: complemento || null,
+      bairro: bairro || null,
+      cidade: cidade || null,
+      estado: estado || null,
     },
     include: {
       vendedor: { select: { id: true, nome: true } },
