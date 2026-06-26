@@ -72,6 +72,29 @@ export function normalizarPlaca(placa?: string | null): string {
 }
 
 /**
+ * Resolve o e-mail do cliente para o fluxo da IAPRO. Cliente PJ normalmente não tem o
+ * campo `email` preenchido (é da pessoa física); o e-mail fica em `emailCobranca` ou no
+ * primeiro sócio (`socios[0].email`). Prioridade: email → emailCobranca → 1º sócio.
+ */
+export function resolverEmailCliente(c: {
+  email?: string | null;
+  emailCobranca?: string | null;
+  socios?: unknown;
+}): string | null {
+  const candidatos: Array<string | null | undefined> = [c.email, c.emailCobranca];
+  const socios = Array.isArray(c.socios) ? (c.socios as Array<Record<string, unknown>>) : [];
+  for (const s of socios) {
+    const e = s && typeof s.email === 'string' ? s.email : null;
+    if (e) candidatos.push(e);
+  }
+  for (const e of candidatos) {
+    const v = (e || '').trim();
+    if (v && /\S+@\S+\.\S+/.test(v)) return v;
+  }
+  return null;
+}
+
+/**
  * Normaliza um telefone/WhatsApp para o formato do wa.me: só dígitos com DDI.
  * "(85) 99201-0562" → "5585992010562". Mantém números que já tenham DDI 55.
  */
@@ -449,10 +472,12 @@ async function orquestrarCotacao(
 ): Promise<string | null> {
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
-    select: { nome: true, email: true, telefone: true },
+    select: { nome: true, email: true, emailCobranca: true, socios: true, telefone: true },
   });
   // Sem e-mail/nome não conseguimos criar/associar o cliente na IAPRO pelo fluxo público.
-  if (!cliente?.email || !cliente?.nome) return null;
+  // Cliente PJ guarda o e-mail em emailCobranca/sócios, não no campo `email`.
+  const email = cliente ? resolverEmailCliente(cliente) : null;
+  if (!email || !cliente?.nome) return null;
   const whatsapp = (cliente.telefone || '').replace(/\D/g, '');
 
   async function rodarPassos(sid: string): Promise<boolean> {
@@ -461,7 +486,7 @@ async function orquestrarCotacao(
     if (!r1.ok) return false; // sessão inexistente/expirada → sinaliza para recriar
     await chamarIapro('PATCH', stepPath, {
       status: 'LINK_ETAPA_1_OK',
-      data: { name: cliente!.nome, email: cliente!.email, whatsapp, acceptedTerms: true },
+      data: { name: cliente!.nome, email, whatsapp, acceptedTerms: true },
     });
     await chamarIapro('PATCH', stepPath, { status: 'LINK_ETAPA_2_OK', data: dadosVeiculo });
     await chamarIapro('PATCH', stepPath, {
@@ -525,7 +550,7 @@ function paraEstadoCivil(s?: string | null): string | undefined {
 }
 
 type ClienteCompleto = {
-  nome: string; email: string | null; telefone: string | null; cpfCnpj: string | null;
+  nome: string; email: string | null; emailCobranca: string | null; socios: unknown; telefone: string | null; cpfCnpj: string | null;
   tipoPessoa: string | null; dataNascimento: string | null; rg: string | null; estadoCivil: string | null;
   cep: string | null; logradouro: string | null; numero: string | null; complemento: string | null;
   bairro: string | null; cidade: string | null; estado: string | null;
@@ -537,7 +562,7 @@ function mapearClienteParaIapro(c: ClienteCompleto): Record<string, unknown> {
   const temEndereco = !!(c.cep || c.logradouro || c.cidade);
   return {
     name: c.nome,
-    email: c.email || undefined,
+    email: resolverEmailCliente(c) || undefined,
     whatsapp: digitsOnly(c.telefone) || undefined,
     phone: c.telefone || undefined,
     cpf: doc.length === 11 ? doc : undefined,
@@ -574,7 +599,7 @@ export async function contratar(clienteId: string, sessionId: string): Promise<C
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
     select: {
-      nome: true, email: true, telefone: true, cpfCnpj: true, tipoPessoa: true,
+      nome: true, email: true, emailCobranca: true, socios: true, telefone: true, cpfCnpj: true, tipoPessoa: true,
       dataNascimento: true, rg: true, estadoCivil: true,
       cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, estado: true,
     },

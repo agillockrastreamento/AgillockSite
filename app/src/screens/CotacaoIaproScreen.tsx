@@ -425,7 +425,7 @@ export function CotacaoIaproScreen() {
     const temPreco = !!cotacao.preco;
     const temWa = !!cotacao.whatsappComercial;
     return (
-      <View>
+      <View style={styles.acoesWrap}>
         <View style={styles.actionsRow}>
           {temPreco ? (
             <Pressable
@@ -434,11 +434,11 @@ export function CotacaoIaproScreen() {
               disabled={isAbrindoWeb}
             >
               {isAbrindoWeb ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={colors.primaryText} size="small" />
               ) : (
-                <Icon source="shield-check" size={20} color="#fff" />
+                <Icon source="shield-check" size={20} color={colors.primaryText} />
               )}
-              <Text style={styles.actionText}>Contratar proteção</Text>
+              <Text style={[styles.actionText, styles.actionTextWeb]}>Contratar proteção</Text>
             </Pressable>
           ) : null}
           <Pressable
@@ -624,7 +624,7 @@ export function CotacaoIaproScreen() {
             <View style={styles.grid2}>
               {COBERTURAS.map((c) => (
                 <View key={c.title} style={styles.covCard}>
-                  <Icon source={c.icon} size={20} color={colors.accent} />
+                  <Icon source={c.icon} size={20} color={colors.primary} />
                   <Text style={styles.covTitle}>{c.title}</Text>
                   <Text style={styles.covDesc}>{c.desc}</Text>
                 </View>
@@ -877,9 +877,11 @@ const styles = StyleSheet.create({
   },
   nopriceText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 20 },
   fipeText: { fontSize: 13, color: colors.textMuted, marginBottom: spacing.md },
+  acoesWrap: { width: '100%' },
   actionsRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   actionBtn: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 150,
     minWidth: 150,
     flexDirection: 'row',
     alignItems: 'center',
@@ -888,9 +890,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: radius.md,
   },
-  actionWeb: { backgroundColor: colors.accent },
+  actionWeb: { backgroundColor: colors.primary },
   actionWa: { backgroundColor: '#25d366' },
   actionText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  actionTextWeb: { color: colors.primaryText },
   ctaHint: { textAlign: 'center', fontSize: 12, color: colors.textSubtle, marginTop: spacing.sm },
   sectionTitle: {
     fontSize: 17,
