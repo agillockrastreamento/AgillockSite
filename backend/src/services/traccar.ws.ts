@@ -26,9 +26,28 @@ const WS_TRACCAR_URL = TRACCAR_URL.replace('http://', 'ws://').replace('https://
 interface FrontendClientContext {
   dispositivoIdsPermitidos: Set<string> | null;
   filtraBoletos: boolean; // vinculados não veem boletos
-  adminEventosIgnorados?: Set<string>; // eventos que o admin não quer ver
+  // Preferências de notificação web do admin (mapa tipoEvento → habilitado).
+  // Presente só quando o admin desabilitou ao menos um tipo; aí os eventos cujo
+  // tipo está marcado como `false` não são enviados a essa conexão.
+  adminPrefs?: Record<string, boolean>;
 }
 const frontendClients = new Map<WebSocket, FrontendClientContext>();
+
+// Mapeia o tipo bruto do evento (vindo do Traccar/sintético) para a chave da
+// preferência do admin. Cobre divergências (deviceOverspeed→overspeed) e os
+// grupos de manutenção/recorrência por data.
+export function tipoEventoParaPrefAdmin(tipo: string): string {
+  if (tipo === 'deviceOverspeed') return 'overspeed';
+  if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
+  if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'recorrenciaData';
+  return tipo;
+}
+
+// O admin não recebe o evento quando desabilitou explicitamente esse tipo
+// (pref === false). Tipos sem preferência salva continuam sendo enviados.
+export function adminIgnoraEvento(adminPrefs: Record<string, boolean>, tipo: string): boolean {
+  return adminPrefs[tipoEventoParaPrefAdmin(tipo)] === false;
+}
 
 // Cache traccarDeviceId → ClienteLogin.dispositivoId (uuid no DB). Reutilizado para filtrar
 // mensagens de saída sem ir ao DB a cada broadcast.
@@ -69,7 +88,7 @@ function filtrarPorContexto<T>(
 }
 
 function payloadParaContexto(payload: Record<string, unknown>, ctx: FrontendClientContext): Record<string, unknown> | null {
-  if (ctx.dispositivoIdsPermitidos === null && !ctx.filtraBoletos && !ctx.adminEventosIgnorados) return payload;
+  if (ctx.dispositivoIdsPermitidos === null && !ctx.filtraBoletos && !ctx.adminPrefs) return payload;
   const result: Record<string, unknown> = {};
   if (Array.isArray(payload.positions)) {
     const f = filtrarPorContexto(payload.positions as Array<{ deviceId?: number }>, ctx, (p) => p.deviceId ?? null);
@@ -82,10 +101,10 @@ function payloadParaContexto(payload: Record<string, unknown>, ctx: FrontendClie
   if (Array.isArray(payload.events)) {
     let evts = payload.events as Array<{ deviceId?: number; type?: string; tipo?: string }>;
     
-    if (ctx.adminEventosIgnorados && ctx.adminEventosIgnorados.size > 0) {
+    if (ctx.adminPrefs) {
       evts = evts.filter((e) => {
         const t = (e.type || e.tipo || '').toString();
-        return !ctx.adminEventosIgnorados!.has(t);
+        return !adminIgnoraEvento(ctx.adminPrefs!, t);
       });
     }
 
@@ -150,8 +169,8 @@ async function resolveContexto(token: string | null): Promise<FrontendClientCont
   // Tenta como token de admin/colaborador: passa tudo, mas aplica filtro das suas preferências.
   try {
     const decoded = verifyToken(token) as any;
-    let adminEventosIgnorados = new Set<string>();
-    
+    let adminPrefs: Record<string, boolean> | undefined;
+
     if (decoded && decoded.id) {
       const adminPref = await prisma.adminPreferencia.findUnique({
         where: { userId: decoded.id },
@@ -159,28 +178,26 @@ async function resolveContexto(token: string | null): Promise<FrontendClientCont
       });
       if (adminPref && adminPref.prefs) {
         const prefs = adminPref.prefs as Record<string, unknown>;
-        if (prefs.ignitionOn === false) adminEventosIgnorados.add('ignitionOn');
-        if (prefs.ignitionOff === false) adminEventosIgnorados.add('ignitionOff');
-        if (prefs.geofenceEnter === false) adminEventosIgnorados.add('geofenceEnter');
-        if (prefs.geofenceExit === false) adminEventosIgnorados.add('geofenceExit');
-        if (prefs.overspeed === false) adminEventosIgnorados.add('overspeed');
-        if (prefs.powerCut === false) adminEventosIgnorados.add('powerCut');
-        if (prefs.alarm === false) adminEventosIgnorados.add('alarm');
-        if (prefs.deviceLocked === false) adminEventosIgnorados.add('deviceLocked');
-        if (prefs.deviceUnlocked === false) adminEventosIgnorados.add('deviceUnlocked');
-        if (prefs.veiculoMovimento === false) adminEventosIgnorados.add('veiculoMovimento');
-        if (prefs.motorOcioso === false) adminEventosIgnorados.add('motorOcioso');
-        if (prefs.semAtualizacao === false) adminEventosIgnorados.add('semAtualizacao');
-        if (prefs.boletoVencendoHoje === false) adminEventosIgnorados.add('boletoVencendoHoje');
-        if (prefs.boletoAtrasado === false) adminEventosIgnorados.add('boletoAtrasado');
-        if (prefs.pagamentoRecebido === false) adminEventosIgnorados.add('pagamentoRecebido');
+        // Mantém apenas os pares booleanos (ignora chaves auxiliares como
+        // semAtualizacaoHoras, al_last_notif_admin, etc). Só ativa o filtro
+        // quando há ao menos um tipo desabilitado — assim quem nunca configurou
+        // (ou habilitou tudo) continua recebendo todos os eventos.
+        const apenasBool: Record<string, boolean> = {};
+        let temFalse = false;
+        for (const [chave, valor] of Object.entries(prefs)) {
+          if (typeof valor === 'boolean') {
+            apenasBool[chave] = valor;
+            if (valor === false) temFalse = true;
+          }
+        }
+        if (temFalse) adminPrefs = apenasBool;
       }
     }
-    
-    return { 
-      dispositivoIdsPermitidos: null, 
+
+    return {
+      dispositivoIdsPermitidos: null,
       filtraBoletos: false,
-      adminEventosIgnorados: adminEventosIgnorados.size > 0 ? adminEventosIgnorados : undefined
+      adminPrefs,
     };
   } catch {}
   // Tenta como token de cliente
