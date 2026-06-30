@@ -155,10 +155,16 @@ router.get('/:id/codigo-barras', requireRoles('ADMIN', 'COLABORADOR', 'VENDEDOR'
     return;
   }
 
-  const codigoBarras: string | null =
+  // Carnê tem a linha digitável em payment.carnet.barcode; boleto avulso em
+  // payment.banking_billet.barcode. Devolvemos só os dígitos (47) — formato que
+  // os apps de banco aceitam ao colar a linha digitável.
+  const barcodeRaw: string | null =
+    detalhe?.payment?.carnet?.barcode ??
     detalhe?.payment?.banking_billet?.barcode ??
     detalhe?.barcode ??
     null;
+
+  const codigoBarras = barcodeRaw ? String(barcodeRaw).replace(/\D/g, '') : null;
 
   if (!codigoBarras) {
     res.status(404).json({ error: 'Código de barras não disponível para este boleto.' });
