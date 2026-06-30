@@ -337,8 +337,8 @@
             '<td>' +
               '<div class="boleto-acoes">' +
                 (link
-                  ? '<a href="' + link + '" target="_blank" class="btn btn-xs btn-default" title="Ver boleto"><i class="fa fa-file-pdf-o"></i> Boleto</a>'
-                  : '<button class="btn btn-xs btn-default" disabled title="Boleto indisponível"><i class="fa fa-file-pdf-o"></i> Boleto</button>') +
+                  ? '<button type="button" class="btn btn-xs btn-default btn-copiar-barras" data-id="' + item.boletoId + '" title="Copiar código de barras"><i class="fa fa-barcode"></i> Copiar código de barras</button>'
+                  : '<button class="btn btn-xs btn-default" disabled title="Código de barras indisponível"><i class="fa fa-barcode"></i> Copiar código de barras</button>') +
                 (wa
                   ? '<a href="' + wa + '" target="_blank" class="btn btn-xs btn-success" title="Falar no WhatsApp"><i class="fa fa-whatsapp"></i></a>'
                   : '') +
@@ -362,6 +362,45 @@
       document.getElementById('filtro-busca').addEventListener('input', function () {
         clearTimeout(debTimer);
         debTimer = setTimeout(aplicarFiltro, 300);
+      });
+
+      // ── Copiar código de barras ───────────────────────────────
+      function copiarTexto(texto) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(texto).catch(function () {
+            prompt('Copie o código de barras:', texto);
+          });
+        }
+        prompt('Copie o código de barras:', texto);
+        return Promise.resolve();
+      }
+
+      document.getElementById('detalhes-tbody').addEventListener('click', function (e) {
+        var btn = e.target.closest ? e.target.closest('.btn-copiar-barras') : null;
+        if (!btn || btn.disabled) return;
+        var boletoId = btn.getAttribute('data-id');
+        if (!boletoId) return;
+
+        var htmlOriginal = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Copiando…';
+
+        AL.apiGet('/api/boletos/' + boletoId + '/codigo-barras')
+          .then(function (data) {
+            var codigo = data && data.codigoBarras;
+            if (!codigo) throw new Error('Código de barras indisponível.');
+            return copiarTexto(codigo);
+          })
+          .then(function () {
+            AL.showAlert('Código de barras copiado!', 'success');
+          })
+          .catch(function (err) {
+            AL.showAlert(err.message || 'Não foi possível copiar o código de barras.', 'error');
+          })
+          .then(function () {
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal;
+          });
       });
 
       // ── Exportar CSV ─────────────────────────────────────────

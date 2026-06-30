@@ -119,6 +119,55 @@ router.get('/:id', requireRoles('ADMIN', 'COLABORADOR', 'VENDEDOR'), async (req:
   res.json(boleto);
 });
 
+// ─── GET /api/boletos/:id/codigo-barras — Linha digitável / código de barras ─
+router.get('/:id/codigo-barras', requireRoles('ADMIN', 'COLABORADOR', 'VENDEDOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+
+  const boleto = await prisma.boleto.findUnique({
+    where: { id },
+    include: {
+      carne: { select: { cliente: { select: { vendedorId: true } } } },
+    },
+  });
+
+  if (!boleto) {
+    res.status(404).json({ error: 'Boleto não encontrado.' });
+    return;
+  }
+
+  // VENDEDOR só pode ver boletos de clientes associados a ele
+  if (req.user!.role === 'VENDEDOR' && boleto.carne.cliente.vendedorId !== req.user!.userId) {
+    res.status(403).json({ error: 'Acesso negado.' });
+    return;
+  }
+
+  if (!boleto.efiChargeId) {
+    res.status(400).json({ error: 'Boleto sem cobrança no EFI; código de barras indisponível.' });
+    return;
+  }
+
+  let detalhe: any;
+  try {
+    detalhe = await efiService.obterDetalheCharge(Number(boleto.efiChargeId));
+  } catch (err: any) {
+    console.error('Erro EFI ao obter código de barras:', err);
+    res.status(502).json({ error: `Erro ao consultar o EFI Bank: ${err.message || 'erro desconhecido'}` });
+    return;
+  }
+
+  const codigoBarras: string | null =
+    detalhe?.payment?.banking_billet?.barcode ??
+    detalhe?.barcode ??
+    null;
+
+  if (!codigoBarras) {
+    res.status(404).json({ error: 'Código de barras não disponível para este boleto.' });
+    return;
+  }
+
+  res.json({ codigoBarras });
+});
+
 // ─── PATCH /api/boletos/:id/editar — Alterar data de vencimento ──────────────
 // Nota: EFI Bank não permite editar o valor de boletos já gerados.
 router.patch('/:id/editar', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
