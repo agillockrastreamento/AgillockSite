@@ -639,13 +639,23 @@ router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequ
     return;
   }
 
-  const totalBoletos = await prisma.boleto.count({ where: { dispositivoId: id } });
-  if (totalBoletos > 0) {
+  // Boletos podem estar vinculados diretamente (Boleto.dispositivoId) ou por
+  // cobrança unificada (join BoletoDispositivo). Ambos impedem a exclusão.
+  const [totalBoletos, totalBoletosUnificados] = await Promise.all([
+    prisma.boleto.count({ where: { dispositivoId: id } }),
+    prisma.boletoDispositivo.count({ where: { dispositivoId: id } }),
+  ]);
+  if (totalBoletos > 0 || totalBoletosUnificados > 0) {
     res.status(400).json({ error: 'Não é possível excluir um dispositivo com boletos. Inative-o.' });
     return;
   }
 
-  await prisma.dispositivo.delete({ where: { id } });
+  // Remove as associações que não têm cascade no schema (geocercas) antes de
+  // excluir o dispositivo, evitando violação de chave estrangeira (erro 500).
+  await prisma.$transaction([
+    prisma.geocercaDispositivo.deleteMany({ where: { dispositivoId: id } }),
+    prisma.dispositivo.delete({ where: { id } }),
+  ]);
 
   // Remover da Traccar (best-effort)
   traccarGetDeviceByImei(existe.identificador)
