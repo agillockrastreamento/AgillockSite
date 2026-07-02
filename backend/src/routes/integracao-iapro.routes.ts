@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { query } from '../utils/params';
 import { iaproApiKeyMiddleware } from '../middleware/iapro-api-key.middleware';
-import { upsertClienteIapro, IaproClientePayload } from '../services/iapro.service';
+import { upsertClienteIapro, IaproClientePayload, removerIntegracaoIapro, IaproRemocaoPayload } from '../services/iapro.service';
 import { traccarGetDevices, traccarGetPositions } from '../services/traccar.service';
 import {
   DISPOSITIVO_MEDIDORES_SELECT,
@@ -25,6 +25,17 @@ router.post('/clientes', async (req: Request, res: Response): Promise<void> => {
     res.status(201).json(resultado);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro ao sincronizar cliente.';
+    res.status(400).json({ error: msg });
+  }
+});
+
+// ─── POST /api/integracao/iapro/clientes/remover — cliente/veículo excluído na IAPRO ──
+router.post('/clientes/remover', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const resultado = await removerIntegracaoIapro(req.body as IaproRemocaoPayload);
+    res.json(resultado);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erro ao remover integração IAPRO.';
     res.status(400).json({ error: msg });
   }
 });

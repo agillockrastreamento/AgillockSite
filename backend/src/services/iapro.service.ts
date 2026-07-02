@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
 
 /**
@@ -347,6 +348,67 @@ export async function contadorSemRastreamento(): Promise<number> {
     include: { cliente: { select: { status: true } } },
   });
   return veiculos.filter((v) => v.cliente.status === 'ATIVO').length;
+}
+
+// ─── Remoção vinda da IAPRO (cliente/veículo excluído lá) ───────────────────
+
+export interface IaproRemocaoPayload {
+  iaproClienteId?: string | null;
+  iaproVehicleId?: string | null;
+  iaproContractId?: string | null;
+}
+
+/**
+ * Chamada PELA IAPRO quando um cliente/veículo/contrato é excluído lá. Remove os
+ * IaproVeiculo correspondentes (que ficariam órfãos na tela IAPRO como "sem rastreador")
+ * e, se o cliente não tiver mais nenhum veículo IAPRO, limpa os marcadores da integração
+ * (sai do contador de clientes IAPRO). Nunca apaga o cliente/dispositivo da Ágil Lock —
+ * apenas desfaz o vínculo com a IAPRO.
+ */
+export async function removerIntegracaoIapro(payload: IaproRemocaoPayload) {
+  const iaproClienteId = payload?.iaproClienteId || null;
+  const iaproVehicleId = payload?.iaproVehicleId || null;
+  const iaproContractId = payload?.iaproContractId || null;
+
+  const or: Prisma.IaproVeiculoWhereInput[] = [];
+  if (iaproVehicleId) or.push({ iaproVehicleId });
+  if (iaproContractId) or.push({ iaproContractId });
+  if (iaproClienteId) or.push({ cliente: { iaproClienteId } });
+  if (!or.length) {
+    throw new Error('Informe iaproClienteId, iaproVehicleId ou iaproContractId.');
+  }
+
+  const veiculos = await prisma.iaproVeiculo.findMany({
+    where: { OR: or },
+    select: { id: true, clienteId: true },
+  });
+
+  const clienteIds = new Set<string>(veiculos.map((v) => v.clienteId));
+
+  if (veiculos.length) {
+    await prisma.iaproVeiculo.deleteMany({ where: { id: { in: veiculos.map((v) => v.id) } } });
+  }
+
+  // Cobre o caso do cliente sem nenhum IaproVeiculo cadastrado (só o marcador de origem).
+  if (iaproClienteId) {
+    const cliente = await prisma.cliente.findUnique({ where: { iaproClienteId }, select: { id: true } });
+    if (cliente) clienteIds.add(cliente.id);
+  }
+
+  // Para cada cliente afetado: se não sobrou nenhum veículo IAPRO, desmarca a origem.
+  let clientesAtualizados = 0;
+  for (const clienteId of clienteIds) {
+    const restantes = await prisma.iaproVeiculo.count({ where: { clienteId } });
+    if (restantes === 0) {
+      const r = await prisma.cliente.updateMany({
+        where: { id: clienteId, origemIapro: true },
+        data: { origemIapro: false, iaproClienteId: null },
+      });
+      clientesAtualizados += r.count;
+    }
+  }
+
+  return { veiculosRemovidos: veiculos.length, clientesAtualizados };
 }
 
 // ─── Compartilhar cliente/veículo da Ágil Lock com a IAPRO ──────────────────
