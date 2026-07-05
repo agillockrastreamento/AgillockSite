@@ -10,6 +10,7 @@ import {
 } from '../middleware/cliente-auth.middleware';
 import { broadcastTrackingEvents } from '../services/traccar.ws';
 import { traccarGetDeviceByImei, traccarGetPositions } from '../services/traccar.service';
+import { calcularKmAtualPorDispositivo } from '../services/medidores.service';
 import ExpoPushService from '../services/expo-push.service';
 
 const router = Router();
@@ -240,7 +241,7 @@ router.get('/recorrencias', requirePermission('manutencao.ver'), async (req: any
       },
       include: {
         dispositivo: {
-          select: { nome: true, placa: true, odometroSistemaMetros: true, clienteId: true },
+          select: { nome: true, placa: true, odometroSistemaMetros: true, clienteId: true, traccarId: true },
         },
         clienteLogin: {
           select: { clienteId: true },
@@ -255,7 +256,21 @@ router.get('/recorrencias', requirePermission('manutencao.ver'), async (req: any
       return r.clienteLogin?.clienteId === r.dispositivo.clienteId;
     });
 
-    res.json(_deduplicarRecorrencias(filtradas));
+    // km atual (mesma fonte do kmBase) para a tela/card calcularem km percorrido sem negativos
+    const dispositivosUnicos = Array.from(
+      new Map(filtradas.map(r => [r.dispositivoId, {
+        id: r.dispositivoId,
+        traccarId: r.dispositivo.traccarId,
+        odometroSistemaMetros: r.dispositivo.odometroSistemaMetros,
+      }])).values(),
+    );
+    const kmAtualPorDispositivo = await calcularKmAtualPorDispositivo(dispositivosUnicos);
+    const comKmAtual = _deduplicarRecorrencias(filtradas).map(r => ({
+      ...r,
+      kmAtual: kmAtualPorDispositivo.get(r.dispositivoId) ?? 0,
+    }));
+
+    res.json(comKmAtual);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao carregar recorrências.' });

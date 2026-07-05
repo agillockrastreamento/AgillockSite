@@ -38,6 +38,8 @@ type Recorrencia = {
   kmBase: number;
   ativa: boolean;
   origem?: string | null;
+  /** km atual na mesma fonte do kmBase (odômetro do sistema ou totalDistance do Traccar). */
+  kmAtual?: number | null;
   dispositivo?: { odometroSistemaMetros?: number | null } | null;
 };
 
@@ -846,8 +848,8 @@ export function ManutencaoScreen() {
             ) : (
               <>
                 {recorrencias.map(r => {
-                  const kmAtual = (r.dispositivo?.odometroSistemaMetros ?? 0) / 1000;
-                  const kmPercorrido = kmAtual - r.kmBase;
+                  const kmAtual = r.kmAtual != null ? r.kmAtual : (r.dispositivo?.odometroSistemaMetros ?? 0) / 1000;
+                  const kmPercorrido = Math.max(0, kmAtual - r.kmBase);
                   const kmRestante = r.intervaloKm - kmPercorrido;
                   const pct = Math.min(100, Math.max(0, (kmPercorrido / r.intervaloKm) * 100));
                   const kmPercorridoLabel = Math.max(0, Math.round(kmPercorrido)).toLocaleString('pt-BR');

@@ -5,6 +5,7 @@ import prisma from '../utils/prisma';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
 import { broadcastTrackingEvents } from '../services/traccar.ws';
+import { calcularKmAtualDispositivo, calcularKmAtualPorDispositivo } from '../services/medidores.service';
 import ExpoPushService from '../services/expo-push.service';
 
 const router = Router();
@@ -283,12 +284,21 @@ router.get('/clientes/:clienteLoginId/recorrencias', async (req, res) => {
         ],
       },
       include: {
-        dispositivo: { select: { nome: true, placa: true, odometroSistemaMetros: true } },
+        dispositivo: { select: { nome: true, placa: true, odometroSistemaMetros: true, traccarId: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    res.json(_deduplicarRecorrencias(recorrencias));
+    const dedup = _deduplicarRecorrencias(recorrencias);
+    const dispositivosUnicos = Array.from(
+      new Map(dedup.map(r => [r.dispositivoId, {
+        id: r.dispositivoId,
+        traccarId: r.dispositivo.traccarId,
+        odometroSistemaMetros: r.dispositivo.odometroSistemaMetros,
+      }])).values(),
+    );
+    const kmAtualPorDispositivo = await calcularKmAtualPorDispositivo(dispositivosUnicos);
+    res.json(dedup.map(r => ({ ...r, kmAtual: kmAtualPorDispositivo.get(r.dispositivoId) ?? 0 })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao carregar recorrências.' });
@@ -314,12 +324,16 @@ router.post('/clientes/:clienteLoginId/recorrencias', async (req: any, res) => {
 
     const dispositivo = await prisma.dispositivo.findUnique({
       where: { id: dispositivoId },
-      select: { odometroSistemaMetros: true, manutencaoAtiva: true },
+      select: { odometroSistemaMetros: true, manutencaoAtiva: true, traccarId: true, identificador: true },
     });
     if (!dispositivo?.manutencaoAtiva) {
       return res.status(403).json({ message: 'Manutenções desativadas para este dispositivo.' });
     }
-    const kmBase = (dispositivo?.odometroSistemaMetros ?? 0) / 1000;
+    const kmBase = await calcularKmAtualDispositivo(
+      dispositivo?.odometroSistemaMetros ?? null,
+      dispositivo?.traccarId,
+      dispositivo?.identificador,
+    );
 
     const recorrencia = await prisma.manutencaoRecorrencia.create({
       data: {
@@ -412,7 +426,7 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
 
     const recorrencia = await prisma.manutencaoRecorrencia.findFirst({
       where: { id },
-      include: { dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true, manutencaoAtiva: true } } },
+      include: { dispositivo: { select: { odometroSistemaMetros: true, nome: true, placa: true, traccarId: true, identificador: true, manutencaoAtiva: true } } },
     });
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada.' });
     if (!recorrencia.dispositivo.manutencaoAtiva) {
@@ -420,7 +434,11 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
     }
 
     const clienteLoginIdCanonical = recorrencia.clienteLoginId || clienteLoginId;
-    const kmAtual = (recorrencia.dispositivo.odometroSistemaMetros ?? 0) / 1000;
+    const kmAtual = await calcularKmAtualDispositivo(
+      recorrencia.dispositivo.odometroSistemaMetros ?? null,
+      recorrencia.dispositivo.traccarId,
+      recorrencia.dispositivo.identificador,
+    );
 
     await prisma.manutencaoRecorrencia.update({
       where: { id },
@@ -587,9 +605,13 @@ router.post('/bulk/recorrencias', async (req: any, res) => {
           const clienteLoginIdCanonical = ctx.loginCanonicalPorDispositivo.get(devId) || loginId;
           const dispositivo = await prisma.dispositivo.findUnique({
             where: { id: devId },
-            select: { odometroSistemaMetros: true },
+            select: { odometroSistemaMetros: true, traccarId: true, identificador: true },
           });
-          const kmBase = (dispositivo?.odometroSistemaMetros ?? 0) / 1000;
+          const kmBase = await calcularKmAtualDispositivo(
+            dispositivo?.odometroSistemaMetros ?? null,
+            dispositivo?.traccarId,
+            dispositivo?.identificador,
+          );
 
           await prisma.manutencaoRecorrencia.create({
             data: {

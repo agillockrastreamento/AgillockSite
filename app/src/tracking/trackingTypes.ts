@@ -58,6 +58,9 @@ export type TrackingDevice = {
     titulo: string;
     intervaloKm: number;
     kmBase: number;
+    /** km atual na mesma fonte do kmBase (odômetro do sistema ou totalDistance do Traccar). */
+    kmAtual?: number | null;
+    dispositivo?: { odometroSistemaMetros?: number | null } | null;
   }>;
 };
 

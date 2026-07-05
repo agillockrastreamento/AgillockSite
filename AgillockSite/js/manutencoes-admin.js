@@ -462,8 +462,8 @@
     empty.style.display = 'none';
 
     list.innerHTML = recorrencias.map(r => {
-      const kmAtual = (r.dispositivo?.odometroSistemaMetros ?? 0) / 1000;
-      const kmPercorrido = kmAtual - r.kmBase;
+      const kmAtual = r.kmAtual != null ? r.kmAtual : (r.dispositivo?.odometroSistemaMetros ?? 0) / 1000;
+      const kmPercorrido = Math.max(0, kmAtual - r.kmBase);
       const kmRestante = r.intervaloKm - kmPercorrido;
       const pct = Math.min(100, Math.max(0, (kmPercorrido / r.intervaloKm) * 100));
       const isAdmin = r.origem === 'ADMIN';

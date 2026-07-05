@@ -2396,17 +2396,21 @@ function buildOleoStatusHtml(p, v) {
   const btnBd = isDark ? '#4a5568' : '#ccc';
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
+  // km atual na MESMA fonte do kmBase (servidor). Fallback para o odômetro exibido no card.
+  const kmAtualDe = (r) => r.kmAtual != null ? r.kmAtual
+    : (r.dispositivo?.odometroSistemaMetros != null ? r.dispositivo.odometroSistemaMetros / 1000
+      : (p?.odometro != null ? p.odometro / 1000 : null));
   const visibles = recs.filter(r => {
     if (r.ativa === false) return false;
-    const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? null);
-    if (odometroM == null) return false;
-    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+    const kmAtual = kmAtualDe(r);
+    if (kmAtual == null) return false;
+    const kmRestante = Math.round(r.intervaloKm - Math.max(0, kmAtual - r.kmBase));
     return kmRestante <= 1000;
   });
   if (!visibles.length) return '';
   return visibles.map(r => {
-    const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? 0);
-    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+    const kmAtual = kmAtualDe(r) ?? 0;
+    const kmRestante = Math.round(r.intervaloKm - Math.max(0, kmAtual - r.kmBase));
     const pastDue = kmRestante < 0;
     const kmAbs = Math.abs(kmRestante);
     const cor = pastDue ? '#e74c3c' : '#f39c12';

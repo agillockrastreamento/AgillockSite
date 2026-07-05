@@ -542,11 +542,15 @@ export function MainVehicleCard({
     }
   };
 
+  // km atual na MESMA fonte do kmBase (servidor). Fallback para o odômetro exibido no card.
+  const kmAtualDe = (r: any): number | null =>
+    r.kmAtual != null ? r.kmAtual
+      : (r.dispositivo?.odometroSistemaMetros != null ? r.dispositivo.odometroSistemaMetros / 1000
+        : (p?.odometro != null ? p.odometro / 1000 : null));
   const maintenanceAlerts = recurrences.filter(r => {
-    const odometroM = r.dispositivo?.odometroSistemaMetros ?? p?.odometro ?? null;
-    if (odometroM == null) return false;
-    const kmPercorrido = (odometroM / 1000) - r.kmBase;
-    const kmRestante = r.intervaloKm - kmPercorrido;
+    const kmAtual = kmAtualDe(r);
+    if (kmAtual == null) return false;
+    const kmRestante = r.intervaloKm - Math.max(0, kmAtual - r.kmBase);
     return kmRestante <= 1000;
   });
 
@@ -663,8 +667,8 @@ export function MainVehicleCard({
         </View>
 
         {!modoResgate ? maintenanceAlerts.map(r => {
-          const odometroM = r.dispositivo?.odometroSistemaMetros ?? p?.odometro ?? 0;
-          const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+          const kmAtual = kmAtualDe(r) ?? 0;
+          const kmRestante = Math.round(r.intervaloKm - Math.max(0, kmAtual - r.kmBase));
           const pastDue = kmRestante < 0;
           return (
             <View key={r.id} style={styles.alertRow}>

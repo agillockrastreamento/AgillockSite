@@ -1,6 +1,6 @@
 import prisma from '../utils/prisma';
 import type { TraccarPosition, TraccarSummary, TraccarStop, TraccarTrip } from './traccar.service';
-import { normalizeAttributes } from './traccar.service';
+import { normalizeAttributes, traccarGetPositions, traccarGetDeviceByImei } from './traccar.service';
 
 const MAX_ENGINE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const MIN_DISTANCE_METERS = 10;
@@ -70,6 +70,94 @@ function isPlausibleDistance(distanceMeters: number, deltaMs: number): boolean {
 
 export function usaOdometroSistema(dispositivo: Pick<DispositivoMedidores, 'ignorarOdometro' | 'odometroSistemaMetros'>): boolean {
   return dispositivo.ignorarOdometro !== true && dispositivo.odometroSistemaMetros != null;
+}
+
+// ── Odômetro efetivo para manutenções ──────────────────────────────────────────
+// O "km atual" usado nas recorrências de manutenção precisa vir SEMPRE da mesma
+// fonte que o kmBase registrado: usa o odômetro do sistema quando definido;
+// caso contrário, o totalDistance acumulado no Traccar. Se a captura do kmBase e
+// o cálculo do km atual usarem fontes diferentes, o "km percorrido" fica negativo
+// (ex.: veículo novo com odômetro do sistema ainda nulo — o kmBase é capturado do
+// Traccar (ex.: 1.638 km), mas a tela calculava com 0 → -1.638 km percorridos).
+
+/** Odômetro efetivo (km) de um único dispositivo. Faz fallback por IMEI quando não há traccarId. */
+export async function calcularKmAtualDispositivo(
+  odometroSistemaMetros: number | null,
+  traccarId?: number | null,
+  identificador?: string,
+): Promise<number> {
+  if (odometroSistemaMetros != null) return odometroSistemaMetros / 1000;
+  try {
+    const deviceId = traccarId ?? (identificador ? (await traccarGetDeviceByImei(identificador))?.id : undefined);
+    if (!deviceId) return 0;
+    const posicoes = await traccarGetPositions([deviceId]);
+    return ((posicoes[0]?.attributes?.totalDistance as number | undefined) ?? 0) / 1000;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Odômetro efetivo (km) de vários dispositivos, com no máximo UMA chamada ao
+ * Traccar (em lote) para os que não têm odômetro de sistema. Retorna
+ * dispositivoId -> km. Usar no GET de recorrências para que a tela e o card
+ * comparem o km atual com o kmBase na mesma escala.
+ */
+export async function calcularKmAtualPorDispositivo(
+  dispositivos: Array<{ id: string; traccarId?: number | null; odometroSistemaMetros: number | null }>,
+): Promise<Map<string, number>> {
+  const mapa = new Map<string, number>();
+  const semSistema: Array<{ id: string; traccarId: number }> = [];
+
+  for (const d of dispositivos) {
+    if (d.odometroSistemaMetros != null) {
+      mapa.set(d.id, d.odometroSistemaMetros / 1000);
+    } else if (d.traccarId != null) {
+      semSistema.push({ id: d.id, traccarId: d.traccarId });
+    } else {
+      mapa.set(d.id, 0);
+    }
+  }
+
+  if (semSistema.length) {
+    try {
+      const posicoes = await traccarGetPositions(semSistema.map(d => d.traccarId));
+      const totalPorDeviceId = new Map<number, number>(
+        posicoes.map(p => [p.deviceId, ((p.attributes?.totalDistance as number | undefined) ?? 0)]),
+      );
+      for (const d of semSistema) {
+        mapa.set(d.id, (totalPorDeviceId.get(d.traccarId) ?? 0) / 1000);
+      }
+    } catch {
+      for (const d of semSistema) mapa.set(d.id, 0);
+    }
+  }
+
+  return mapa;
+}
+
+/**
+ * Re-ancora as recorrências de manutenção (por km) quando o odômetro do
+ * dispositivo é corrigido para um valor MENOR que o kmBase registrado — o que
+ * tornaria o "km percorrido" negativo. Trata a correção como um novo ponto de
+ * partida (equivalente a "serviço feito agora") e reinicia os alertas.
+ */
+export async function reancorarRecorrenciasSeOdometroMenor(
+  dispositivoId: string,
+  novoOdometroMetros: number | null,
+): Promise<void> {
+  if (novoOdometroMetros == null) return;
+  const novoKm = novoOdometroMetros / 1000;
+  await prisma.manutencaoRecorrencia.updateMany({
+    where: { dispositivoId, ativa: true, kmBase: { gt: novoKm } },
+    data: {
+      kmBase: novoKm,
+      alerta50Enviado: false,
+      alerta25Enviado: false,
+      alerta0Enviado: false,
+      ultimaAlertaPostDueKm: -1,
+    },
+  });
 }
 
 function aplicarPosicaoAoEstado(

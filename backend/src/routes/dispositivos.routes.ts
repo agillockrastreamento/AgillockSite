@@ -16,6 +16,7 @@ import {
   type TraccarDeviceSyncData,
 } from '../services/traccar.service';
 import { notificarIaproVinculoDispositivo } from '../services/iapro.service';
+import { reancorarRecorrenciasSeOdometroMenor } from '../services/medidores.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -417,6 +418,12 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), upload.single('imagem')
   // Garante TagBLE associada ao MAC quando este foi atualizado
   if (enderecoMac !== undefined) {
     await syncTagPrincipal(dispositivo.id, dispositivo.enderecoMac);
+  }
+
+  // Se o odômetro foi corrigido para baixo, re-ancora as recorrências para não
+  // exibirem "km percorrido" negativo.
+  if (odometro !== undefined) {
+    await reancorarRecorrenciasSeOdometroMenor(id, odometroKm != null ? Math.round(odometroKm * 1000) : null);
   }
 
   // Se manutencaoAtiva foi desativado, cancela todas as recorrências ativas do dispositivo

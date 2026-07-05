@@ -2813,11 +2813,15 @@ function _buildManutencoesAdminHtml(dispositivoId) {
   const btnClr = isDark ? '#cbd5e0' : '#555';
   const btnStyle = `background:${btnBg};border:1px solid ${btnBd};border-radius:4px;padding:2px 6px;cursor:pointer;color:${btnClr};font-size:10px;line-height:1;`;
   const p = v?.posicao;
+  // km atual na MESMA fonte do kmBase (servidor). Fallback para o odômetro exibido no card.
+  const kmAtualDe = (r) => r.kmAtual != null ? r.kmAtual
+    : (r.dispositivo?.odometroSistemaMetros != null ? r.dispositivo.odometroSistemaMetros / 1000
+      : (p?.odometro != null ? p.odometro / 1000 : null));
   const visiveis = recs.filter(r => {
     if (r.ativa === false) return false;
-    const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? null);
-    if (odometroM == null) return false;
-    const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+    const kmAtual = kmAtualDe(r);
+    if (kmAtual == null) return false;
+    const kmRestante = Math.round(r.intervaloKm - Math.max(0, kmAtual - r.kmBase));
     return kmRestante <= 1000;
   });
   if (!visiveis.length) return '';
@@ -2826,8 +2830,8 @@ function _buildManutencoesAdminHtml(dispositivoId) {
     <div style="border-top:1px solid rgba(128,128,128,.15);margin-top:10px;padding-top:10px">
       <div class="dcard-section-title">Manutenções</div>
       ${visiveis.map(r => {
-        const odometroM = r.dispositivo?.odometroSistemaMetros ?? (p?.odometro ?? 0);
-        const kmRestante = Math.round(r.intervaloKm - (odometroM / 1000 - r.kmBase));
+        const kmAtual = kmAtualDe(r) ?? 0;
+        const kmRestante = Math.round(r.intervaloKm - Math.max(0, kmAtual - r.kmBase));
         const atrasada = kmRestante < 0;
         const kmAbs = Math.abs(kmRestante);
         const cor = atrasada ? '#e74c3c' : '#f39c12';

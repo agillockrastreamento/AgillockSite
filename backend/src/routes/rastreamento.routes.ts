@@ -35,6 +35,7 @@ import {
   aplicarViagensComMedidores,
   aplicarParadasComMedidores,
   calcularOciosidade,
+  reancorarRecorrenciasSeOdometroMenor,
 } from '../services/medidores.service';
 
 const router = Router();
@@ -608,6 +609,12 @@ router.patch('/dispositivos/:id/medidores', requireRoles('ADMIN', 'COLABORADOR')
       horimetroSistemaSegundos: true,
     },
   });
+
+  // Se o odômetro foi corrigido para baixo, re-ancora as recorrências para não
+  // exibirem "km percorrido" negativo.
+  if (odometro !== undefined) {
+    await reancorarRecorrenciasSeOdometroMenor(id, atualizado.odometroSistemaMetros);
+  }
 
   if (traccarDevice && atualizado.odometroSistemaMetros != null) {
     traccarUpdateDeviceAccumulators(
