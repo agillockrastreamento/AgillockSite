@@ -43,6 +43,11 @@ export type TrackingDevice = {
     id: string;
     nome: string;
   } | null;
+  /** Motorista vinculado ao dispositivo, quando houver. */
+  motorista?: {
+    id: string;
+    nome: string;
+  } | null;
   traccarId: number | null;
   status: string;
   lastUpdate: string | null;

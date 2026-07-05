@@ -2379,6 +2379,9 @@ function buildStatusHtmlCliente(p, bat, batFa, batCor, v) {
     si.push(`<span${_med}><i class="fa fa-clock-o" style="color:#7f8c8d"></i> Motor: ${p.horas_motor} h${_lapis}</span>`);
   }
 
+  if (v?.motorista?.nome) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista: ${v.motorista.nome}</span>`);
+  else if (p.motorista_id) si.push(`<span><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> Motorista ID: ${p.motorista_id}</span>`);
+
   if (p.bloqueado != null) si.push(`<span style="color:${p.bloqueado ? '#e74c3c' : '#27ae60'}"><i class="fa fa-${p.bloqueado ? 'lock' : 'unlock'}"></i> ${p.bloqueado ? 'Bloqueado' : 'Desbloqueado'}</span>`);
   return si.join('');
 }

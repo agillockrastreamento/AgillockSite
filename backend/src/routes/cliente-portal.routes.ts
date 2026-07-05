@@ -336,6 +336,9 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
         mapa: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { select: { id: true, nome: true } },
+        motoristasVinculados: {
+          include: { motorista: { select: { id: true, nome: true } } }
+        },
       },
     }),
     traccarGetDevices(),
@@ -371,12 +374,14 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
     const traccar = traccarByImei.get(d.identificador);
     const posicao = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
     const estado = estadosAtualizados.get(d.identificador) ?? d;
+    const motorista = d.motoristasVinculados && d.motoristasVinculados.length > 0 ? d.motoristasVinculados[0].motorista : null;
 
     return {
       dispositivoId: d.id,
       nome: d.nome,
       placa: d.placa,
       categoria: d.categoria,
+      motorista: motorista,
       imagemUrlCliente: d.imagemUrlCliente,
       apelidoCliente: d.apelidoCliente,
       marca: d.marca,

@@ -644,6 +644,12 @@ export function MainVehicleCard({
                 ) : null}
               </View>
             )}
+            {device.motorista?.nome ? (
+              <View style={styles.statusItem}>
+                <Icon source="card-account-details-outline" size={14} color={colors.textMuted} />
+                <Text style={styles.statusItemText}>Motorista: {device.motorista.nome}</Text>
+              </View>
+            ) : null}
             {p?.bloqueado != null && (
               <View style={styles.statusItem}>
                 <Icon source={p.bloqueado ? 'lock' : 'lock-open'} size={14} color={p.bloqueado ? colors.danger : colors.success} />
