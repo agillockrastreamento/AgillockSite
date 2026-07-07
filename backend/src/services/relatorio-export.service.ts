@@ -24,6 +24,7 @@ import {
 } from './medidores.service';
 import { carregarResolvedorMotoristas, cartaoDaViagem, cartaoAntesDe } from './motoristas.service';
 import { htmlParaPdf } from './pdf.service';
+import { reverseGeocode } from '../utils/reverse-geocode';
 
 const FUSO = 'America/Sao_Paulo';
 const COR = '#fab32c';       // laranja AgilLock
@@ -49,6 +50,36 @@ function fmtDuracaoMin(min: number): string {
 function num(v: number): string { return (Math.round(v * 10) / 10).toLocaleString('pt-BR'); }
 function escHtml(s: unknown): string {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Endereços (reverse-geocode) ─────────────────────────────────────────────────
+// O Traccar devolve endereço nulo; a tela resolve no navegador. Aqui resolvemos no
+// servidor, com dedup por coordenada arredondada e um teto de chamadas por relatório.
+function coordKey(lat: number, lon: number): string { return `${lat.toFixed(4)},${lon.toFixed(4)}`; }
+function coordsFallback(lat: number, lon: number): string {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) return '';
+  return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+}
+async function preResolverEnderecos(pontos: { lat: number; lon: number }[], cache: Map<string, string>, maxChamadas: number): Promise<void> {
+  const pendentes: { k: string; lat: number; lon: number }[] = [];
+  const vistos = new Set<string>();
+  for (const p of pontos) {
+    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon) || (p.lat === 0 && p.lon === 0)) continue;
+    const k = coordKey(p.lat, p.lon);
+    if (cache.has(k) || vistos.has(k)) continue;
+    vistos.add(k);
+    pendentes.push({ k, lat: p.lat, lon: p.lon });
+  }
+  const alvo = pendentes.slice(0, maxChamadas);
+  let idx = 0;
+  const worker = async (): Promise<void> => {
+    while (idx < alvo.length) {
+      const cur = alvo[idx++];
+      const end = await reverseGeocode(cur.lat, cur.lon).catch(() => '');
+      cache.set(cur.k, end);
+    }
+  };
+  await Promise.all(Array.from({ length: 5 }, () => worker()));
 }
 
 // ── Dataset ───────────────────────────────────────────────────────────────────
@@ -103,6 +134,14 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
     return m ? m.nome : `ID ${cartao}`;
   };
 
+  // Resolve endereços de início/fim das viagens e das paradas (Traccar vem nulo)
+  const geoCache = new Map<string, string>();
+  const pontosGeo: { lat: number; lon: number }[] = [];
+  for (const t of trips) { pontosGeo.push({ lat: t.startLat, lon: t.startLon }, { lat: t.endLat, lon: t.endLon }); }
+  for (const s of stops) { pontosGeo.push({ lat: s.lat, lon: s.lon }); }
+  await preResolverEnderecos(pontosGeo, geoCache, 200);
+  const enderecoDe = (lat: number, lon: number): string => geoCache.get(coordKey(lat, lon)) || coordsFallback(lat, lon);
+
   const viagens = trips.map(t => {
     const disp = localPorId.get(t.deviceId);
     const posDev = posPorId.get(t.deviceId) || [];
@@ -115,7 +154,8 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
       distanciaKm: Math.round(tm.distance / 100) / 10,
       velMedia: Math.round(t.averageSpeed * 1.852),
       velMax: Math.round(tm.maxSpeed * 1.852),
-      origem: t.startAddress || '', destino: t.endAddress || '',
+      origem: t.startAddress || enderecoDe(t.startLat, t.startLon),
+      destino: t.endAddress || enderecoDe(t.endLat, t.endLon),
     };
   });
 
@@ -124,7 +164,7 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
     const sm = aplicarParadasComMedidores([s], posDev)[0];
     return {
       veiculo: s.deviceName, inicio: s.startTime, fim: s.endTime,
-      duracaoMin: Math.round((s.duration || 0) / 60000), endereco: s.address || '',
+      duracaoMin: Math.round((s.duration || 0) / 60000), endereco: s.address || enderecoDe(s.lat, s.lon),
       horasMotor: Math.round((sm.engineHours || 0) / 3600000 * 10) / 10, combustivel: Math.round((s.spentFuel || 0) * 10) / 10,
     };
   });
@@ -158,7 +198,8 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
       veiculo: nomePorId.get(p.deviceId) || String(p.deviceId), dataHora: p.deviceTime || p.fixTime,
       lat: p.latitude, lon: p.longitude, velKmh: Math.round((p.speed || 0) * 1.852), curso: Math.round(p.course || 0),
       ignicao: norm.ignicao, odometroKm: norm.odometro != null ? Math.round(norm.odometro / 1000) : null,
-      motorista: nomeMotorista(cartao ? cartao.cartao : null), endereco: p.address || '',
+      motorista: nomeMotorista(cartao ? cartao.cartao : null),
+      endereco: p.address || geoCache.get(coordKey(p.latitude, p.longitude)) || coordsFallback(p.latitude, p.longitude),
     };
   });
 
@@ -281,7 +322,7 @@ export async function gerarRelatorioXlsx(ds: RelatorioDataset, tipo: TipoRelator
 // ── PDF (gráficos em SVG inline) ────────────────────────────────────────────────
 function svgBarras(dados: { label: string; valor: number }[], cor: string): string {
   if (!dados.length) return '<div style="color:#999;font-size:12px;padding:20px 0">Sem dados para o período.</div>';
-  const w = 760, h = 240, padL = 34, padR = 12, padT = 16, padB = 54;
+  const w = 760, h = 190, padL = 34, padR = 12, padT = 14, padB = 44;
   const max = Math.max(1, ...dados.map(d => d.valor));
   const areaW = w - padL - padR, areaH = h - padT - padB;
   const bw = areaW / dados.length;
@@ -328,8 +369,8 @@ export async function gerarRelatorioPdf(ds: RelatorioDataset): Promise<Buffer> {
     .kpi { flex: 1; min-width: 120px; background: #f6f8fa; border-radius: 10px; padding: 12px 14px; border-top: 3px solid ${COR}; }
     .kpi-v { font-size: 22px; font-weight: 700; color: #1e2530; }
     .kpi-l { font-size: 11px; color: #78909c; text-transform: uppercase; letter-spacing: .03em; }
-    .card { background: #fff; border: 1px solid #eceff1; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; }
-    .card h3 { margin: 0 0 6px; font-size: 13px; color: #37474f; }
+    .card { background: #fff; border: 1px solid #eceff1; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; page-break-inside: avoid; }
+    .card h3 { margin: 0 0 4px; font-size: 13px; color: #37474f; }
     h2 { font-size: 15px; margin: 22px 0 8px; color: #1e2530; border-bottom: 2px solid ${COR}; padding-bottom: 4px; }
     table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
     thead th { background: #1e2530; color: #fff; text-align: left; padding: 6px 8px; font-weight: 600; }

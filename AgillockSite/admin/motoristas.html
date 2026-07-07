@@ -462,7 +462,7 @@
     });
     document.getElementById('matriz-wrap').addEventListener('click', function (e) {
       var cardBtn = e.target.closest('[data-cardbtn]');
-      if (cardBtn) { verUltimoCartao(cardBtn.getAttribute('data-cardbtn')); return; }
+      if (cardBtn) { verUltimoCartao(cardBtn.getAttribute('data-cardbtn'), cardBtn); return; }
       var editBtn = e.target.closest('[data-edit]');
       if (editBtn) { e.stopPropagation(); abrirModalMotorista(mtz.motoristas.find(function (m) { return m.id === editBtn.getAttribute('data-edit'); })); return; }
       var stBtn = e.target.closest('[data-status]');
@@ -516,14 +516,17 @@
       clearTimeout(filtroDevTimer); filtroDevTimer = setTimeout(renderMatriz, 150);
     });
 
-    function verUltimoCartao(dId) {
+    function verUltimoCartao(dId, botao) {
       var d = mtz.dispositivos.find(function (x) { return x.id === dId; });
       var nome = d ? (d.nome || d.placa || d.identificador) : 'Dispositivo';
+      var htmlOrig = botao ? botao.innerHTML : null;
+      if (botao) { botao.disabled = true; botao.innerHTML = '<i class="fa fa-spinner fa-spin"></i> consultando…'; }
       AL.apiGet('/api/motoristas/dispositivos/' + encodeURIComponent(dId) + '/ultimo-cartao').then(function (r) {
-        if (!r.cartaoId) { AL.showAlert(nome + ': nenhum cartão identificado na última posição.', 'info'); return; }
+        if (!r.cartaoId) { AL.showAlert(nome + ': nenhum cartão identificado nos últimos 7 dias.', 'info'); return; }
         var quem = r.motorista ? (' → ' + r.motorista.nome) : ' (não cadastrado)';
         AL.showAlert(nome + ': último cartão ' + r.cartaoId + quem + ' — lido ' + fmtDate(r.lidoEm), 'info');
-      }).catch(function (err) { AL.showAlert(err.message || 'Erro ao consultar cartão.', 'danger'); });
+      }).catch(function (err) { AL.showAlert(err.message || 'Erro ao consultar cartão.', 'danger'); })
+        .then(function () { if (botao) { botao.disabled = false; botao.innerHTML = htmlOrig; } });
     }
 
     // ═══════════════════════ Navegação entre views ═════════════════════════════
