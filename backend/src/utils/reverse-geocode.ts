@@ -36,7 +36,9 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
         language: 'pt-BR',
         key: googleKey,
       });
-      const googleRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${googleParams.toString()}`);
+      const googleRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${googleParams.toString()}`, {
+        signal: AbortSignal.timeout(6000),
+      });
       if (googleRes.ok) {
         const googleData = await googleRes.json() as { status?: string; results?: Array<{ formatted_address?: string }> };
         const enderecoGoogle = googleData.status === 'OK' ? googleData.results?.[0]?.formatted_address : '';
@@ -60,6 +62,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
         'User-Agent': 'AgilLockRastreamento/1.0 (https://agillock.com.br)',
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return '';
     const data = await res.json() as { display_name?: string; address?: Record<string, unknown> };

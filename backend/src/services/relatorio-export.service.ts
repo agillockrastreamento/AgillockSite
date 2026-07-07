@@ -60,7 +60,12 @@ function coordsFallback(lat: number, lon: number): string {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) return '';
   return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 }
-async function preResolverEnderecos(pontos: { lat: number; lon: number }[], cache: Map<string, string>, maxChamadas: number): Promise<void> {
+async function preResolverEnderecos(
+  pontos: { lat: number; lon: number }[],
+  cache: Map<string, string>,
+  maxChamadas: number,
+  prazoMs: number,
+): Promise<void> {
   const pendentes: { k: string; lat: number; lon: number }[] = [];
   const vistos = new Set<string>();
   for (const p of pontos) {
@@ -71,9 +76,10 @@ async function preResolverEnderecos(pontos: { lat: number; lon: number }[], cach
     pendentes.push({ k, lat: p.lat, lon: p.lon });
   }
   const alvo = pendentes.slice(0, maxChamadas);
+  const limite = Date.now() + prazoMs; // deadline: passou disso, o resto vira coordenada
   let idx = 0;
   const worker = async (): Promise<void> => {
-    while (idx < alvo.length) {
+    while (idx < alvo.length && Date.now() < limite) {
       const cur = alvo[idx++];
       const end = await reverseGeocode(cur.lat, cur.lon).catch(() => '');
       cache.set(cur.k, end);
@@ -139,7 +145,9 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
   const pontosGeo: { lat: number; lon: number }[] = [];
   for (const t of trips) { pontosGeo.push({ lat: t.startLat, lon: t.startLon }, { lat: t.endLat, lon: t.endLon }); }
   for (const s of stops) { pontosGeo.push({ lat: s.lat, lon: s.lon }); }
-  await preResolverEnderecos(pontosGeo, geoCache, 200);
+  // Teto de chamadas + deadline: se o geocode demorar, o resto vira coordenada
+  // (evita estourar o tempo do proxy e dar 502).
+  await preResolverEnderecos(pontosGeo, geoCache, 80, 25000);
   const enderecoDe = (lat: number, lon: number): string => geoCache.get(coordKey(lat, lon)) || coordsFallback(lat, lon);
 
   const viagens = trips.map(t => {
