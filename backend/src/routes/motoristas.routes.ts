@@ -10,9 +10,10 @@ import {
   traccarLinkDriverToDevice,
   traccarUnlinkDriverFromDevice,
   traccarGetDeviceByImei,
-  traccarGetPositions,
+  traccarGetPositionHistory,
+  cartaoDaPosicao,
 } from '../services/traccar.service';
-import { carregarResolvedorMotoristas, idMotoristaVazio } from '../services/motoristas.service';
+import { carregarResolvedorMotoristas } from '../services/motoristas.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -172,25 +173,34 @@ router.post('/vincular-massa', requireRoles('ADMIN', 'COLABORADOR'), async (req:
 });
 
 // ── GET /api/motoristas/dispositivos/:id/ultimo-cartao ─────────────────────────
-// Último cartão RFID lido por um dispositivo (última posição). Ajuda a cadastrar o
-// identificador no formato exato que o Traccar recebe.
+// Último cartão RFID lido por um dispositivo. O leitor só envia o cartão no
+// login/logout da jornada (posições esparsas), então varre o histórico recente
+// e pega a leitura mais recente. Ajuda a cadastrar o identificador no formato
+// exato que o Traccar recebe (número do cartão no atributo `serial`).
 router.get('/dispositivos/:id/ultimo-cartao', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
   const disp = await prisma.dispositivo.findUnique({ where: { id }, select: { identificador: true } });
   if (!disp) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
 
   const tDev = await traccarGetDeviceByImei(disp.identificador).catch(() => null);
-  if (!tDev) { res.json({ cartaoId: null, motorista: null, lidoEm: null }); return; }
+  if (!tDev) { res.json({ cartaoId: null, motorista: null, lidoEm: null, inicio: null }); return; }
 
-  const posicoes = await traccarGetPositions([tDev.id]).catch(() => []);
-  const pos = posicoes[0];
-  const driverId = pos?.attributes?.driverUniqueId;
+  const ate = new Date();
+  const de = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const historico = await traccarGetPositionHistory([tDev.id], de, ate).catch(() => []);
+
+  let melhor: { t: number; cartao: string; inicio: boolean; lidoEm: string | null } | null = null;
+  for (const pos of historico) {
+    const cartao = cartaoDaPosicao(pos.attributes);
+    if (!cartao) continue;
+    const lidoEm = pos.deviceTime || pos.fixTime || pos.serverTime || null;
+    const t = lidoEm ? new Date(lidoEm).getTime() : 0;
+    if (!melhor || t > melhor.t) melhor = { t, cartao: cartao.cartao, inicio: cartao.inicio, lidoEm };
+  }
+
+  if (!melhor) { res.json({ cartaoId: null, motorista: null, lidoEm: null, inicio: null }); return; }
   const resolver = await carregarResolvedorMotoristas();
-  res.json({
-    cartaoId: idMotoristaVazio(driverId) ? null : String(driverId),
-    motorista: resolver(driverId),
-    lidoEm: pos ? (pos.deviceTime || pos.fixTime || pos.serverTime || null) : null,
-  });
+  res.json({ cartaoId: melhor.cartao, motorista: resolver(melhor.cartao), lidoEm: melhor.lidoEm, inicio: melhor.inicio });
 });
 
 // ── GET /api/motoristas/:id ────────────────────────────────────────────────────

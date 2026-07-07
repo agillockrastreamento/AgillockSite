@@ -25,6 +25,7 @@ import {
   traccarGetServerLog,
   traccarExportReport,
   normalizeAttributes,
+  cartaoDaPosicao,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
 import {
@@ -39,8 +40,7 @@ import {
 } from '../services/medidores.service';
 import {
   carregarResolvedorMotoristas,
-  driverUniqueIdDaViagem,
-  idMotoristaVazio,
+  cartaoDaViagem,
 } from '../services/motoristas.service';
 
 const router = Router();
@@ -233,7 +233,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
     // Prioriza o motorista que passou o cartão RFID (última posição); só cai no
     // primeiro vínculo do veículo quando não há leitura de cartão identificada.
     const motoristaVinculado = d.motoristasVinculados && d.motoristasVinculados.length > 0 ? d.motoristasVinculados[0].motorista : null;
-    const motorista = resolverMotorista(posicao?.attributes?.driverUniqueId) ?? motoristaVinculado;
+    const motorista = resolverMotorista(cartaoDaPosicao(posicao?.attributes)?.cartao) ?? motoristaVinculado;
 
     return {
       dispositivoId: d.id,
@@ -324,7 +324,7 @@ router.get('/dispositivos/:id/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
   const resolverMotorista = await carregarResolvedorMotoristas();
 
   res.json(viagensComMedidores.map(v => {
-    const driverId = driverUniqueIdDaViagem(v, historico);
+    const driverId = cartaoDaViagem(v, historico);
     return {
       inicio: v.startTime,
       fim: v.endTime,
@@ -681,15 +681,12 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
 
   const attrs = posicao?.attributes ?? {};
   const resolverMotorista = await carregarResolvedorMotoristas();
-  // Motorista que passou o cartão RFID na última posição (estritamente a leitura).
-  const cartaoId = idMotoristaVazio(attrs.driverUniqueId as string | undefined) ? null : String(attrs.driverUniqueId);
-  const motoristaCartao = resolverMotorista(attrs.driverUniqueId as string | undefined);
-  // Prioriza o motorista do cartão; só cai no primeiro vínculo quando não há leitura.
+  // Prioriza o motorista que passou o cartão RFID (última posição); só cai no
+  // primeiro vínculo do veículo quando não há leitura de cartão identificada.
   const motoristaVinculado = dispositivo.motoristasVinculados && dispositivo.motoristasVinculados.length > 0
     ? dispositivo.motoristasVinculados[0].motorista
     : null;
-  const motorista = motoristaCartao ?? motoristaVinculado;
-  const motoristasVinculados = (dispositivo.motoristasVinculados || []).map(mv => mv.motorista);
+  const motorista = resolverMotorista(cartaoDaPosicao(attrs)?.cartao) ?? motoristaVinculado;
 
   res.json({
     dispositivo: {
@@ -708,13 +705,6 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
       operadora: dispositivo.operadora,
       cliente: dispositivo.cliente,
       motorista: motorista,
-    },
-    motoristasVinculados: motoristasVinculados,
-    motoristaEmTransito: {
-      motorista: motoristaCartao,
-      cartaoId: cartaoId,
-      lidoEm: posicao ? (posicao.deviceTime || posicao.fixTime || posicao.serverTime || null) : null,
-      ignicao: (attrs.ignition as boolean | undefined) ?? null,
     },
     traccar: traccarDevice ? {
       id: traccarDevice.id,
@@ -1125,7 +1115,7 @@ router.get('/relatorios/batch/viagens', requireRoles('ADMIN', 'COLABORADOR'), as
       const viagemComMedidores = dispositivo ? aplicarViagensComMedidores(dispositivo, [viagem], historico)[0] : viagem;
       const posInicio = posicaoMaisProxima(historico, viagem.deviceId, viagem.startTime);
       const posFim = posicaoMaisProxima(historico, viagem.deviceId, viagem.endTime);
-      const driverId = driverUniqueIdDaViagem(viagem, historico.filter(p => p.deviceId === viagem.deviceId));
+      const driverId = cartaoDaViagem(viagem, historico.filter(p => p.deviceId === viagem.deviceId));
       return {
         ...viagemComMedidores,
         startAddress: temEndereco(viagemComMedidores.startAddress) ? viagemComMedidores.startAddress : posInicio?.address ?? viagemComMedidores.startAddress,

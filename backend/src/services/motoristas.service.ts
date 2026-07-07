@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma';
 import type { TraccarPosition } from './traccar.service';
+import { cartaoDaPosicao } from './traccar.service';
 
 // O leitor RFID (SGBRAS) envia o número do cartão do motorista via serial/1-wire
 // ao rastreador, que o repassa ao Traccar no atributo `driverUniqueId`. Quando o
@@ -45,21 +46,24 @@ function tempoPosicaoMs(posicao: TraccarPosition): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-// Determina o cartão de motorista de uma viagem: usa o `driverUniqueId` da própria
-// viagem (o Traccar o extrai da posição inicial) e, se vier vazio/zerado, procura a
-// primeira posição dentro da janela da viagem que traga um cartão identificado.
-export function driverUniqueIdDaViagem(
+// Determina o cartão de motorista de uma viagem. O leitor SGBRAS só envia o cartão
+// no login/logout da jornada (não em toda posição), e esse evento costuma cair um
+// pouco ANTES do início do trecho de movimento detectado pelo Traccar. Por isso
+// usa-se o cartão do evento mais recente com tempo ≤ fim da viagem (o motorista que
+// estava logado durante o trecho). Fallback para `driverUniqueId` (1-wire) se vier.
+export function cartaoDaViagem(
   viagem: { driverUniqueId?: string | null; startTime: string; endTime: string },
   posicoes: TraccarPosition[],
 ): string | null {
   if (!idMotoristaVazio(viagem.driverUniqueId)) return viagem.driverUniqueId!;
-  const inicioMs = new Date(viagem.startTime).getTime();
   const fimMs = new Date(viagem.endTime).getTime();
+  let melhor: { t: number; cartao: string } | null = null;
   for (const posicao of posicoes) {
     const t = tempoPosicaoMs(posicao);
-    if (t == null || t < inicioMs || t > fimMs) continue;
-    const driver = posicao.attributes?.driverUniqueId;
-    if (!idMotoristaVazio(driver)) return driver!;
+    if (t == null || t > fimMs) continue;
+    const cartao = cartaoDaPosicao(posicao.attributes);
+    if (!cartao) continue;
+    if (!melhor || t > melhor.t) melhor = { t, cartao: cartao.cartao };
   }
-  return null;
+  return melhor?.cartao ?? null;
 }

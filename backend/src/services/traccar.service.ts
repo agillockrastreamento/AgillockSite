@@ -411,6 +411,32 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
 // mapas ou qualquer outra parte do sistema.
 const IGNORED_ALARMS = new Set(['parking']);
 
+// Número do cartão RFID do motorista a partir dos atributos de uma posição.
+// O leitor SGBRAS ligado por RS232/TTL envia a string bruta no atributo `serial`
+// (ex.: "SGBT|6|1|0|3105176557|1|"): o número do cartão é o penúltimo campo e o
+// último indica a jornada (1/3 = início/login, 2 = fim/logout). Rastreadores
+// ligados por 1-wire usam `driverUniqueId` — usado como fallback quando não-zerado.
+// (Nesses Suntech o slot 1-wire vem sempre "0000000000000", por isso é ignorado.)
+export function cartaoDaPosicao(
+  attr: TraccarPosition['attributes'] | undefined | null,
+): { cartao: string; inicio: boolean } | null {
+  if (!attr) return null;
+  const serial = typeof attr.serial === 'string' ? attr.serial.trim() : null;
+  if (serial && /^SGB/i.test(serial)) {
+    const campos = serial.split('|').map(c => c.trim()).filter(c => c.length > 0);
+    if (campos.length >= 3) {
+      const cartao = campos[campos.length - 2];
+      const status = campos[campos.length - 1];
+      if (/^\d{3,}$/.test(cartao) && !/^0+$/.test(cartao)) {
+        return { cartao, inicio: status === '1' || status === '3' };
+      }
+    }
+  }
+  const dui = typeof attr.driverUniqueId === 'string' ? attr.driverUniqueId.trim() : null;
+  if (dui && !/^0+$/.test(dui)) return { cartao: dui, inicio: true };
+  return null;
+}
+
 // Normaliza os attributes de uma posição para um formato consistente,
 // independente do protocolo/fabricante do dispositivo.
 export function normalizeAttributes(attr: TraccarPosition['attributes']) {
@@ -441,7 +467,7 @@ export function normalizeAttributes(attr: TraccarPosition['attributes']) {
     bloqueado: attr.blocked ?? null,
     entrada_digital: attr.input ?? null,
     saida_digital: attr.output ?? null,
-    motorista_id: attr.driverUniqueId ?? null,
+    motorista_id: cartaoDaPosicao(attr)?.cartao ?? null,
   };
 }
 

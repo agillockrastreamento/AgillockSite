@@ -163,7 +163,7 @@
     <!-- ── Nível 2: Matriz da empresa ────────────────────────────────── -->
     <div id="view-matriz" style="display:none;height:100%;flex-direction:column;">
       <div class="matriz-toolbar">
-        <input type="text" id="filtro-motorista" class="form-control" style="width:220px" placeholder="Filtrar motorista…" />
+        <input type="text" id="filtro-motorista" class="form-control" style="width:240px" placeholder="Filtrar motorista (nome ou cartão)…" />
         <input type="text" id="filtro-dispositivo" class="form-control" style="width:220px" placeholder="Filtrar dispositivo…" />
         <button class="btn btn-success btn-sm" id="btn-vincular-tudo"><i class="fa fa-th"></i> Vincular tudo ↔ tudo</button>
         <button class="btn btn-primary btn-sm" id="btn-novo-motorista"><i class="fa fa-plus"></i> Motorista</button>
@@ -381,8 +381,14 @@
     };
 
     function motoristasFiltrados() {
-      var f = document.getElementById('filtro-motorista').value.toLowerCase();
-      return mtz.motoristas.filter(function (m) { return !f || m.nome.toLowerCase().indexOf(f) !== -1; });
+      var f = document.getElementById('filtro-motorista').value.trim().toLowerCase();
+      if (!f) return mtz.motoristas;
+      return mtz.motoristas.filter(function (m) {
+        return (m.nome && m.nome.toLowerCase().indexOf(f) !== -1)
+          || (m.identificador && String(m.identificador).toLowerCase().indexOf(f) !== -1)
+          || (m.cnh && String(m.cnh).toLowerCase().indexOf(f) !== -1)
+          || (m.telefone && String(m.telefone).toLowerCase().indexOf(f) !== -1);
+      });
     }
     function dispositivosFiltrados() {
       var f = document.getElementById('filtro-dispositivo').value.toLowerCase();
@@ -431,8 +437,11 @@
           + '<button data-del="' + esc(m.id) + '" title="Excluir"><i class="fa fa-trash"></i></button>'
           + '</span>';
         var nomeCor = m.ativo ? '' : 'style="color:#bbb;text-decoration:line-through"';
+        var cartao = m.identificador
+          ? '<small style="display:block;font-weight:400;color:#999"><i class="fa fa-id-card-o"></i> ' + esc(m.identificador) + '</small>'
+          : '<small style="display:block;font-weight:400;color:#d9534f" title="Sem cartão cadastrado — não aparece nos relatórios">sem cartão</small>';
         body += '<tr><th data-mot="' + esc(m.id) + '" title="Clique para vincular/desvincular a linha">'
-          + '<span class="mtz-mot-nome" ' + nomeCor + '>' + esc(m.nome) + '</span>' + acoes + '</th>';
+          + '<span class="mtz-mot-nome" ' + nomeCor + '>' + esc(m.nome) + '</span>' + acoes + cartao + '</th>';
         disps.forEach(function (d) {
           var on = !!mtz.vinc[chaveVinc(m.id, d.id)];
           body += '<td><input type="checkbox" class="mtz-check" data-m="' + esc(m.id) + '" data-d="' + esc(d.id) + '"' + (on ? ' checked' : '') + '></td>';
