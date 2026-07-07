@@ -55,10 +55,36 @@ function escHtml(s: unknown): string {
 // ── Endereços (reverse-geocode) ─────────────────────────────────────────────────
 // O Traccar devolve endereço nulo; a tela resolve no navegador. Aqui resolvemos no
 // servidor, com dedup por coordenada arredondada e um teto de chamadas por relatório.
-function coordKey(lat: number, lon: number): string { return `${lat.toFixed(4)},${lon.toFixed(4)}`; }
-function coordsFallback(lat: number, lon: number): string {
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) return '';
-  return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+function coordValida(lat?: number, lon?: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0);
+}
+function coordKey(lat?: number, lon?: number): string {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '';
+  return `${(lat as number).toFixed(4)},${(lon as number).toFixed(4)}`;
+}
+function coordsFallback(lat?: number, lon?: number): string {
+  if (!coordValida(lat, lon)) return '';
+  return `${(lat as number).toFixed(5)}, ${(lon as number).toFixed(5)}`;
+}
+// Posição mais próxima de um instante (para pegar coordenada quando a viagem/parada
+// não traz lat/lon — o Traccar às vezes omite e devolve endereço nulo).
+function posMaisProxima(posicoes: TraccarPosition[], iso: string): TraccarPosition | null {
+  const alvo = new Date(iso).getTime();
+  if (Number.isNaN(alvo)) return null;
+  let best: TraccarPosition | null = null, bestDiff = Infinity;
+  for (const p of posicoes) {
+    const t = new Date(p.deviceTime || p.fixTime || p.serverTime).getTime();
+    if (Number.isNaN(t)) continue;
+    const diff = Math.abs(t - alvo);
+    if (diff < bestDiff) { bestDiff = diff; best = p; }
+  }
+  return best;
+}
+function coordDe(lat: number | undefined, lon: number | undefined, posicoes: TraccarPosition[], iso: string): { lat: number; lon: number } | null {
+  if (coordValida(lat, lon)) return { lat: lat as number, lon: lon as number };
+  const p = posMaisProxima(posicoes, iso);
+  if (p && coordValida(p.latitude, p.longitude)) return { lat: p.latitude, lon: p.longitude };
+  return null;
 }
 async function preResolverEnderecos(
   pontos: { lat: number; lon: number }[],
@@ -140,17 +166,24 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
     return m ? m.nome : `ID ${cartao}`;
   };
 
-  // Resolve endereços de início/fim das viagens e das paradas (Traccar vem nulo)
+  // Resolve endereços de início/fim das viagens e das paradas (Traccar vem nulo).
+  // Coordenada vem da viagem/parada ou, se ausente, da posição mais próxima.
   const geoCache = new Map<string, string>();
+  const coordViagem = trips.map(t => {
+    const posDev = posPorId.get(t.deviceId) || [];
+    return { ini: coordDe(t.startLat, t.startLon, posDev, t.startTime), fim: coordDe(t.endLat, t.endLon, posDev, t.endTime) };
+  });
+  const coordParada = stops.map(s => coordDe(s.lat, s.lon, posPorId.get(s.deviceId) || [], s.startTime));
   const pontosGeo: { lat: number; lon: number }[] = [];
-  for (const t of trips) { pontosGeo.push({ lat: t.startLat, lon: t.startLon }, { lat: t.endLat, lon: t.endLon }); }
-  for (const s of stops) { pontosGeo.push({ lat: s.lat, lon: s.lon }); }
+  for (const c of coordViagem) { if (c.ini) pontosGeo.push(c.ini); if (c.fim) pontosGeo.push(c.fim); }
+  for (const c of coordParada) { if (c) pontosGeo.push(c); }
   // Teto de chamadas + deadline: se o geocode demorar, o resto vira coordenada
   // (evita estourar o tempo do proxy e dar 502).
   await preResolverEnderecos(pontosGeo, geoCache, 80, 25000);
-  const enderecoDe = (lat: number, lon: number): string => geoCache.get(coordKey(lat, lon)) || coordsFallback(lat, lon);
+  const endCoord = (c: { lat: number; lon: number } | null): string =>
+    c ? (geoCache.get(coordKey(c.lat, c.lon)) || coordsFallback(c.lat, c.lon)) : '';
 
-  const viagens = trips.map(t => {
+  const viagens = trips.map((t, i) => {
     const disp = localPorId.get(t.deviceId);
     const posDev = posPorId.get(t.deviceId) || [];
     const tm = disp ? aplicarViagensComMedidores(disp, [t], posDev)[0] : t;
@@ -162,17 +195,17 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
       distanciaKm: Math.round(tm.distance / 100) / 10,
       velMedia: Math.round(t.averageSpeed * 1.852),
       velMax: Math.round(tm.maxSpeed * 1.852),
-      origem: t.startAddress || enderecoDe(t.startLat, t.startLon),
-      destino: t.endAddress || enderecoDe(t.endLat, t.endLon),
+      origem: t.startAddress || endCoord(coordViagem[i].ini),
+      destino: t.endAddress || endCoord(coordViagem[i].fim),
     };
   });
 
-  const paradas = stops.map(s => {
+  const paradas = stops.map((s, i) => {
     const posDev = posPorId.get(s.deviceId) || [];
     const sm = aplicarParadasComMedidores([s], posDev)[0];
     return {
       veiculo: s.deviceName, inicio: s.startTime, fim: s.endTime,
-      duracaoMin: Math.round((s.duration || 0) / 60000), endereco: s.address || enderecoDe(s.lat, s.lon),
+      duracaoMin: Math.round((s.duration || 0) / 60000), endereco: s.address || endCoord(coordParada[i]),
       horasMotor: Math.round((sm.engineHours || 0) / 3600000 * 10) / 10, combustivel: Math.round((s.spentFuel || 0) * 10) / 10,
     };
   });
