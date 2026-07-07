@@ -281,6 +281,15 @@ function getVelMax(v) {
   return Math.round((Number(v.maxSpeed) || 0) * 1.852);
 }
 
+// Motorista da viagem: nome se o cartão RFID casou com um cadastro; senão o ID
+// cru (quando não zerado); "—" quando não houve identificação de cartão.
+function nomeMotoristaViagem(v) {
+  if (v && v.motorista && v.motorista.nome) return v.motorista.nome;
+  var id = v && v.motorista_id;
+  if (id && !/^0+$/.test(String(id).trim())) return '<span style="color:#888" title="Cartão não cadastrado">ID ' + id + '</span>';
+  return '<span style="color:#bbb">—</span>';
+}
+
 async function resolverEndereco(valor, lat, lng) {
   if (enderecoValido(valor)) return valor.trim();
   const coordsTexto = extrairCoords(valor);
@@ -822,7 +831,7 @@ async function renderViagens(lista) {
       <div class="resumo-card" style="min-width:100px"><div class="rc-val">${vmax}</div><div class="rc-lbl">km/h max</div></div>
     </div>
     <div class="table-responsive"><table class="rel-table rel-table--center table"><thead><tr>
-      <th>Veículo</th><th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
+      <th>Veículo</th><th>Motorista</th><th>#</th><th>Início</th><th>Fim</th><th>Duração</th><th>Distância</th><th>Vel. Máx</th><th>Origem/Destino</th>
     </tr></thead><tbody>
       ${(await Promise.all(lista.map(async (v, i) => {
         const d = dispositivosMap[v.deviceId] || { nome: '—' };
@@ -830,6 +839,7 @@ async function renderViagens(lista) {
         const destino = await resolverEndereco(v.endAddress || v.destino, v.endLat || v.destinoLat, v.endLon || v.destinoLng);
         return `<tr>
           <td><strong>${nomeDisp(d)}</strong></td>
+          <td style="white-space:nowrap">${nomeMotoristaViagem(v)}</td>
           <td style="color:#888">${i+1}</td>
           <td style="white-space:nowrap">${fmtHora(getInicioViagem(v))}</td>
           <td style="white-space:nowrap">${fmtHora(getFimViagem(v))}</td>

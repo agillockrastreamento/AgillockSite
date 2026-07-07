@@ -51,6 +51,8 @@ export interface Viagem {
   maxSpeed?: number;
   duration?: number;
   deviceId?: string;
+  motorista?: { id: string; nome: string } | null;
+  motorista_id?: string | null;
 }
 
 export interface Parada {

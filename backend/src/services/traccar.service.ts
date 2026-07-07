@@ -481,6 +481,7 @@ export interface TraccarTrip {
   averageSpeed: number;
   maxSpeed: number;
   duration: number;
+  driverUniqueId?: string; // cartão RFID do motorista (posição inicial da viagem)
 }
 
 export interface TraccarStop {

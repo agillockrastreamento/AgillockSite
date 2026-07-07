@@ -46,6 +46,10 @@ import {
   calcularOciosidade,
   reancorarRecorrenciasSeOdometroMenor,
 } from '../services/medidores.service';
+import {
+  carregarResolvedorMotoristas,
+  driverUniqueIdDaViagem,
+} from '../services/motoristas.service';
 import { CLIENTE_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
 const router = Router();
@@ -370,12 +374,16 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
     if (posicao) posicaoPorIdentificador.set(dispositivo.identificador, posicao);
   }
   const estadosAtualizados = await sincronizarDispositivosComPosicoes(dispositivos, posicaoPorIdentificador);
+  const resolverMotorista = await carregarResolvedorMotoristas();
 
   const resultado = dispositivos.map(d => {
     const traccar = traccarByImei.get(d.identificador);
     const posicao = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
     const estado = estadosAtualizados.get(d.identificador) ?? d;
-    const motorista = d.motoristasVinculados && d.motoristasVinculados.length > 0 ? d.motoristasVinculados[0].motorista : null;
+    // Prioriza o motorista que passou o cartão RFID (última posição); só cai no
+    // primeiro vínculo do veículo quando não há leitura de cartão identificada.
+    const motoristaVinculado = d.motoristasVinculados && d.motoristasVinculados.length > 0 ? d.motoristasVinculados[0].motorista : null;
+    const motorista = resolverMotorista(posicao?.attributes?.driverUniqueId) ?? motoristaVinculado;
 
     return {
       dispositivoId: d.id,
@@ -498,10 +506,12 @@ router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest,
   const viagens = await traccarGetTrips([traccarDevice.id], fromDate, toDate);
   const historico = await traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []);
   const viagensComMedidores = aplicarViagensComMedidores(dispositivo, viagens, historico);
+  const resolverMotorista = await carregarResolvedorMotoristas();
 
   res.json(viagensComMedidores.map(v => {
     const posInicio = posicaoMaisProxima(historico, traccarDevice.id, v.startTime);
     const posFim = posicaoMaisProxima(historico, traccarDevice.id, v.endTime);
+    const driverId = driverUniqueIdDaViagem(v, historico);
     return {
       inicio: v.startTime,
       fim: v.endTime,
@@ -515,6 +525,8 @@ router.get('/rastreamento/dispositivos/:id/viagens', async (req: ClienteRequest,
       velocidadeMedia: Math.round(v.averageSpeed * 1.852),
       velocidadeMaxima: Math.round(v.maxSpeed * 1.852),
       duracao: Math.round(v.duration / 60000),
+      motorista: resolverMotorista(driverId),
+      motorista_id: driverId,
     };
   }));
 });
@@ -790,11 +802,13 @@ router.get('/rastreamento/relatorios/batch/viagens', async (req: ClienteRequest,
       traccarGetTrips(traccarIds, new Date(from), new Date(to)),
       traccarGetPositionHistory(traccarIds, new Date(from), new Date(to)).catch(() => []),
     ]);
+    const resolverMotorista = await carregarResolvedorMotoristas();
     res.json(viagens.map(viagem => {
       const dispositivo = localPorTraccarId.get(viagem.deviceId);
       const viagemComMedidores = dispositivo ? aplicarViagensComMedidores(dispositivo, [viagem], historico)[0] : viagem;
       const posInicio = posicaoMaisProxima(historico, viagem.deviceId, viagem.startTime);
       const posFim = posicaoMaisProxima(historico, viagem.deviceId, viagem.endTime);
+      const driverId = driverUniqueIdDaViagem(viagem, historico.filter(p => p.deviceId === viagem.deviceId));
       return {
         ...viagemComMedidores,
         startAddress: temEndereco(viagemComMedidores.startAddress) ? viagemComMedidores.startAddress : posInicio?.address ?? viagemComMedidores.startAddress,
@@ -803,6 +817,8 @@ router.get('/rastreamento/relatorios/batch/viagens', async (req: ClienteRequest,
         endAddress: temEndereco(viagemComMedidores.endAddress) ? viagemComMedidores.endAddress : posFim?.address ?? viagemComMedidores.endAddress,
         endLat: viagemComMedidores.endLat || posFim?.latitude || 0,
         endLon: viagemComMedidores.endLon || posFim?.longitude || 0,
+        motorista: resolverMotorista(driverId),
+        motorista_id: driverId,
       };
     }));
   } catch { res.status(502).json({ error: 'Erro ao buscar viagens.' }); }

@@ -92,6 +92,9 @@
         <h2 class="topbar-title" id="topbar-titulo">Detalhes do Dispositivo</h2>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-default btn-sm" id="btn-motorista-transito" title="Ver motorista em trânsito" style="display:none;">
+          <i class="fa fa-id-card-o"></i> Motorista em trânsito
+        </button>
         <button class="btn btn-default btn-sm" id="btn-atualizar" title="Atualizar dados">
           <i class="fa fa-refresh"></i> Atualizar
         </button>
@@ -105,6 +108,23 @@
         <i class="fa fa-spinner fa-spin fa-lg"></i> Carregando…
       </div>
       <div id="detalhe-conteudo" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Motorista em trânsito -->
+  <div id="mt-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;width:400px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden;" id="mt-box">
+      <div style="background:#1e2530;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:14px;font-weight:700"><i class="fa fa-id-card-o" style="margin-right:6px"></i> Motorista em trânsito</span>
+        <button id="mt-fechar" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;line-height:1;padding:0">×</button>
+      </div>
+      <div style="padding:18px 16px;" id="mt-body">
+        <!-- preenchido via JS -->
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid #eee;display:flex;justify-content:space-between;gap:8px;" id="mt-footer">
+        <button type="button" class="btn btn-default btn-sm" id="mt-atualizar"><i class="fa fa-refresh"></i> Atualizar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="mt-ok">Fechar</button>
+      </div>
     </div>
   </div>
 
@@ -217,12 +237,21 @@
       result:        ['result',        'Resultado de comando'],
     };
 
+    var _detalhe = null;
+    var _mtOpen = false;
+
     function renderDetalhe(data) {
+      _detalhe = data;
       var d = data.dispositivo;
       var t = data.traccar;
       var p = data.posicao;
 
       document.getElementById('topbar-titulo').textContent = d.nome || d.identificador;
+
+      // Botão "Motorista em trânsito" só aparece se o veículo tem motorista vinculado
+      var temVinculo = data.motoristasVinculados && data.motoristasVinculados.length > 0;
+      document.getElementById('btn-motorista-transito').style.display = temVinculo ? '' : 'none';
+      if (_mtOpen) renderModalMt();
 
       var html = '';
 
@@ -319,6 +348,41 @@
     }
 
     document.getElementById('btn-atualizar').addEventListener('click', carregarDetalhe);
+
+    // ── Modal: Motorista em trânsito ──────────────────────────────────────────────
+    function renderModalMt() {
+      var d = (_detalhe && _detalhe.dispositivo) || {};
+      var mt = (_detalhe && _detalhe.motoristaEmTransito) || {};
+      var veiculo = esc(d.nome || d.identificador || '—') + (d.placa ? ' (' + esc(d.placa) + ')' : '');
+      var corpo = '<div style="font-size:12px;color:#888;margin-bottom:10px"><i class="fa fa-car"></i> ' + veiculo + '</div>';
+
+      if (mt.motorista) {
+        corpo += '<div style="font-size:17px;font-weight:700;margin-bottom:8px"><i class="fa fa-user" style="color:#27ae60;margin-right:6px"></i>' + esc(mt.motorista.nome) + '</div>';
+        corpo += '<table class="detalhe-table" style="font-size:13px"><tbody>';
+        corpo += '<tr><td>Cartão (ID)</td><td>' + esc(mt.cartaoId || '—') + '</td></tr>';
+        corpo += '<tr><td>CNH</td><td>' + esc(mt.motorista.cnh || '—') + '</td></tr>';
+        corpo += '<tr><td>Lido em</td><td>' + fmtDate(mt.lidoEm) + '</td></tr>';
+        corpo += '<tr><td>Ignição</td><td>' + (mt.ignicao == null ? '—' : (mt.ignicao ? '<span style="color:#27ae60">Ligada</span>' : '<span style="color:#e74c3c">Desligada</span>')) + '</td></tr>';
+        corpo += '</tbody></table>';
+      } else if (mt.cartaoId) {
+        corpo += '<div style="font-size:14px;margin-bottom:8px"><i class="fa fa-id-card-o" style="color:#f39c12;margin-right:6px"></i> Cartão <strong>' + esc(mt.cartaoId) + '</strong> não está cadastrado como motorista.</div>';
+        corpo += '<div style="font-size:12px;color:#888;margin-bottom:8px">Lido em ' + fmtDate(mt.lidoEm) + '.</div>';
+        corpo += '<a href="motoristas.html" class="btn btn-xs btn-default"><i class="fa fa-plus"></i> Cadastrar motorista</a>';
+      } else {
+        corpo += '<div style="text-align:center;color:#aaa;padding:16px 0"><i class="fa fa-id-card-o fa-2x"></i><div style="margin-top:8px;font-size:13px">Nenhum cartão identificado no momento.</div></div>';
+      }
+
+      document.getElementById('mt-body').innerHTML = corpo;
+    }
+
+    function abrirModalMt() { _mtOpen = true; renderModalMt(); document.getElementById('mt-overlay').style.display = 'flex'; }
+    function fecharModalMt() { _mtOpen = false; document.getElementById('mt-overlay').style.display = 'none'; }
+
+    document.getElementById('btn-motorista-transito').addEventListener('click', abrirModalMt);
+    document.getElementById('mt-fechar').addEventListener('click', fecharModalMt);
+    document.getElementById('mt-ok').addEventListener('click', fecharModalMt);
+    document.getElementById('mt-overlay').addEventListener('click', function (e) { if (e.target === this) fecharModalMt(); });
+    document.getElementById('mt-atualizar').addEventListener('click', carregarDetalhe);
 
     carregarDetalhe();
   })();

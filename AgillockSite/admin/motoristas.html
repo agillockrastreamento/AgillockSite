@@ -14,48 +14,72 @@
     body { overflow: hidden !important; height: 100vh; }
     .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
     #al-alert-container, .filter-bar { flex-shrink: 0; }
-    .table-responsive { flex: 1; overflow-y: auto; border-radius: 8px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 0; }
-    html.dark-theme .table-responsive { background: #141820; }
-    .admin-table thead th { position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
+    #view-empresas, #view-matriz { flex: 1; min-height: 0; flex-direction: column; }
+    .view-scroll { flex: 1; min-height: 0; overflow: auto; }
+    .matriz-toolbar { flex-shrink: 0; }
 
-    /* Modal */
-    #modal-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,.55); z-index: 3000;
-      align-items: center; justify-content: center;
-    }
-    #modal-overlay.open { display: flex; }
-    #modal-box {
-      background: #fff; border-radius: 10px; width: 440px; max-width: 95vw;
-      box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden;
-    }
-    html.dark-theme #modal-box { background: #1e1e2e; }
-    #modal-header {
-      background: #1e2530; color: #fff;
-      padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
-    }
-    #modal-titulo { font-size: 14px; font-weight: 700; }
-    #modal-fechar { background: none; border: none; color: rgba(255,255,255,.7); font-size: 20px; cursor: pointer; line-height: 1; padding: 0; }
-    #modal-body { padding: 18px 16px; }
-    #modal-body label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
-    html.dark-theme #modal-body label { color: #aaa; }
-    #modal-body .form-group { margin-bottom: 12px; }
-    #modal-footer {
-      padding: 12px 16px; border-top: 1px solid #eee;
-      display: flex; justify-content: flex-end; gap: 8px;
-    }
-    html.dark-theme #modal-footer { border-color: #333; }
+    /* Empresas (nível 1) */
+    .empresas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding: 4px; }
+    .empresa-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); padding: 16px; cursor: pointer; transition: transform .12s, box-shadow .12s; border-left: 4px solid #fab32c; }
+    .empresa-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.12); }
+    html.dark-theme .empresa-card { background: #141820; }
+    .empresa-nome { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+    .empresa-doc { font-size: 11px; color: #999; margin-bottom: 10px; min-height: 14px; }
+    .empresa-stats { display: flex; gap: 14px; }
+    .empresa-stat { font-size: 12px; color: #555; }
+    html.dark-theme .empresa-stat { color: #bbb; }
+    .empresa-stat b { font-size: 18px; display: block; color: #2980b9; font-weight: 700; }
+    .empresa-card.nova { border-left-color: #27ae60; display: flex; align-items: center; justify-content: center; color: #27ae60; font-weight: 700; font-size: 14px; text-align: center; }
 
-    /* Vínculo */
-    .tag-dispositivo {
-      display: inline-flex; align-items: center; gap: 4px;
-      background: #e8f4fd; color: #2980b9; border-radius: 12px;
-      padding: 2px 8px; font-size: 12px; margin: 2px;
-    }
-    html.dark-theme .tag-dispositivo { background: #1a3045; color: #74b9e8; }
-    .tag-dispositivo button {
-      background: none; border: none; color: inherit; cursor: pointer; padding: 0; font-size: 13px; line-height: 1;
-    }
+    /* Matriz (nível 2) */
+    .matriz-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .matriz-wrap { overflow: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.05); max-height: 100%; }
+    html.dark-theme .matriz-wrap { background: #141820; }
+    table.matriz { border-collapse: separate; border-spacing: 0; font-size: 12px; width: auto; }
+    table.matriz th, table.matriz td { border-bottom: 1px solid #eee; border-right: 1px solid #eee; padding: 7px 10px; text-align: center; white-space: nowrap; }
+    html.dark-theme table.matriz th, html.dark-theme table.matriz td { border-color: #222a38; }
+    table.matriz thead th { position: sticky; top: 0; background: #fafafa; z-index: 2; cursor: pointer; user-select: none; }
+    html.dark-theme table.matriz thead th { background: #1c2230; }
+    table.matriz thead th:hover { background: #eef4fb; }
+    table.matriz tbody th { position: sticky; left: 0; background: #fff; text-align: left; cursor: pointer; z-index: 1; user-select: none; }
+    html.dark-theme table.matriz tbody th { background: #141820; }
+    table.matriz tbody th:hover { background: #f5faff; }
+    table.matriz th.corner { position: sticky; left: 0; top: 0; z-index: 3; background: #f0f0f0; cursor: default; }
+    html.dark-theme table.matriz th.corner { background: #10141c; }
+    .mtz-check { width: 17px; height: 17px; cursor: pointer; }
+    .mtz-dev-head { font-weight: 700; }
+    .mtz-dev-head small { display: block; font-weight: 400; color: #999; font-size: 10px; }
+    .mtz-card-btn { background: none; border: none; color: #b58a2e; cursor: pointer; font-size: 11px; padding: 0; margin-top: 2px; }
+    .mtz-mot-nome { font-weight: 600; }
+    .mtz-mot-acoes { display: inline-flex; gap: 3px; margin-left: 8px; }
+    .mtz-mot-acoes button { background: none; border: none; cursor: pointer; color: #888; font-size: 12px; padding: 1px 3px; }
+    .mtz-mot-acoes button:hover { color: #2980b9; }
+    .mtz-empty { padding: 40px; text-align: center; color: #aaa; }
+
+    /* Modal genérico */
+    .ov { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 3000; align-items: center; justify-content: center; }
+    .ov.open { display: flex; }
+    .modal-card { background: #fff; border-radius: 10px; width: 440px; max-width: 95vw; box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: visible; }
+    html.dark-theme .modal-card { background: #1e1e2e; }
+    .modal-head { background: #1e2530; color: #fff; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; border-radius: 10px 10px 0 0; }
+    .modal-head span { font-size: 14px; font-weight: 700; }
+    .modal-head button { background: none; border: none; color: rgba(255,255,255,.7); font-size: 20px; cursor: pointer; line-height: 1; padding: 0; }
+    .modal-bd { padding: 18px 16px; }
+    .modal-bd label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+    html.dark-theme .modal-bd label { color: #aaa; }
+    .modal-bd .form-group { margin-bottom: 12px; }
+    .modal-ft { padding: 12px 16px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 8px; }
+    html.dark-theme .modal-ft { border-color: #333; }
+
+    /* Combo com busca */
+    .combo { position: relative; }
+    .combo-list { position: absolute; z-index: 60; background: #fff; border: 1px solid #ccc; border-radius: 6px; width: 100%; max-height: 220px; overflow: auto; display: none; margin-top: 2px; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+    html.dark-theme .combo-list { background: #23232f; border-color: #444; }
+    .combo-list.open { display: block; }
+    .combo-item { padding: 8px 12px; cursor: pointer; font-size: 13px; }
+    .combo-item:hover, .combo-item.active { background: #e8f4fd; }
+    html.dark-theme .combo-item:hover, html.dark-theme .combo-item.active { background: #1a3045; }
+    .combo-empty { padding: 8px 12px; color: #999; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -110,118 +134,111 @@
     <div class="admin-topbar">
       <div style="display:flex;align-items:center;gap:12px;">
         <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
-        <h2 class="topbar-title">Motoristas</h2>
+        <button class="btn btn-default btn-sm" id="btn-voltar-empresas" style="display:none;"><i class="fa fa-arrow-left"></i></button>
+        <h2 class="topbar-title" id="topbar-titulo">Motoristas</h2>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <button id="btn-novo" class="btn btn-primary-al">
-          <i class="fa fa-plus"></i> Novo Motorista
-        </button>
+        <button id="btn-nova-empresa" class="btn btn-primary-al"><i class="fa fa-plus"></i> Vincular por empresa</button>
       </div>
     </div>
 
     <div id="al-alert-container"></div>
 
-    <!-- Filtros -->
-    <div class="filter-bar">
-      <div class="row">
-        <div class="col-sm-6">
-          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por nome, CNH ou telefone…" />
+    <!-- ── Nível 1: Empresas ─────────────────────────────────────────── -->
+    <div id="view-empresas">
+      <div class="filter-bar">
+        <div class="row">
+          <div class="col-sm-6">
+            <input type="text" id="filtro-empresa" class="form-control" placeholder="Buscar empresa…" />
+          </div>
         </div>
-        <div class="col-sm-3">
-          <select id="filtro-status" class="form-control">
-            <option value="">Todos os status</option>
-            <option value="true">Ativo</option>
-            <option value="false">Inativo</option>
-          </select>
+      </div>
+      <div class="view-scroll">
+        <div class="empresas-grid" id="empresas-grid">
+          <div style="grid-column:1/-1;text-align:center;color:#aaa;padding:40px;"><i class="fa fa-spinner fa-spin fa-2x"></i></div>
         </div>
       </div>
     </div>
 
-    <!-- Tabela -->
-    <div class="table-responsive">
-      <table class="table admin-table">
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>CNH</th>
-            <th>Telefone</th>
-            <th>Dispositivos Vinculados</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="tabela-body">
-          <tr><td colspan="6" class="text-center text-muted" style="padding:40px;">
-            <i class="fa fa-spinner fa-spin fa-2x"></i>
-          </td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Modal -->
-  <div id="modal-overlay">
-    <div id="modal-box">
-      <div id="modal-header">
-        <span id="modal-titulo"><i class="fa fa-id-card-o" style="margin-right:6px"></i> Motorista</span>
-        <button id="modal-fechar" title="Fechar">×</button>
+    <!-- ── Nível 2: Matriz da empresa ────────────────────────────────── -->
+    <div id="view-matriz" style="display:none;height:100%;flex-direction:column;">
+      <div class="matriz-toolbar">
+        <input type="text" id="filtro-motorista" class="form-control" style="width:220px" placeholder="Filtrar motorista…" />
+        <input type="text" id="filtro-dispositivo" class="form-control" style="width:220px" placeholder="Filtrar dispositivo…" />
+        <button class="btn btn-success btn-sm" id="btn-vincular-tudo"><i class="fa fa-th"></i> Vincular tudo ↔ tudo</button>
+        <button class="btn btn-primary btn-sm" id="btn-novo-motorista"><i class="fa fa-plus"></i> Motorista</button>
+        <span style="flex:1"></span>
+        <span id="matriz-contadores" style="font-size:12px;color:#888"></span>
       </div>
-      <div id="modal-body">
-        <input type="hidden" id="modal-id" />
-        <div class="form-group">
-          <label for="modal-nome">Nome *</label>
-          <input type="text" id="modal-nome" class="form-control" placeholder="Nome completo" />
-        </div>
-        <div class="form-group">
-          <label for="modal-identificador">Identificador (Driver ID)</label>
-          <input type="text" id="modal-identificador" class="form-control" placeholder="Ex: 426696170" />
-        </div>
-        <div class="form-group">
-          <label for="modal-cnh">CNH</label>
-          <input type="text" id="modal-cnh" class="form-control" placeholder="Número da CNH" />
-        </div>
-        <div class="form-group">
-          <label for="modal-telefone">Telefone</label>
-          <input type="text" id="modal-telefone" class="form-control" placeholder="(00) 00000-0000" />
-        </div>
-        <div class="form-group" id="modal-dispositivo-wrap">
-          <label for="modal-dispositivo">Vincular a Dispositivo</label>
-          <select id="modal-dispositivo" class="form-control">
-            <option value="">Nenhum dispositivo</option>
-          </select>
-        </div>
-      </div>
-      <div id="modal-footer">
-        <button type="button" class="btn btn-default btn-sm" id="btn-cancelar">Cancelar</button>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-salvar">
-          <i class="fa fa-check"></i> Salvar
-        </button>
+      <div class="matriz-wrap view-scroll" id="matriz-wrap">
+        <!-- matriz renderizada via JS -->
       </div>
     </div>
   </div>
 
-  <!-- Modal de vínculo avulso -->
-  <div id="vincular-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:10px;width:380px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden;">
-      <div style="background:#1e2530;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:14px;font-weight:700"><i class="fa fa-link" style="margin-right:6px"></i> Vincular Dispositivo</span>
-        <button onclick="fecharVincular()" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;line-height:1;padding:0">×</button>
+  <!-- Modal Novo/Editar Motorista -->
+  <div class="ov" id="mm-ov">
+    <div class="modal-card">
+      <div class="modal-head">
+        <span id="mm-titulo"><i class="fa fa-id-card-o" style="margin-right:6px"></i> Motorista</span>
+        <button id="mm-fechar">×</button>
       </div>
-      <div style="padding:18px 16px;">
+      <div class="modal-bd">
+        <input type="hidden" id="mm-id" />
         <div class="form-group">
-          <label style="font-size:12px;font-weight:600;color:#555">Motorista</label>
-          <div id="vincular-nome" style="font-size:14px;font-weight:600;margin-top:2px;margin-bottom:12px"></div>
+          <label for="mm-nome">Nome *</label>
+          <input type="text" id="mm-nome" class="form-control" placeholder="Nome completo" />
         </div>
         <div class="form-group">
-          <label for="vincular-dispositivo" style="font-size:12px;font-weight:600;color:#555">Dispositivo</label>
-          <select id="vincular-dispositivo" class="form-control"></select>
+          <label>Empresa</label>
+          <div class="combo">
+            <input type="text" id="mm-empresa-input" class="form-control" placeholder="Sem empresa" autocomplete="off" />
+            <input type="hidden" id="mm-empresa-id" />
+            <div class="combo-list" id="mm-empresa-list"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="mm-identificador">Identificador (cartão / Driver ID)</label>
+          <input type="text" id="mm-identificador" class="form-control" placeholder="Ex: 426696170" />
+          <div style="font-size:11px;color:#999;margin-top:4px">Deve casar com o valor que o rastreador envia (use "último cartão" na matriz para conferir).</div>
+        </div>
+        <div class="form-group">
+          <label for="mm-cnh">CNH</label>
+          <input type="text" id="mm-cnh" class="form-control" placeholder="Número da CNH" />
+        </div>
+        <div class="form-group">
+          <label for="mm-telefone">Telefone</label>
+          <input type="text" id="mm-telefone" class="form-control" placeholder="(00) 00000-0000" />
         </div>
       </div>
-      <div style="padding:12px 16px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;">
-        <button type="button" class="btn btn-default btn-sm" onclick="fecharVincular()">Cancelar</button>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-confirmar-vincular">
-          <i class="fa fa-link"></i> Vincular
-        </button>
+      <div class="modal-ft">
+        <button type="button" class="btn btn-default btn-sm" id="mm-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="mm-salvar"><i class="fa fa-check"></i> Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Escolher Empresa (nova vinculação) -->
+  <div class="ov" id="ce-ov">
+    <div class="modal-card" style="width:400px">
+      <div class="modal-head">
+        <span><i class="fa fa-building-o" style="margin-right:6px"></i> Escolher empresa</span>
+        <button id="ce-fechar">×</button>
+      </div>
+      <div class="modal-bd">
+        <div class="form-group">
+          <label>Empresa (cliente)</label>
+          <div class="combo">
+            <input type="text" id="ce-input" class="form-control" placeholder="Buscar empresa…" autocomplete="off" />
+            <input type="hidden" id="ce-id" />
+            <div class="combo-list" id="ce-list"></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#888">Ao abrir a empresa você poderá cadastrar motoristas e montar a matriz de vínculos.</div>
+      </div>
+      <div class="modal-ft">
+        <button type="button" class="btn btn-default btn-sm" id="ce-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="ce-abrir"><i class="fa fa-arrow-right"></i> Abrir</button>
       </div>
     </div>
   </div>
@@ -252,230 +269,375 @@
     document.getElementById('btn-logout').addEventListener('click', AL.logout);
     AL.initThemeToggle('btn-tema');
 
-    var todosMotoristas = [];
-    var todosDispositivos = [];
-
     function esc(s) {
       return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+    function fmtDate(s) { if (!s) return '—'; try { return new Date(s).toLocaleString('pt-BR'); } catch (e) { return s; } }
 
-    // ── Carregar dispositivos para o select ──────────────────────────────────────
-    AL.apiGet('/api/dispositivos').then(function (data) {
-      todosDispositivos = Array.isArray(data) ? data : (data.dispositivos || []);
-      preencherSelectDispositivos();
-    }).catch(function () {});
-
-    function preencherSelectDispositivos() {
-      var opts = '<option value="">Nenhum dispositivo</option>';
-      todosDispositivos.forEach(function (d) {
-        if (!d.ativo) return;
-        var label = d.nome + (d.placa ? ' (' + d.placa + ')' : '');
-        opts += '<option value="' + esc(d.id) + '">' + esc(label) + '</option>';
+    // ═══════════════════════ Combo com busca ═══════════════════════════════════
+    // Cria um dropdown filtrável. options = [{ id, label }]. onSelect(opt).
+    function criarCombo(inputEl, listEl, hiddenEl, getOptions, onSelect) {
+      function abrir(filtro) {
+        var opts = getOptions();
+        var f = (filtro || '').toLowerCase();
+        var filtradas = opts.filter(function (o) { return o.label.toLowerCase().indexOf(f) !== -1; });
+        if (!filtradas.length) { listEl.innerHTML = '<div class="combo-empty">Nenhum resultado</div>'; }
+        else {
+          listEl.innerHTML = filtradas.slice(0, 100).map(function (o) {
+            return '<div class="combo-item" data-id="' + esc(o.id) + '">' + esc(o.label) + '</div>';
+          }).join('');
+        }
+        listEl.classList.add('open');
+      }
+      inputEl.addEventListener('focus', function () { abrir(inputEl.value); });
+      inputEl.addEventListener('input', function () { hiddenEl.value = ''; abrir(inputEl.value); });
+      listEl.addEventListener('mousedown', function (e) {
+        var item = e.target.closest('.combo-item');
+        if (!item) return;
+        e.preventDefault();
+        var id = item.getAttribute('data-id');
+        var opt = getOptions().find(function (o) { return String(o.id) === String(id); });
+        if (opt) { inputEl.value = opt.label; hiddenEl.value = opt.id; if (onSelect) onSelect(opt); }
+        listEl.classList.remove('open');
       });
-      document.getElementById('modal-dispositivo').innerHTML = opts;
-      var vinc = document.getElementById('vincular-dispositivo');
-      if (vinc) vinc.innerHTML = opts;
+      inputEl.addEventListener('blur', function () { setTimeout(function () { listEl.classList.remove('open'); }, 150); });
     }
 
-    // ── Carregar motoristas ───────────────────────────────────────────────────────
-    function carregarMotoristas() {
-      AL.apiGet('/api/motoristas').then(function (data) {
-        todosMotoristas = Array.isArray(data) ? data : [];
-        renderTabela();
+    // ═══════════════════════ Dados globais ═════════════════════════════════════
+    var todosClientes = [];      // p/ combos (carregado sob demanda)
+    var clientesCarregados = false;
+
+    function carregarClientes() {
+      if (clientesCarregados) return Promise.resolve(todosClientes);
+      return AL.apiGet('/api/clientes').then(function (data) {
+        todosClientes = (Array.isArray(data) ? data : []).map(function (c) {
+          return { id: c.id, label: c.nome + (c.cpfCnpj ? ' — ' + c.cpfCnpj : '') };
+        });
+        clientesCarregados = true;
+        return todosClientes;
+      }).catch(function () { return []; });
+    }
+
+    // ═══════════════════════ Nível 1: Empresas ═════════════════════════════════
+    var empresas = [];
+
+    function carregarEmpresas() {
+      return AL.apiGet('/api/motoristas/empresas').then(function (data) {
+        empresas = Array.isArray(data) ? data : [];
+        renderEmpresas();
       }).catch(function (err) {
-        AL.showAlert(err.message || 'Erro ao carregar motoristas.', 'danger');
+        AL.showAlert(err.message || 'Erro ao carregar empresas.', 'danger');
       });
     }
 
-    // ── Filtro ────────────────────────────────────────────────────────────────────
-    var filtroTimer = null;
-    document.getElementById('filtro-busca').addEventListener('input', function () {
-      clearTimeout(filtroTimer);
-      filtroTimer = setTimeout(renderTabela, 200);
+    var filtroEmpresaTimer = null;
+    document.getElementById('filtro-empresa').addEventListener('input', function () {
+      clearTimeout(filtroEmpresaTimer);
+      filtroEmpresaTimer = setTimeout(renderEmpresas, 150);
     });
-    document.getElementById('filtro-status').addEventListener('change', renderTabela);
 
-    function renderTabela() {
-      var busca = document.getElementById('filtro-busca').value.toLowerCase();
-      var filtroStatus = document.getElementById('filtro-status').value;
-      var lista = todosMotoristas.filter(function (m) {
-        if (filtroStatus !== '' && String(m.ativo) !== filtroStatus) return false;
-        if (busca && !(
-          m.nome.toLowerCase().indexOf(busca) !== -1 ||
-          (m.cnh || '').toLowerCase().indexOf(busca) !== -1 ||
-          (m.telefone || '').toLowerCase().indexOf(busca) !== -1
-        )) return false;
-        return true;
+    function renderEmpresas() {
+      var grid = document.getElementById('empresas-grid');
+      var busca = document.getElementById('filtro-empresa').value.toLowerCase();
+      var lista = empresas.filter(function (e) { return !busca || e.nome.toLowerCase().indexOf(busca) !== -1; });
+
+      var cards = '<div class="empresa-card nova" onclick="window.__abrirEscolherEmpresa()">'
+        + '<div><i class="fa fa-plus-circle fa-2x"></i><br>Vincular nova empresa</div></div>';
+
+      cards += lista.map(function (e) {
+        return '<div class="empresa-card" onclick="window.__abrirMatriz(\'' + esc(e.clienteId) + '\')">'
+          + '<div class="empresa-nome"><i class="fa fa-building-o" style="color:#fab32c;margin-right:6px"></i>' + esc(e.nome) + '</div>'
+          + '<div class="empresa-doc">' + esc(e.cpfCnpj || '') + '</div>'
+          + '<div class="empresa-stats">'
+          + '<div class="empresa-stat"><b>' + e.qtdMotoristas + '</b> motoristas</div>'
+          + '<div class="empresa-stat"><b>' + e.qtdDispositivos + '</b> veículos</div>'
+          + '</div></div>';
+      }).join('');
+
+      grid.innerHTML = cards;
+    }
+
+    // ═══════════════════════ Nível 2: Matriz ═══════════════════════════════════
+    var mtz = { clienteId: null, cliente: null, motoristas: [], dispositivos: [], vinc: {} };
+
+    function chaveVinc(mId, dId) { return mId + '|' + dId; }
+
+    window.__abrirMatriz = function (clienteId) {
+      AL.apiGet('/api/motoristas/empresa/' + encodeURIComponent(clienteId)).then(function (data) {
+        mtz.clienteId = clienteId;
+        mtz.cliente = data.cliente;
+        mtz.motoristas = data.motoristas || [];
+        mtz.dispositivos = data.dispositivos || [];
+        mtz.vinc = {};
+        (data.vinculos || []).forEach(function (v) { mtz.vinc[chaveVinc(v.motoristaId, v.dispositivoId)] = true; });
+        mostrarView('matriz');
+        document.getElementById('topbar-titulo').textContent = data.cliente.nome;
+        document.getElementById('filtro-motorista').value = '';
+        document.getElementById('filtro-dispositivo').value = '';
+        renderMatriz();
+      }).catch(function (err) {
+        AL.showAlert(err.message || 'Erro ao abrir empresa.', 'danger');
       });
+    };
 
-      var tbody = document.getElementById('tabela-body');
-      if (!lista.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:32px;">Nenhum motorista encontrado.</td></tr>';
+    function motoristasFiltrados() {
+      var f = document.getElementById('filtro-motorista').value.toLowerCase();
+      return mtz.motoristas.filter(function (m) { return !f || m.nome.toLowerCase().indexOf(f) !== -1; });
+    }
+    function dispositivosFiltrados() {
+      var f = document.getElementById('filtro-dispositivo').value.toLowerCase();
+      return mtz.dispositivos.filter(function (d) {
+        var label = (d.nome || '') + ' ' + (d.placa || '');
+        return !f || label.toLowerCase().indexOf(f) !== -1;
+      });
+    }
+
+    function renderMatriz() {
+      var wrap = document.getElementById('matriz-wrap');
+      var mots = motoristasFiltrados();
+      var disps = dispositivosFiltrados();
+
+      document.getElementById('matriz-contadores').textContent =
+        mtz.motoristas.length + ' motoristas · ' + mtz.dispositivos.length + ' veículos';
+
+      if (!mtz.motoristas.length && !mtz.dispositivos.length) {
+        wrap.innerHTML = '<div class="mtz-empty"><i class="fa fa-info-circle"></i> Esta empresa não tem motoristas nem veículos ativos.<br>Use "+ Motorista" para começar.</div>';
+        return;
+      }
+      if (!mtz.dispositivos.length) {
+        wrap.innerHTML = '<div class="mtz-empty"><i class="fa fa-info-circle"></i> Nenhum veículo ativo nesta empresa para vincular.</div>';
         return;
       }
 
-      tbody.innerHTML = lista.map(function (m) {
-        var disps = (m.dispositivos || []).map(function (d) {
-          return '<span class="tag-dispositivo">'
-            + '<i class="fa fa-microchip"></i> ' + esc(d.nome || d.placa || d.identificador)
-            + '<button onclick="desvincularDispositivo(\'' + esc(m.id) + '\',\'' + esc(d.id) + '\')" title="Desvincular"><i class="fa fa-times"></i></button>'
-            + '</span>';
-        }).join('');
+      var head = '<thead><tr><th class="corner">Motorista \\ Veículo</th>';
+      disps.forEach(function (d) {
+        var label = esc(d.nome || d.identificador);
+        var sub = d.placa ? '<small>' + esc(d.placa) + '</small>' : '';
+        head += '<th data-dev="' + esc(d.id) + '" title="Clique para vincular/desvincular a coluna">'
+          + '<div class="mtz-dev-head">' + label + sub + '</div>'
+          + '<button class="mtz-card-btn" data-cardbtn="' + esc(d.id) + '" title="Ver último cartão lido"><i class="fa fa-tag"></i> cartão</button>'
+          + '</th>';
+      });
+      head += '</tr></thead>';
 
-        return '<tr>'
-          + '<td><strong>' + esc(m.nome) + '</strong></td>'
-          + '<td>' + esc(m.cnh || '—') + '</td>'
-          + '<td>' + esc(m.telefone || '—') + '</td>'
-          + '<td>' + (disps || '<span style="color:#bbb;font-size:12px">—</span>') + '</td>'
-          + '<td>' + AL.badgeStatus(m.ativo) + '</td>'
-          + '<td style="text-align:right;white-space:nowrap">'
-          + '<button class="btn btn-xs btn-default" style="margin-right:4px" onclick="abrirVincular(\'' + esc(m.id) + '\',\'' + esc(m.nome) + '\')" title="Vincular dispositivo"><i class="fa fa-link"></i></button>'
-          + '<button class="btn btn-xs btn-default" style="margin-right:4px" onclick="editarMotorista(\'' + esc(m.id) + '\')" title="Editar"><i class="fa fa-pencil"></i></button>'
-          + '<button class="btn btn-xs btn-default" style="margin-right:4px" onclick="toggleStatus(\'' + esc(m.id) + '\')" title="Ativar/Inativar"><i class="fa fa-power-off"></i></button>'
-          + '<button class="btn btn-xs btn-danger" onclick="deletarMotorista(\'' + esc(m.id) + '\',\'' + esc(m.nome) + '\')" title="Excluir"><i class="fa fa-trash"></i></button>'
-          + '</td>'
-          + '</tr>';
-      }).join('');
+      var body = '<tbody>';
+      if (!mots.length) {
+        body += '<tr><td colspan="' + (disps.length + 1) + '" class="mtz-empty">Nenhum motorista' + (document.getElementById('filtro-motorista').value ? ' no filtro.' : ' cadastrado nesta empresa.') + '</td></tr>';
+      }
+      mots.forEach(function (m) {
+        var acoes = '<span class="mtz-mot-acoes">'
+          + '<button data-edit="' + esc(m.id) + '" title="Editar"><i class="fa fa-pencil"></i></button>'
+          + '<button data-status="' + esc(m.id) + '" title="Ativar/Inativar"><i class="fa fa-power-off"></i></button>'
+          + '<button data-del="' + esc(m.id) + '" title="Excluir"><i class="fa fa-trash"></i></button>'
+          + '</span>';
+        var nomeCor = m.ativo ? '' : 'style="color:#bbb;text-decoration:line-through"';
+        body += '<tr><th data-mot="' + esc(m.id) + '" title="Clique para vincular/desvincular a linha">'
+          + '<span class="mtz-mot-nome" ' + nomeCor + '>' + esc(m.nome) + '</span>' + acoes + '</th>';
+        disps.forEach(function (d) {
+          var on = !!mtz.vinc[chaveVinc(m.id, d.id)];
+          body += '<td><input type="checkbox" class="mtz-check" data-m="' + esc(m.id) + '" data-d="' + esc(d.id) + '"' + (on ? ' checked' : '') + '></td>';
+        });
+        body += '</tr>';
+      });
+      body += '</tbody>';
+
+      wrap.innerHTML = '<table class="matriz">' + head + body + '</table>';
     }
 
-    // ── Modal Novo/Editar ─────────────────────────────────────────────────────────
-    document.getElementById('btn-novo').addEventListener('click', function () { abrirModal(); });
-    document.getElementById('modal-fechar').addEventListener('click', fecharModal);
-    document.getElementById('btn-cancelar').addEventListener('click', fecharModal);
-    document.getElementById('modal-overlay').addEventListener('click', function (e) {
-      if (e.target === this) fecharModal();
+    // Delegação de eventos na matriz
+    document.getElementById('matriz-wrap').addEventListener('change', function (e) {
+      var chk = e.target.closest('.mtz-check');
+      if (!chk) return;
+      // Célula única: o próprio checkbox já reflete o estado — não re-renderiza (mantém scroll)
+      togglePares([chk.getAttribute('data-m')], [chk.getAttribute('data-d')], chk.checked, true);
     });
-    document.getElementById('btn-salvar').addEventListener('click', salvarMotorista);
+    document.getElementById('matriz-wrap').addEventListener('click', function (e) {
+      var cardBtn = e.target.closest('[data-cardbtn]');
+      if (cardBtn) { verUltimoCartao(cardBtn.getAttribute('data-cardbtn')); return; }
+      var editBtn = e.target.closest('[data-edit]');
+      if (editBtn) { e.stopPropagation(); abrirModalMotorista(mtz.motoristas.find(function (m) { return m.id === editBtn.getAttribute('data-edit'); })); return; }
+      var stBtn = e.target.closest('[data-status]');
+      if (stBtn) { e.stopPropagation(); toggleStatus(stBtn.getAttribute('data-status')); return; }
+      var delBtn = e.target.closest('[data-del]');
+      if (delBtn) { e.stopPropagation(); deletarMotorista(delBtn.getAttribute('data-del')); return; }
+      var devHead = e.target.closest('th[data-dev]');
+      if (devHead) { toggleColuna(devHead.getAttribute('data-dev')); return; }
+      var motHead = e.target.closest('th[data-mot]');
+      if (motHead) { toggleLinha(motHead.getAttribute('data-mot')); return; }
+    });
 
-    function abrirModal(m) {
-      document.getElementById('modal-id').value = m ? m.id : '';
-      document.getElementById('modal-titulo').innerHTML = '<i class="fa fa-id-card-o" style="margin-right:6px"></i>' + (m ? 'Editar Motorista' : 'Novo Motorista');
-      document.getElementById('modal-nome').value = m ? (m.nome || '') : '';
-      document.getElementById('modal-identificador').value = m ? (m.identificador || '') : '';
-      document.getElementById('modal-cnh').value = m ? (m.cnh || '') : '';
-      document.getElementById('modal-telefone').value = m ? (m.telefone || '') : '';
-      var sel = document.getElementById('modal-dispositivo');
-      sel.value = '';
-      // Ao editar, não pré-seleciona dispositivo (pode ter vários)
-      document.getElementById('modal-dispositivo-wrap').style.display = m ? 'none' : 'block';
-      document.getElementById('modal-overlay').classList.add('open');
-      document.getElementById('modal-nome').focus();
+    function toggleLinha(mId) {
+      var dispIds = mtz.dispositivos.map(function (d) { return d.id; });
+      var todosOn = dispIds.every(function (dId) { return mtz.vinc[chaveVinc(mId, dId)]; });
+      togglePares([mId], dispIds, !todosOn);
+    }
+    function toggleColuna(dId) {
+      var motIds = mtz.motoristas.map(function (m) { return m.id; });
+      var todosOn = motIds.every(function (mId) { return mtz.vinc[chaveVinc(mId, dId)]; });
+      togglePares(motIds, [dId], !todosOn);
+    }
+    document.getElementById('btn-vincular-tudo').addEventListener('click', function () {
+      var motIds = mtz.motoristas.map(function (m) { return m.id; });
+      var dispIds = mtz.dispositivos.map(function (d) { return d.id; });
+      if (!motIds.length || !dispIds.length) { AL.showAlert('Nada para vincular.', 'warning'); return; }
+      var todosOn = motIds.every(function (mId) { return dispIds.every(function (dId) { return mtz.vinc[chaveVinc(mId, dId)]; }); });
+      togglePares(motIds, dispIds, !todosOn);
+    });
+
+    // Aplica no servidor e atualiza estado local
+    function togglePares(motIds, dispIds, vincular, semRender) {
+      // Atualização otimista
+      motIds.forEach(function (mId) { dispIds.forEach(function (dId) {
+        if (vincular) mtz.vinc[chaveVinc(mId, dId)] = true; else delete mtz.vinc[chaveVinc(mId, dId)];
+      }); });
+      if (!semRender) renderMatriz();
+
+      AL.apiPost('/api/motoristas/vincular-massa', { motoristaIds: motIds, dispositivoIds: dispIds, vincular: vincular })
+        .catch(function (err) {
+          AL.showAlert(err.message || 'Erro ao salvar vínculo. Recarregando…', 'danger');
+          window.__abrirMatriz(mtz.clienteId); // reverte com estado real
+        });
     }
 
-    function fecharModal() {
-      document.getElementById('modal-overlay').classList.remove('open');
+    var filtroMotTimer = null, filtroDevTimer = null;
+    document.getElementById('filtro-motorista').addEventListener('input', function () {
+      clearTimeout(filtroMotTimer); filtroMotTimer = setTimeout(renderMatriz, 150);
+    });
+    document.getElementById('filtro-dispositivo').addEventListener('input', function () {
+      clearTimeout(filtroDevTimer); filtroDevTimer = setTimeout(renderMatriz, 150);
+    });
+
+    function verUltimoCartao(dId) {
+      var d = mtz.dispositivos.find(function (x) { return x.id === dId; });
+      var nome = d ? (d.nome || d.placa || d.identificador) : 'Dispositivo';
+      AL.apiGet('/api/motoristas/dispositivos/' + encodeURIComponent(dId) + '/ultimo-cartao').then(function (r) {
+        if (!r.cartaoId) { AL.showAlert(nome + ': nenhum cartão identificado na última posição.', 'info'); return; }
+        var quem = r.motorista ? (' → ' + r.motorista.nome) : ' (não cadastrado)';
+        AL.showAlert(nome + ': último cartão ' + r.cartaoId + quem + ' — lido ' + fmtDate(r.lidoEm), 'info');
+      }).catch(function (err) { AL.showAlert(err.message || 'Erro ao consultar cartão.', 'danger'); });
     }
 
-    window.editarMotorista = function (id) {
-      var m = todosMotoristas.find(function (x) { return x.id === id; });
-      if (m) abrirModal(m);
-    };
+    // ═══════════════════════ Navegação entre views ═════════════════════════════
+    function mostrarView(v) {
+      document.getElementById('view-empresas').style.display = v === 'empresas' ? 'flex' : 'none';
+      document.getElementById('view-matriz').style.display = v === 'matriz' ? 'flex' : 'none';
+      document.getElementById('btn-voltar-empresas').style.display = v === 'matriz' ? '' : 'none';
+      document.getElementById('btn-nova-empresa').style.display = v === 'empresas' ? '' : 'none';
+      if (v === 'empresas') document.getElementById('topbar-titulo').textContent = 'Motoristas';
+    }
+    document.getElementById('btn-voltar-empresas').addEventListener('click', function () {
+      mostrarView('empresas');
+      carregarEmpresas();
+    });
 
-    async function salvarMotorista() {
-      var id = document.getElementById('modal-id').value;
-      var nome = document.getElementById('modal-nome').value.trim();
-      var identificador = document.getElementById('modal-identificador').value.trim();
-      var cnh = document.getElementById('modal-cnh').value.trim();
-      var telefone = document.getElementById('modal-telefone').value.trim();
-      var dispositivoId = document.getElementById('modal-dispositivo').value;
+    // ═══════════════════════ Modal: Motorista ══════════════════════════════════
+    criarCombo(
+      document.getElementById('mm-empresa-input'),
+      document.getElementById('mm-empresa-list'),
+      document.getElementById('mm-empresa-id'),
+      function () { return [{ id: '', label: 'Sem empresa' }].concat(todosClientes); },
+      null
+    );
 
+    function abrirModalMotorista(m) {
+      carregarClientes();
+      document.getElementById('mm-id').value = m ? m.id : '';
+      document.getElementById('mm-titulo').innerHTML = '<i class="fa fa-id-card-o" style="margin-right:6px"></i>' + (m ? 'Editar Motorista' : 'Novo Motorista');
+      document.getElementById('mm-nome').value = m ? (m.nome || '') : '';
+      document.getElementById('mm-identificador').value = m ? (m.identificador || '') : '';
+      document.getElementById('mm-cnh').value = m ? (m.cnh || '') : '';
+      document.getElementById('mm-telefone').value = m ? (m.telefone || '') : '';
+
+      // Empresa: no cadastro dentro da matriz, prefixa a empresa atual
+      var empId = '', empLabel = 'Sem empresa';
+      if (mtz.clienteId && mtz.clienteId !== 'sem-empresa') {
+        empId = mtz.clienteId; empLabel = mtz.cliente ? mtz.cliente.nome : '';
+      }
+      document.getElementById('mm-empresa-id').value = empId;
+      document.getElementById('mm-empresa-input').value = empLabel;
+
+      document.getElementById('mm-ov').classList.add('open');
+      document.getElementById('mm-nome').focus();
+    }
+    function fecharModalMotorista() { document.getElementById('mm-ov').classList.remove('open'); }
+
+    document.getElementById('btn-novo-motorista').addEventListener('click', function () { abrirModalMotorista(null); });
+    document.getElementById('mm-fechar').addEventListener('click', fecharModalMotorista);
+    document.getElementById('mm-cancelar').addEventListener('click', fecharModalMotorista);
+    document.getElementById('mm-ov').addEventListener('click', function (e) { if (e.target === this) fecharModalMotorista(); });
+
+    document.getElementById('mm-salvar').addEventListener('click', async function () {
+      var id = document.getElementById('mm-id').value;
+      var nome = document.getElementById('mm-nome').value.trim();
       if (!nome) { AL.showAlert('Nome é obrigatório.', 'warning'); return; }
-
-      var btn = document.getElementById('btn-salvar');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
-
+      var payload = {
+        nome: nome,
+        identificador: document.getElementById('mm-identificador').value.trim() || null,
+        cnh: document.getElementById('mm-cnh').value.trim() || null,
+        telefone: document.getElementById('mm-telefone').value.trim() || null,
+        clienteId: document.getElementById('mm-empresa-id').value || null,
+      };
+      var btn = document.getElementById('mm-salvar');
+      btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
       try {
-        var payload = { 
-          nome: nome, 
-          identificador: identificador || null,
-          cnh: cnh || null, 
-          telefone: telefone || null 
-        };
-        if (!id && dispositivoId) payload.dispositivoId = dispositivoId;
-
-        if (id) {
-          await AL.apiPut('/api/motoristas/' + encodeURIComponent(id), payload);
-        } else {
-          await AL.apiPost('/api/motoristas', payload);
-        }
-        fecharModal();
-        await carregarMotoristas();
+        if (id) await AL.apiPut('/api/motoristas/' + encodeURIComponent(id), payload);
+        else await AL.apiPost('/api/motoristas', payload);
+        fecharModalMotorista();
         AL.showAlert(id ? 'Motorista atualizado.' : 'Motorista criado.', 'success');
+        // Recarrega a matriz atual (se aberta) ou a lista de empresas
+        if (document.getElementById('view-matriz').style.display !== 'none' && mtz.clienteId) window.__abrirMatriz(mtz.clienteId);
+        else carregarEmpresas();
       } catch (err) {
         AL.showAlert(err.message || 'Erro ao salvar.', 'danger');
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-check"></i> Salvar';
-      }
-    }
-
-    // ── Toggle status ─────────────────────────────────────────────────────────────
-    window.toggleStatus = async function (id) {
-      try {
-        await AL.apiPatch('/api/motoristas/' + encodeURIComponent(id) + '/status', {});
-        await carregarMotoristas();
-      } catch (err) {
-        AL.showAlert(err.message || 'Erro ao alterar status.', 'danger');
-      }
-    };
-
-    // ── Deletar ───────────────────────────────────────────────────────────────────
-    window.deletarMotorista = async function (id, nome) {
-      if (!confirm('Excluir motorista "' + nome + '"? Os vínculos com dispositivos serão removidos.')) return;
-      try {
-        await AL.apiDelete('/api/motoristas/' + encodeURIComponent(id));
-        await carregarMotoristas();
-        AL.showAlert('Motorista excluído.', 'success');
-      } catch (err) {
-        AL.showAlert(err.message || 'Erro ao excluir.', 'danger');
-      }
-    };
-
-    // ── Vincular avulso ───────────────────────────────────────────────────────────
-    var _vincularId = null;
-    window.abrirVincular = function (id, nome) {
-      _vincularId = id;
-      document.getElementById('vincular-nome').textContent = nome;
-      var sel = document.getElementById('vincular-dispositivo');
-      sel.innerHTML = '<option value="">Selecione o dispositivo...</option>';
-      todosDispositivos.forEach(function (d) {
-        if (!d.ativo) return;
-        var label = d.nome + (d.placa ? ' (' + d.placa + ')' : '');
-        sel.innerHTML += '<option value="' + esc(d.id) + '">' + esc(label) + '</option>';
-      });
-      document.getElementById('vincular-overlay').style.display = 'flex';
-    };
-    window.fecharVincular = function () {
-      document.getElementById('vincular-overlay').style.display = 'none';
-      _vincularId = null;
-    };
-    document.getElementById('btn-confirmar-vincular').addEventListener('click', async function () {
-      var dispositivoId = document.getElementById('vincular-dispositivo').value;
-      if (!dispositivoId || !_vincularId) { AL.showAlert('Selecione um dispositivo.', 'warning'); return; }
-      try {
-        await AL.apiPost('/api/motoristas/' + encodeURIComponent(_vincularId) + '/vincular', { dispositivoId: dispositivoId });
-        fecharVincular();
-        await carregarMotoristas();
-        AL.showAlert('Motorista vinculado ao dispositivo.', 'success');
-      } catch (err) {
-        AL.showAlert(err.message || 'Erro ao vincular.', 'danger');
+        btn.disabled = false; btn.innerHTML = '<i class="fa fa-check"></i> Salvar';
       }
     });
 
-    // ── Desvincular ───────────────────────────────────────────────────────────────
-    window.desvincularDispositivo = async function (motoristaId, dispositivoId) {
-      if (!confirm('Desvincular este dispositivo do motorista?')) return;
-      try {
-        await AL.apiDelete('/api/motoristas/' + encodeURIComponent(motoristaId) + '/vincular/' + encodeURIComponent(dispositivoId));
-        await carregarMotoristas();
-        AL.showAlert('Dispositivo desvinculado.', 'success');
-      } catch (err) {
-        AL.showAlert(err.message || 'Erro ao desvincular.', 'danger');
-      }
-    };
+    function toggleStatus(id) {
+      AL.apiPatch('/api/motoristas/' + encodeURIComponent(id) + '/status', {}).then(function () {
+        if (mtz.clienteId) window.__abrirMatriz(mtz.clienteId);
+      }).catch(function (err) { AL.showAlert(err.message || 'Erro ao alterar status.', 'danger'); });
+    }
+    function deletarMotorista(id) {
+      var m = mtz.motoristas.find(function (x) { return x.id === id; });
+      if (!confirm('Excluir motorista "' + (m ? m.nome : '') + '"? Os vínculos serão removidos.')) return;
+      AL.apiDelete('/api/motoristas/' + encodeURIComponent(id)).then(function () {
+        AL.showAlert('Motorista excluído.', 'success');
+        if (mtz.clienteId) window.__abrirMatriz(mtz.clienteId);
+      }).catch(function (err) { AL.showAlert(err.message || 'Erro ao excluir.', 'danger'); });
+    }
 
-    carregarMotoristas();
+    // ═══════════════════════ Modal: Escolher empresa ═══════════════════════════
+    criarCombo(
+      document.getElementById('ce-input'),
+      document.getElementById('ce-list'),
+      document.getElementById('ce-id'),
+      function () { return todosClientes; },
+      null
+    );
+    window.__abrirEscolherEmpresa = function () {
+      carregarClientes();
+      document.getElementById('ce-id').value = '';
+      document.getElementById('ce-input').value = '';
+      document.getElementById('ce-ov').classList.add('open');
+      document.getElementById('ce-input').focus();
+    };
+    function fecharEscolherEmpresa() { document.getElementById('ce-ov').classList.remove('open'); }
+    document.getElementById('ce-fechar').addEventListener('click', fecharEscolherEmpresa);
+    document.getElementById('ce-cancelar').addEventListener('click', fecharEscolherEmpresa);
+    document.getElementById('ce-ov').addEventListener('click', function (e) { if (e.target === this) fecharEscolherEmpresa(); });
+    document.getElementById('btn-nova-empresa').addEventListener('click', window.__abrirEscolherEmpresa);
+    document.getElementById('ce-abrir').addEventListener('click', function () {
+      var id = document.getElementById('ce-id').value;
+      if (!id) { AL.showAlert('Selecione uma empresa.', 'warning'); return; }
+      fecharEscolherEmpresa();
+      window.__abrirMatriz(id);
+    });
+
+    // ═══════════════════════ Início ════════════════════════════════════════════
+    mostrarView('empresas');
+    carregarEmpresas();
   })();
   </script>
 </body>

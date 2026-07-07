@@ -141,6 +141,14 @@ function getViagemVelMax(v: Viagem): number {
   if (v.velocidadeMaxima != null) return Number(v.velocidadeMaxima) || 0;
   return Math.round((Number(v.maxSpeed) || 0) * 1.852);
 }
+// Motorista da viagem (cartão RFID): nome se casou com cadastro; senão o ID cru
+// quando não zerado; null quando não houve identificação de cartão.
+function getViagemMotorista(v: Viagem): string | null {
+  if (v.motorista?.nome) return v.motorista.nome;
+  const id = v.motorista_id;
+  if (id && !/^0+$/.test(String(id).trim())) return `ID ${id}`;
+  return null;
+}
 
 function getParadaInicio(p: Parada)  { return p.inicio ?? p.startTime; }
 function getParadaFim(p: Parada)     { return p.fim    ?? p.endTime; }
@@ -781,6 +789,9 @@ function ViagensTab({ viagens }: { viagens: Viagem[] }) {
               <Text style={styles.tripStat}>{fmtDuracao(getViagemDurMin(item))}</Text>
               <Text style={styles.tripStat}>{getViagemVelMax(item)} km/h</Text>
             </View>
+            {getViagemMotorista(item) ? (
+              <Text style={styles.tripDriver} numberOfLines={1}>👤 {getViagemMotorista(item)}</Text>
+            ) : null}
             {(origem || destino) && (
               <View style={styles.tripRoute}>
                 {origem ? <Text style={styles.tripAddress} numberOfLines={1}>↑ {origem}</Text> : null}
@@ -1797,6 +1808,12 @@ const styles = StyleSheet.create({
   tripAddress: {
     fontSize: 11,
     color: colors.textMuted,
+  },
+  tripDriver: {
+    paddingLeft: 24 + spacing.sm,
+    fontSize: 12,
+    color: colors.text,
+    fontWeight: '600',
   },
 
   // Stop card

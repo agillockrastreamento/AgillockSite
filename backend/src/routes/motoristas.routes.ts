@@ -3,14 +3,16 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { requireMonitoramentoAccess, requireRoles } from '../middleware/roles.middleware';
 import { param } from '../utils/params';
 import prisma from '../utils/prisma';
-import { 
-  traccarCreateDriver, 
-  traccarUpdateDriver, 
-  traccarDeleteDriver, 
-  traccarLinkDriverToDevice, 
+import {
+  traccarCreateDriver,
+  traccarUpdateDriver,
+  traccarDeleteDriver,
+  traccarLinkDriverToDevice,
   traccarUnlinkDriverFromDevice,
-  traccarGetDeviceByImei 
+  traccarGetDeviceByImei,
+  traccarGetPositions,
 } from '../services/traccar.service';
+import { carregarResolvedorMotoristas, idMotoristaVazio } from '../services/motoristas.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -34,8 +36,161 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, 
     ...m,
     dispositivos: m.dispositivosVinculados.map(dv => dv.dispositivo)
   }));
-  
+
   res.json(result);
+});
+
+// ── GET /api/motoristas/empresas ───────────────────────────────────────────────
+// Nível 1 da tela: empresas (clientes) que possuem motoristas, com contagens.
+// Inclui um balde "Sem empresa" (clienteId null) para motoristas não atribuídos.
+router.get('/empresas', requireRoles('ADMIN', 'COLABORADOR'), async (_req: AuthRequest, res: Response): Promise<void> => {
+  const grupos = await prisma.motorista.groupBy({
+    by: ['clienteId'],
+    _count: { _all: true },
+  });
+  const clienteIds = grupos.map(g => g.clienteId).filter((x): x is string => !!x);
+  const [clientes, dispPorCliente] = await Promise.all([
+    prisma.cliente.findMany({ where: { id: { in: clienteIds } }, select: { id: true, nome: true, cpfCnpj: true } }),
+    prisma.dispositivo.groupBy({ by: ['clienteId'], where: { clienteId: { in: clienteIds }, ativo: true }, _count: { _all: true } }),
+  ]);
+  const clientePorId = new Map(clientes.map(c => [c.id, c]));
+  const dispCount = new Map(dispPorCliente.map(d => [d.clienteId, d._count._all]));
+
+  const empresas = grupos
+    .filter(g => g.clienteId)
+    .map(g => ({
+      clienteId: g.clienteId as string,
+      nome: clientePorId.get(g.clienteId as string)?.nome ?? '—',
+      cpfCnpj: clientePorId.get(g.clienteId as string)?.cpfCnpj ?? null,
+      qtdMotoristas: g._count._all,
+      qtdDispositivos: dispCount.get(g.clienteId as string) ?? 0,
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+
+  const semEmpresa = grupos.find(g => g.clienteId === null);
+  if (semEmpresa) {
+    empresas.push({ clienteId: 'sem-empresa', nome: 'Sem empresa', cpfCnpj: null, qtdMotoristas: semEmpresa._count._all, qtdDispositivos: 0 });
+  }
+  res.json(empresas);
+});
+
+// ── GET /api/motoristas/empresa/:clienteId ─────────────────────────────────────
+// Nível 2 da tela: motoristas + dispositivos + matriz de vínculos de uma empresa.
+router.get('/empresa/:clienteId', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const raw = param(req, 'clienteId');
+  const semEmpresa = raw === 'sem-empresa';
+  const clienteId = semEmpresa ? null : raw;
+
+  const cliente = semEmpresa ? null : await prisma.cliente.findUnique({ where: { id: clienteId! }, select: { id: true, nome: true, cpfCnpj: true } });
+  if (!semEmpresa && !cliente) { res.status(404).json({ error: 'Empresa não encontrada.' }); return; }
+
+  const motoristas = await prisma.motorista.findMany({
+    where: { clienteId: clienteId },
+    orderBy: { nome: 'asc' },
+    select: {
+      id: true, nome: true, identificador: true, cnh: true, telefone: true, ativo: true,
+      dispositivosVinculados: { select: { dispositivoId: true } },
+    },
+  });
+
+  // Dispositivos disponíveis para a matriz: da empresa (ativos) ou, no balde
+  // "Sem empresa", os que já estão vinculados a esses motoristas (para dar contexto).
+  let dispositivos: { id: string; nome: string; placa: string | null; identificador: string }[];
+  if (semEmpresa) {
+    const idsVinculados = [...new Set(motoristas.flatMap(m => m.dispositivosVinculados.map(dv => dv.dispositivoId)))];
+    dispositivos = idsVinculados.length
+      ? await prisma.dispositivo.findMany({ where: { id: { in: idsVinculados } }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, placa: true, identificador: true } })
+      : [];
+  } else {
+    dispositivos = await prisma.dispositivo.findMany({
+      where: { clienteId: clienteId!, ativo: true },
+      orderBy: { nome: 'asc' },
+      select: { id: true, nome: true, placa: true, identificador: true },
+    });
+  }
+
+  const dispIds = new Set(dispositivos.map(d => d.id));
+  const vinculos: { motoristaId: string; dispositivoId: string }[] = [];
+  for (const m of motoristas) {
+    for (const dv of m.dispositivosVinculados) {
+      if (dispIds.has(dv.dispositivoId)) vinculos.push({ motoristaId: m.id, dispositivoId: dv.dispositivoId });
+    }
+  }
+
+  res.json({
+    cliente: cliente ?? { id: 'sem-empresa', nome: 'Sem empresa', cpfCnpj: null },
+    motoristas: motoristas.map(m => ({ id: m.id, nome: m.nome, identificador: m.identificador, cnh: m.cnh, telefone: m.telefone, ativo: m.ativo })),
+    dispositivos,
+    vinculos,
+  });
+});
+
+// ── POST /api/motoristas/vincular-massa ────────────────────────────────────────
+// Vincula (ou desvincula) várias combinações motorista×dispositivo de uma vez.
+router.post('/vincular-massa', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { motoristaIds, dispositivoIds, vincular } = req.body as {
+    motoristaIds?: string[]; dispositivoIds?: string[]; vincular?: boolean;
+  };
+  if (!Array.isArray(motoristaIds) || !Array.isArray(dispositivoIds) || !motoristaIds.length || !dispositivoIds.length) {
+    res.status(400).json({ error: 'Informe ao menos um motorista e um dispositivo.' }); return;
+  }
+  const ligar = vincular !== false; // default: vincular
+
+  const pares: { motoristaId: string; dispositivoId: string }[] = [];
+  for (const mId of motoristaIds) for (const dId of dispositivoIds) pares.push({ motoristaId: mId, dispositivoId: dId });
+
+  // 1. Banco local
+  if (ligar) {
+    await prisma.motoristaDispositivo.createMany({ data: pares, skipDuplicates: true });
+  } else {
+    await prisma.motoristaDispositivo.deleteMany({ where: { OR: pares } });
+  }
+
+  // 2. Traccar (best-effort — não bloqueia a resposta em caso de falha)
+  try {
+    const [motoristas, dispositivos] = await Promise.all([
+      prisma.motorista.findMany({ where: { id: { in: motoristaIds }, traccarId: { not: null } }, select: { traccarId: true } }),
+      prisma.dispositivo.findMany({ where: { id: { in: dispositivoIds } }, select: { identificador: true } }),
+    ]);
+    const traccarDeviceIds: number[] = [];
+    for (const d of dispositivos) {
+      const tDev = await traccarGetDeviceByImei(d.identificador).catch(() => null);
+      if (tDev) traccarDeviceIds.push(tDev.id);
+    }
+    for (const m of motoristas) {
+      if (!m.traccarId) continue;
+      for (const tDevId of traccarDeviceIds) {
+        if (ligar) await traccarLinkDriverToDevice(m.traccarId, tDevId).catch(() => {});
+        else await traccarUnlinkDriverFromDevice(m.traccarId, tDevId).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao sincronizar vínculos em massa no Traccar:', err);
+  }
+
+  res.json({ ok: true, pares: pares.length, vinculados: ligar });
+});
+
+// ── GET /api/motoristas/dispositivos/:id/ultimo-cartao ─────────────────────────
+// Último cartão RFID lido por um dispositivo (última posição). Ajuda a cadastrar o
+// identificador no formato exato que o Traccar recebe.
+router.get('/dispositivos/:id/ultimo-cartao', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const disp = await prisma.dispositivo.findUnique({ where: { id }, select: { identificador: true } });
+  if (!disp) { res.status(404).json({ error: 'Dispositivo não encontrado.' }); return; }
+
+  const tDev = await traccarGetDeviceByImei(disp.identificador).catch(() => null);
+  if (!tDev) { res.json({ cartaoId: null, motorista: null, lidoEm: null }); return; }
+
+  const posicoes = await traccarGetPositions([tDev.id]).catch(() => []);
+  const pos = posicoes[0];
+  const driverId = pos?.attributes?.driverUniqueId;
+  const resolver = await carregarResolvedorMotoristas();
+  res.json({
+    cartaoId: idMotoristaVazio(driverId) ? null : String(driverId),
+    motorista: resolver(driverId),
+    lidoEm: pos ? (pos.deviceTime || pos.fixTime || pos.serverTime || null) : null,
+  });
 });
 
 // ── GET /api/motoristas/:id ────────────────────────────────────────────────────
@@ -63,8 +218,8 @@ router.get('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
 
 // ── POST /api/motoristas ───────────────────────────────────────────────────────
 router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
-  const { nome, identificador, cnh, telefone, dispositivoId } = req.body as {
-    nome: string; identificador?: string; cnh?: string; telefone?: string; dispositivoId?: string;
+  const { nome, identificador, cnh, telefone, dispositivoId, clienteId } = req.body as {
+    nome: string; identificador?: string; cnh?: string; telefone?: string; dispositivoId?: string; clienteId?: string | null;
   };
   if (!nome?.trim()) { res.status(400).json({ error: 'Nome é obrigatório.' }); return; }
 
@@ -75,6 +230,7 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
       identificador: identificador?.trim() || null,
       cnh: cnh?.trim() || null,
       telefone: telefone?.trim() || null,
+      clienteId: clienteId || null,
       ...(dispositivoId ? {
         dispositivosVinculados: {
           create: { dispositivoId: dispositivoId }
@@ -124,8 +280,8 @@ router.post('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, 
 // ── PUT /api/motoristas/:id ────────────────────────────────────────────────────
 router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
-  const { nome, identificador, cnh, telefone, ativo } = req.body as {
-    nome?: string; identificador?: string; cnh?: string; telefone?: string; ativo?: boolean;
+  const { nome, identificador, cnh, telefone, ativo, clienteId } = req.body as {
+    nome?: string; identificador?: string; cnh?: string; telefone?: string; ativo?: boolean; clienteId?: string | null;
   };
 
   const existe = await prisma.motorista.findUnique({ where: { id } });
@@ -139,6 +295,7 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
       ...(cnh !== undefined ? { cnh: cnh.trim() || null } : {}),
       ...(telefone !== undefined ? { telefone: telefone.trim() || null } : {}),
       ...(ativo !== undefined ? { ativo } : {}),
+      ...(clienteId !== undefined ? { clienteId: clienteId || null } : {}),
     },
     include: {
       dispositivosVinculados: {

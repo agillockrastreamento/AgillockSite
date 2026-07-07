@@ -710,6 +710,7 @@ function renderViagens(viagens) {
     const card = document.createElement('div');
     card.className = 'viagem-card';
     card.dataset.i = i;
+    const motorista = nomeMotoristaViagem(v);
     card.innerHTML = `
       <div class="viagem-hora">
         <i class="fa fa-circle" style="font-size:7px;color:#2980b9;vertical-align:middle"></i>
@@ -720,6 +721,7 @@ function renderViagens(viagens) {
         &nbsp;·&nbsp; ${v.distancia.toFixed(1)} km
         &nbsp;·&nbsp; máx ${v.velocidadeMaxima} km/h
       </div>
+      ${motorista ? `<div class="viagem-info"><i class="fa fa-id-card-o" style="color:#7f8c8d"></i> ${motorista}</div>` : ''}
     `;
     card.addEventListener('click', function () {
       lista.querySelectorAll('.viagem-card').forEach(c => c.classList.remove('ativo'));
@@ -737,6 +739,15 @@ function fmtDuracao(minutos) {
   const h = Math.floor(minutos / 60);
   const m = minutos % 60;
   return h ? `${h}h ${m}min` : `${m}min`;
+}
+
+// Motorista da viagem: nome se o cartão RFID casou com um cadastro; senão o ID
+// cru (quando não zerado); null quando não houve identificação de cartão.
+function nomeMotoristaViagem(v) {
+  if (v && v.motorista && v.motorista.nome) return v.motorista.nome;
+  const id = v && v.motorista_id;
+  if (id && !/^0+$/.test(String(id).trim())) return 'ID ' + id;
+  return null;
 }
 
 function fmtHora(iso) {

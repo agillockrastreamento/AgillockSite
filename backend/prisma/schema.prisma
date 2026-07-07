@@ -141,6 +141,7 @@ model Cliente {
   logins                 ClienteLogin[]
   geocercas              Geocerca[]
   iaproVeiculos          IaproVeiculo[]
+  motoristas             Motorista[]
 }
 
 // Veículo de um contrato da IAPRO sincronizado via API. Enquanto não houver um
@@ -394,7 +395,15 @@ model Motorista {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Empresa (cliente) à qual o motorista pertence. Opcional: motoristas antigos
+  // ficam sem empresa até serem reatribuídos. Usado para agrupar a tela e para o
+  // vínculo em massa (todos os motoristas ↔ todos os dispositivos da empresa).
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
   dispositivosVinculados MotoristaDispositivo[]
+
+  @@index([clienteId])
 }
 
 model MotoristaDispositivo {
