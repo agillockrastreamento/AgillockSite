@@ -23,7 +23,6 @@ import {
   traccarGetStops,
   traccarGetEvents,
   traccarGetSummary,
-  traccarExportReport,
   traccarGetCommandTypes,
   traccarSendCommand,
   traccarGetGeofences,
@@ -50,7 +49,14 @@ import {
 import {
   carregarResolvedorMotoristas,
   cartaoDaViagem,
+  cartaoAntesDe,
 } from '../services/motoristas.service';
+import {
+  coletarDadosRelatorio,
+  gerarRelatorioXlsx,
+  gerarRelatorioPdf,
+  TipoRelatorio,
+} from '../services/relatorio-export.service';
 import { CLIENTE_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
 const router = Router();
@@ -626,7 +632,11 @@ router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest,
 
   const fromDate = from ? new Date(from) : new Date(Date.now() - 24 * 60 * 60 * 1000);
   const toDate = to ? new Date(to) : new Date();
-  const eventos = await traccarGetEvents([traccarDevice.id], fromDate, toDate);
+  const [eventos, historicoEventos, resolverMotoristaEv] = await Promise.all([
+    traccarGetEvents([traccarDevice.id], fromDate, toDate),
+    traccarGetPositionHistory([traccarDevice.id], fromDate, toDate).catch(() => []),
+    carregarResolvedorMotoristas(),
+  ]);
 
   const allowedGeocercas = await prisma.geocerca.findMany({
     where: {
@@ -643,15 +653,20 @@ router.get('/rastreamento/dispositivos/:id/eventos', async (req: ClienteRequest,
 
   res.json(eventos
     .filter(e => !(e.type === 'geofenceEnter' || e.type === 'geofenceExit') || allowedSet.has(e.geofenceId))
-    .map(e => ({
-      id: e.id,
-      tipo: e.type,
-      tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
-      hora: e.eventTime,
-      posicaoId: e.positionId,
-      atributos: e.attributes,
-      geofenceId: e.geofenceId,
-  })));
+    .map(e => {
+      const cartao = cartaoAntesDe(historicoEventos, new Date(e.eventTime).getTime());
+      return {
+        id: e.id,
+        tipo: e.type,
+        tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
+        hora: e.eventTime,
+        posicaoId: e.positionId,
+        atributos: e.attributes,
+        geofenceId: e.geofenceId,
+        motorista: resolverMotoristaEv(cartao),
+        motorista_id: cartao,
+      };
+  }));
 });
 
 // ── GET /api/cliente/rastreamento/dispositivos/:id/resumo ────────────────────
@@ -864,8 +879,15 @@ router.get('/rastreamento/relatorios/batch/eventos', async (req: ClienteRequest,
   try {
     const { traccarIds } = await resolverDispositivosCliente(req, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
-    const eventos = await traccarGetEvents(traccarIds, new Date(from), new Date(to));
-    res.json(eventos.map(e => ({ id: e.id, deviceId: e.deviceId, tipo: e.type, tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type, hora: e.eventTime, atributos: e.attributes })));
+    const [eventos, historico, resolverMotorista] = await Promise.all([
+      traccarGetEvents(traccarIds, new Date(from), new Date(to)),
+      traccarGetPositionHistory(traccarIds, new Date(from), new Date(to)).catch(() => []),
+      carregarResolvedorMotoristas(),
+    ]);
+    res.json(eventos.map(e => {
+      const cartao = cartaoAntesDe(historico.filter(p => p.deviceId === e.deviceId), new Date(e.eventTime).getTime());
+      return { id: e.id, deviceId: e.deviceId, tipo: e.type, tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type, hora: e.eventTime, atributos: e.attributes, motorista: resolverMotorista(cartao), motorista_id: cartao };
+    }));
   } catch { res.status(502).json({ error: 'Erro ao buscar eventos.' }); }
 });
 
@@ -895,9 +917,9 @@ router.get('/rastreamento/dispositivos/:id/exportar', async (req: ClienteRequest
   const dispositivoId = param(req, 'id');
   const from = query(req.query.from);
   const to = query(req.query.to);
-  const type = query(req.query.type) || 'route';
+  const type = query(req.query.type) || 'completo';
 
-  if (!from || !to || !['route', 'events', 'trips', 'stops', 'summary'].includes(type)) {
+  if (!from || !to || !['route', 'events', 'trips', 'stops', 'summary', 'completo'].includes(type)) {
     res.status(400).json({ error: 'Parâmetros incompletos.' });
     return;
   }
@@ -926,12 +948,18 @@ router.get('/rastreamento/dispositivos/:id/exportar', async (req: ClienteRequest
     return;
   }
 
+  const formatoSingle = query(req.query.formato) === 'pdf' ? 'pdf' : 'xlsx';
   try {
-    const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', [traccarDevice.id], from, to);
-    const buffer = await response.arrayBuffer();
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);
-    res.send(Buffer.from(buffer));
+    const dados = await coletarDadosRelatorio([traccarDevice.id], from, to);
+    if (formatoSingle === 'pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=relatorio.pdf');
+      res.send(await gerarRelatorioPdf(dados));
+    } else {
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=relatorio.xlsx');
+      res.send(await gerarRelatorioXlsx(dados, type as TipoRelatorio));
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Erro na exportação: ${msg}` });
@@ -942,9 +970,10 @@ router.get('/rastreamento/relatorios/exportar', async (req: ClienteRequest, res:
   const clienteId = req.cliente!.clienteId;
   const from = query(req.query.from);
   const to = query(req.query.to);
-  const type = query(req.query.type) || 'route';
+  const type = query(req.query.type) || 'completo';
+  const formato = query(req.query.formato) === 'pdf' ? 'pdf' : 'xlsx';
   const deviceIds = req.query.deviceId as string[] | string;
-  if (!from || !to || !deviceIds || !['route', 'events', 'trips', 'stops', 'summary'].includes(type)) {
+  if (!from || !to || !deviceIds || !['route', 'events', 'trips', 'stops', 'summary', 'completo'].includes(type)) {
     res.status(400).json({ error: 'Parâmetros incompletos.' });
     return;
   }
@@ -955,11 +984,16 @@ router.get('/rastreamento/relatorios/exportar', async (req: ClienteRequest, res:
   try {
     const { traccarIds } = await resolverDispositivosCliente(req, deviceIds);
     if (!traccarIds.length) { res.status(404).json({ error: 'Nenhum dispositivo sincronizado.' }); return; }
-    const response = await traccarExportReport(type as 'route' | 'events' | 'trips' | 'stops' | 'summary', traccarIds, from, to);
-    const buffer = await response.arrayBuffer();
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);
-    res.send(Buffer.from(buffer));
+    const dados = await coletarDadosRelatorio(traccarIds, from, to);
+    if (formato === 'pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=relatorio.pdf');
+      res.send(await gerarRelatorioPdf(dados));
+    } else {
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=relatorio.xlsx');
+      res.send(await gerarRelatorioXlsx(dados, type as TipoRelatorio));
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Erro na exportação: ${msg}` });

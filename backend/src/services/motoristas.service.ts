@@ -56,11 +56,16 @@ export function cartaoDaViagem(
   posicoes: TraccarPosition[],
 ): string | null {
   if (!idMotoristaVazio(viagem.driverUniqueId)) return viagem.driverUniqueId!;
-  const fimMs = new Date(viagem.endTime).getTime();
+  return cartaoAntesDe(posicoes, new Date(viagem.endTime).getTime());
+}
+
+// Cartão do motorista em efeito num instante: o evento de cartão (serial) mais
+// recente com tempo ≤ ateMs. Usado para viagens e para eventos (ex.: driverChanged).
+export function cartaoAntesDe(posicoes: TraccarPosition[], ateMs: number): string | null {
   let melhor: { t: number; cartao: string } | null = null;
   for (const posicao of posicoes) {
     const t = tempoPosicaoMs(posicao);
-    if (t == null || t > fimMs) continue;
+    if (t == null || t > ateMs) continue;
     const cartao = cartaoDaPosicao(posicao.attributes);
     if (!cartao) continue;
     if (!melhor || t > melhor.t) melhor = { t, cartao: cartao.cartao };

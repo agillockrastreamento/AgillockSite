@@ -102,11 +102,6 @@
         <button class="btn btn-default btn-sm" id="btn-voltar"><i class="fa fa-arrow-left"></i></button>
         <h2 class="topbar-title" id="page-title">Novo Dispositivo</h2>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button class="btn btn-default btn-sm" id="btn-motorista-transito" title="Ver motorista em trânsito" style="display:none;">
-          <i class="fa fa-id-card-o"></i> Motorista em trânsito
-        </button>
-      </div>
     </div>
 
     <div class="disp-page-scroll">
@@ -416,21 +411,6 @@
 
     </div><!-- /page-body -->
     </div><!-- /disp-page-scroll -->
-  </div>
-
-  <!-- Modal: Motorista em trânsito -->
-  <div id="mt-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:10px;width:400px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden;">
-      <div style="background:#1e2530;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:14px;font-weight:700"><i class="fa fa-id-card-o" style="margin-right:6px"></i> Motorista em trânsito</span>
-        <button id="mt-fechar" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;line-height:1;padding:0">×</button>
-      </div>
-      <div style="padding:18px 16px;" id="mt-body"></div>
-      <div style="padding:12px 16px;border-top:1px solid #eee;display:flex;justify-content:space-between;gap:8px;">
-        <button type="button" class="btn btn-default btn-sm" id="mt-atualizar"><i class="fa fa-refresh"></i> Atualizar</button>
-        <button type="button" class="btn btn-primary btn-sm" id="mt-ok">Fechar</button>
-      </div>
-    </div>
   </div>
 
   <script src="../js/jquery.js"></script>
@@ -786,9 +766,6 @@
 
     // ── Carregar dados se editando ────────────────────────────────────────
     function preencherForm(d) {
-      // Botão "Motorista em trânsito" só aparece se o veículo tem motorista vinculado
-      document.getElementById('btn-motorista-transito').style.display =
-        (d.motoristasVinculados && d.motoristasVinculados.length) ? '' : 'none';
       document.getElementById('d-nome').value = d.nome || '';
       document.getElementById('d-identificador').value = d.identificador || '';
       document.getElementById('d-grupo').value = d.grupo || '';
@@ -952,51 +929,6 @@
           document.getElementById('btn-salvar-spin').style.display = 'none';
         });
     });
-
-    // ── Modal: Motorista em trânsito ────────────────────────────────────────
-    (function () {
-      var btnMt = document.getElementById('btn-motorista-transito');
-      var ov = document.getElementById('mt-overlay');
-      function escMt(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-      function fmtDt(s){ if(!s) return '—'; try { return new Date(s).toLocaleString('pt-BR'); } catch(e){ return s; } }
-      function abrir() {
-        ov.style.display = 'flex';
-        document.getElementById('mt-body').innerHTML = '<div style="text-align:center;color:#aaa;padding:20px"><i class="fa fa-spinner fa-spin fa-2x"></i></div>';
-        if (!dispositivoId) return;
-        AL.apiGet('/api/motoristas/dispositivos/' + encodeURIComponent(dispositivoId) + '/ultimo-cartao')
-          .then(render)
-          .catch(function (err) {
-            document.getElementById('mt-body').innerHTML = '<div style="color:#e74c3c">' + escMt(err.message || 'Erro ao consultar.') + '</div>';
-          });
-      }
-      function render(r) {
-        var jornada = r.inicio === false ? '<span style="color:#e74c3c">Encerrou a jornada</span>'
-          : (r.inicio === true ? '<span style="color:#27ae60">Em jornada</span>' : '');
-        var corpo;
-        if (r.motorista) {
-          corpo = '<div style="font-size:17px;font-weight:700;margin-bottom:10px"><i class="fa fa-user" style="color:#27ae60;margin-right:6px"></i>' + escMt(r.motorista.nome) + '</div>'
-            + '<table style="width:100%;font-size:13px"><tbody>'
-            + '<tr><td style="color:#888;padding:4px 0;width:90px">Cartão</td><td>' + escMt(r.cartaoId) + '</td></tr>'
-            + '<tr><td style="color:#888;padding:4px 0">CNH</td><td>' + escMt(r.motorista.cnh || '—') + '</td></tr>'
-            + '<tr><td style="color:#888;padding:4px 0">Lido em</td><td>' + fmtDt(r.lidoEm) + '</td></tr>'
-            + (jornada ? '<tr><td style="color:#888;padding:4px 0">Jornada</td><td>' + jornada + '</td></tr>' : '')
-            + '</tbody></table>';
-        } else if (r.cartaoId) {
-          corpo = '<div style="margin-bottom:8px"><i class="fa fa-id-card-o" style="color:#f39c12;margin-right:6px"></i> Cartão <strong>' + escMt(r.cartaoId) + '</strong> não cadastrado como motorista.</div>'
-            + '<div style="font-size:12px;color:#888;margin-bottom:10px">Lido em ' + fmtDt(r.lidoEm) + '.' + (jornada ? ' · ' + jornada : '') + '</div>'
-            + '<div style="font-size:12px;color:#888">Cadastre um motorista com o identificador <strong>' + escMt(r.cartaoId) + '</strong> para ele aparecer nos relatórios.</div>';
-        } else {
-          corpo = '<div style="text-align:center;color:#aaa;padding:16px 0"><i class="fa fa-id-card-o fa-2x"></i><div style="margin-top:8px;font-size:13px">Nenhum cartão lido nos últimos 7 dias.</div></div>';
-        }
-        document.getElementById('mt-body').innerHTML = corpo;
-      }
-      function fechar(){ ov.style.display = 'none'; }
-      btnMt.addEventListener('click', abrir);
-      document.getElementById('mt-fechar').addEventListener('click', fechar);
-      document.getElementById('mt-ok').addEventListener('click', fechar);
-      document.getElementById('mt-atualizar').addEventListener('click', abrir);
-      ov.addEventListener('click', function(e){ if(e.target===this) fechar(); });
-    })();
 
   })();
   </script>

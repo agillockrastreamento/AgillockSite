@@ -140,8 +140,9 @@ export async function getExportUrl(
   from: Date,
   to: Date,
   tipo: string,
+  formato: string = 'xlsx',
 ): Promise<{ url: string; token: string }> {
   const token = (await tokenStorage.get()) ?? '';
-  const url = `${environment.apiUrl}${BASE}/${id}/exportar?${buildQs(from, to)}&type=${tipo}`;
+  const url = `${environment.apiUrl}${BASE}/${id}/exportar?${buildQs(from, to)}&type=${tipo}&formato=${formato}`;
   return { url, token };
 }

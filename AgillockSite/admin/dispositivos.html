@@ -17,6 +17,20 @@
     .table-responsive { flex: 1; overflow-y: auto; border-radius: 8px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 0; }
     html.dark-theme .table-responsive { background: #141820; }
     .admin-table thead th { position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
+
+    /* Modal Motorista em trânsito (adaptado ao tema escuro) */
+    #mt-ov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:3000; align-items:center; justify-content:center; }
+    #mt-ov.open { display:flex; }
+    #mt-card { background:#fff; color:#263238; border-radius:10px; width:400px; max-width:95vw; box-shadow:0 8px 32px rgba(0,0,0,.25); overflow:hidden; }
+    html.dark-theme #mt-card { background:#1e1e2e; color:#e6e6e6; }
+    #mt-card .mt-head { background:#1e2530; color:#fff; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; }
+    #mt-card .mt-head button { background:none; border:none; color:rgba(255,255,255,.7); font-size:20px; cursor:pointer; line-height:1; padding:0; }
+    #mt-card .mt-body { padding:18px 16px; font-size:13px; }
+    #mt-card .mt-body table { width:100%; }
+    #mt-card .mt-body td { padding:4px 0; }
+    #mt-card .mt-body td.lbl { color:#90a4ae; width:90px; }
+    #mt-card .mt-foot { padding:12px 16px; border-top:1px solid #eee; display:flex; justify-content:space-between; gap:8px; }
+    html.dark-theme #mt-card .mt-foot { border-color:#333; }
   </style>
 </head>
 <body>
@@ -124,6 +138,21 @@
     </div>
   </div>
 
+  <!-- Modal: Motorista em trânsito -->
+  <div id="mt-ov">
+    <div id="mt-card">
+      <div class="mt-head">
+        <span style="font-size:14px;font-weight:700"><i class="fa fa-id-card-o" style="margin-right:6px"></i> Motorista em trânsito</span>
+        <button id="mt-x">&times;</button>
+      </div>
+      <div class="mt-body" id="mt-body"></div>
+      <div class="mt-foot">
+        <button type="button" class="btn btn-default btn-sm" id="mt-refresh"><i class="fa fa-refresh"></i> Atualizar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="mt-ok">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/jquery.js"></script>
   <script src="../js/bootstrap.min.js"></script>
   <script src="../js/config.js"></script>
@@ -144,6 +173,11 @@
         document.getElementById('sidebar').classList.toggle('open');
         document.getElementById('sidebar-overlay').classList.toggle('open');
       });
+      document.getElementById('mt-x').addEventListener('click', fecharMotoristaTransito);
+      document.getElementById('mt-ok').addEventListener('click', fecharMotoristaTransito);
+      document.getElementById('mt-refresh').addEventListener('click', carregarMotoristaTransito);
+      document.getElementById('mt-ov').addEventListener('click', function (e) { if (e.target === this) fecharMotoristaTransito(); });
+
       document.getElementById('sidebar-overlay').addEventListener('click', function () {
         document.getElementById('sidebar').classList.remove('open');
         document.getElementById('sidebar-overlay').classList.remove('open');
@@ -201,6 +235,9 @@
             '<td onclick="event.stopPropagation();">' + clienteNome + '</td>' +
             '<td>' + AL.badgeStatus(d.ativo ? 'ATIVO' : 'INATIVO') + '</td>' +
             '<td onclick="event.stopPropagation();" style="text-align:right;white-space:nowrap;">' +
+            ((d._count && d._count.motoristasVinculados > 0)
+              ? '<button class="btn btn-xs btn-info btn-mt" data-id="' + d.id + '" data-nome="' + esc(d.nome) + (d.placa ? ' (' + esc(d.placa) + ')' : '') + '" title="Motorista em trânsito"><i class="fa fa-id-card-o"></i></button> '
+              : '') +
             '<a href="' + editUrl + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a> ' +
             '<button class="btn btn-xs ' + (d.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + d.id + '" title="' + (d.ativo ? 'Inativar' : 'Ativar') + '"><i class="fa fa-power-off"></i></button> ' +
             '<button class="btn btn-xs btn-danger btn-excluir-disp" data-id="' + d.id + '" data-nome="' + esc(d.nome) + '" title="Excluir"><i class="fa fa-trash"></i></button>' +
@@ -235,6 +272,49 @@
             });
           });
         });
+
+        document.querySelectorAll('.btn-mt').forEach(function (btn) {
+          btn.addEventListener('click', function () { abrirMotoristaTransito(this.dataset.id, this.dataset.nome); });
+        });
+      }
+
+      // ── Modal: Motorista em trânsito ──────────────────────────────────────
+      var _mtId = null, _mtNome = '';
+      function escMt(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+      function fmtMtDt(s) { if (!s) return '—'; try { return new Date(s).toLocaleString('pt-BR'); } catch (e) { return s; } }
+      function abrirMotoristaTransito(id, nome) {
+        _mtId = id; _mtNome = nome || '';
+        document.getElementById('mt-ov').classList.add('open');
+        carregarMotoristaTransito();
+      }
+      function fecharMotoristaTransito() { document.getElementById('mt-ov').classList.remove('open'); _mtId = null; }
+      function carregarMotoristaTransito() {
+        document.getElementById('mt-body').innerHTML = '<div style="text-align:center;color:#999;padding:20px"><i class="fa fa-spinner fa-spin fa-2x"></i></div>';
+        AL.apiGet('/api/motoristas/dispositivos/' + encodeURIComponent(_mtId) + '/ultimo-cartao')
+          .then(renderMotoristaTransito)
+          .catch(function (err) { document.getElementById('mt-body').innerHTML = '<div style="color:#e74c3c">' + escMt(err.message || 'Erro ao consultar.') + '</div>'; });
+      }
+      function renderMotoristaTransito(r) {
+        var jornada = r.inicio === false ? '<span style="color:#e74c3c">Encerrou a jornada</span>'
+          : (r.inicio === true ? '<span style="color:#27ae60">Em jornada</span>' : '');
+        var veic = '<div style="font-size:12px;color:#90a4ae;margin-bottom:10px"><i class="fa fa-car"></i> ' + escMt(_mtNome) + '</div>';
+        var corpo;
+        if (r.motorista) {
+          corpo = veic + '<div style="font-size:17px;font-weight:700;margin-bottom:8px"><i class="fa fa-user" style="color:#27ae60;margin-right:6px"></i>' + escMt(r.motorista.nome) + '</div>'
+            + '<table><tbody>'
+            + '<tr><td class="lbl">Cartão</td><td>' + escMt(r.cartaoId) + '</td></tr>'
+            + '<tr><td class="lbl">CNH</td><td>' + escMt(r.motorista.cnh || '—') + '</td></tr>'
+            + '<tr><td class="lbl">Lido em</td><td>' + fmtMtDt(r.lidoEm) + '</td></tr>'
+            + (jornada ? '<tr><td class="lbl">Jornada</td><td>' + jornada + '</td></tr>' : '')
+            + '</tbody></table>';
+        } else if (r.cartaoId) {
+          corpo = veic + '<div style="margin-bottom:8px"><i class="fa fa-id-card-o" style="color:#f39c12;margin-right:6px"></i> Cartão <strong>' + escMt(r.cartaoId) + '</strong> não cadastrado.</div>'
+            + '<div style="font-size:12px;color:#90a4ae;margin-bottom:8px">Lido em ' + fmtMtDt(r.lidoEm) + '.' + (jornada ? ' · ' + jornada : '') + '</div>'
+            + '<a href="motoristas.html" class="btn btn-xs btn-default"><i class="fa fa-plus"></i> Cadastrar motorista</a>';
+        } else {
+          corpo = veic + '<div style="text-align:center;color:#999;padding:16px 0"><i class="fa fa-id-card-o fa-2x"></i><div style="margin-top:8px">Nenhum cartão lido nos últimos 7 dias.</div></div>';
+        }
+        document.getElementById('mt-body').innerHTML = corpo;
       }
 
       function carregarDispositivos() {

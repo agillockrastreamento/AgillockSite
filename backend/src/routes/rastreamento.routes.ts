@@ -23,11 +23,16 @@ import {
   traccarLinkGeofenceToDevice,
   traccarUnlinkGeofenceFromDevice,
   traccarGetServerLog,
-  traccarExportReport,
   normalizeAttributes,
   cartaoDaPosicao,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
+import {
+  coletarDadosRelatorio,
+  gerarRelatorioXlsx,
+  gerarRelatorioPdf,
+  TipoRelatorio,
+} from '../services/relatorio-export.service';
 import {
   DISPOSITIVO_MEDIDORES_SELECT,
   sincronizarDispositivosComPosicoes,
@@ -41,6 +46,7 @@ import {
 import {
   carregarResolvedorMotoristas,
   cartaoDaViagem,
+  cartaoAntesDe,
 } from '../services/motoristas.service';
 
 const router = Router();
@@ -1168,7 +1174,11 @@ router.get('/relatorios/batch/eventos', requireRoles('ADMIN', 'COLABORADOR'), as
   const ids = parseDeviceIdsParam(deviceIds);
   if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
   try {
-    const eventos = await traccarGetEvents(ids, new Date(from), new Date(to));
+    const [eventos, historico, resolverMotorista] = await Promise.all([
+      traccarGetEvents(ids, new Date(from), new Date(to)),
+      traccarGetPositionHistory(ids, new Date(from), new Date(to)).catch(() => []),
+      carregarResolvedorMotoristas(),
+    ]);
 
     const allowedGeocercas = await prisma.geocerca.findMany({
       where: { origemTipo: 'ADMIN' },
@@ -1178,15 +1188,20 @@ router.get('/relatorios/batch/eventos', requireRoles('ADMIN', 'COLABORADOR'), as
 
     res.json(eventos
       .filter(e => !(e.type === 'geofenceEnter' || e.type === 'geofenceExit') || allowedSet.has(e.geofenceId))
-      .map(e => ({
-        id: e.id,
-        deviceId: e.deviceId,
-        tipo: e.type,
-        tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
-        hora: e.eventTime,
-        atributos: e.attributes,
-        geofenceId: e.geofenceId,
-      })));
+      .map(e => {
+        const cartao = cartaoAntesDe(historico.filter(p => p.deviceId === e.deviceId), new Date(e.eventTime).getTime());
+        return {
+          id: e.id,
+          deviceId: e.deviceId,
+          tipo: e.type,
+          tipoLabel: EVENT_TYPE_LABELS[e.type] ?? e.type,
+          hora: e.eventTime,
+          atributos: e.attributes,
+          geofenceId: e.geofenceId,
+          motorista: resolverMotorista(cartao),
+          motorista_id: cartao,
+        };
+      }));
   } catch (err: unknown) { res.status(502).json({ error: 'Erro ao buscar eventos.' }); }
 });
 
@@ -1237,14 +1252,21 @@ router.get('/relatorios/exportar', requireRoles('ADMIN', 'COLABORADOR'), async (
   const ids = parseDeviceIdsParam(deviceIds);
   if (!ids.length) { res.status(400).json({ error: 'Nenhum dispositivo válido informado.' }); return; }
 
-  try {
-    const response = await traccarExportReport(type as any, ids, from, to);
+  const formato = (req.query.formato as string) === 'pdf' ? 'pdf' : 'xlsx';
+  const tiposValidos = ['route', 'events', 'trips', 'stops', 'summary', 'completo'];
+  const tipo = (tiposValidos.includes(type) ? type : 'completo') as TipoRelatorio;
 
-    const buffer = await response.arrayBuffer();
-    
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=relatorio_${type}.xlsx`);
-    res.send(Buffer.from(buffer));
+  try {
+    const dados = await coletarDadosRelatorio(ids, from, to);
+    if (formato === 'pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=relatorio.pdf');
+      res.send(await gerarRelatorioPdf(dados));
+    } else {
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=relatorio.xlsx');
+      res.send(await gerarRelatorioXlsx(dados, tipo));
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Erro na exportação: ${msg}` });

@@ -103,6 +103,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.getElementById('btn-carregar').addEventListener('click', carregarRelatorio);
   document.getElementById('btn-confirmar-exportar').addEventListener('click', exportarRelatorio);
+  var _expFmt = document.getElementById('export-formato');
+  if (_expFmt) _expFmt.addEventListener('change', function () {
+    var wrap = document.getElementById('export-tipo-wrap');
+    if (wrap) wrap.style.display = this.value === 'pdf' ? 'none' : 'block';
+  });
   const btnAbrirExportar = document.getElementById('btn-abrir-exportar');
   if (btnAbrirExportar) {
     btnAbrirExportar.addEventListener('click', function () {
@@ -812,7 +817,11 @@ function renderEventos(lista) {
     ${lista.map(e => {
       const info = _EVENTO_LABEL[e.tipo] || { label: e.tipo, cls: 'ev-default' };
       const d = dispositivosMap[e.deviceId] || { nome: '—' };
-      const det = Object.entries(e.atributos || {}).filter(([k]) => !['protocol','alarm'].includes(k)).map(([k,v]) => `${k}: ${v}`).join(', ');
+      const outros = Object.entries(e.atributos || {}).filter(([k]) => !['protocol','alarm','driverUniqueId'].includes(k)).map(([k,v]) => `${k}: ${v}`).join(', ');
+      let det = '';
+      if (e.motorista && e.motorista.nome) det = `<strong>Motorista:</strong> ${e.motorista.nome}`;
+      else if (e.motorista_id) det = `<strong>Cartão:</strong> ${e.motorista_id}`;
+      if (outros) det += (det ? ' · ' : '') + outros;
       return `<tr><td><strong>${nomeDisp(d)}</strong></td><td style="white-space:nowrap">${fmtHora(e.hora)}</td><td><span class="ev-badge ${info.cls}">${info.label}</span></td><td style="font-size:11px;color:#888">${det||'—'}</td></tr>`;
     }).join('')}
   </tbody></table></div>`;
@@ -1038,6 +1047,8 @@ function renderGraficoBatch(data) {
 async function exportarRelatorio() {
   const { from, to } = calcularIntervalo();
   const tipo = document.getElementById('export-tipo').value;
+  const formatoEl = document.getElementById('export-formato');
+  const formato = formatoEl ? formatoEl.value : 'xlsx';
   const btn = document.getElementById('btn-confirmar-exportar');
   const old = btn.innerHTML;
   btn.disabled = true;
@@ -1045,11 +1056,11 @@ async function exportarRelatorio() {
   try {
     let url;
     if (document.getElementById('sel-dispositivo')) {
-      const params = new URLSearchParams({ from: isoComFuso(from), to: isoComFuso(to), type: tipo });
+      const params = new URLSearchParams({ from: isoComFuso(from), to: isoComFuso(to), type: tipo, formato: formato });
       adicionarDeviceIdsQuery(params, dispositivoIdsAtuais);
       url = `${_BASE}/api/cliente/rastreamento/relatorios/exportar?${params.toString()}`;
     } else {
-      url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(isoComFuso(from))}&to=${encodeURIComponent(isoComFuso(to))}&type=${encodeURIComponent(tipo)}`;
+      url = `${_BASE}/api/cliente/rastreamento/dispositivos/${_did}/exportar?from=${encodeURIComponent(isoComFuso(from))}&to=${encodeURIComponent(isoComFuso(to))}&type=${encodeURIComponent(tipo)}&formato=${encodeURIComponent(formato)}`;
     }
     const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + _token } });
     if (!res.ok) {
@@ -1063,7 +1074,7 @@ async function exportarRelatorio() {
     const blob = await res.blob();
     const a = document.createElement('a');
     a.href = window.URL.createObjectURL(blob);
-    a.download = `relatorio_${tipo}_${Date.now()}.xlsx`;
+    a.download = `relatorio_${Date.now()}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`;
     a.click();
     window.URL.revokeObjectURL(a.href);
     $('#modal-exportar').modal('hide');

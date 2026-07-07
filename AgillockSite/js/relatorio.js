@@ -107,6 +107,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 
   document.getElementById('btn-confirmar-exportar').addEventListener('click', exportarRelatorio);
+  // O "Conteúdo (planilha)" só se aplica ao XLSX; no PDF é sempre o relatório completo
+  var _exportFormato = document.getElementById('export-formato');
+  if (_exportFormato) _exportFormato.addEventListener('change', function () {
+    document.getElementById('export-tipo-wrap').style.display = this.value === 'pdf' ? 'none' : 'block';
+  });
   document.getElementById('btn-carregar').addEventListener('click', carregarRelatorio);
 
   aplicarDispositivoInicialDaUrl();
@@ -784,7 +789,13 @@ function renderEventos(lista) {
     <tbody>${lista.map(e => {
       const info = _EVENTO_LABEL[e.tipo] || { label: e.tipo, cls: 'ev-default' };
       const d = dispositivosMap[e.deviceId] || { nome: '—' };
-      const det = Object.entries(e.atributos || {}).filter(([k]) => !['protocol','alarm'].includes(k)).map(([k,v]) => `${k}:${v}`).join(', ');
+      // Não despeja o driverUniqueId cru (vem zerado nos Suntech); o motorista real
+      // vem resolvido do cartão (serial) em e.motorista / e.motorista_id.
+      const outros = Object.entries(e.atributos || {}).filter(([k]) => !['protocol','alarm','driverUniqueId'].includes(k)).map(([k,v]) => `${k}:${v}`).join(', ');
+      let det = '';
+      if (e.motorista && e.motorista.nome) det = `<strong>Motorista:</strong> ${e.motorista.nome}`;
+      else if (e.motorista_id) det = `<strong>Cartão:</strong> ${e.motorista_id}`;
+      if (outros) det += (det ? ' · ' : '') + outros;
       return `<tr><td><strong>${nomeDisp(d)}</strong></td><td>${fmtHora(e.hora)}</td><td><span class="ev-badge ${info.cls}">${info.label}</span></td><td style="font-size:11px;color:#888">${det || '—'}</td></tr>`;
     }).join('')}</tbody></table></div>`;
 }
@@ -962,30 +973,33 @@ function renderGraficoBatch(data) {
 async function exportarRelatorio() {
   const selecionados = normalizarIdsSelecionados($('#sel-dispositivo').val());
   if (!selecionados || selecionados.length === 0) return;
-  const tipo = document.getElementById('export-tipo').value, { from, to } = calcularIntervalo();
+  const tipo = document.getElementById('export-tipo').value;
+  const formato = document.getElementById('export-formato').value;
+  const { from, to } = calcularIntervalo();
   const btn = document.getElementById('btn-confirmar-exportar'), old = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando...';
-  
+
   try {
     const token = localStorage.getItem('al-token') || localStorage.getItem('al_token');
     const params = new URLSearchParams({
       from: isoComFuso(from),
       to: isoComFuso(to),
       type: tipo,
+      formato: formato,
     });
     adicionarDeviceIdsQuery(params, selecionados);
     const url = `${window.API_URL}/api/rastreamento/relatorios/exportar?${params.toString()}`;
-    
-    const res = await fetch(url, { 
-      headers: { 'Authorization': `Bearer ${token}` } 
+
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
-    
+
     if (res.status === 401) throw new Error('Sessão expirada. Faça login novamente.');
     if (!res.ok) throw new Error('Erro ao gerar arquivo no servidor.');
-    
+
     const blob = await res.blob(), a = document.createElement('a');
-    a.href = window.URL.createObjectURL(blob); 
-    a.download = `relatorio_${tipo}_${Date.now()}.xlsx`; 
+    a.href = window.URL.createObjectURL(blob);
+    a.download = `relatorio_${Date.now()}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`;
     a.click();
     $('#modal-exportar').modal('hide'); 
     AL.showAlert('Download concluído!', 'success');

@@ -79,6 +79,8 @@ export interface Evento {
   hora: string;
   atributos?: Record<string, unknown>;
   deviceId?: string;
+  motorista?: { id: string; nome: string } | null;
+  motorista_id?: string | null;
 }
 
 export interface Resumo {
@@ -95,4 +97,5 @@ export interface Resumo {
 
 export type ReportPeriodo = 'hoje' | 'ontem' | '7dias' | 'custom';
 export type ReportTab = 'rota' | 'viagens' | 'paradas' | 'eventos' | 'resumo' | 'grafico';
-export type ExportType = 'route' | 'events' | 'trips' | 'stops' | 'summary';
+export type ExportType = 'route' | 'events' | 'trips' | 'stops' | 'summary' | 'completo';
+export type ExportFormato = 'xlsx' | 'pdf';

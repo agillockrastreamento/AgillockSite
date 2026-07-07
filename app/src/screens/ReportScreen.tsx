@@ -37,6 +37,7 @@ import {
 import type {
   Evento,
   ExportType,
+  ExportFormato,
   HistoricoResponse,
   OciosoSegmento,
   Parada,
@@ -75,10 +76,11 @@ const PERIODO_LABELS: Record<ReportPeriodo, string> = {
 };
 
 const EXPORT_OPTIONS: { label: string; value: ExportType }[] = [
-  { label: 'Rota / Trajeto', value: 'route' },
-  { label: 'Eventos', value: 'events' },
+  { label: 'Completo (todas as abas)', value: 'completo' },
   { label: 'Viagens', value: 'trips' },
   { label: 'Paradas', value: 'stops' },
+  { label: 'Eventos', value: 'events' },
+  { label: 'Rota / Trajeto', value: 'route' },
   { label: 'Resumo / Totais', value: 'summary' },
 ];
 
@@ -705,17 +707,22 @@ function EventosTab({ eventos }: { eventos: Evento[] }) {
       renderItem={({ item }) => {
         const cfg = EVENTO_CONFIG[item.tipo] ?? { label: item.tipoLabel ?? item.tipo, bg: '#e2e3e5', fg: '#383d41' };
         const label = item.tipoLabel ?? cfg.label ?? item.tipo;
-        const attrs = Object.entries(item.atributos ?? {})
-          .filter(([k]) => !['protocol', 'alarm'].includes(k))
+        // Não mostra o driverUniqueId cru (zerado nos Suntech); usa o motorista resolvido do cartão (serial)
+        const outros = Object.entries(item.atributos ?? {})
+          .filter(([k]) => !['protocol', 'alarm', 'driverUniqueId'].includes(k))
           .map(([k, v]) => `${k}: ${v}`)
           .join(', ');
+        const motoristaTxt = item.motorista?.nome
+          ? `👤 ${item.motorista.nome}`
+          : (item.motorista_id ? `👤 Cartão ${item.motorista_id}` : '');
+        const detalhes = [motoristaTxt, outros].filter(Boolean).join(' · ');
         return (
           <View style={styles.eventoRow}>
             <View style={styles.eventoLeft}>
               <Text style={styles.eventoHora}>{fmtHora(item.hora)}</Text>
               <EventosBadge tipo={item.tipo} label={label} />
             </View>
-            {attrs ? <Text style={styles.eventoAttrs} numberOfLines={2}>{attrs}</Text> : null}
+            {detalhes ? <Text style={styles.eventoAttrs} numberOfLines={2}>{detalhes}</Text> : null}
           </View>
         );
       }}
@@ -994,33 +1001,58 @@ function ExportModal({
   onClose,
 }: {
   visible: boolean;
-  onConfirm(tipo: ExportType): void;
+  onConfirm(tipo: ExportType, formato: ExportFormato): void;
   onClose(): void;
 }) {
-  const [tipo, setTipo] = useState<ExportType>('route');
+  const [tipo, setTipo] = useState<ExportType>('completo');
+  const [formato, setFormato] = useState<ExportFormato>('xlsx');
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalBackdrop} onPress={onClose}>
         <Pressable style={styles.exportCard}>
-          <Text style={styles.exportTitle}>Exportar Relatório (XLSX)</Text>
-          <Text style={styles.exportSubtitle}>Tipo de relatório</Text>
-          {EXPORT_OPTIONS.map(opt => (
+          <Text style={styles.exportTitle}>Exportar Relatório</Text>
+
+          <Text style={styles.exportSubtitle}>Formato</Text>
+          <View style={styles.exportFormatoRow}>
             <Pressable
-              key={opt.value}
-              style={[styles.exportOption, tipo === opt.value && styles.exportOptionSelected]}
-              onPress={() => setTipo(opt.value)}
+              style={[styles.exportFormatoBtn, formato === 'xlsx' && styles.exportFormatoBtnSel]}
+              onPress={() => setFormato('xlsx')}
             >
-              <View style={[styles.exportRadio, tipo === opt.value && styles.exportRadioSelected]} />
-              <Text style={[styles.exportOptionLabel, tipo === opt.value && styles.exportOptionLabelSelected]}>
-                {opt.label}
-              </Text>
+              <Icon source="file-excel" size={18} color={formato === 'xlsx' ? colors.surface : colors.accent} />
+              <Text style={[styles.exportFormatoTxt, formato === 'xlsx' && styles.exportFormatoTxtSel]}>Excel (dados)</Text>
             </Pressable>
-          ))}
+            <Pressable
+              style={[styles.exportFormatoBtn, formato === 'pdf' && styles.exportFormatoBtnSel]}
+              onPress={() => setFormato('pdf')}
+            >
+              <Icon source="file-pdf-box" size={18} color={formato === 'pdf' ? colors.surface : '#c0392b'} />
+              <Text style={[styles.exportFormatoTxt, formato === 'pdf' && styles.exportFormatoTxtSel]}>PDF (gráficos)</Text>
+            </Pressable>
+          </View>
+
+          {formato === 'xlsx' && (
+            <>
+              <Text style={styles.exportSubtitle}>Conteúdo</Text>
+              {EXPORT_OPTIONS.map(opt => (
+                <Pressable
+                  key={opt.value}
+                  style={[styles.exportOption, tipo === opt.value && styles.exportOptionSelected]}
+                  onPress={() => setTipo(opt.value)}
+                >
+                  <View style={[styles.exportRadio, tipo === opt.value && styles.exportRadioSelected]} />
+                  <Text style={[styles.exportOptionLabel, tipo === opt.value && styles.exportOptionLabelSelected]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </>
+          )}
+
           <View style={styles.exportActions}>
             <Pressable style={styles.exportCancel} onPress={onClose}>
               <Text style={styles.exportCancelText}>Cancelar</Text>
             </Pressable>
-            <Pressable style={styles.exportConfirm} onPress={() => onConfirm(tipo)}>
+            <Pressable style={styles.exportConfirm} onPress={() => onConfirm(tipo, formato)}>
               <Icon source="download" size={16} color={colors.surface} />
               <Text style={styles.exportConfirmText}>Baixar</Text>
             </Pressable>
@@ -1168,7 +1200,7 @@ export function ReportScreen() {
     loadReport(selectedDevice, 'custom', customFrom, customTo);
   };
 
-  const handleExport = async (tipo: ExportType) => {
+  const handleExport = async (tipo: ExportType, formato: ExportFormato) => {
     if (!selectedDevice) return;
     setIsExporting(true);
     setShowExportModal(false);
@@ -1176,19 +1208,23 @@ export function ReportScreen() {
       const { from, to } = periodo === 'custom'
         ? { from: customFrom, to: customTo }
         : calcularIntervalo(periodo);
-      const { url, token } = await getExportUrl(selectedDevice.dispositivoId, from, to, tipo);
+      const { url, token } = await getExportUrl(selectedDevice.dispositivoId, from, to, tipo, formato);
 
-      const cacheDir = new FileSystem.Directory(FileSystem.Paths.cache);
-      const downloaded = await FileSystem.File.downloadFileAsync(url, cacheDir, {
+      // Baixa para um arquivo com a extensão correta (importante p/ iOS abrir/compartilhar)
+      const ehPdf = formato === 'pdf';
+      const nomeArquivo = `relatorio_${Date.now()}.${ehPdf ? 'pdf' : 'xlsx'}`;
+      const destino = new FileSystem.File(FileSystem.Paths.cache, nomeArquivo);
+      if (destino.exists) destino.delete();
+      const downloaded = await FileSystem.File.downloadFileAsync(url, destino, {
         headers: { Authorization: `Bearer ${token}` },
         idempotent: true,
       });
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(downloaded.uri, {
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          mimeType: ehPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           dialogTitle: 'Salvar relatório',
-          UTI: 'com.microsoft.excel.xlsx',
+          UTI: ehPdf ? 'com.adobe.pdf' : 'com.microsoft.excel.xlsx',
         });
       } else {
         toast.show({ message: 'Compartilhamento não disponível neste dispositivo.', type: 'info' });
@@ -1967,6 +2003,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textMuted,
     marginTop: spacing.xs,
+  },
+  exportFormatoRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  exportFormatoBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  exportFormatoBtnSel: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  exportFormatoTxt: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  exportFormatoTxtSel: {
+    color: colors.surface,
   },
   exportOption: {
     flexDirection: 'row',
