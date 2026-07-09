@@ -34,6 +34,7 @@ import iaproRoutes from './routes/iapro.routes';
 import workerRoutes from './routes/worker.routes';
 import multasAdminRoutes from './routes/multas-admin.routes';
 import clienteMultasRoutes from './routes/cliente-multas.routes';
+import clienteDispositivosRoutes from './routes/cliente-dispositivos.routes';
 import { UPLOADS_DIR } from './utils/upload-paths';
 
 const app = express();
@@ -127,6 +128,9 @@ app.use('/api/cliente/perfil', clientePerfilRoutes); // Perfil do cliente
 app.use('/api/cliente/multas', clienteMultasRoutes); // Multas do cliente — antes de clientePortalRoutes
 app.use('/api/cliente/cotacao-iapro', clienteCotacaoIaproRoutes); // Cotação IAPRO — antes de clientePortalRoutes
 app.use('/api/cliente', clienteUsuariosRoutes); // Sub-usuários + /me/permissoes — antes de clientePortalRoutes
+// Gestão de dispositivos do cliente. Compartilha o prefixo /dispositivos com o portal
+// (apelido, foto, comandos…): as rotas que não casam aqui seguem para clientePortalRoutes.
+app.use('/api/cliente/dispositivos', clienteDispositivosRoutes);
 app.use('/api/cliente', clientePortalRoutes);   // portal do cliente (JWT role=CLIENTE)
 app.use('/api', usuariosResgateRoutes); // CRUD admin de usuários de resgate
 app.use('/api', tagsBleRoutes);         // CRUD de tags BLE (admin)

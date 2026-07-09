@@ -12,6 +12,7 @@ export type RootStackParamList = {
   Pagamentos: undefined;
   Historico: { dispositivoId: string; nome: string; placa?: string | null };
   UsuarioForm: { id?: string } | undefined;
+  DispositivoForm: { id?: string } | undefined;
 };
 
 export type ClienteDrawerParamList = {
@@ -22,6 +23,7 @@ export type ClienteDrawerParamList = {
   CotacaoIapro: undefined;
   Pagamentos: undefined;
   Multas: undefined;
+  Dispositivos: undefined;
   Usuarios: undefined;
 };
 

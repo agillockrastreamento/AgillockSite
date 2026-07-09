@@ -22,7 +22,7 @@ router.get('/me/permissoes', async (req: ClienteRequest, res: Response): Promise
   }
   const cli = await prisma.cliente.findUnique({
     where: { id: req.cliente.clienteId },
-    select: { multasHabilitado: true },
+    select: { multasHabilitado: true, dispositivosHabilitado: true, limiteDispositivos: true },
   });
   res.json({
     tipo: req.cliente.tipo,
@@ -31,6 +31,8 @@ router.get('/me/permissoes', async (req: ClienteRequest, res: Response): Promise
     permissoes: req.cliente.permissoes,
     dispositivoIdsPermitidos: req.cliente.dispositivoIdsPermitidos,
     multasHabilitado: cli?.multasHabilitado ?? false,
+    dispositivosHabilitado: cli?.dispositivosHabilitado ?? false,
+    limiteDispositivos: cli?.limiteDispositivos ?? 0,
   });
 });
 

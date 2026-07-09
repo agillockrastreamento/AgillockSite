@@ -10,13 +10,17 @@ import { DISPOSITIVOS_UPLOADS_DIR } from '../utils/upload-paths';
 import {
   traccarCreateDevice,
   traccarUpdateDevice,
-  traccarUpdateDeviceAccumulators,
   traccarDeleteDevice,
   traccarGetDeviceByImei,
-  type TraccarDeviceSyncData,
 } from '../services/traccar.service';
 import { notificarIaproVinculoDispositivo } from '../services/iapro.service';
 import { reancorarRecorrenciasSeOdometroMenor } from '../services/medidores.service';
+import {
+  parseOptionalKm,
+  mapDispositivoResponse,
+  buildTraccarDeviceSyncData,
+  syncTraccarAccumulators,
+} from '../utils/dispositivo-sync';
 
 const router = Router();
 router.use(authMiddleware);
@@ -60,27 +64,6 @@ const CLIENTES_VINCULADOS_INCLUDE = {
   },
 };
 
-function parseOptionalKm(value: unknown): number | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null || value === '') return null;
-  const numero = Number(value);
-  return Number.isFinite(numero) && numero >= 0 ? numero : null;
-}
-
-function mapDispositivoResponse(dispositivo: Record<string, unknown>) {
-  return {
-    ...dispositivo,
-    odometro: typeof dispositivo.odometroSistemaMetros === 'number' ? Math.round(dispositivo.odometroSistemaMetros) / 1000 : null,
-    horimetro: typeof dispositivo.horimetroSistemaSegundos === 'number' ? Math.round((dispositivo.horimetroSistemaSegundos / 3600) * 10) / 10 : 0,
-  };
-}
-
-function numberOrNull(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null;
-  const numero = Number(value);
-  return Number.isFinite(numero) ? numero : null;
-}
-
 /**
  * Sincroniza a TagBLE principal do dispositivo com o campo enderecoMac.
  * SÓ cria a tag se não houver nenhuma cadastrada para o dispositivo —
@@ -100,46 +83,6 @@ async function syncTagPrincipal(dispositivoId: string, enderecoMac: string | nul
       apelido: 'Tag principal',
     },
   });
-}
-
-function buildTraccarAccumulatorData(dispositivo: Record<string, unknown>) {
-  const odometroMetros = numberOrNull(dispositivo.odometroSistemaMetros);
-  const horimetroSegundos = numberOrNull(dispositivo.horimetroSistemaSegundos);
-  return {
-    odometroMetros,
-    horimetroMilissegundos: horimetroSegundos != null ? horimetroSegundos * 1000 : null,
-  };
-}
-
-async function syncTraccarAccumulators(traccarId: number, dispositivo: Record<string, unknown>): Promise<void> {
-  const { odometroMetros, horimetroMilissegundos } = buildTraccarAccumulatorData(dispositivo);
-  if (odometroMetros == null) return;
-  await traccarUpdateDeviceAccumulators(traccarId, odometroMetros, horimetroMilissegundos);
-}
-
-function buildTraccarDeviceSyncData(dispositivo: Record<string, unknown>): TraccarDeviceSyncData {
-  const odometroMetros = numberOrNull(dispositivo.odometroSistemaMetros);
-  const limiteVelocidade = numberOrNull(dispositivo.limiteVelocidade);
-  return {
-    name: (() => {
-      const nome = String(dispositivo.nome || '').trim();
-      const placa = dispositivo.placa ? String(dispositivo.placa).trim() : '';
-      return placa ? `${nome} (${placa})` : nome;
-    })(),
-    uniqueId: String(dispositivo.identificador || '').trim(),
-    category: dispositivo.categoria ? String(dispositivo.categoria) : 'car',
-    model: dispositivo.modeloRastreador ? String(dispositivo.modeloRastreador) : null,
-    phone: dispositivo.telefoneRastreador ? String(dispositivo.telefoneRastreador) : null,
-    attributes: {
-      iccid: dispositivo.iccid || null,
-      operadoraChip: dispositivo.operadora || null,
-      odometroAtualKm: odometroMetros != null ? Math.round((odometroMetros / 1000) * 10) / 10 : null,
-      consumo: dispositivo.consumo || null,
-      limiteVelocidadeKmh: limiteVelocidade,
-      speedLimit: limiteVelocidade,
-      senha: dispositivo.senha || null,
-    },
-  };
 }
 
 // ─── GET /api/dispositivos ─────────────────────────────────────────────────

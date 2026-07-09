@@ -27,6 +27,8 @@ import { HistoricoScreen } from '../screens/HistoricoScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
 import { UsuariosScreen } from '../screens/UsuariosScreen';
 import { UsuarioFormScreen } from '../screens/UsuarioFormScreen';
+import { DispositivosScreen } from '../screens/DispositivosScreen';
+import { DispositivoFormScreen } from '../screens/DispositivoFormScreen';
 import { NotificationBootstrap } from '../notifications/NotificationBootstrap';
 import { NotificationHandlers } from '../notifications/NotificationHandlers';
 import { colors } from '../theme/colors';
@@ -50,6 +52,7 @@ const routeIcons: Record<keyof ClienteDrawerParamList, string> = {
   CotacaoIapro: 'shield-car',
   Pagamentos: 'credit-card-outline',
   Multas: 'gavel',
+  Dispositivos: 'chip',
   Usuarios: 'account-group-outline',
 };
 
@@ -314,6 +317,13 @@ function ClienteDrawer() {
       {me?.multasHabilitado ? (
         <Drawer.Screen name="Multas" component={MultasScreen} options={{ title: 'Multas' }} />
       ) : null}
+      {responsavel && me?.dispositivosHabilitado ? (
+        <Drawer.Screen
+          name="Dispositivos"
+          component={DispositivosScreen}
+          options={{ title: 'Dispositivos' }}
+        />
+      ) : null}
       {responsavel ? (
         <Drawer.Screen name="Usuarios" component={UsuariosScreen} options={{ title: 'Usuários' }} />
       ) : null}
@@ -371,6 +381,18 @@ export function AppNavigator() {
             options={({ route }) => ({
               headerShown: true,
               headerTitle: route.params?.id ? 'Editar Usuário' : 'Novo Usuário',
+              headerTitleAlign: 'center',
+              headerStyle: { backgroundColor: colors.loginBackgroundStart },
+              headerTintColor: colors.surface,
+              headerShadowVisible: false,
+            })}
+          />
+          <Stack.Screen
+            name="DispositivoForm"
+            component={DispositivoFormScreen}
+            options={({ route }) => ({
+              headerShown: true,
+              headerTitle: route.params?.id ? 'Editar Dispositivo' : 'Novo Dispositivo',
               headerTitleAlign: 'center',
               headerStyle: { backgroundColor: colors.loginBackgroundStart },
               headerTintColor: colors.surface,

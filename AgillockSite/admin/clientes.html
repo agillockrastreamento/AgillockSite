@@ -250,6 +250,64 @@
     </div>
   </div>
 
+  <!-- ═══════════════ MODAL GESTÃO DE DISPOSITIVOS ═══════════════ -->
+  <div class="modal fade" id="modal-gd" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#1e2530;">
+          <button type="button" class="close" data-dismiss="modal" style="color:white;">&times;</button>
+          <h4 class="modal-title" style="color:#fff;display:flex;align-items:center;gap:10px;">
+            <i class="fa fa-microchip"></i>
+            <span id="gd-titulo">Habilitar tela de dispositivos</span>
+          </h4>
+        </div>
+        <div class="modal-body">
+          <div id="modal-gd-alert"></div>
+
+          <!-- Ativação -->
+          <div id="gd-ativar">
+            <p style="font-size:15px;">
+              Habilitar a tela de <strong>Dispositivos</strong> para o cliente
+              <strong id="gd-cliente-nome">—</strong>?
+            </p>
+            <div class="alert alert-info" style="font-size:13px;">
+              <i class="fa fa-info-circle"></i>
+              O cliente passa a ver a tela de dispositivos no site e no app, podendo cadastrar
+              os próprios rastreadores. Os dispositivos associados por você continuam
+              protegidos: ele não pode inativá-los nem excluí-los.
+            </div>
+            <div class="form-group">
+              <label>Quantidade de dispositivos permitida *</label>
+              <input type="number" class="form-control" id="gd-limite" min="1" step="1" placeholder="Ex.: 5" />
+              <p class="help-block" style="font-size:12px;">
+                Teto total de dispositivos do cliente — os que você associou a ele também contam nessa cota.
+              </p>
+            </div>
+          </div>
+
+          <!-- Desativação -->
+          <div id="gd-desativar" style="display:none;">
+            <p style="font-size:15px;">
+              Desabilitar a tela de <strong>Dispositivos</strong> do cliente
+              <strong id="gd-cliente-nome-off">—</strong>?
+            </p>
+            <div class="alert alert-warning" style="font-size:13px;">
+              <i class="fa fa-exclamation-triangle"></i>
+              A tela some do site e do app do cliente. Os dispositivos já cadastrados
+              continuam existindo e rastreando normalmente.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary-al" id="btn-gd-confirmar">
+            <i class="fa fa-check"></i> <span id="btn-gd-txt">Habilitar</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/jquery.js"></script>
   <script src="../js/bootstrap.min.js"></script>
   <script src="../js/config.js"></script>
@@ -328,6 +386,8 @@
         var numVeiculos = (c.dispositivos || []).length + ((c._count && c._count.dispositivosVinculados) ? c._count.dispositivosVinculados : 0);
         var medOn = c.podeEditarMedidores === true;
         var multasOn = c.multasHabilitado === true;
+        var gdOn = c.dispositivosHabilitado === true;
+        var gdLimite = c.limiteDispositivos || 0;
         var acoes = '<button class="btn btn-xs btn-default btn-editar" data-id="' + c.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' +
           '<button class="btn btn-xs ' + (c.status === 'ATIVO' ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + c.id + '" data-status="' + c.status + '" title="' + (c.status === 'ATIVO' ? 'Inativar' : 'Ativar') + '">' +
           '<i class="fa fa-power-off"></i></button> ' +
@@ -335,6 +395,8 @@
           '<i class="fa fa-tachometer"></i></button> ' +
           '<button class="btn btn-xs ' + (multasOn ? 'btn-success' : 'btn-default') + ' btn-multas" data-id="' + c.id + '" title="' + (multasOn ? 'Consulta de multas HABILITADA — clique para desabilitar' : 'Consulta de multas desabilitada — clique para habilitar') + '">' +
           '<i class="fa fa-gavel"></i></button> ' +
+          '<button class="btn btn-xs ' + (gdOn ? 'btn-success' : 'btn-default') + ' btn-dispositivos" data-id="' + c.id + '" data-nome="' + c.nome + '" data-on="' + (gdOn ? '1' : '0') + '" data-limite="' + gdLimite + '" title="' + (gdOn ? 'Tela de dispositivos HABILITADA (limite: ' + gdLimite + ') — clique para desabilitar' : 'Tela de dispositivos desabilitada — clique para habilitar') + '">' +
+          '<i class="fa fa-microchip"></i>' + (gdOn ? ' <strong>' + gdLimite + '</strong>' : '') + '</button> ' +
           '<button class="btn btn-xs btn-default btn-iapro" data-id="' + c.id + '" data-nome="' + c.nome + '" title="Compartilhar com a IAPRO" style="padding:1px 4px;">' +
           '<img src="../img/logo_iapro.jpeg" alt="IAPRO" style="height:16px;border-radius:3px;vertical-align:middle;" /></button>';
         if (isAdmin) {
@@ -410,6 +472,14 @@
         });
       });
 
+      // Habilitar/desabilitar a tela de dispositivos do cliente
+      tbody.querySelectorAll('.btn-dispositivos').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          abrirModalGestaoDispositivos(this.dataset.id, this.dataset.nome, this.dataset.on === '1', this.dataset.limite);
+        });
+      });
+
       // Compartilhar com a IAPRO
       tbody.querySelectorAll('.btn-iapro').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
@@ -453,6 +523,57 @@
     // ── Novo / Editar Cliente → página dedicada ───────────────
     document.getElementById('btn-novo-cliente').addEventListener('click', function () {
       window.location.href = 'cliente-form.html';
+    });
+
+    // ── Modal: habilitar/desabilitar a tela de dispositivos do cliente ──────
+    var gdClienteId = null;
+    var gdEstavaOn = false;
+
+    function gdAlert(msg, type) {
+      document.getElementById('modal-gd-alert').innerHTML = msg
+        ? '<div class="alert alert-' + (type || 'danger') + '" style="font-size:13px;">' + msg + '</div>'
+        : '';
+    }
+
+    function abrirModalGestaoDispositivos(clienteId, nome, ligado, limiteAtual) {
+      gdClienteId = clienteId;
+      gdEstavaOn = ligado;
+      gdAlert('');
+      document.getElementById('gd-cliente-nome').textContent = nome;
+      document.getElementById('gd-cliente-nome-off').textContent = nome;
+      document.getElementById('gd-ativar').style.display = ligado ? 'none' : '';
+      document.getElementById('gd-desativar').style.display = ligado ? '' : 'none';
+      document.getElementById('gd-titulo').textContent = ligado ? 'Desabilitar tela de dispositivos' : 'Habilitar tela de dispositivos';
+      document.getElementById('btn-gd-txt').textContent = ligado ? 'Desabilitar' : 'Habilitar';
+      document.getElementById('gd-limite').value = ligado ? '' : (limiteAtual && Number(limiteAtual) > 0 ? limiteAtual : '');
+      $('#modal-gd').modal('show');
+    }
+
+    document.getElementById('btn-gd-confirmar').addEventListener('click', function () {
+      var habilitar = !gdEstavaOn;
+      var payload = { habilitado: habilitar };
+
+      if (habilitar) {
+        var limite = parseInt(document.getElementById('gd-limite').value, 10);
+        if (!limite || limite < 1) {
+          gdAlert('Informe uma quantidade de dispositivos maior que zero.');
+          return;
+        }
+        payload.limite = limite;
+      }
+
+      var btn = this;
+      btn.disabled = true;
+      AL.apiPatch('/api/clientes/' + gdClienteId + '/dispositivos-habilitado', payload)
+        .then(function (data) {
+          $('#modal-gd').modal('hide');
+          AL.showAlert(data.dispositivosHabilitado
+            ? 'Tela de dispositivos habilitada (limite: ' + data.limiteDispositivos + ').'
+            : 'Tela de dispositivos desabilitada para o cliente.', 'success');
+          loadClientes();
+        })
+        .catch(function (err) { gdAlert(err.message); })
+        .then(function () { btn.disabled = false; });
     });
 
     // ── Modal: compartilhar dados com a IAPRO (2 passos) ──────

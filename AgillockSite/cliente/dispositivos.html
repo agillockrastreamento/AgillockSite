@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Dispositivos — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 24px !important; }
+    #al-alert-container, .filter-bar { flex-shrink: 0; }
+    .table-responsive { flex: 1; overflow-y: auto; border-radius: 8px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 0; }
+    html.dark-theme .table-responsive { background: #141820; }
+    .admin-table thead th { position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); }
+
+    .cota { font-size: 12px; color: #888; white-space: nowrap; }
+    .cota strong { color: #c8870a; }
+    .lock-ico { color: #b0b7c3; margin-left: 6px; cursor: help; }
+    html.dark-theme .lock-ico { color: #6b7280; }
+    .btn-xs[disabled] { opacity: .4; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
+      <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> <span>Relatório</span></a></li>
+      <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> <span>Notificações</span></a></li>
+      <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> <span>Manutenções</span></a></li>
+      <li><a href="geocercas.html"><i class="fa fa-object-group fa-fw"></i> <span>Geocercas</span></a></li>
+      <li><a href="cotacao-iapro.html"><i class="fa fa-shield fa-fw"></i> <span>Cotação Proteção Veicular</span></a></li>
+      <li><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+      <li id="li-multas" style="display:none;"><a href="multas.html"><i class="fa fa-gavel fa-fw"></i> <span>Multas</span></a></li>
+      <li id="li-dispositivos" class="active" style="display:none;"><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> <span>Dispositivos</span></a></li>
+      <li id="li-usuarios" style="display:none;"><a href="usuarios.html"><i class="fa fa-users fa-fw"></i> <span>Usuários</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Dispositivos</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <span class="cota" id="cota-info"></span>
+        <button type="button" id="btn-novo" class="btn btn-primary-al">
+          <i class="fa fa-plus"></i> Novo Dispositivo
+        </button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <div class="row">
+        <div class="col-sm-8">
+          <input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por nome, identificador ou placa…" />
+        </div>
+        <div class="col-sm-4">
+          <select id="filtro-status" class="form-control">
+            <option value="">Todos os status</option>
+            <option value="true">Ativo</option>
+            <option value="false">Inativo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Identificador</th>
+            <th>Nome</th>
+            <th>Placa</th>
+            <th>Categoria</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tabela-body">
+          <tr><td colspan="6" class="text-center text-muted" style="padding:40px;">
+            <i class="fa fa-spinner fa-spin fa-2x"></i>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+    (function () {
+      var AL = window.AL_CLIENTE;
+      var user = AL.requireAuth();
+      if (!user) return;
+
+      document.getElementById('user-nome').textContent = user.nome || '—';
+      document.getElementById('sidebar-toggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      });
+      document.getElementById('sidebar-overlay').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+      });
+      document.getElementById('btn-logout').addEventListener('click', AL.logout);
+      AL.initThemeToggle('btn-tema');
+
+      var todos = [];
+      var limite = 0;
+      var total = 0;
+      var podeCriar = false;
+      var filtroBusca = '';
+      var filtroStatus = '';
+      var filtroTimer = null;
+
+      function esc(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      // O botão sempre existe: quando a cota está cheia, avisa em vez de navegar.
+      document.getElementById('btn-novo').addEventListener('click', function () {
+        if (!podeCriar) {
+          AL.showAlert('Você atingiu o limite de ' + limite + ' dispositivo(s) do seu plano. Entre em contato com a AgilLock para ampliá-lo.', 'danger');
+          return;
+        }
+        window.location.href = 'dispositivo.html';
+      });
+
+      function renderCota() {
+        document.getElementById('cota-info').innerHTML =
+          '<i class="fa fa-microchip"></i> <strong>' + total + '</strong> de <strong>' + limite + '</strong> dispositivos';
+      }
+
+      function renderTabela() {
+        var busca = filtroBusca.toLowerCase();
+        var lista = todos.filter(function (d) {
+          if (filtroStatus !== '' && String(d.ativo) !== filtroStatus) return false;
+          if (busca && !(
+            d.nome.toLowerCase().indexOf(busca) !== -1 ||
+            d.identificador.toLowerCase().indexOf(busca) !== -1 ||
+            (d.placa || '').toLowerCase().indexOf(busca) !== -1
+          )) return false;
+          return true;
+        });
+
+        var tbody = document.getElementById('tabela-body');
+        if (!lista.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:40px;">Nenhum dispositivo encontrado.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = lista.map(function (d) {
+          var editUrl = 'dispositivo.html?id=' + d.id;
+          var bloqueado = !d.podeGerenciar;
+          var cadeado = bloqueado
+            ? '<i class="fa fa-lock lock-ico" title="Dispositivo cadastrado pela AgilLock — não pode ser inativado nem excluído por você."></i>'
+            : '';
+          var tituloBloqueio = 'Dispositivo cadastrado pela AgilLock';
+
+          return '<tr style="cursor:pointer;" onclick="window.location=\'' + editUrl + '\'">' +
+            '<td><strong>' + esc(d.identificador) + '</strong>' + cadeado + '</td>' +
+            '<td>' + esc(d.nome) + '</td>' +
+            '<td>' + (d.placa ? esc(d.placa) : '<span class="text-muted">—</span>') + '</td>' +
+            '<td>' + (d.categoria ? esc(d.categoria) : '<span class="text-muted">—</span>') + '</td>' +
+            '<td>' + AL.badgeStatus(d.ativo ? 'ATIVO' : 'INATIVO') + '</td>' +
+            '<td onclick="event.stopPropagation();" style="text-align:right;white-space:nowrap;">' +
+            '<a href="' + editUrl + '" class="btn btn-xs btn-default" title="Editar"><i class="fa fa-pencil"></i></a> ' +
+            '<button class="btn btn-xs ' + (d.ativo ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + d.id + '"' +
+              (bloqueado ? ' disabled title="' + tituloBloqueio + '"' : ' title="' + (d.ativo ? 'Inativar' : 'Ativar') + '"') +
+              '><i class="fa fa-power-off"></i></button> ' +
+            '<button class="btn btn-xs btn-danger btn-excluir" data-id="' + d.id + '" data-nome="' + esc(d.nome) + '"' +
+              (bloqueado ? ' disabled title="' + tituloBloqueio + '"' : ' title="Excluir"') +
+              '><i class="fa fa-trash"></i></button>' +
+            '</td></tr>';
+        }).join('');
+
+        tbody.querySelectorAll('.btn-toggle').forEach(function (btn) {
+          if (btn.disabled) return;
+          btn.addEventListener('click', function () {
+            var self = this;
+            self.disabled = true;
+            AL.apiPatch('/api/cliente/dispositivos/' + this.dataset.id + '/status')
+              .then(function () { carregar(); })
+              .catch(function (err) { self.disabled = false; AL.showAlert(err.message); });
+          });
+        });
+
+        tbody.querySelectorAll('.btn-excluir').forEach(function (btn) {
+          if (btn.disabled) return;
+          btn.addEventListener('click', function () {
+            var nome = this.dataset.nome;
+            if (!confirm('Excluir o dispositivo "' + nome + '"? Esta ação não pode ser desfeita.')) return;
+            AL.apiDelete('/api/cliente/dispositivos/' + this.dataset.id)
+              .then(function () { AL.showAlert('Dispositivo excluído.', 'success'); carregar(); })
+              .catch(function (err) { AL.showAlert(err.message); });
+          });
+        });
+      }
+
+      function carregar() {
+        AL.apiGet('/api/cliente/dispositivos')
+          .then(function (data) {
+            todos = data.dispositivos || [];
+            limite = data.limite || 0;
+            total = data.total || 0;
+            podeCriar = !!data.podeCriar;
+            renderCota();
+            renderTabela();
+          })
+          .catch(function (err) {
+            document.getElementById('tabela-body').innerHTML =
+              '<tr><td colspan="6" class="text-danger" style="padding:20px;">' + esc(err.message) + '</td></tr>';
+          });
+      }
+
+      document.getElementById('filtro-busca').addEventListener('input', function () {
+        filtroBusca = this.value;
+        clearTimeout(filtroTimer);
+        filtroTimer = setTimeout(renderTabela, 200);
+      });
+      document.getElementById('filtro-status').addEventListener('change', function () {
+        filtroStatus = this.value;
+        renderTabela();
+      });
+
+      carregar();
+    })();
+  </script>
+</body>
+</html>

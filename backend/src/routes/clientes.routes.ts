@@ -302,6 +302,38 @@ router.patch('/:id/multas-habilitado', requireRoles('ADMIN', 'COLABORADOR'), asy
   res.json(cliente);
 });
 
+// PATCH /api/clientes/:id/dispositivos-habilitado — Habilita a tela de dispositivos do cliente
+// Body: { habilitado: boolean, limite?: number }. O limite é o teto TOTAL de dispositivos
+// do cliente (os associados pelo admin também contam na cota).
+router.patch('/:id/dispositivos-habilitado', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+  const { habilitado, limite } = req.body;
+
+  const existe = await prisma.cliente.findUnique({ where: { id }, select: { id: true } });
+  if (!existe) {
+    res.status(404).json({ error: 'Cliente não encontrado.' });
+    return;
+  }
+
+  const ligar = habilitado === true || habilitado === 'true';
+  let novoLimite = 0;
+  if (ligar) {
+    novoLimite = Number(limite);
+    if (!Number.isInteger(novoLimite) || novoLimite < 1) {
+      res.status(400).json({ error: 'Informe uma quantidade de dispositivos maior que zero.' });
+      return;
+    }
+  }
+
+  const cliente = await prisma.cliente.update({
+    where: { id },
+    data: { dispositivosHabilitado: ligar, limiteDispositivos: novoLimite },
+    select: { id: true, nome: true, dispositivosHabilitado: true, limiteDispositivos: true },
+  });
+
+  res.json(cliente);
+});
+
 // DELETE /api/clientes/:id
 router.delete('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   if (req.user!.role === 'COLABORADOR' && !req.user!.podeExcluirCliente) {

@@ -118,6 +118,12 @@ model Cliente {
   // "Multas" aparece no site e no app dele. Default desligado; admin liga caso a caso.
   multasHabilitado Boolean @default(false)
 
+  // Quando true, a tela "Dispositivos" aparece no portal e no app do cliente, permitindo
+  // que ele cadastre os próprios rastreadores. `limiteDispositivos` é o teto TOTAL de
+  // dispositivos do cliente (os associados pelo admin também contam na cota).
+  dispositivosHabilitado Boolean @default(false)
+  limiteDispositivos     Int     @default(0)
+
   // Integração IAPRO — cliente criado/sincronizado a partir de um contrato da IAPRO.
   // Pagamentos desse cliente são feitos pela IAPRO (sem boletos na Ágil Lock).
   origemIapro    Boolean  @default(false)
@@ -327,8 +333,14 @@ model Dispositivo {
   cliente     Cliente? @relation(fields: [clienteId], references: [id])
   vendedorId  String?
   vendedor    User?    @relation("DispositivoVendedor", fields: [vendedorId], references: [id])
-  criadoPorId String
-  criadoPor   User     @relation("DispositivoCriador", fields: [criadoPorId], references: [id])
+  // Criador: ou um usuário interno (admin/colaborador), ou um login do próprio cliente.
+  // Dispositivos criados pelo cliente (criadoPorClienteLoginId != null) são os únicos que
+  // ele pode inativar, excluir e ter os campos do rastreador editados.
+  criadoPorId String?
+  criadoPor   User?    @relation("DispositivoCriador", fields: [criadoPorId], references: [id])
+
+  criadoPorClienteLoginId String?
+  criadoPorClienteLogin   ClienteLogin? @relation("DispositivoCriadorCliente", fields: [criadoPorClienteLoginId], references: [id], onDelete: SetNull)
 
   boletos                  Boleto[]
   boletosUnificados        BoletoDispositivo[]
@@ -518,6 +530,7 @@ model ClienteLogin {
   cliente                  Cliente                      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   criadoPorLogin           ClienteLogin?                @relation("ClienteLoginCriador", fields: [criadoPorLoginId], references: [id], onDelete: SetNull)
   loginsCriados            ClienteLogin[]               @relation("ClienteLoginCriador")
+  dispositivosCriados      Dispositivo[]                @relation("DispositivoCriadorCliente")
   placasPermitidas         ClienteLoginPlaca[]
   preferenciasNotificacoes PreferenciaNotificacao[]
   eventosNotificacoes      EventoNotificacao[]
