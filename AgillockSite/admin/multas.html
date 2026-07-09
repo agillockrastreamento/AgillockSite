@@ -172,6 +172,25 @@
   <script>
   (function () {
     var API = window.API_URL || '';
+
+    // ── Auth + rodapé da sidebar (nome/badge do admin, tema, logout, toggle) ──
+    var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+    if (!currentUser) return;
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge ' + (currentUser.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
     function badgeConsulta(st){
       if (st==='OK') return '<span class="mini-badge b-ok">OK</span>';
