@@ -267,6 +267,8 @@ router.get('/eventos', async (req, res) => {
     ]);
     const adminPrefs = (adminPrefsRow?.prefs as Record<string, any>) ?? {};
     const eventosPermitidos = eventos.filter(e => {
+      // Resumo da consulta de multas (10h/17h) sempre aparece para o admin, sem depender de preferência.
+      if (e.origemTipo === 'consultaMultas') return true;
       return !!adminPrefs[tipoPreferenciaAdmin(e.tipoEvento)];
     });
 

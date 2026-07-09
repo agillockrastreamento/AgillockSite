@@ -202,7 +202,7 @@ async function persistirConsulta(dispositivoId: string | null, uf: string, r: Co
     }
   });
 
-  await notificarConsultaCliente(disp.clienteId, r, aitsAntigos, primeiraConsulta);
+  await notificarConsultaCliente(disp.clienteId, dispositivoId, r, aitsAntigos, primeiraConsulta);
 }
 
 // ─────────────────────────── Saúde do worker (heartbeat) ───────────────────────────
@@ -316,6 +316,7 @@ function diasAte(venc: Date, hoje: Date): number {
 /** Notifica o cliente: multa nova (só a partir da 2ª consulta) + vencimento (7 dias / hoje). */
 async function notificarConsultaCliente(
   clienteId: string,
+  dispositivoId: string,
   r: ConsultaResult,
   aitsAntigos: Set<string>,
   primeiraConsulta: boolean,
@@ -334,6 +335,7 @@ async function notificarConsultaCliente(
       const qtd = novas.length;
       await notificarClienteMulta(
         login.id,
+        dispositivoId,
         novas.map((m) => m.ait),
         'multaNova',
         hoje,
@@ -352,13 +354,13 @@ async function notificarConsultaCliente(
     if (!venc) continue;
     const d = diasAte(venc, hoje);
     if (d === 7) {
-      await notificarClienteMulta(login.id, [m.ait], 'multaVencimento7dias', hoje, {
+      await notificarClienteMulta(login.id, dispositivoId, [m.ait], 'multaVencimento7dias', hoje, {
         title: 'Multa a vencer',
         body: `${r.placa}: autuação vence em 7 dias (${m.dataVencimento}).`,
         mensagem: `Multa a vencer: ${r.placa} — vence em 7 dias (${m.dataVencimento}), R$ ${Number(m.valorAPagar).toFixed(2)}.`,
       });
     } else if (d === 0) {
-      await notificarClienteMulta(login.id, [m.ait], 'multaVencimentoHoje', hoje, {
+      await notificarClienteMulta(login.id, dispositivoId, [m.ait], 'multaVencimentoHoje', hoje, {
         title: 'Multa vence hoje',
         body: `${r.placa}: autuação vence hoje.`,
         mensagem: `Multa vence hoje: ${r.placa} — R$ ${Number(m.valorAPagar).toFixed(2)}. Pague para evitar acréscimos.`,
@@ -367,9 +369,14 @@ async function notificarConsultaCliente(
   }
 }
 
-/** Cria o evento + push ao cliente, com dedup por (login, ait, tipo, dia). */
+/**
+ * Cria o evento + push ao cliente, com dedup por (login, ait, tipo, dia).
+ * O evento carrega `dispositivoId` (associa ao veículo, e sub-usuários passam a ver)
+ * e `origemTipo='multa'` + `origemId=<AIT(s)>` (permite achar/filtrar a notificação por AIT).
+ */
 async function notificarClienteMulta(
   clienteLoginId: string,
+  dispositivoId: string,
   aits: string[],
   tipo: 'multaNova' | 'multaVencimento7dias' | 'multaVencimentoHoje',
   dataReferencia: Date,
@@ -387,12 +394,19 @@ async function notificarClienteMulta(
   if (!algumNovo) return;
 
   await prisma.eventoNotificacao.create({
-    data: { clienteLoginId, tipoEvento: tipo, mensagem: payload.mensagem },
+    data: {
+      clienteLoginId,
+      dispositivoId,
+      tipoEvento: tipo,
+      origemTipo: 'multa',
+      origemId: aits.join(','),
+      mensagem: payload.mensagem,
+    },
   });
   await ExpoPushService.enviarParaCliente(clienteLoginId, {
     title: payload.title,
     body: payload.body,
-    data: { tipo },
+    data: { tipo, ait: aits.join(',') },
   });
 }
 
@@ -435,7 +449,7 @@ async function notificarResumoAdmin(log: LogResumo): Promise<void> {
   }
 
   await prisma.eventoNotificacao.create({
-    data: { clienteLoginId: ref.id, tipoEvento, adminEvento: true, mensagem },
+    data: { clienteLoginId: ref.id, tipoEvento, adminEvento: true, origemTipo: 'consultaMultas', mensagem },
   });
 }
 

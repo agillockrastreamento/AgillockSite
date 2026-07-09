@@ -337,6 +337,8 @@ router.get('/eventos', clienteAuthMiddleware, async (req: ClienteRequest, res) =
       dispositivoId: e.dispositivoId,
       tipo: e.tipoEvento,
       tipoLabel: e.mensagem.split(':')[0],
+      origemTipo: e.origemTipo,
+      origemId: e.origemId,
       mensagem: e.mensagem,
       serverTime: e.createdAt,
       lat: e.latitude,
