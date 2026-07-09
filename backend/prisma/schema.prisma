@@ -114,10 +114,14 @@ model Cliente {
   // (mesmo modal do admin) pelo card flutuante do mapa (web) e bottom sheet (app).
   podeEditarMedidores Boolean @default(false)
 
+  // Quando true, o cliente entra na rotina de consulta de multas (Detran) e a tela
+  // "Multas" aparece no site e no app dele. Default desligado; admin liga caso a caso.
+  multasHabilitado Boolean @default(false)
+
   // Integração IAPRO — cliente criado/sincronizado a partir de um contrato da IAPRO.
   // Pagamentos desse cliente são feitos pela IAPRO (sem boletos na Ágil Lock).
-  origemIapro    Boolean @default(false)
-  iaproClienteId String? @unique
+  origemIapro    Boolean  @default(false)
+  iaproClienteId String?  @unique
   cep            String?
   logradouro     String?
   numero         String?
@@ -125,8 +129,8 @@ model Cliente {
   bairro         String?
   cidade         String?
   estado         String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   criadoPorId String
   criadoPor   User    @relation("ClienteCriador", fields: [criadoPorId], references: [id])
@@ -142,6 +146,7 @@ model Cliente {
   geocercas              Geocerca[]
   iaproVeiculos          IaproVeiculo[]
   motoristas             Motorista[]
+  veiculosMultaSituacao  VeiculoMultaSituacao[]
 }
 
 // Veículo de um contrato da IAPRO sincronizado via API. Enquanto não houver um
@@ -340,6 +345,7 @@ model Dispositivo {
   tagsBle                  TagBLE[]
   usuariosResgate          UsuarioResgateDispositivo[]
   iaproVeiculos            IaproVeiculo[]
+  veiculoMultaSituacao     VeiculoMultaSituacao?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -477,7 +483,7 @@ model Configuracoes {
 model RegraComissao {
   id         String   @id @default(uuid())
   valor      Decimal  @db.Decimal(10, 2) // valor exato da cobrança (R$)
-  percentual Decimal  @db.Decimal(5, 2)  // % de comissão aplicado
+  percentual Decimal  @db.Decimal(5, 2) // % de comissão aplicado
   ativo      Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -521,6 +527,7 @@ model ClienteLogin {
   recorrenciasData         ManutencaoRecorrenciaData[]
   appPushTokens            AppPushToken[]
   notificacoesFinanceiras  NotificacaoFinanceiraEnvio[]
+  notificacoesMultas       NotificacaoMultaEnvio[]
 
   @@index([clienteId, tipo])
 }
@@ -556,22 +563,22 @@ model AppPushToken {
 }
 
 model PreferenciaNotificacao {
-  id                 String   @id @default(uuid())
-  clienteLoginId     String
-  dispositivoId      String
-  tipoEvento         String // ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut, kmExcedida, kmReduzida, trocaOleo
-  web                Boolean  @default(false)
-  app                Boolean  @default(false)
-  email              Boolean  @default(false)
-  overspeedLimit     Int?     @default(100)
-  kmMaximo30Dias     Int?
-  diaRenovacaoMes    Int?
-  kmMinimo7Dias      Int?
-  diaSemanaRenovacao Int?
-  kmTrocaOleo        Int?
-  semAtualizacaoHoras Int?    @default(3) // Horas sem posição p/ disparar "semAtualizacao" (escolha do usuário)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  clienteLoginId      String
+  dispositivoId       String
+  tipoEvento          String // ignitionOn, ignitionOff, geofenceEnter, geofenceExit, overspeed, powerCut, kmExcedida, kmReduzida, trocaOleo
+  web                 Boolean  @default(false)
+  app                 Boolean  @default(false)
+  email               Boolean  @default(false)
+  overspeedLimit      Int?     @default(100)
+  kmMaximo30Dias      Int?
+  diaRenovacaoMes     Int?
+  kmMinimo7Dias       Int?
+  diaSemanaRenovacao  Int?
+  kmTrocaOleo         Int?
+  semAtualizacaoHoras Int?     @default(3) // Horas sem posição p/ disparar "semAtualizacao" (escolha do usuário)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
   dispositivo  Dispositivo  @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
@@ -775,4 +782,131 @@ model Contrato {
   assinadoEm           DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+}
+
+// ========================= Consulta de Multas (Detran) =========================
+// Documentação em docs/multas/. Consulta feita pelo worker (docs/multas/ARQUITETURA_WORKER.md).
+
+// Estado atual da consulta de multas de um dispositivo (1-para-1). Atualizado a cada consulta.
+model VeiculoMultaSituacao {
+  id String @id @default(uuid())
+
+  dispositivoId String      @unique
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  clienteId     String
+  cliente       Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  placa   String
+  renavam String?
+  uf      String  @default("CE")
+
+  qtdMultas             Int     @default(0)
+  valorTotal            Decimal @default(0) @db.Decimal(10, 2) // soma dos "valor a pagar"
+  possuiDebitoIpva      Boolean @default(false)
+  licenciamentoPendente Boolean @default(false)
+
+  // Pagamento pré-gerado de TODAS as multas (a consulta automática traz tudo)
+  extratoId       String?
+  pixEmv          String? @db.Text // Pix copia-e-cola
+  pixQrCodeBase64 String? @db.Text // PNG base64 do QR
+  boletoArquivo   String? // caminho relativo em /uploads/multas/...
+
+  ultimaConsultaEm     DateTime?
+  ultimaConsultaStatus String? // OK | ERRO | DADOS_INVALIDOS | SEM_RENAVAM
+  ultimaConsultaErro   String?
+
+  multas    Multa[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clienteId])
+}
+
+// Item da tabela de multas (substituídos a cada consulta do veículo).
+model Multa {
+  id String @id @default(uuid())
+
+  situacaoId String
+  situacao   VeiculoMultaSituacao @relation(fields: [situacaoId], references: [id], onDelete: Cascade)
+
+  ait            String
+  aitOriginaria  String?
+  motivo         String  @db.Text
+  dataInfracao   String? // "dd/mm/aaaa" do Detran
+  dataVencimento String?
+  valor          Decimal @db.Decimal(10, 2) // "Valor"
+  valorAPagar    Decimal @db.Decimal(10, 2) // "Valor a Pagar" (pode ter desconto ou juros)
+  selecaoValue   String // value do checkbox no Detran (ex "213890*VM00331695*5550*0")
+
+  createdAt DateTime @default(now())
+
+  @@index([situacaoId])
+  @@index([ait])
+}
+
+// Histórico das execuções em lote (agendadas e manuais). Aba de histórico do admin.
+model ConsultaMultaLog {
+  id String @id @default(uuid())
+
+  origem    String // AGENDADA | MANUAL_ADMIN
+  inicioEm  DateTime  @default(now())
+  fimEm     DateTime?
+  duracaoMs Int?
+  status    String    @default("EM_ANDAMENTO") // OK | PARCIAL | ERRO | EM_ANDAMENTO
+
+  clientesConsultados Int @default(0)
+  veiculosConsultados Int @default(0)
+  veiculosComSucesso  Int @default(0)
+  veiculosComErro     Int @default(0)
+  multasColetadas     Int @default(0)
+
+  detalhes Json? // por veículo: { placa, status, qtdMultas, erro? }
+
+  createdAt DateTime @default(now())
+
+  @@index([inicioEm])
+}
+
+// Dedup das notificações ao cliente (rotina roda 2x/dia). Espelha NotificacaoFinanceiraEnvio.
+model NotificacaoMultaEnvio {
+  id             String   @id @default(uuid())
+  clienteLoginId String
+  ait            String
+  tipo           String // multaNova | multaVencimento7dias | multaVencimentoHoje
+  dataReferencia DateTime // dia de referência (00:00) p/ unicidade por dia
+  createdAt      DateTime @default(now())
+
+  clienteLogin ClienteLogin @relation(fields: [clienteLoginId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteLoginId, ait, tipo, dataReferencia])
+}
+
+// Fila de tarefas para o worker (máquina que alcança o Detran).
+model ConsultaJob {
+  id            String    @id @default(uuid())
+  tipo          String // CONSULTA_VEICULO | GERAR_PAGAMENTO
+  uf            String    @default("CE")
+  placa         String
+  renavam       String?
+  dispositivoId String?
+  aits          Json? // GERAR_PAGAMENTO: AITs selecionados (null/[] = todas)
+  origem        String // AGENDADA | MANUAL_ADMIN | CLIENTE
+  status        String    @default("PENDENTE") // PENDENTE | PROCESSANDO | CONCLUIDO | ERRO
+  tentativas    Int       @default(0)
+  resultado     Json?
+  erro          String?
+  claimedEm     DateTime?
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+
+  @@index([status, criadoEm])
+}
+
+// Saúde do worker (linha única). Alimenta o indicador online/offline no admin.
+model WorkerStatus {
+  id              String    @id @default("singleton")
+  ultimoHeartbeat DateTime?
+  online          Boolean   @default(false)
+  info            Json?
+  updatedAt       DateTime  @updatedAt
 }

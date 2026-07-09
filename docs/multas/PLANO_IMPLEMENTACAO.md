@@ -18,10 +18,10 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] IPVA: detecta frase "débito de IPVA" (validado; hoje sem débito pois foi pago). Multas: 100%.
 - [ ] **Pendente validar:** detecção de `licenciamentoPendente` (heurística) — precisa de um veículo com licenciamento pendente para confirmar o texto exato. IPVA em débito idem (a OSU6H88 quitou).
 
-## Fase 2 — Banco de dados (backend)
-- [ ] Modelos Prisma ([BANCO_DE_DADOS](BANCO_DE_DADOS.md)): flag `Cliente.multasHabilitado`, `VeiculoMultaSituacao`, `Multa`, `ConsultaMultaLog`, `NotificacaoMultaEnvio`.
-- [ ] Modelo `ConsultaJob` (fila do worker) + campo/registro de saúde do worker ([ARQUITETURA_WORKER](ARQUITETURA_WORKER.md)).
-- [ ] Migração e `db:migrate`.
+## Fase 2 — Banco de dados (backend) ✅
+- [x] Modelos Prisma: flag `Cliente.multasHabilitado`, `VeiculoMultaSituacao`, `Multa`, `ConsultaMultaLog`, `NotificacaoMultaEnvio`.
+- [x] `ConsultaJob` (fila do worker) + `WorkerStatus` (saúde/heartbeat do worker).
+- [x] Migração `20260709120629_consulta_multas_detran` criada e aplicada; client gerado; schema válido.
 
 ## Fase 3 — Backend: fila + endpoints do worker
 - [ ] Auth por `WORKER_API_KEY` (middleware separado do JWT).
