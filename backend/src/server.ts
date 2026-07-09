@@ -67,7 +67,11 @@ function agendarConsultaMultas() {
   console.log(`[Multas] Proxima consulta automatica agendada para ${proxima.toISOString()} (10h/17h America/Sao_Paulo).`);
   setTimeout(() => {
     iniciarConsultaLote('AGENDADA')
-      .then((logId) => console.log(`[Multas] Lote de consulta iniciado (log ${logId}).`))
+      .then((r) =>
+        console.log(
+          `[Multas] Lote iniciado (log ${r.logId}): ${r.elegiveis} veículo(s); ${r.ignorados} ignorado(s) por falta de renavam/chassi.`,
+        ),
+      )
       .catch((err) => console.error('[Multas] Erro ao iniciar lote:', err))
       .finally(agendarConsultaMultas);
   }, delay);

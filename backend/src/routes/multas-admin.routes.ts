@@ -9,6 +9,7 @@ import {
   criarJobPagamento,
   aguardarJob,
   getDetalheVeiculo,
+  listarVeiculosIncompletos,
 } from '../services/multas.service';
 
 const router = Router();
@@ -36,11 +37,16 @@ router.get('/historico', async (req: AuthRequest, res: Response): Promise<void> 
 // ─── POST /api/multas/consultar-todos — dispara o lote manualmente ───────────
 router.post('/consultar-todos', async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const logId = await iniciarConsultaLote('MANUAL_ADMIN');
-    res.json({ ok: true, logId });
+    const r = await iniciarConsultaLote('MANUAL_ADMIN');
+    res.json({ ok: true, ...r });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Erro ao iniciar consulta.' });
   }
+});
+
+// ─── GET /api/multas/incompletos — veículos habilitados sem renavam/chassi ───
+router.get('/incompletos', async (_req: AuthRequest, res: Response): Promise<void> => {
+  res.json({ itens: await listarVeiculosIncompletos() });
 });
 
 // ─── GET /api/multas — lista de situações (filtros + paginação) ──────────────

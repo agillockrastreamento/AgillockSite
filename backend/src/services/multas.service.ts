@@ -228,9 +228,12 @@ export async function getWorkerStatus() {
 
 /**
  * Cria um lote de consulta: 1 job CONSULTA_VEICULO por veículo de cliente habilitado
- * (com placa + renavam/chassi). Retorna o id do ConsultaMultaLog. Ver docs/multas/SCHEDULER.md.
+ * (com placa + renavam/chassi). Veículos habilitados SEM renavam/chassi são ignorados
+ * (não dá para consultar no Detran). Ver docs/multas/SCHEDULER.md.
  */
-export async function iniciarConsultaLote(origem: 'AGENDADA' | 'MANUAL_ADMIN'): Promise<string> {
+export async function iniciarConsultaLote(
+  origem: 'AGENDADA' | 'MANUAL_ADMIN',
+): Promise<{ logId: string; elegiveis: number; ignorados: number }> {
   const dispositivos = await prisma.dispositivo.findMany({
     where: {
       ativo: true,
@@ -239,6 +242,17 @@ export async function iniciarConsultaLote(origem: 'AGENDADA' | 'MANUAL_ADMIN'): 
       OR: [{ renavam: { not: null } }, { chassi: { not: null } }],
     },
     select: { id: true, clienteId: true, placa: true, renavam: true, chassi: true },
+  });
+
+  // Veículos habilitados que NÃO podem ser consultados por falta de renavam/chassi.
+  const ignorados = await prisma.dispositivo.count({
+    where: {
+      ativo: true,
+      placa: { not: null },
+      cliente: { is: { multasHabilitado: true } },
+      renavam: null,
+      chassi: null,
+    },
   });
 
   const clientesDistintos = new Set(dispositivos.map((d) => d.clienteId)).size;
@@ -256,7 +270,7 @@ export async function iniciarConsultaLote(origem: 'AGENDADA' | 'MANUAL_ADMIN'): 
       where: { id: log.id },
       data: { status: 'OK', fimEm: new Date(), duracaoMs: 0 },
     });
-    return log.id;
+    return { logId: log.id, elegiveis: 0, ignorados };
   }
 
   await prisma.consultaJob.createMany({
@@ -270,7 +284,23 @@ export async function iniciarConsultaLote(origem: 'AGENDADA' | 'MANUAL_ADMIN'): 
       logId: log.id,
     })),
   });
-  return log.id;
+  return { logId: log.id, elegiveis: dispositivos.length, ignorados };
+}
+
+/** Veículos de clientes habilitados que estão sem renavam/chassi (não consultáveis). */
+export async function listarVeiculosIncompletos() {
+  const disp = await prisma.dispositivo.findMany({
+    where: {
+      ativo: true,
+      placa: { not: null },
+      renavam: null,
+      chassi: null,
+      cliente: { is: { multasHabilitado: true } },
+    },
+    select: { id: true, placa: true, cliente: { select: { nome: true } } },
+    orderBy: { placa: 'asc' },
+  });
+  return disp.map((d) => ({ dispositivoId: d.id, placa: d.placa, clienteNome: d.cliente?.nome ?? '' }));
 }
 
 /** Contabiliza um veículo no log do lote e fecha o log (+ notifica admin) quando todos terminam. */

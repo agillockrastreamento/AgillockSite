@@ -26,6 +26,8 @@
     .b-warn { background:#fff4e0; color:#a35b00; } .b-neutral { background:#eceff3; color:#556; }
     html.dark-theme .b-neutral { background:#222a35; color:#9aa4b2; }
     .info-aviso { font-size:12px; color:#777; margin:2px 0 12px; }
+    .aviso-warn { font-size:13px; background:#fff4e0; color:#8a5300; border:1px solid #f0d9a8; border-radius:8px; padding:10px 14px; margin:0 0 12px; }
+    html.dark-theme .aviso-warn { background:#3a2f14; color:#e6c589; border-color:#5c4a1e; }
     .pix-box { background:#f7f8fa; border:1px solid #e5e7eb; border-radius:8px; padding:12px; margin-top:10px; }
     html.dark-theme .pix-box { background:#141820; border-color:#2a3340; }
     .pix-emv { font-family:monospace; font-size:11px; word-break:break-all; background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px; }
@@ -98,6 +100,7 @@
     <div id="al-alert-container"></div>
 
     <div class="info-aviso"><i class="fa fa-info-circle"></i> Dados consultados no Detran. Atualização automática 2×/dia, às 10h e às 17h. A geração de boleto/Pix é feita no momento do pagamento (valor atual).</div>
+    <div id="aviso-incompletos" class="aviso-warn" style="display:none;"></div>
 
     <!-- Abas -->
     <div class="mt-tabs">
@@ -328,11 +331,24 @@
     }
 
     // ── Consultar todos ──
+    function loadIncompletos(){
+      AL.apiGet('/api/multas/incompletos').then(function(d){
+        var el = document.getElementById('aviso-incompletos');
+        if (!d.itens || !d.itens.length){ el.style.display='none'; return; }
+        var placas = d.itens.map(function(i){ return esc(i.placa); }).join(', ');
+        el.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <b>'+d.itens.length+' veículo(s)</b> de cliente(s) habilitado(s) estão <b>sem renavam/chassi</b> e por isso não são consultados no Detran: '+placas+'. Preencha o RENAVAM no cadastro do dispositivo.';
+        el.style.display='';
+      }).catch(function(){});
+    }
+
     document.getElementById('btn-consultar-todos').onclick = function(){
       var b=this; var old=b.innerHTML; b.disabled=true; b.innerHTML='<i class="fa fa-spinner fa-spin"></i> Enfileirando…';
-      AL.apiPost('/api/multas/consultar-todos', {}).then(function(){
-        AL.showAlert('Consulta de todos os veículos iniciada. Os resultados aparecem conforme o worker processa.', 'success');
-        setTimeout(function(){ loadMultas(); loadWorkerStatus(); }, 2000);
+      AL.apiPost('/api/multas/consultar-todos', {}).then(function(r){
+        var msg = (r && r.elegiveis != null)
+          ? ('Consulta iniciada: ' + r.elegiveis + ' veículo(s).' + (r.ignorados ? ' ' + r.ignorados + ' ignorado(s) por falta de renavam/chassi.' : ''))
+          : 'Consulta de todos os veículos iniciada.';
+        AL.showAlert(msg, (r && r.ignorados) ? 'info' : 'success');
+        setTimeout(function(){ loadMultas(); loadWorkerStatus(); loadIncompletos(); }, 2000);
       }).catch(function(err){ AL.showAlert(err.message); }).then(function(){ b.disabled=false; b.innerHTML=old; });
     };
 
@@ -344,6 +360,7 @@
     // ── Init ──
     loadWorkerStatus();
     loadMultas();
+    loadIncompletos();
     setInterval(loadWorkerStatus, 60000);
   })();
   </script>
