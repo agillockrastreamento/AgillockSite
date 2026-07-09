@@ -497,21 +497,24 @@
 
     // ── Labels para tooltip ──────────────────────────────────────────────────
     // Nav principal
+    // O badge de contagem (ex.: IAPRO) entraria no texto e viraria "IAPRO0".
+    function rotuloDoLink(a) {
+      var clone = a.cloneNode(true);
+      clone.querySelectorAll('i, .sidebar-badge').forEach(function (el) { el.remove(); });
+      return clone.textContent.replace(/\s+/g, ' ').trim();
+    }
+
     sidebar.querySelectorAll('.sidebar-nav > li').forEach(function (li) {
       var a = li.querySelector(':scope > a');
       if (!a) return;
-      var clone = a.cloneNode(true);
-      clone.querySelectorAll('i').forEach(function (el) { el.remove(); });
-      var label = clone.textContent.replace(/\s+/g, ' ').trim();
+      var label = rotuloDoLink(a);
       if (label) li.setAttribute('data-nav-label', label);
     });
     // Sub-itens
     sidebar.querySelectorAll('.sidebar-submenu li').forEach(function (li) {
       var a = li.querySelector('a');
       if (!a) return;
-      var clone = a.cloneNode(true);
-      clone.querySelectorAll('i').forEach(function (el) { el.remove(); });
-      var label = clone.textContent.replace(/\s+/g, ' ').trim();
+      var label = rotuloDoLink(a);
       if (label) li.setAttribute('data-nav-label', label);
     });
 
