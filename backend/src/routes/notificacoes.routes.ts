@@ -118,13 +118,38 @@ router.get('/preferencias/:dispositivoId', clienteAuthMiddleware, async (req: an
   }
 });
 
-// Salvar preferências
+// Salvar preferências — aceita um dispositivo (dispositivoId) ou vários (dispositivoIds).
+// Salvar para vários é o "configurar todos": grava a mesma preferência em cada dispositivo,
+// que depois pode ser sobrescrita individualmente.
 router.post('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
   try {
-    const { dispositivoId, preferencias, overspeedLimit, kmExcedida, kmReduzida, kmTrocaOleo, semAtualizacaoHoras } = req.body;
+    const { dispositivoId, dispositivoIds, preferencias, overspeedLimit, kmExcedida, kmReduzida, kmTrocaOleo, semAtualizacaoHoras } = req.body;
     const clienteLoginId = req.cliente.sub;
 
-    await prisma.$transaction(
+    const alvos: string[] = Array.isArray(dispositivoIds) && dispositivoIds.length
+      ? [...new Set(dispositivoIds.map(String))]
+      : (dispositivoId ? [String(dispositivoId)] : []);
+
+    if (!alvos.length) {
+      res.status(400).json({ message: 'Informe dispositivoId ou dispositivoIds.' });
+      return;
+    }
+    if (!preferencias || typeof preferencias !== 'object') {
+      res.status(400).json({ message: 'preferencias é obrigatório.' });
+      return;
+    }
+
+    // Só deixa gravar em dispositivos que o cliente logado enxerga.
+    const permitidos = await prisma.dispositivo.findMany({
+      where: { id: { in: alvos }, ...whereDispositivosDoCliente(req) },
+      select: { id: true },
+    });
+    if (permitidos.length !== alvos.length) {
+      res.status(403).json({ message: 'Um ou mais dispositivos não pertencem a este cliente.' });
+      return;
+    }
+
+    const operacoes = alvos.flatMap(alvoId =>
       Object.keys(preferencias).map(tipo => {
         const extra: any = {};
         if (tipo === 'overspeed') extra.overspeedLimit = overspeedLimit ?? 100;
@@ -145,15 +170,17 @@ router.post('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
 
         return prisma.preferenciaNotificacao.upsert({
           where: {
-            clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: tipo },
+            clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: alvoId, tipoEvento: tipo },
           },
           update: { web: preferencias[tipo].web, app: preferencias[tipo].app, email: preferencias[tipo].email, ...extra },
-          create: { clienteLoginId, dispositivoId, tipoEvento: tipo, web: preferencias[tipo].web, app: preferencias[tipo].app, email: preferencias[tipo].email, ...extra },
+          create: { clienteLoginId, dispositivoId: alvoId, tipoEvento: tipo, web: preferencias[tipo].web, app: preferencias[tipo].app, email: preferencias[tipo].email, ...extra },
         });
       })
     );
 
-    res.json({ message: 'Preferências salvas com sucesso!' });
+    await prisma.$transaction(operacoes);
+
+    res.json({ message: 'Preferências salvas com sucesso!', dispositivosAtualizados: alvos.length });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erro ao salvar preferências.' });

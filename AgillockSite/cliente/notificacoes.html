@@ -414,6 +414,20 @@
       transition: opacity .2s;
     }
     #btn-salvar-geral:disabled { opacity: .65; }
+
+    /* ── Modo "Configurar todos" ── */
+    #btn-configurar-todos.ativo {
+      background: #1f6f9f; border-color: #1f6f9f; color: #fff;
+    }
+    .notif-modo-todos-aviso {
+      display: none; align-items: center; gap: 8px;
+      background: #eef6fd; border: 1px solid #bcdff5; color: #1f6f9f;
+      border-radius: 6px; padding: 9px 12px; margin-bottom: 14px; font-size: 13px;
+    }
+    .notif-modo-todos-aviso.visivel { display: flex; }
+    html.dark-theme .notif-modo-todos-aviso {
+      background: #14293b; border-color: #1f4a6b; color: #9ecfdb;
+    }
   </style>
 </head>
 <body>
@@ -465,6 +479,11 @@
           </select>
         </div>
         <div>
+          <button class="btn btn-default" id="btn-configurar-todos" style="display:none;">
+            <i class="fa fa-check-square-o"></i> Configurar todos
+          </button>
+        </div>
+        <div>
           <button class="btn btn-primary btn-salvar" id="btn-salvar-geral">
             <i class="fa fa-save"></i> Salvar configurações
           </button>
@@ -473,6 +492,12 @@
 
       <!-- Conteúdo quando dispositivo selecionado -->
       <div id="notif-container" style="display:none;">
+
+        <!-- Aviso do modo "Configurar todos" -->
+        <div id="aviso-modo-todos" class="notif-modo-todos-aviso">
+          <i class="fa fa-info-circle"></i>
+          <span id="aviso-modo-todos-texto"></span>
+        </div>
 
         <!-- Cabeçalho do veículo -->
         <div class="notif-veiculo-title">

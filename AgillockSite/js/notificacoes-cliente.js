@@ -35,6 +35,10 @@
   let veiculos = [];
   let dispositivoIdAtivo = null;
   let preferenciasAtivas = {};
+  // Modo "Configurar todos": o que for salvo vale para todos os dispositivos.
+  // Continua sendo preferência por dispositivo no banco — depois dá para
+  // selecionar um veículo e sobrescrever só ele.
+  let modoTodos = false;
 
   function normalizarPlacaBusca(valor) {
     return String(valor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -88,6 +92,10 @@
     const select = document.getElementById('filtro-dispositivo');
     const btnLabel = document.querySelector('#picker-dispositivo-btn span');
     if (!btnLabel) return;
+    if (modoTodos) {
+      btnLabel.textContent = `Todos os dispositivos (${veiculos.length})`;
+      return;
+    }
     const opt = select.options[select.selectedIndex];
     btnLabel.textContent = opt && opt.value ? opt.text : 'Selecione um veículo...';
   }
@@ -135,14 +143,42 @@
       const data = await AL_CLIENTE.apiGet('/api/cliente/rastreamento/posicoes');
       veiculos = data || [];
       renderOpcoesVeiculos(document.getElementById('busca-placa-dispositivo')?.value || '');
+      // "Configurar todos" só faz sentido com mais de um dispositivo.
+      document.getElementById('btn-configurar-todos').style.display = veiculos.length > 1 ? '' : 'none';
     } catch (err) {
       console.error('Erro ao carregar veículos', err);
     }
   }
 
+  function sairModoTodos() {
+    modoTodos = false;
+    document.getElementById('btn-configurar-todos').classList.remove('ativo');
+    document.getElementById('aviso-modo-todos').classList.remove('visivel');
+  }
+
+  async function entrarModoTodos() {
+    if (veiculos.length < 2) return;
+    modoTodos = true;
+    dispositivoIdAtivo = null;
+    document.getElementById('filtro-dispositivo').value = '';
+    document.getElementById('btn-configurar-todos').classList.add('ativo');
+    atualizarLabelPickerVeiculos();
+
+    document.getElementById('nome-veiculo-selecionado').textContent =
+      `Todos os dispositivos (${veiculos.length})`;
+    document.getElementById('aviso-modo-todos-texto').textContent =
+      `O que você salvar aqui vale para os ${veiculos.length} dispositivos. ` +
+      'Depois, para configurar um deles de forma diferente, basta selecioná-lo na lista.';
+    document.getElementById('aviso-modo-todos').classList.add('visivel');
+
+    await carregarPreferenciasTodos();
+  }
+
   function bindEvents() {
     document.getElementById('filtro-dispositivo').addEventListener('change', function () {
       const id = this.value;
+      sairModoTodos();   // escolher um veículo sai do modo global
+      atualizarLabelPickerVeiculos();   // já fora do modo global, mostra o nome do veículo
       if (!id) {
         document.getElementById('notif-container').style.display = 'none';
         document.getElementById('notif-vazio').style.display = 'block';
@@ -155,6 +191,7 @@
       carregarPreferencias(id);
     });
 
+    document.getElementById('btn-configurar-todos').addEventListener('click', entrarModoTodos);
     document.getElementById('btn-salvar-geral').addEventListener('click', salvarConfiguracoes);
   }
 
@@ -180,6 +217,57 @@
       document.getElementById('notif-vazio').style.display = 'none';
     } catch (err) {
       AL_CLIENTE.showAlert('Erro ao carregar preferências.');
+    }
+  }
+
+  // No modo "todos", mostra o denominador comum: um canal só aparece ligado se
+  // estiver ligado em todos os dispositivos; campos numéricos só aparecem
+  // preenchidos se o valor for o mesmo em todos.
+  async function carregarPreferenciasTodos() {
+    try {
+      const todas = await Promise.all(
+        veiculos.map(v => AL_CLIENTE.apiGet(`/api/cliente/notificacoes/preferencias/${v.dispositivoId}`))
+      );
+
+      const ligadoEmTodos = (tipo, canal) =>
+        todas.every(d => d?.preferencias?.[tipo]?.[canal] === true);
+
+      preferenciasAtivas = {};
+      TIPOS_NOTIF.forEach(tipo => {
+        preferenciasAtivas[tipo.id] = {
+          web: ligadoEmTodos(tipo.id, 'web'),
+          app: ligadoEmTodos(tipo.id, 'app'),
+          email: ligadoEmTodos(tipo.id, 'email'),
+        };
+      });
+
+      const valorComum = (fn) => {
+        const valores = todas.map(fn);
+        const primeiro = valores[0];
+        return valores.every(v => v === primeiro) ? primeiro : null;
+      };
+
+      const overspeed = valorComum(d => d?.overspeedLimit ?? null);
+      if (overspeed != null) preferenciasAtivas.overspeedLimit = overspeed;
+      const semAtualizacao = valorComum(d => d?.semAtualizacaoHoras ?? null);
+      if (semAtualizacao != null) preferenciasAtivas.semAtualizacaoHoras = semAtualizacao;
+
+      renderGrid();
+
+      const kmMax = valorComum(d => d?.kmExcedida?.kmMaximo30Dias ?? null);
+      const diaMes = valorComum(d => d?.kmExcedida?.diaRenovacaoMes ?? null);
+      const kmMin = valorComum(d => d?.kmReduzida?.kmMinimo7Dias ?? null);
+      const diaSemana = valorComum(d => d?.kmReduzida?.diaSemanaRenovacao ?? null);
+
+      document.getElementById('input-km-max').value = kmMax || '';
+      document.getElementById('input-dia-mes').value = diaMes || '';
+      document.getElementById('input-km-min').value = kmMin || '';
+      if (diaSemana != null) document.getElementById('select-dia-semana').value = diaSemana;
+
+      document.getElementById('notif-container').style.display = 'block';
+      document.getElementById('notif-vazio').style.display = 'none';
+    } catch (err) {
+      AL_CLIENTE.showAlert('Erro ao carregar preferências dos dispositivos.');
     }
   }
 
@@ -220,14 +308,18 @@
   };
 
   async function salvarConfiguracoes() {
-    if (!dispositivoIdAtivo) return;
+    if (!dispositivoIdAtivo && !modoTodos) return;
 
     const btn = document.getElementById('btn-salvar-geral');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> SALVANDO...';
 
+    const alvo = modoTodos
+      ? { dispositivoIds: veiculos.map(v => v.dispositivoId) }
+      : { dispositivoId: dispositivoIdAtivo };
+
     const payload = {
-      dispositivoId: dispositivoIdAtivo,
+      ...alvo,
       preferencias: {},
       overspeedLimit: parseInt(document.getElementById('input-vel-limite').value) || 100,
       semAtualizacaoHoras: parseInt(document.getElementById('input-sem-atualizacao-horas').value) || 3,
@@ -252,7 +344,12 @@
 
     try {
       await AL_CLIENTE.apiPost('/api/cliente/notificacoes/preferencias', payload);
-      AL_CLIENTE.showAlert('Configurações salvas com sucesso!', 'success');
+      AL_CLIENTE.showAlert(
+        modoTodos
+          ? `Configurações salvas para os ${veiculos.length} dispositivos!`
+          : 'Configurações salvas com sucesso!',
+        'success'
+      );
     } catch (err) {
       AL_CLIENTE.showAlert('Erro ao salvar: ' + err.message);
     } finally {
