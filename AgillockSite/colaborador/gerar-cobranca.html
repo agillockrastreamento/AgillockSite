@@ -73,6 +73,19 @@
     html.dark-theme .unif-total-bar { background: #252d3d !important; }
     html.dark-theme #form-unif .input-group-addon { background: #2d3748; border-color: #4a5568; color: #c9d1d9; }
     html.dark-theme .unif-total-bar strong { color: #c9d1d9 !important; }
+
+    /* ── Seleção de dispositivos na unificação ── */
+    .unif-selecao-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px; font-size: 13px;
+    }
+    .unif-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .unif-item .unif-placa-check { margin: 0; cursor: pointer; }
+    .unif-item .unif-placa-nome { flex: 1; font-weight: 600; cursor: pointer; }
+    .unif-item.desmarcado .unif-placa-nome { opacity: .45; text-decoration: line-through; }
+    .unif-item.desmarcado .input-group { opacity: .45; }
+    html.dark-theme .unif-selecao-bar { color: #9aa4b2; }
+
     .disp-card { display:flex; align-items:center; gap:10px; padding:10px; border:2px solid #eee; border-radius:8px; margin-bottom:8px; cursor:pointer; transition:border-color .15s; }
     .disp-card.selected { border-color:#fab32c; }
     .disp-toggle { width:42px; height:24px; border-radius:12px; background:#ccc; position:relative; transition:background .2s; flex-shrink:0; }
@@ -210,6 +223,10 @@
 
           <!-- ─ Formulário de unificação ─ -->
           <div id="form-unif" style="display:none;padding-top:4px;">
+            <div class="unif-selecao-bar">
+              <span id="unif-selecao-info" class="text-muted"></span>
+              <a href="#" id="unif-alternar-todos">Desmarcar todos</a>
+            </div>
             <div id="form-unif-placas"></div>
             <div class="unif-total-bar" style="background:#f8f9fa;border-radius:6px;padding:10px 14px;margin:10px 0 14px;display:flex;justify-content:space-between;align-items:center;">
               <strong style="color:#555;">Total mensal:</strong>
@@ -741,8 +758,8 @@
               var qtdComCarne = todasPlacas.filter(function (d) { return dispComCarne[d.id]; }).length;
               var qtdSemCarne = todasPlacas.length - qtdComCarne;
               var texto = (qtdComCarne > 0 && qtdSemCarne > 0)
-                ? 'Este cliente tem ' + todasPlacas.length + ' dispositivos (' + qtdComCarne + ' com carnê ativo e ' + qtdSemCarne + ' sem carnê). Deseja gerar um boleto unificado para todos?'
-                : 'Este cliente tem ' + todasPlacas.length + ' dispositivos. Deseja gerar um boleto unificado para todos?';
+                ? 'Este cliente tem ' + todasPlacas.length + ' dispositivos (' + qtdComCarne + ' com carnê ativo e ' + qtdSemCarne + ' sem carnê). Deseja gerar um boleto unificado? Você escolhe quais entram.'
+                : 'Este cliente tem ' + todasPlacas.length + ' dispositivos. Deseja gerar um boleto unificado? Você escolhe quais entram.';
               document.getElementById('sugestao-unif-texto').textContent = texto;
               document.getElementById('sugestao-unif').style.display = 'block';
             }
@@ -755,7 +772,7 @@
                 document.getElementById('sugestao-unif-texto').textContent =
                   'Este cliente possui um boleto unificado com ' + carneUnificadoAtivo.placas.length +
                   ' dispositivo(s) (' + nomesUnif + ') e mais ' + dispForaDoUnif.length +
-                  ' dispositivo(s) fora dele. Deseja gerar um novo boleto unificado para todos?';
+                  ' dispositivo(s) fora dele. Deseja gerar um novo boleto unificado? Você escolhe quais entram.';
                 document.getElementById('sugestao-unif').style.display = 'block';
               }
             }
@@ -767,7 +784,11 @@
 
       // ── Unificação: funções ───────────────────────────────────
       function mostrarFormUnificado(placasParaUnif) {
-        unifPlacas = placasParaUnif;
+        // Todos entram marcados; o usuário desmarca os que ficam de fora do unificado.
+        unifPlacas = placasParaUnif.map(function (p) {
+          p.selecionado = true;
+          return p;
+        });
         // Fix 3: reduz indicador de passos para 2 no modo unificação
         ['3','4'].forEach(function(n) {
           var el = document.querySelector('.wizard-step[data-step="' + n + '"]');
@@ -801,15 +822,35 @@
         document.getElementById('form-unif').style.display = 'block';
       }
 
+      // Dispositivos marcados para entrar no boleto unificado.
+      function unifSelecionadas() {
+        return unifPlacas.filter(function (p) { return p.selecionado; });
+      }
+
       function renderFormUnifPlacas() {
         document.getElementById('form-unif-placas').innerHTML = unifPlacas.map(function (p, i) {
-          return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
-            '<span style="flex:1;font-weight:600;">' + p.placa + '</span>' +
+          return '<div class="unif-item' + (p.selecionado ? '' : ' desmarcado') + '" data-index="' + i + '">' +
+            '<input type="checkbox" class="unif-placa-check" id="unif-check-' + i + '" data-index="' + i + '"' +
+            (p.selecionado ? ' checked' : '') + ' />' +
+            '<label class="unif-placa-nome" for="unif-check-' + i + '">' + p.placa + '</label>' +
             '<div style="width:160px;"><div class="input-group input-group-sm">' +
             '<span class="input-group-addon">R$</span>' +
             '<input type="number" class="form-control unif-placa-valor" data-index="' + i + '" value="' +
-            (p.valor || '') + '" step="0.01" min="0.01" placeholder="0,00" /></div></div></div>';
+            (p.valor || '') + '" step="0.01" min="0.01" placeholder="0,00"' +
+            (p.selecionado ? '' : ' disabled') + ' /></div></div></div>';
         }).join('');
+
+        document.querySelectorAll('.unif-placa-check').forEach(function (chk) {
+          chk.addEventListener('change', function () {
+            var idx = parseInt(this.dataset.index);
+            unifPlacas[idx].selecionado = this.checked;
+            var linha = this.closest('.unif-item');
+            linha.classList.toggle('desmarcado', !this.checked);
+            linha.querySelector('.unif-placa-valor').disabled = !this.checked;
+            atualizarTotalUnif();
+          });
+        });
+
         document.querySelectorAll('.unif-placa-valor').forEach(function (inp) {
           inp.addEventListener('input', function () {
             var idx = parseInt(this.dataset.index);
@@ -828,8 +869,19 @@
       }
 
       function atualizarTotalUnif() {
-        var total = unifPlacas.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
+        var selecionadas = unifSelecionadas();
+        var total = selecionadas.reduce(function (s, p) { return s + (Number(p.valor) || 0); }, 0);
         document.getElementById('unif-total').textContent = AL.fmtMoney(total);
+
+        document.getElementById('unif-selecao-info').textContent =
+          selecionadas.length + ' de ' + unifPlacas.length + ' dispositivo(s) selecionado(s)';
+        document.getElementById('unif-alternar-todos').textContent =
+          selecionadas.length === unifPlacas.length ? 'Desmarcar todos' : 'Marcar todos';
+
+        // O boleto unificado exige ao menos 2 dispositivos (mesma regra do backend).
+        var btnGerar = document.getElementById('btn-unif-gerar');
+        btnGerar.disabled = selecionadas.length < 2;
+        btnGerar.title = selecionadas.length < 2 ? 'Selecione ao menos 2 dispositivos.' : '';
       }
 
       function buscarVendedoresUnif(q) {
@@ -888,6 +940,12 @@
       document.getElementById('btn-nao-add-unif').addEventListener('click', function () {
         document.getElementById('prompt-add-unif').style.display = 'none';
       });
+      document.getElementById('unif-alternar-todos').addEventListener('click', function (e) {
+        e.preventDefault();
+        var marcarTodos = unifSelecionadas().length !== unifPlacas.length;
+        unifPlacas.forEach(function (p) { p.selecionado = marcarTodos; });
+        renderFormUnifPlacas();
+      });
       document.getElementById('btn-unif-cancelar').addEventListener('click', function () {
         document.getElementById('form-unif').style.display = 'none';
         carregarPlacas();
@@ -895,12 +953,17 @@
       document.getElementById('btn-unif-gerar').addEventListener('click', function () {
         var vencimento = document.getElementById('unif-vencimento').value;
         var parcelas   = document.getElementById('unif-parcelas').value;
+        var selecionadas = unifSelecionadas();
         if (!vencimento || !parcelas) {
           document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;">Preencha a data de vencimento e o número de parcelas.</div>';
           return;
         }
-        if (unifPlacas.some(function (p) { return !p.valor || Number(p.valor) <= 0; })) {
-          document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;">Informe o valor de cada dispositivo.</div>';
+        if (selecionadas.length < 2) {
+          document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;">Selecione ao menos 2 dispositivos para o boleto unificado.</div>';
+          return;
+        }
+        if (selecionadas.some(function (p) { return !p.valor || Number(p.valor) <= 0; })) {
+          document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger" style="padding:6px 10px;">Informe o valor de cada dispositivo selecionado.</div>';
           return;
         }
         document.getElementById('form-unif-alert').innerHTML = '';
@@ -912,7 +975,7 @@
         var unifDescricao = document.getElementById('unif-descricao').value.trim() || null;
         AL.apiPost('/api/carnes/unificar-dispositivos', {
           clienteId:      state.cliente.id,
-          dispositivos:   unifPlacas.map(function (p) { return { dispositivoId: p.placaId, valor: p.valor }; }),
+          dispositivos:   selecionadas.map(function (p) { return { dispositivoId: p.placaId, valor: p.valor }; }),
           dataVencimento: vencimento,
           numeroParcelas: parseInt(parcelas),
           vendedorId:     unifVendedorId || null,
@@ -923,10 +986,10 @@
           document.getElementById('btn-unif-gerar').disabled = false;
           document.getElementById('btn-unif-cancelar').disabled = false;
 
-          var total = unifPlacas.reduce(function (s, p) { return s + Number(p.valor); }, 0);
+          var total = selecionadas.reduce(function (s, p) { return s + Number(p.valor); }, 0);
           document.getElementById('res-cliente').textContent  = state.cliente.nome;
           document.getElementById('res-cpf').textContent      = AL.fmtCpfCnpj(state.cliente.cpfCnpj);
-          document.getElementById('res-placa').textContent    = 'Boleto Unificado (' + unifPlacas.map(function (p) { return p.placa; }).join(', ') + ')';
+          document.getElementById('res-placa').textContent    = 'Boleto Unificado (' + selecionadas.map(function (p) { return p.placa; }).join(', ') + ')';
           document.getElementById('res-valor').textContent    = AL.fmtMoney(total) + ' por parcela';
           document.getElementById('res-parcelas').textContent = parcelas + 'x';
           document.getElementById('res-vencimento').textContent = AL.fmtDate(vencimento);
@@ -949,8 +1012,8 @@
         }).catch(function (err) {
           document.getElementById('btn-unif-gerar-texto').style.display = 'inline';
           document.getElementById('btn-unif-gerar-spinner').style.display = 'none';
-          document.getElementById('btn-unif-gerar').disabled = false;
           document.getElementById('btn-unif-cancelar').disabled = false;
+          atualizarTotalUnif();   // reabilita o Gerar respeitando o mínimo de 2 selecionados
           document.getElementById('form-unif-alert').innerHTML = '<div class="alert alert-danger"><strong>Erro:</strong> ' + humanizarErro(err.message) + '</div>';
         });
       });
