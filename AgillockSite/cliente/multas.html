@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Multas — AgilLock</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    body { overflow: hidden !important; height: 100vh; }
+    .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
+    #al-alert-container { flex-shrink: 0; }
+    #scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 24px 24px; scrollbar-gutter: stable; }
+    #scroll-area::-webkit-scrollbar { width: 7px; }
+    #scroll-area::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    html.dark-theme #scroll-area::-webkit-scrollbar-thumb { background: #3a4555; }
+
+    .aviso { font-size: 12.5px; color: #7a7a7a; background: #f4f6f9; border-radius: 8px; padding: 10px 14px; margin: 14px 0; }
+    html.dark-theme .aviso { background: #1a212c; color: #9aa4b2; }
+
+    .veic-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.06); margin-bottom: 16px; overflow: hidden; }
+    html.dark-theme .veic-card { background: #1e2530; }
+    .veic-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #eef0f3; }
+    html.dark-theme .veic-head { border-color: #2d3748; }
+    .placa { font-weight: 700; font-size: 13px; background: #333; color: #fff; padding: 2px 9px; border-radius: 4px; letter-spacing: 1px; }
+    .apelido { color: #666; font-size: 13px; }
+    html.dark-theme .apelido { color: #9aa4b2; }
+    .veic-resumo { margin-left: auto; font-size: 13px; font-weight: 600; }
+    .mini-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+    .b-err { background: #fdecea; color: #b71c1c; } .b-ok { background: #e3f9e5; color: #1b7a2f; } .b-neutral { background: #eceff3; color: #556; }
+    html.dark-theme .b-neutral { background: #222a35; color: #9aa4b2; }
+    .veic-body { padding: 8px 16px 16px; }
+    table.multas-tab { width: 100%; font-size: 13px; }
+    table.multas-tab th { color: #888; font-weight: 600; font-size: 11px; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid #eee; }
+    html.dark-theme table.multas-tab th { border-color: #2d3748; }
+    table.multas-tab td { padding: 8px; border-bottom: 1px solid #f4f4f4; vertical-align: top; }
+    html.dark-theme table.multas-tab td { border-color: #232b36; }
+    .valor-de { color: #999; text-decoration: line-through; font-size: 11px; }
+    .acoes-pag { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .pix-box { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin-top: 12px; }
+    html.dark-theme .pix-box { background: #141820; border-color: #2a3340; }
+    .pix-emv { font-family: monospace; font-size: 11px; word-break: break-all; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
+    html.dark-theme .pix-emv { background: #0e1116; border-color: #2a3340; color: #cbd5e1; }
+    .sem-multa { color: #1b7a2f; font-size: 13px; padding: 6px 2px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> <span>Mapa</span></a></li>
+      <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> <span>Relatório</span></a></li>
+      <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> <span>Notificações</span></a></li>
+      <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> <span>Manutenções</span></a></li>
+      <li><a href="geocercas.html"><i class="fa fa-object-group fa-fw"></i> <span>Geocercas</span></a></li>
+      <li><a href="cotacao-iapro.html"><i class="fa fa-shield fa-fw"></i> <span>Cotação Proteção Veicular</span></a></li>
+      <li><a href="pagamentos.html"><i class="fa fa-money fa-fw"></i> <span>Pagamentos</span></a></li>
+      <li id="li-multas" class="active" style="display:none;"><a href="multas.html"><i class="fa fa-gavel fa-fw"></i> <span>Multas</span></a></li>
+      <li id="li-usuarios" style="display:none;"><a href="usuarios.html"><i class="fa fa-users fa-fw"></i> <span>Usuários</span></a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> <span>Sair</span></button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Multas</h2>
+      </div>
+      <div id="atualizado-em" style="font-size:12px;color:#888;"></div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div id="scroll-area">
+      <div class="aviso"><i class="fa fa-info-circle"></i> As multas são consultadas diretamente no <b>Detran</b>. A atualização é automática <b>2 vezes ao dia, às 10h e às 17h</b>. O boleto/Pix é gerado com o valor atualizado no momento do pagamento.</div>
+      <div id="lista-veiculos"><p style="color:#888;text-align:center;padding:20px;">Carregando…</p></div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard-cliente.js"></script>
+  <script>
+  (function () {
+    var AL = window.AL_CLIENTE;
+    var API = window.API_URL || '';
+    var user = AL.requireAuth();
+    if (!user) return;
+
+    document.getElementById('user-nome').textContent = user.nome || '—';
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    });
+    AL.refreshPermissoes(); // revela o item "Multas" no menu
+
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+    function render(veiculos){
+      var box = document.getElementById('lista-veiculos');
+      if (!veiculos.length){ box.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">Nenhum veículo disponível.</p>'; return; }
+      box.innerHTML = veiculos.map(function(v){
+        var badges = (v.possuiDebitoIpva ? '<span class="mini-badge b-err">Débito IPVA</span> ' : '') +
+                     (v.licenciamentoPendente ? '<span class="mini-badge b-err">Licenciamento pendente</span> ' : '');
+        var corpo;
+        if (!v.multas.length){
+          corpo = '<div class="sem-multa"><i class="fa fa-check-circle"></i> Nenhuma multa encontrada.</div>';
+        } else {
+          var linhas = v.multas.map(function(m){
+            var de = m.valor !== m.valorAPagar ? '<div class="valor-de">de '+AL.fmtMoney(m.valor)+'</div>' : '';
+            return '<tr>'+
+              '<td><input type="checkbox" class="chk" data-disp="'+v.dispositivoId+'" value="'+esc(m.ait)+'" checked></td>'+
+              '<td><b>'+esc(m.ait)+'</b><br><span style="color:#888;font-size:11px;">'+esc(m.motivo)+'</span></td>'+
+              '<td>'+esc(m.dataVencimento||'—')+'</td>'+
+              '<td style="text-align:right;"><b>'+AL.fmtMoney(m.valorAPagar)+'</b>'+de+'</td>'+
+            '</tr>';
+          }).join('');
+          corpo =
+            '<table class="multas-tab"><thead><tr><th><input type="checkbox" class="chk-todas" data-disp="'+v.dispositivoId+'" checked></th><th>Autuação</th><th>Vencimento</th><th style="text-align:right;">A pagar</th></tr></thead><tbody>'+linhas+'</tbody></table>'+
+            '<div class="acoes-pag">'+
+              '<button class="btn btn-primary-al btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="sel"><i class="fa fa-qrcode"></i> Pagar selecionadas</button>'+
+              '<button class="btn btn-default btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="todas"><i class="fa fa-qrcode"></i> Pagar todas</button>'+
+            '</div>'+
+            '<div class="pag-result" id="pag-'+v.dispositivoId+'"></div>';
+        }
+        return '<div class="veic-card">'+
+          '<div class="veic-head"><span class="placa">'+esc(v.placa)+'</span>'+
+          (v.apelido?'<span class="apelido">'+esc(v.apelido)+'</span>':'')+' '+badges+
+          '<span class="veic-resumo">'+(v.qtdMultas>0?('<span class="mini-badge b-err">'+v.qtdMultas+' multa'+(v.qtdMultas>1?'s':'')+'</span> · '+AL.fmtMoney(v.valorTotal)):'<span class="mini-badge b-ok">Sem multas</span>')+'</span></div>'+
+          '<div class="veic-body">'+corpo+'</div>'+
+        '</div>';
+      }).join('');
+
+      // seleciona todas por veículo
+      box.querySelectorAll('.chk-todas').forEach(function(ct){
+        ct.onclick = function(){ box.querySelectorAll('.chk[data-disp="'+ct.dataset.disp+'"]').forEach(function(c){c.checked=ct.checked;}); };
+      });
+      // pagar
+      box.querySelectorAll('.btn-pagar').forEach(function(b){
+        b.onclick = function(){ pagar(this.dataset.disp, this.dataset.modo, this); };
+      });
+    }
+
+    function pagar(disp, modo, btn){
+      var aits = [];
+      if (modo === 'sel'){
+        document.querySelectorAll('.chk[data-disp="'+disp+'"]:checked').forEach(function(c){ aits.push(c.value); });
+        if (!aits.length){ AL.showAlert('Selecione ao menos uma multa.'); return; }
+      }
+      var res = document.getElementById('pag-'+disp);
+      var old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando…';
+      res.innerHTML = '';
+      AL.apiPost('/api/cliente/multas/'+disp+'/pagamento', { aits: aits }).then(function(p){
+        var qr = (p.pagamento && p.pagamento.qrCodeBase64) ? '<img src="data:image/png;base64,'+p.pagamento.qrCodeBase64+'" style="width:180px;height:180px;" alt="QR Pix">' : '';
+        var emv = p.pagamento ? p.pagamento.emv : '';
+        res.innerHTML = '<div class="pix-box"><div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">'+
+          '<div>'+qr+'</div>'+
+          '<div style="flex:1;min-width:220px;">'+
+            '<div style="font-weight:600;margin-bottom:6px;">Pague com Pix</div>'+
+            '<div class="pix-emv" id="emv-'+disp+'">'+esc(emv)+'</div>'+
+            '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">'+
+              '<button class="btn btn-xs btn-default" onclick="(function(){var t=document.getElementById(\'emv-'+disp+'\').textContent;navigator.clipboard&&navigator.clipboard.writeText(t);AL_CLIENTE.showAlert(\'Pix copiado!\',\'success\');})()"><i class="fa fa-copy"></i> Copiar código Pix</button>'+
+              (p.boletoUrl?'<a class="btn btn-xs btn-primary" href="'+API+esc(p.boletoUrl)+'" target="_blank"><i class="fa fa-file-pdf-o"></i> Baixar boleto (PDF)</a>':'')+
+            '</div>'+
+          '</div></div></div>';
+      }).catch(function(err){ res.innerHTML = '<p style="color:#b71c1c;margin-top:10px;">'+esc(err.message)+'</p>'; })
+        .then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    }
+
+    function load(){
+      AL.apiGet('/api/cliente/multas').then(function(d){
+        if (d.atualizadoEm) document.getElementById('atualizado-em').textContent = 'Atualizado em ' + AL.fmtDate(d.atualizadoEm);
+        render(d.veiculos || []);
+      }).catch(function(err){
+        document.getElementById('lista-veiculos').innerHTML = '<p style="color:#b71c1c;text-align:center;padding:20px;">'+esc(err.message)+'</p>';
+      });
+    }
+    load();
+  })();
+  </script>
+</body>
+</html>

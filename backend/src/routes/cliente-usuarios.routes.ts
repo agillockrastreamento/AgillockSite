@@ -20,12 +20,17 @@ router.get('/me/permissoes', async (req: ClienteRequest, res: Response): Promise
     res.status(401).json({ error: 'Não autenticado.' });
     return;
   }
+  const cli = await prisma.cliente.findUnique({
+    where: { id: req.cliente.clienteId },
+    select: { multasHabilitado: true },
+  });
   res.json({
     tipo: req.cliente.tipo,
     nome: req.cliente.nome,
     clienteId: req.cliente.clienteId,
     permissoes: req.cliente.permissoes,
     dispositivoIdsPermitidos: req.cliente.dispositivoIdsPermitidos,
+    multasHabilitado: cli?.multasHabilitado ?? false,
   });
 });
 

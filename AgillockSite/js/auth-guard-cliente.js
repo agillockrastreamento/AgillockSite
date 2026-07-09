@@ -141,6 +141,7 @@
       'notificacoes.html': function () { return responsavel; },
       'pagamentos.html':   function () { return responsavel; },
       'usuarios.html':     function () { return responsavel; },
+      'multas.html':       function () { var me = _cachedMe(); return !!(me && me.multasHabilitado); },
     };
     nav.querySelectorAll('li').forEach(function (li) {
       var link = li.querySelector('a');

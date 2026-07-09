@@ -58,8 +58,10 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] Entrada "Multas" no menu de todas as páginas admin (`fa-gavel`, após Cobranças).
 - [x] Testado no navegador (Puppeteer) — prints na raiz: lista, botão em clientes, pagamento (QR/Pix/boleto), histórico.
 
-## Fase 8 — Cliente (web)
-- [ ] `multas.html` no portal do cliente + menu condicional à flag. Ver [FRONTEND_CLIENTE_APP](FRONTEND_CLIENTE_APP.md).
+## Fase 8 — Cliente (web) ✅
+- [x] `cliente/multas.html`: cards por veículo com tabela de multas (checkbox), aviso 10h/17h, "Pagar selecionadas"/"Pagar todas" → Pix (QR + copia-e-cola) + boleto PDF. Mostra desconto ("de R$X").
+- [x] Item "Multas" no menu de todas as páginas do cliente, **condicional** à flag: `multasHabilitado` exposto em `/api/cliente/me/permissoes` e regra `multas.html` em `aplicarPermissoesSidebar` (`auth-guard-cliente.js`).
+- [x] Usa `AL_CLIENTE`. Testado no navegador — prints na raiz: `print-5-cliente-multas`, `print-6-cliente-pagamento`.
 
 ## Fase 9 — App
 - [ ] Tela "Multas" condicional à flag; QR/Pix/copiar; download de PDF (expo-file-system v18). Ver [FRONTEND_CLIENTE_APP](FRONTEND_CLIENTE_APP.md).
