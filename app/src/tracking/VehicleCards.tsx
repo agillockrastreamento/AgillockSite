@@ -4,6 +4,7 @@ import { ActivityIndicator, Icon, IconButton } from 'react-native-paper';
 import Svg, { Path, Text as SvgText } from 'react-native-svg';
 
 import { GeofenceCreateModal } from '../components/GeofenceCreateModal';
+import { ApelidoEditModal } from './ApelidoEditModal';
 import { MedidoresEditModal } from './MedidoresEditModal';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { useAuth } from '../auth/AuthProvider';
@@ -183,6 +184,7 @@ export function MainVehicleCard({
   onShowRoute,
   onCompartilhar,
   onFocusDevice,
+  onApelidoChanged,
   modoResgate,
   geofenceRefreshKey,
 }: {
@@ -190,6 +192,8 @@ export function MainVehicleCard({
   onUploadPhoto(): void;
   onRemovePhoto(): void;
   isUploading?: boolean;
+  /** Chamado após salvar o apelido, para o pai refletir a mudança na lista de dispositivos. */
+  onApelidoChanged?: (apelidoCliente: string | null) => void;
   onGeofenceCreated?: () => void;
   onGeofenceDeleted?: () => void;
   onVerMais?: () => void;
@@ -208,6 +212,7 @@ export function MainVehicleCard({
   const canDesbloquear = can('rastreamento.desbloquear');
   const canCriarCerca = can('rastreamento.criarCerca');
   const canUploadFoto = can('rastreamento.uploadFoto');
+  const canEditarIdentificacao = can('rastreamento.editarIdentificacao');
   const canMarcarManutFeita = can('rastreamento.marcarManutencaoRecorrenteFeita');
   const canMarcarRecDataFeita = can('rastreamento.marcarRecorrenciaDataFeita');
   const [summary, setSummary] = useState<{
@@ -229,6 +234,8 @@ export function MainVehicleCard({
   const [geofenceModalVisible, setGeofenceModalVisible] = useState(false);
   const [medidoresModalVisible, setMedidoresModalVisible] = useState(false);
   const [savingMedidores, setSavingMedidores] = useState(false);
+  const [apelidoModalVisible, setApelidoModalVisible] = useState(false);
+  const [savingApelido, setSavingApelido] = useState(false);
   // Força re-render após editar medidores (a posição é mutada no próprio objeto device).
   const [, setMedidoresTick] = useState(0);
 
@@ -542,6 +549,26 @@ export function MainVehicleCard({
     }
   };
 
+  const saveApelido = async (apelido: string) => {
+    setSavingApelido(true);
+    try {
+      const data = await apiRequest<{ apelidoCliente: string | null }>(
+        `/cliente/dispositivos/${device.dispositivoId}/apelido`,
+        { method: 'PATCH', body: { apelidoCliente: apelido } }
+      );
+      onApelidoChanged?.(data?.apelidoCliente ?? null);
+      setApelidoModalVisible(false);
+      toast.show({ message: 'Identificação atualizada.', type: 'success' });
+    } catch (err) {
+      toast.show({
+        message: err instanceof Error ? err.message : 'Erro ao salvar identificação.',
+        type: 'error',
+      });
+    } finally {
+      setSavingApelido(false);
+    }
+  };
+
   // km atual na MESMA fonte do kmBase (servidor). Fallback para o odômetro exibido no card.
   const kmAtualDe = (r: any): number | null =>
     r.kmAtual != null ? r.kmAtual
@@ -573,6 +600,15 @@ export function MainVehicleCard({
         onConfirm={saveMedidores}
       />
 
+      <ApelidoEditModal
+        visible={apelidoModalVisible}
+        deviceName={device.nome}
+        apelido={device.apelidoCliente}
+        saving={savingApelido}
+        onClose={() => setApelidoModalVisible(false)}
+        onConfirm={saveApelido}
+      />
+
       {!modoResgate ? (
         <View style={styles.mainCoverWrap}>
           <Pressable onPress={onFocusDevice} style={StyleSheet.absoluteFill}>
@@ -584,6 +620,17 @@ export function MainVehicleCard({
               </View>
             )}
           </Pressable>
+          {canEditarIdentificacao ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Editar identificação do veículo"
+              onPress={() => setApelidoModalVisible(true)}
+              hitSlop={8}
+              style={styles.coverPencilBadge}
+            >
+              <Icon source="pencil" size={16} color={colors.primaryText} />
+            </Pressable>
+          ) : null}
           {canUploadFoto ? (
             <Pressable
               accessibilityRole="button"
@@ -946,6 +993,19 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  coverPencilBadge: {
+    position: 'absolute',
+    right: spacing.sm,
+    top: spacing.sm,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.surface,
+    backgroundColor: colors.primary,
   },
   coverCameraBadge: {
     position: 'absolute',

@@ -1318,6 +1318,9 @@ export function MapScreen() {
               onUploadPhoto={handleUploadPhoto}
               onRemovePhoto={handleRemovePhoto}
               isUploading={isPhotoUploading}
+              onApelidoChanged={(apelidoCliente) =>
+                updateDevice(selectedDevice.dispositivoId, { apelidoCliente })
+              }
               onGeofenceCreated={handleGeofenceCreated}
               onGeofenceDeleted={() => {
                 if (showFences && canVerCerca) getGeofences().then(setGeofences).catch(() => {});
