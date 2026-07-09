@@ -1330,6 +1330,19 @@ html.dark-theme .btn-tema-login:hover { border-color: #fab32c; color: #fab32c; }
     width: auto !important;
     margin: 0;
 }
+/* O item IAPRO é injetado com <span flex:1> + badge. Mesmo com font-size 0
+   o span continua sendo um item flex que cresce, tirando o ícone do centro. */
+.admin-sidebar.collapsed .sidebar-nav li > a:not(.dropdown-toggle-link) > span:not(.sidebar-badge) {
+    display: none;
+}
+.admin-sidebar.collapsed .sidebar-nav li > a > .sidebar-badge {
+    position: absolute;
+    top: 7px;
+    right: 9px;
+    padding: 2px 5px;
+    min-width: 16px;
+    font-size: 10px;
+}
 /* Ativo — linha âmbar à esquerda + ícone colorido */
 .admin-sidebar.collapsed .sidebar-nav li.active > a {
     border-left-width: 3px;
