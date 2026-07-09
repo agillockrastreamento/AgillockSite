@@ -52,10 +52,11 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] Helpers no service: `criarJobConsulta`, `criarJobPagamento`, `aguardarJob`, `getDetalheVeiculo`.
 - [x] Testado E2E (backend+worker): habilitar→consulta inicial, lista, detalhe, consultar, pagamento (admin e cliente), consultar-todos+histórico, perfil.
 
-## Fase 7 — Admin (web)
-- [ ] Botão `.btn-multas` em `admin/clientes.html` (toggle). Ver [FRONTEND_ADMIN](FRONTEND_ADMIN.md).
-- [ ] Tela `admin/multas.html`: aba Multas (filtros, tabela, detalhe, pagamento) + aba Histórico + status do worker.
-- [ ] Entrada no menu do admin.
+## Fase 7 — Admin (web) ✅
+- [x] Botão `.btn-multas` (ícone `fa-gavel`, verde quando ligado) em `admin/clientes.html` → `PATCH /api/clientes/:id/multas-habilitado`.
+- [x] Tela `admin/multas.html`: aba Multas (filtros, tabela, detalhe em modal com pagamento Pix/QR/boleto) + aba Histórico + badge de status do worker + botão "Consultar todos" + aviso 10h/17h.
+- [x] Entrada "Multas" no menu de todas as páginas admin (`fa-gavel`, após Cobranças).
+- [x] Testado no navegador (Puppeteer) — prints na raiz: lista, botão em clientes, pagamento (QR/Pix/boleto), histórico.
 
 ## Fase 8 — Cliente (web)
 - [ ] `multas.html` no portal do cliente + menu condicional à flag. Ver [FRONTEND_CLIENTE_APP](FRONTEND_CLIENTE_APP.md).

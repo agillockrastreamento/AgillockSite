@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Multas — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    .worker-badge { font-size:12px; padding:4px 10px; border-radius:12px; font-weight:600; }
+    .worker-on  { background:#e3f9e5; color:#1b7a2f; }
+    .worker-off { background:#fdecea; color:#b71c1c; }
+    html.dark-theme .worker-on { background:#123a1c; color:#7ee2a0; }
+    html.dark-theme .worker-off { background:#3a1414; color:#ff9c9c; }
+    .mt-tabs { border-bottom:2px solid #e5e7eb; margin-bottom:14px; }
+    .mt-tabs a { display:inline-block; padding:8px 16px; color:#555; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:600; }
+    .mt-tabs a.active { color:#0a58ca; border-bottom-color:#0a58ca; }
+    html.dark-theme .mt-tabs a { color:#9aa4b2; }
+    html.dark-theme .mt-tabs a.active { color:#6ea8fe; border-bottom-color:#6ea8fe; }
+    .mini-badge { font-size:11px; padding:2px 7px; border-radius:10px; font-weight:600; white-space:nowrap; }
+    .b-ok { background:#e3f9e5; color:#1b7a2f; } .b-err { background:#fdecea; color:#b71c1c; }
+    .b-warn { background:#fff4e0; color:#a35b00; } .b-neutral { background:#eceff3; color:#556; }
+    html.dark-theme .b-neutral { background:#222a35; color:#9aa4b2; }
+    .info-aviso { font-size:12px; color:#777; margin:2px 0 12px; }
+    .pix-box { background:#f7f8fa; border:1px solid #e5e7eb; border-radius:8px; padding:12px; margin-top:10px; }
+    html.dark-theme .pix-box { background:#141820; border-color:#2a3340; }
+    .pix-emv { font-family:monospace; font-size:11px; word-break:break-all; background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px; }
+    html.dark-theme .pix-emv { background:#0e1116; border-color:#2a3340; color:#cbd5e1; }
+    .table-responsive { background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+    html.dark-theme .table-responsive { background:#141820; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="sidebar-dropdown">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+          <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
+          <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li><a href="usuarios-resgate.html"><i class="fa fa-life-ring fa-fw"></i> Usuários Resgate</a></li>
+          <li><a href="geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li class="active"><a href="multas.html"><i class="fa fa-gavel fa-fw"></i> Multas</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Multas</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="worker-status" class="worker-badge b-neutral">verificando worker…</span>
+        <button class="btn btn-primary-al" id="btn-consultar-todos"><i class="fa fa-refresh"></i> Consultar todos</button>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="info-aviso"><i class="fa fa-info-circle"></i> Dados consultados no Detran. Atualização automática 2×/dia, às 10h e às 17h. A geração de boleto/Pix é feita no momento do pagamento (valor atual).</div>
+
+    <!-- Abas -->
+    <div class="mt-tabs">
+      <a href="#" data-tab="multas" class="active">Multas</a>
+      <a href="#" data-tab="historico">Histórico de consulta</a>
+    </div>
+
+    <!-- Aba Multas -->
+    <div id="tab-multas">
+      <div class="filter-bar">
+        <div class="row">
+          <div class="col-sm-5"><input type="text" id="filtro-busca" class="form-control" placeholder="Buscar por placa, nome ou CPF/CNPJ…" /></div>
+          <div class="col-sm-3">
+            <select id="filtro-status" class="form-control">
+              <option value="">Todos os status</option>
+              <option value="OK">OK</option>
+              <option value="ERRO">Erro</option>
+              <option value="DADOS_INVALIDOS">Dados inválidos</option>
+            </select>
+          </div>
+          <div class="col-sm-4" style="padding-top:7px;">
+            <label style="font-weight:normal;cursor:pointer;"><input type="checkbox" id="filtro-com-multas" /> Somente com multas</label>
+          </div>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="admin-table table">
+          <thead><tr>
+            <th>Placa</th><th>Cliente</th><th style="text-align:center;">Multas</th><th>Valor total</th>
+            <th style="text-align:center;">IPVA</th><th style="text-align:center;">Licenc.</th>
+            <th>Última consulta</th><th style="text-align:center;">Status</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-multas"><tr><td colspan="9" style="text-align:center;color:#888;">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Aba Histórico -->
+    <div id="tab-historico" style="display:none;">
+      <div class="table-responsive">
+        <table class="admin-table table">
+          <thead><tr>
+            <th>Início</th><th>Origem</th><th style="text-align:center;">Status</th><th>Duração</th>
+            <th style="text-align:center;">Clientes</th><th style="text-align:center;">Veículos (ok/erro)</th><th style="text-align:center;">Multas</th>
+          </tr></thead>
+          <tbody id="tbody-historico"><tr><td colspan="7" style="text-align:center;color:#888;">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal detalhe -->
+  <div class="modal fade" id="modal-detalhe" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title" id="det-titulo">Detalhe do veículo</h4>
+        </div>
+        <div class="modal-body" id="det-body">…</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var API = window.API_URL || '';
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+    function badgeConsulta(st){
+      if (st==='OK') return '<span class="mini-badge b-ok">OK</span>';
+      if (st==='ERRO') return '<span class="mini-badge b-err">Erro</span>';
+      if (st==='DADOS_INVALIDOS') return '<span class="mini-badge b-warn">Dados inválidos</span>';
+      if (st==='SEM_RENAVAM') return '<span class="mini-badge b-warn">Sem renavam</span>';
+      return '<span class="mini-badge b-neutral">'+esc(st||'—')+'</span>';
+    }
+    function badgeSimNao(v, label){
+      return v ? '<span class="mini-badge b-err">'+label+'</span>' : '<span class="mini-badge b-neutral">—</span>';
+    }
+
+    // ── Abas ──
+    document.querySelectorAll('.mt-tabs a').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        document.querySelectorAll('.mt-tabs a').forEach(function(x){x.classList.remove('active');});
+        this.classList.add('active');
+        var tab = this.dataset.tab;
+        document.getElementById('tab-multas').style.display = tab==='multas'?'':'none';
+        document.getElementById('tab-historico').style.display = tab==='historico'?'':'none';
+        if (tab==='historico') loadHistorico();
+      });
+    });
+
+    // ── Worker status ──
+    function loadWorkerStatus(){
+      AL.apiGet('/api/multas/worker-status').then(function(s){
+        var el = document.getElementById('worker-status');
+        if (s.online){ el.className='worker-badge worker-on'; el.innerHTML='<i class="fa fa-circle"></i> Worker online'; }
+        else { el.className='worker-badge worker-off'; el.innerHTML='<i class="fa fa-circle-o"></i> Worker offline'; }
+      }).catch(function(){});
+    }
+
+    // ── Lista ──
+    var buscaTimer;
+    function filtros(){
+      var q = [];
+      var b = document.getElementById('filtro-busca').value.trim();
+      var st = document.getElementById('filtro-status').value;
+      if (b) q.push('busca='+encodeURIComponent(b));
+      if (st) q.push('status='+st);
+      if (document.getElementById('filtro-com-multas').checked) q.push('comMultas=true');
+      return q.length ? '?'+q.join('&') : '';
+    }
+    function loadMultas(){
+      var tb = document.getElementById('tbody-multas');
+      AL.apiGet('/api/multas'+filtros()).then(function(d){
+        if (!d.itens.length){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888;">Nenhum veículo habilitado / consultado.</td></tr>'; return; }
+        tb.innerHTML = d.itens.map(function(s){
+          return '<tr>'+
+            '<td><b>'+esc(s.placa)+'</b></td>'+
+            '<td>'+esc(s.clienteNome)+'</td>'+
+            '<td style="text-align:center;">'+(s.qtdMultas>0?'<span class="mini-badge b-err">'+s.qtdMultas+'</span>':'<span class="mini-badge b-ok">0</span>')+'</td>'+
+            '<td>'+AL.fmtMoney(s.valorTotal)+'</td>'+
+            '<td style="text-align:center;">'+badgeSimNao(s.possuiDebitoIpva,'Débito')+'</td>'+
+            '<td style="text-align:center;">'+badgeSimNao(s.licenciamentoPendente,'Pendente')+'</td>'+
+            '<td>'+(s.ultimaConsultaEm?AL.fmtDate(s.ultimaConsultaEm):'—')+'</td>'+
+            '<td style="text-align:center;">'+badgeConsulta(s.ultimaConsultaStatus)+'</td>'+
+            '<td style="white-space:nowrap;">'+
+              '<button class="btn btn-xs btn-primary btn-ver" data-id="'+s.dispositivoId+'" title="Ver detalhes"><i class="fa fa-eye"></i></button> '+
+              '<button class="btn btn-xs btn-default btn-buscar" data-id="'+s.dispositivoId+'" title="Buscar agora"><i class="fa fa-refresh"></i></button>'+
+            '</td>'+
+          '</tr>';
+        }).join('');
+        tb.querySelectorAll('.btn-ver').forEach(function(b){ b.onclick=function(){ openDetalhe(this.dataset.id); }; });
+        tb.querySelectorAll('.btn-buscar').forEach(function(b){ b.onclick=function(){ buscarAgora(this.dataset.id, this); }; });
+      }).catch(function(err){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#b71c1c;">'+esc(err.message)+'</td></tr>'; });
+    }
+
+    function buscarAgora(id, btn){
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i>';
+      AL.apiPost('/api/multas/'+id+'/consultar', {}).then(function(){
+        AL.showAlert('Consulta atualizada.', 'success'); loadMultas(); loadWorkerStatus();
+      }).catch(function(err){ AL.showAlert(err.message); }).then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    }
+
+    // ── Histórico ──
+    function loadHistorico(){
+      var tb = document.getElementById('tbody-historico');
+      AL.apiGet('/api/multas/historico').then(function(d){
+        if (!d.itens.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888;">Nenhuma consulta registrada.</td></tr>'; return; }
+        tb.innerHTML = d.itens.map(function(l){
+          var stb = l.status==='OK'?'b-ok':(l.status==='ERRO'?'b-err':(l.status==='PARCIAL'?'b-warn':'b-neutral'));
+          var dur = l.duracaoMs!=null ? (Math.round(l.duracaoMs/1000)+'s') : '—';
+          return '<tr>'+
+            '<td>'+AL.fmtDate(l.inicioEm)+'</td>'+
+            '<td>'+(l.origem==='AGENDADA'?'Agendada':'Manual')+'</td>'+
+            '<td style="text-align:center;"><span class="mini-badge '+stb+'">'+esc(l.status)+'</span></td>'+
+            '<td>'+dur+'</td>'+
+            '<td style="text-align:center;">'+l.clientesConsultados+'</td>'+
+            '<td style="text-align:center;">'+l.veiculosConsultados+' ('+l.veiculosComSucesso+'/'+l.veiculosComErro+')</td>'+
+            '<td style="text-align:center;">'+l.multasColetadas+'</td>'+
+          '</tr>';
+        }).join('');
+      }).catch(function(err){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#b71c1c;">'+esc(err.message)+'</td></tr>'; });
+    }
+
+    // ── Detalhe + pagamento ──
+    function openDetalhe(id){
+      var body = document.getElementById('det-body');
+      body.innerHTML = '<div style="text-align:center;color:#888;padding:20px;"><i class="fa fa-spinner fa-spin"></i> Carregando…</div>';
+      $('#modal-detalhe').modal('show');
+      AL.apiGet('/api/multas/'+id).then(function(d){
+        document.getElementById('det-titulo').textContent = 'Veículo '+d.placa;
+        var linhas = d.multas.map(function(m){
+          return '<tr>'+
+            '<td><input type="checkbox" class="chk-multa" value="'+esc(m.ait)+'" checked></td>'+
+            '<td>'+esc(m.ait)+'</td>'+
+            '<td>'+esc(m.motivo)+'</td>'+
+            '<td>'+esc(m.dataInfracao||'—')+'</td>'+
+            '<td>'+esc(m.dataVencimento||'—')+'</td>'+
+            '<td>'+AL.fmtMoney(m.valor)+'</td>'+
+            '<td><b>'+AL.fmtMoney(m.valorAPagar)+'</b></td>'+
+          '</tr>';
+        }).join('');
+        var tabela = d.multas.length ?
+          '<div class="table-responsive" style="box-shadow:none;"><table class="admin-table table"><thead><tr>'+
+          '<th><input type="checkbox" id="chk-todas" checked></th><th>AIT</th><th>Motivo</th><th>Infração</th><th>Vencimento</th><th>Valor</th><th>A pagar</th>'+
+          '</tr></thead><tbody>'+linhas+'</tbody></table></div>' :
+          '<p style="color:#1b7a2f;"><i class="fa fa-check-circle"></i> Nenhuma multa.</p>';
+        body.innerHTML =
+          '<p>'+badgeSimNao(d.possuiDebitoIpva,'Débito IPVA')+' &nbsp; '+
+          (d.licenciamentoPendente?'<span class="mini-badge b-err">Licenciamento pendente</span>':'<span class="mini-badge b-neutral">Licenciamento em dia</span>')+
+          ' &nbsp; <span class="mini-badge b-neutral">Atualizado: '+(d.ultimaConsultaEm?AL.fmtDate(d.ultimaConsultaEm):'—')+'</span></p>'+
+          tabela+
+          (d.multas.length?'<div style="margin-top:10px;"><button class="btn btn-primary-al" id="btn-gerar-pag"><i class="fa fa-qrcode"></i> Gerar pagamento das selecionadas</button></div>':'')+
+          '<div id="pag-resultado"></div>';
+        var chkTodas = document.getElementById('chk-todas');
+        if (chkTodas) chkTodas.onclick = function(){ body.querySelectorAll('.chk-multa').forEach(function(c){c.checked=chkTodas.checked;}); };
+        var btnPag = document.getElementById('btn-gerar-pag');
+        if (btnPag) btnPag.onclick = function(){ gerarPagamento(id, btnPag); };
+      }).catch(function(err){ body.innerHTML='<p style="color:#b71c1c;">'+esc(err.message)+'</p>'; });
+    }
+
+    function gerarPagamento(id, btn){
+      var aits = Array.prototype.map.call(document.querySelectorAll('.chk-multa:checked'), function(c){return c.value;});
+      if (!aits.length){ AL.showAlert('Selecione ao menos uma multa.'); return; }
+      var res = document.getElementById('pag-resultado');
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Gerando…';
+      res.innerHTML='';
+      AL.apiPost('/api/multas/'+id+'/pagamento', { aits: aits }).then(function(p){
+        var qr = p.pagamento && p.pagamento.qrCodeBase64 ? '<img src="data:image/png;base64,'+p.pagamento.qrCodeBase64+'" style="width:180px;height:180px;" alt="QR Pix">' : '';
+        var emv = p.pagamento ? p.pagamento.emv : '';
+        res.innerHTML = '<div class="pix-box">'+
+          '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">'+
+            '<div>'+qr+'</div>'+
+            '<div style="flex:1;min-width:220px;">'+
+              '<div style="font-weight:600;margin-bottom:6px;">Pix copia-e-cola</div>'+
+              '<div class="pix-emv" id="pix-emv">'+esc(emv)+'</div>'+
+              '<button class="btn btn-xs btn-default" style="margin-top:6px;" onclick="(function(){var t=document.getElementById(\'pix-emv\').textContent;navigator.clipboard&&navigator.clipboard.writeText(t);AL.showAlert(\'Pix copiado!\',\'success\');})()"><i class="fa fa-copy"></i> Copiar</button> '+
+              (p.boletoUrl?'<a class="btn btn-xs btn-primary" style="margin-top:6px;" href="'+API+esc(p.boletoUrl)+'" target="_blank"><i class="fa fa-file-pdf-o"></i> Baixar boleto (PDF)</a>':'')+
+            '</div>'+
+          '</div></div>';
+      }).catch(function(err){ res.innerHTML='<p style="color:#b71c1c;margin-top:10px;">'+esc(err.message)+'</p>'; })
+        .then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    }
+
+    // ── Consultar todos ──
+    document.getElementById('btn-consultar-todos').onclick = function(){
+      var b=this; var old=b.innerHTML; b.disabled=true; b.innerHTML='<i class="fa fa-spinner fa-spin"></i> Enfileirando…';
+      AL.apiPost('/api/multas/consultar-todos', {}).then(function(){
+        AL.showAlert('Consulta de todos os veículos iniciada. Os resultados aparecem conforme o worker processa.', 'success');
+        setTimeout(function(){ loadMultas(); loadWorkerStatus(); }, 2000);
+      }).catch(function(err){ AL.showAlert(err.message); }).then(function(){ b.disabled=false; b.innerHTML=old; });
+    };
+
+    // ── Filtros ──
+    document.getElementById('filtro-busca').addEventListener('input', function(){ clearTimeout(buscaTimer); buscaTimer=setTimeout(loadMultas, 350); });
+    document.getElementById('filtro-status').addEventListener('change', loadMultas);
+    document.getElementById('filtro-com-multas').addEventListener('change', loadMultas);
+
+    // ── Init ──
+    loadWorkerStatus();
+    loadMultas();
+    setInterval(loadWorkerStatus, 60000);
+  })();
+  </script>
+</body>
+</html>
