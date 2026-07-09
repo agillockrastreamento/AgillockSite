@@ -891,6 +891,7 @@ model ConsultaJob {
   dispositivoId String?
   aits          Json? // GERAR_PAGAMENTO: AITs selecionados (null/[] = todas)
   origem        String // AGENDADA | MANUAL_ADMIN | CLIENTE
+  logId         String? // vincula ao ConsultaMultaLog do lote (jobs AGENDADA/MANUAL_ADMIN)
   status        String    @default("PENDENTE") // PENDENTE | PROCESSANDO | CONCLUIDO | ERRO
   tentativas    Int       @default(0)
   resultado     Json?

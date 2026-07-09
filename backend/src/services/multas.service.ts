@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import prisma from '../utils/prisma';
 import { UPLOADS_DIR } from '../utils/upload-paths';
+import ExpoPushService from './expo-push.service';
 
 const MULTAS_DIR = path.join(UPLOADS_DIR, 'multas');
 const MAX_TENTATIVAS = 5;
@@ -88,10 +89,11 @@ export async function concluirJobComResultado(jobId: string, resultado: unknown)
   let resultadoFinal: unknown = resultado;
 
   if (job.tipo === 'CONSULTA_VEICULO') {
-    await persistirConsulta(job.dispositivoId, job.uf, resultado as ConsultaResult);
-    // não guardamos o PDF em base64 no job (fica em VeiculoMultaSituacao.boletoArquivo)
     const r = resultado as ConsultaResult;
+    await persistirConsulta(job.dispositivoId, job.uf, r);
+    // não guardamos o PDF em base64 no job (fica em VeiculoMultaSituacao.boletoArquivo)
     resultadoFinal = { ...r, boletoPdfBase64: r.boletoPdfBase64 ? '[salvo]' : null };
+    if (job.logId) await contabilizarNoLog(job.logId, true, r.multas?.length ?? 0);
   } else if (job.tipo === 'GERAR_PAGAMENTO') {
     const r = resultado as PagamentoJobResult;
     let boletoUrl: string | null = null;
@@ -131,6 +133,8 @@ export async function registrarErroJob(jobId: string, mensagem: string, permanen
     where: { id: jobId },
     data: encerrar ? { status: 'ERRO', erro: mensagem } : { status: 'PENDENTE', erro: mensagem },
   });
+
+  if (encerrar && job.logId) await contabilizarNoLog(job.logId, false, 0);
 }
 
 // ─────────────────────────── Persistência da consulta ───────────────────────────
@@ -142,6 +146,14 @@ async function persistirConsulta(dispositivoId: string | null, uf: string, r: Co
     select: { id: true, clienteId: true },
   });
   if (!disp?.clienteId) throw new Error('Dispositivo sem cliente para a situação de multas');
+
+  // Estado anterior (para detectar multas novas) antes de substituir.
+  const sitAntes = await prisma.veiculoMultaSituacao.findUnique({
+    where: { dispositivoId },
+    select: { multas: { select: { ait: true } } },
+  });
+  const primeiraConsulta = !sitAntes;
+  const aitsAntigos = new Set((sitAntes?.multas ?? []).map((m) => m.ait));
 
   let boletoArquivo: string | null = null;
   if (r.boletoPdfBase64 && r.pagamentoTodas) {
@@ -189,7 +201,8 @@ async function persistirConsulta(dispositivoId: string | null, uf: string, r: Co
       });
     }
   });
-  // TODO(Fase 5): detectar AITs novas (diff) e disparar notificações.
+
+  await notificarConsultaCliente(disp.clienteId, r, aitsAntigos, primeiraConsulta);
 }
 
 // ─────────────────────────── Saúde do worker (heartbeat) ───────────────────────────
@@ -209,4 +222,219 @@ export async function getWorkerStatus() {
   const online =
     !!st?.ultimoHeartbeat && Date.now() - new Date(st.ultimoHeartbeat).getTime() < HEARTBEAT_ONLINE_MIN * 60_000;
   return { online, ultimoHeartbeat: st?.ultimoHeartbeat ?? null, info: st?.info ?? null };
+}
+
+// ─────────────────────────── Lote agendado + histórico (ConsultaMultaLog) ───────────────────────────
+
+/**
+ * Cria um lote de consulta: 1 job CONSULTA_VEICULO por veículo de cliente habilitado
+ * (com placa + renavam/chassi). Retorna o id do ConsultaMultaLog. Ver docs/multas/SCHEDULER.md.
+ */
+export async function iniciarConsultaLote(origem: 'AGENDADA' | 'MANUAL_ADMIN'): Promise<string> {
+  const dispositivos = await prisma.dispositivo.findMany({
+    where: {
+      ativo: true,
+      placa: { not: null },
+      cliente: { is: { multasHabilitado: true } },
+      OR: [{ renavam: { not: null } }, { chassi: { not: null } }],
+    },
+    select: { id: true, clienteId: true, placa: true, renavam: true, chassi: true },
+  });
+
+  const clientesDistintos = new Set(dispositivos.map((d) => d.clienteId)).size;
+  const log = await prisma.consultaMultaLog.create({
+    data: {
+      origem,
+      status: 'EM_ANDAMENTO',
+      clientesConsultados: clientesDistintos,
+      veiculosConsultados: dispositivos.length,
+    },
+  });
+
+  if (dispositivos.length === 0) {
+    await prisma.consultaMultaLog.update({
+      where: { id: log.id },
+      data: { status: 'OK', fimEm: new Date(), duracaoMs: 0 },
+    });
+    return log.id;
+  }
+
+  await prisma.consultaJob.createMany({
+    data: dispositivos.map((d) => ({
+      tipo: 'CONSULTA_VEICULO',
+      uf: 'CE',
+      placa: d.placa ?? '',
+      renavam: d.renavam ?? d.chassi ?? null,
+      dispositivoId: d.id,
+      origem,
+      logId: log.id,
+    })),
+  });
+  return log.id;
+}
+
+/** Contabiliza um veículo no log do lote e fecha o log (+ notifica admin) quando todos terminam. */
+async function contabilizarNoLog(logId: string, sucesso: boolean, multasCount: number): Promise<void> {
+  await prisma.consultaMultaLog.update({
+    where: { id: logId },
+    data: {
+      veiculosComSucesso: sucesso ? { increment: 1 } : undefined,
+      veiculosComErro: sucesso ? undefined : { increment: 1 },
+      multasColetadas: sucesso && multasCount ? { increment: multasCount } : undefined,
+    },
+  });
+
+  const log = await prisma.consultaMultaLog.findUnique({ where: { id: logId } });
+  if (!log) return;
+  if (log.veiculosComSucesso + log.veiculosComErro < log.veiculosConsultados) return;
+
+  const status = log.veiculosComErro === 0 ? 'OK' : log.veiculosComSucesso === 0 ? 'ERRO' : 'PARCIAL';
+  const fimEm = new Date();
+  const duracaoMs = fimEm.getTime() - new Date(log.inicioEm).getTime();
+  // guard: só quem efetivamente fecha (EM_ANDAMENTO → status) notifica o admin
+  const upd = await prisma.consultaMultaLog.updateMany({
+    where: { id: logId, status: 'EM_ANDAMENTO' },
+    data: { status, fimEm, duracaoMs },
+  });
+  if (upd.count === 1) await notificarResumoAdmin({ ...log, status, duracaoMs });
+}
+
+// ─────────────────────────── Notificações ───────────────────────────
+
+function inicioDiaBrasil(d = new Date()): Date {
+  const iso = d.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  return new Date(`${iso}T00:00:00-03:00`);
+}
+function parseDataBr(s: string | null): Date | null {
+  const m = s?.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00-03:00`) : null;
+}
+function diasAte(venc: Date, hoje: Date): number {
+  return Math.round((venc.getTime() - hoje.getTime()) / 86_400_000);
+}
+
+/** Notifica o cliente: multa nova (só a partir da 2ª consulta) + vencimento (7 dias / hoje). */
+async function notificarConsultaCliente(
+  clienteId: string,
+  r: ConsultaResult,
+  aitsAntigos: Set<string>,
+  primeiraConsulta: boolean,
+): Promise<void> {
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId, tipo: 'responsavel', ativo: true },
+    select: { id: true },
+  });
+  if (!login) return;
+  const hoje = inicioDiaBrasil();
+
+  // Multa nova: só a partir da 2ª consulta, para não estourar notificações ao habilitar o cliente.
+  if (!primeiraConsulta) {
+    const novas = (r.multas ?? []).filter((m) => !aitsAntigos.has(m.ait));
+    if (novas.length) {
+      const qtd = novas.length;
+      await notificarClienteMulta(
+        login.id,
+        novas.map((m) => m.ait),
+        'multaNova',
+        hoje,
+        {
+          title: 'Nova multa',
+          body: `${r.placa}: ${qtd} nova${qtd > 1 ? 's' : ''} autuação${qtd > 1 ? 'ões' : ''}.`,
+          mensagem: `Nova multa: ${r.placa} — ${qtd} nova${qtd > 1 ? 's' : ''} autuação${qtd > 1 ? 'ões' : ''} (Detran).`,
+        },
+      );
+    }
+  }
+
+  // Vencimento: 7 dias antes e no dia.
+  for (const m of r.multas ?? []) {
+    const venc = parseDataBr(m.dataVencimento);
+    if (!venc) continue;
+    const d = diasAte(venc, hoje);
+    if (d === 7) {
+      await notificarClienteMulta(login.id, [m.ait], 'multaVencimento7dias', hoje, {
+        title: 'Multa a vencer',
+        body: `${r.placa}: autuação vence em 7 dias (${m.dataVencimento}).`,
+        mensagem: `Multa a vencer: ${r.placa} — vence em 7 dias (${m.dataVencimento}), R$ ${Number(m.valorAPagar).toFixed(2)}.`,
+      });
+    } else if (d === 0) {
+      await notificarClienteMulta(login.id, [m.ait], 'multaVencimentoHoje', hoje, {
+        title: 'Multa vence hoje',
+        body: `${r.placa}: autuação vence hoje.`,
+        mensagem: `Multa vence hoje: ${r.placa} — R$ ${Number(m.valorAPagar).toFixed(2)}. Pague para evitar acréscimos.`,
+      });
+    }
+  }
+}
+
+/** Cria o evento + push ao cliente, com dedup por (login, ait, tipo, dia). */
+async function notificarClienteMulta(
+  clienteLoginId: string,
+  aits: string[],
+  tipo: 'multaNova' | 'multaVencimento7dias' | 'multaVencimentoHoje',
+  dataReferencia: Date,
+  payload: { title: string; body: string; mensagem: string },
+): Promise<void> {
+  let algumNovo = false;
+  for (const ait of aits) {
+    try {
+      await prisma.notificacaoMultaEnvio.create({ data: { clienteLoginId, ait, tipo, dataReferencia } });
+      algumNovo = true;
+    } catch (err: any) {
+      if (err?.code !== 'P2002') throw err; // P2002 = já enviado (dedup)
+    }
+  }
+  if (!algumNovo) return;
+
+  await prisma.eventoNotificacao.create({
+    data: { clienteLoginId, tipoEvento: tipo, mensagem: payload.mensagem },
+  });
+  await ExpoPushService.enviarParaCliente(clienteLoginId, {
+    title: payload.title,
+    body: payload.body,
+    data: { tipo },
+  });
+}
+
+interface LogResumo {
+  inicioEm: Date;
+  status: string;
+  duracaoMs: number | null;
+  clientesConsultados: number;
+  veiculosConsultados: number;
+  veiculosComSucesso: number;
+  veiculosComErro: number;
+  multasColetadas: number;
+}
+
+/** Evento de resumo ao admin (área de eventos do admin), sem push. */
+async function notificarResumoAdmin(log: LogResumo): Promise<void> {
+  const ref = await prisma.clienteLogin.findFirst({
+    where: { tipo: 'responsavel' },
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (!ref) return; // sem nenhum login de cliente, não há como ancorar o evento
+
+  const hora = new Date(log.inicioEm).toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const dur = log.duracaoMs ? `${Math.round(log.duracaoMs / 1000)}s` : '—';
+
+  let tipoEvento: string;
+  let mensagem: string;
+  if (log.status === 'ERRO') {
+    tipoEvento = 'consultaMultasErro';
+    mensagem = `Consulta de multas (${hora}): FALHOU — ${log.veiculosComErro} veículo(s) com erro.`;
+  } else {
+    tipoEvento = 'consultaMultasConcluida';
+    const rot = log.status === 'PARCIAL' ? 'parcial' : 'concluída';
+    mensagem = `Consulta de multas (${hora}): ${rot} — ${log.multasColetadas} multas de ${log.clientesConsultados} cliente(s) (${log.veiculosConsultados} veículos: ${log.veiculosComSucesso} ok, ${log.veiculosComErro} erro) em ${dur}.`;
+  }
+
+  await prisma.eventoNotificacao.create({
+    data: { clienteLoginId: ref.id, tipoEvento, adminEvento: true, mensagem },
+  });
 }

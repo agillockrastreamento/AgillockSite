@@ -5,6 +5,7 @@ import { initTraccarWebSocket, broadcastTrackingEvents } from './services/tracca
 import FinanceiroNotificationService from './services/financeiro-notification.service';
 import ContratoClicksignSyncService from './services/contrato-clicksign-sync.service';
 import NotificationService from './services/notification.service';
+import { iniciarConsultaLote } from './services/multas.service';
 
 const PORT = process.env.PORT || 3000;
 
@@ -49,6 +50,29 @@ function agendarSemAtualizacao(delayMs: number) {
 }
 
 agendarSemAtualizacao(2 * 60 * 1000);
+
+// Consulta de multas (Detran): 2x/dia às 10h e 17h (America/Sao_Paulo). Ver docs/multas/SCHEDULER.md.
+const HORARIOS_MULTAS = [10, 17];
+function proximaExecucaoMultas(): Date {
+  const agora = new Date();
+  const dataSp = agora.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const candidatos = HORARIOS_MULTAS.map((h) => new Date(`${dataSp}T${String(h).padStart(2, '0')}:00:00-03:00`));
+  const futuro = candidatos.find((d) => d > agora);
+  const base = candidatos[0] ?? agora;
+  return futuro ?? new Date(base.getTime() + 24 * 60 * 60 * 1000);
+}
+function agendarConsultaMultas() {
+  const proxima = proximaExecucaoMultas();
+  const delay = Math.max(1000, proxima.getTime() - Date.now());
+  console.log(`[Multas] Proxima consulta automatica agendada para ${proxima.toISOString()} (10h/17h America/Sao_Paulo).`);
+  setTimeout(() => {
+    iniciarConsultaLote('AGENDADA')
+      .then((logId) => console.log(`[Multas] Lote de consulta iniciado (log ${logId}).`))
+      .catch((err) => console.error('[Multas] Erro ao iniciar lote:', err))
+      .finally(agendarConsultaMultas);
+  }, delay);
+}
+agendarConsultaMultas();
 
 httpServer.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);

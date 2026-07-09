@@ -36,10 +36,12 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] Teste ponta a ponta local: backend cria job → worker consulta o Detran → resultado persistido. CONSULTA_VEICULO (OSU6H88: situação+2 multas+pix+boleto) e GERAR_PAGAMENTO (subconjunto) OK. Typecheck OK.
 - [ ] Instalação no Windows como serviço (NSSM) na máquina do cliente — quando for pra produção (ver [ARQUITETURA_WORKER](ARQUITETURA_WORKER.md)).
 
-## Fase 5 — Orquestração + Scheduler + Notificações (backend)
-- [ ] Ao chegar `resultado` de `CONSULTA_VEICULO`: detectar **AITs novas** (diff antes de substituir) e disparar notificações ([NOTIFICACOES](NOTIFICACOES.md)): cliente (`multaNova`, `multaVencimento7dias`, `multaVencimentoHoje` com dedup) e admin (`consultaMultasConcluida`/`Erro`).
-- [ ] Scheduler 10h/17h em `server.ts` ([SCHEDULER](SCHEDULER.md)): cria jobs `CONSULTA_VEICULO` para cada veículo de cliente habilitado + fecha `ConsultaMultaLog`.
-- [ ] Alerta ao admin se o worker estiver **offline** (heartbeat vencido).
+## Fase 5 — Orquestração + Scheduler + Notificações (backend) ✅
+- [x] `iniciarConsultaLote(origem)`: cria `ConsultaMultaLog` + jobs `CONSULTA_VEICULO` para cada veículo de cliente habilitado (com placa + renavam/chassi). Jobs carregam `logId` (migração `consulta_job_log_id`).
+- [x] Tabulação do log conforme resultados chegam (`contabilizarNoLog`, com guard de fechamento único); ao fechar, notifica admin (`consultaMultasConcluida`/`consultaMultasErro`).
+- [x] Notificações ao cliente: `multaNova` (diff de AITs, suprimida na 1ª consulta), `multaVencimento7dias`/`multaVencimentoHoje`, com dedup via `NotificacaoMultaEnvio` + push (`ExpoPushService`).
+- [x] Scheduler 10h/17h em `server.ts` (padrão `setTimeout`/SP). Testado E2E: lote→worker→log OK + resumo admin + `multaNova` com dedup.
+- [ ] Alerta ao admin se o worker ficar **offline** (heartbeat vencido) — fazer junto da tela admin (Fase 7, usa `getWorkerStatus`).
 
 ## Fase 6 — API (admin + cliente)
 - [ ] `multas.routes.ts` (admin): `GET /api/multas`, `GET /:id`, `POST /:id/consultar` (cria job), `POST /:id/pagamento` (cria job `GERAR_PAGAMENTO`), `GET /:id/boleto`, `GET /historico`, `POST /consultar-todos`.
