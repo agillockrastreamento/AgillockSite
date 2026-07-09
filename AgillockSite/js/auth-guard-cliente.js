@@ -242,6 +242,20 @@
 
   // ─── Logo do cliente no sidebar ───────────────────────────────────────────
 
+  // Envolve o menu em um container rolável, para que brand (topo) e footer
+  // (rodapé) permaneçam fixos e só nav + logo do cliente rolem — como no admin.
+  function _ensureSidebarScroll(sidebar) {
+    var scroll = sidebar.querySelector('.sidebar-scroll');
+    if (scroll) return scroll;
+    var nav = sidebar.querySelector('.sidebar-nav');
+    if (!nav) return null;
+    scroll = document.createElement('div');
+    scroll.className = 'sidebar-scroll';
+    sidebar.insertBefore(scroll, nav);
+    scroll.appendChild(nav);
+    return scroll;
+  }
+
   function _buildLogoSection(logoUrl) {
     if (!logoUrl) return null;
 
@@ -268,21 +282,18 @@
 
       var sidebar = document.getElementById('sidebar');
       if (!sidebar) return;
-      var footer = sidebar.querySelector('.sidebar-footer');
-      if (!footer) return;
+      var scroll = _ensureSidebarScroll(sidebar);
+      if (!scroll) return;
 
-      // Remove nav flex-grow so the two spacers can center the logo
-      var nav = sidebar.querySelector('.sidebar-nav');
-      if (nav) nav.style.flex = 'none';
-
+      // Os dois spacers centralizam a logo no espaço que sobra abaixo do menu
       var spacer1 = document.createElement('div');
       spacer1.className = 'sidebar-logo-spacer';
       var spacer2 = document.createElement('div');
       spacer2.className = 'sidebar-logo-spacer';
 
-      sidebar.insertBefore(spacer1, footer);
-      sidebar.insertBefore(logoSection, footer);
-      sidebar.insertBefore(spacer2, footer);
+      scroll.appendChild(spacer1);
+      scroll.appendChild(logoSection);
+      scroll.appendChild(spacer2);
     }).catch(function () {});
   }
 
@@ -358,6 +369,8 @@
 
     var sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
+
+    _ensureSidebarScroll(sidebar);
 
     var LOGO_FULL = '../img/logo_agillock_white_new.png';
     var LOGO_ICON = '../favicon.ico';

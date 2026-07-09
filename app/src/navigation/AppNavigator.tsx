@@ -1,14 +1,14 @@
 import { NavigationContainer, DefaultTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import {
-  DrawerContentScrollView,
   DrawerItemList,
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, Avatar, Icon } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../auth/AuthProvider';
 import { ProfileModal } from '../profile/ProfileModal';
@@ -72,6 +72,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
   const { user, me, signOut } = useAuth();
   const clienteUser = user && user.role === 'CLIENTE' ? (user as ClienteUser) : null;
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const [isProfileVisible, setIsProfileVisible] = useState(false);
   const [profile, setProfile] = useState<ClientePerfil | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -104,32 +105,39 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
     };
   }, [isResponsavel]);
 
+  // Cabeçalho e rodapé ficam fora do ScrollView: só o menu e a logo do cliente rolam.
   return (
-    <DrawerContentScrollView {...props} contentContainerStyle={styles.drawer}>
+    <View style={[styles.drawer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.drawerHeader}>
         <View style={styles.brandRow}>
           <View style={styles.logoTile}>
             <Image source={drawerLogo} style={styles.drawerLogo} resizeMode="contain" />
           </View>
           <View style={styles.brandTextBlock}>
-            <Text style={styles.brandTitle}>AgilLock</Text>
+            <Text style={styles.brandTitle}>Agil Lock</Text>
             <Text style={styles.brandSubtitle}>Gestão de Risco</Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.navArea}>
-        <Text style={styles.navLabel}>Menu</Text>
-        <DrawerItemList {...props} />
-      </View>
-
-      <View style={styles.logoSpacer} />
-      {isResponsavel && logoUri ? (
-        <View style={styles.logoContainer}>
-          <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
+      <ScrollView
+        style={styles.drawerScroll}
+        contentContainerStyle={styles.drawerScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.navArea}>
+          <Text style={styles.navLabel}>Menu</Text>
+          <DrawerItemList {...props} />
         </View>
-      ) : null}
-      <View style={styles.logoSpacer} />
+
+        <View style={styles.logoSpacer} />
+        {isResponsavel && logoUri ? (
+          <View style={styles.logoContainer}>
+            <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
+          </View>
+        ) : null}
+        <View style={styles.logoSpacer} />
+      </ScrollView>
 
       <View style={styles.profileArea}>
         {isResponsavel ? (
@@ -206,7 +214,7 @@ function ClienteDrawerContent(props: DrawerContentComponentProps) {
           setIsProfileLoading(false);
         }}
       />
-    </DrawerContentScrollView>
+    </View>
   );
 }
 
@@ -407,10 +415,22 @@ export function AppNavigator() {
 
 const styles = StyleSheet.create({
   drawer: {
-    flexGrow: 1,
+    // height 100% além do flex: o container do drawer é absoluto (top/bottom),
+    // e sem altura explícita o ScrollView cresce e empurra o rodapé para fora.
+    flex: 1,
+    height: '100%',
     backgroundColor: colors.surface,
   },
+  drawerScroll: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  drawerScrollContent: {
+    // flexGrow permite que os spacers centralizem a logo quando sobra espaço
+    flexGrow: 1,
+  },
   drawerHeader: {
+    flexShrink: 0,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
@@ -487,6 +507,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   profileArea: {
+    flexShrink: 0,
     padding: spacing.lg,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
