@@ -70,13 +70,13 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] Item "Multas" no drawer do cliente **condicional** a `me.multasHabilitado` (exposto em `/me/permissoes`; tipo em `permissoes.ts`; ícone `gavel` em `AppNavigator`). `Multas` em `ClienteDrawerParamList`.
 - [x] `npm run typecheck` OK. Print/execução real dependem de emulador/Expo (feito pelo usuário).
 
-## Fase 10 — Validação final
-- [ ] Worker rodando como serviço no Windows, reiniciando no boot.
-- [ ] Consulta em lote manual (`POST /consultar-todos`) e conferir histórico + notificações.
-- [ ] Pix (pagável) e boleto (PDF abre) para "uma" e "todas".
-- [ ] Habilitar/desabilitar cliente → tela aparece/some no site e app.
-- [ ] Derrubar o worker → admin recebe alerta de offline; jobs ficam pendentes e processam ao voltar.
-- [ ] `npm run typecheck` (app) e `npm run build` (backend). Migração em produção (`npm run db:deploy`).
+## Fase 10 — Deploy + validação final (guia: [FASE10_DEPLOY](FASE10_DEPLOY.md))
+- [ ] Gerar `WORKER_API_KEY` (mesma no backend e no worker).
+- [ ] Deploy do backend (`git pull` + `docker compose up -d --build backend`) — aplica a migração no boot. Snapshot do banco antes.
+- [ ] Atualizar `/opt/agillock/backend/.env` com `WORKER_API_KEY` e **recriar** o container (`up -d --force-recreate backend`).
+- [ ] Instalar o worker na máquina Windows (serviço NSSM) + `.env` (BACKEND_URL, WORKER_API_KEY).
+- [ ] Validar: worker online no admin, habilitar cliente, consulta/pix/boleto, notificações, rotina 10h/17h.
+- [x] `npm run typecheck` (app) e `npm run build` (backend) — OK durante o desenvolvimento.
 
 ## Riscos / pontos de atenção
 - **Worker/máquina offline:** consultas param. Mitigação: heartbeat + alerta ao admin; jobs não se perdem (processam ao voltar); no-break + suspensão desativada.

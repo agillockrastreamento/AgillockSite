@@ -180,10 +180,10 @@ Recomendado: rodar como **serviço do Windows** com o **NSSM** (simples e robust
    ```powershell
    C:\nssm\win64\nssm.exe install DetranWorker
    ```
-3. Na janela do NSSM:
+3. Na janela do NSSM (o worker é TypeScript, roda via `tsx`):
    - **Application → Path:** `C:\Program Files\nodejs\node.exe`
    - **Application → Startup directory:** `C:\detran-worker`
-   - **Application → Arguments:** `worker.js`
+   - **Application → Arguments:** `node_modules\tsx\dist\cli.mjs src\worker.ts`
    - Aba **Details → Startup type:** `Automatic` (inicia no boot).
    - Aba **Exit actions:** deixar "Restart" (reinicia se cair).
    - Aba **I/O** (opcional): apontar `Output`/`Error` para arquivos de log, ex.: `C:\detran-worker\logs\out.log` e `err.log`.

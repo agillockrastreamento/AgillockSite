@@ -19,6 +19,7 @@ Documentação completa da funcionalidade de **consulta automática de multas, d
 | [FRONTEND_ADMIN.md](FRONTEND_ADMIN.md) | Botão de habilitar em clientes + tela de multas do admin + aba de histórico |
 | [FRONTEND_CLIENTE_APP.md](FRONTEND_CLIENTE_APP.md) | Tela "Multas" no site do cliente e no app |
 | [PLANO_IMPLEMENTACAO.md](PLANO_IMPLEMENTACAO.md) | Ordem de execução, fases e checklist |
+| [FASE10_DEPLOY.md](FASE10_DEPLOY.md) | Deploy em produção: migração, atualizar `.env` do servidor (WORKER_API_KEY) e instalar o worker |
 
 ## Resumo da funcionalidade
 
