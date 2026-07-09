@@ -23,11 +23,13 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] `ConsultaJob` (fila do worker) + `WorkerStatus` (saúde/heartbeat do worker).
 - [x] Migração `20260709120629_consulta_multas_detran` criada e aplicada; client gerado; schema válido.
 
-## Fase 3 — Backend: fila + endpoints do worker
-- [ ] Auth por `WORKER_API_KEY` (middleware separado do JWT).
-- [ ] Endpoints `/api/worker/*` ([ARQUITETURA_WORKER](ARQUITETURA_WORKER.md)): `claim` (long-poll), `jobs/:id/resultado`, `jobs/:id/erro`, `heartbeat`.
-- [ ] Ao receber `resultado`: persistir `VeiculoMultaSituacao` + `Multa`, salvar boleto em `uploads/multas/...`, guardar pix.
-- [ ] Recuperação de jobs travados (`PROCESSANDO` > N min → `PENDENTE`); status online/offline do worker.
+## Fase 3 — Backend: fila + endpoints do worker ✅
+- [x] Auth por `WORKER_API_KEY` (`middleware/worker-api-key.middleware.ts`, Bearer/x-api-key).
+- [x] Endpoints `/api/worker/*` (`routes/worker.routes.ts`): `claim` (long-poll ~25s), `jobs/:id/resultado`, `jobs/:id/erro`, `heartbeat`.
+- [x] `services/multas.service.ts`: ao receber `resultado` persiste `VeiculoMultaSituacao` + `Multa` (delete+insert em transação), salva boleto em `uploads/multas/...`, guarda pix. Pagamento avulso salvo em `uploads/multas/pagamentos/`.
+- [x] Recuperação de jobs travados (`PROCESSANDO` > 10 min → `PENDENTE`, ou `ERRO` após 5 tentativas); heartbeat + `getWorkerStatus` (online = heartbeat < 3 min).
+- [x] Testado ponta a ponta (auth 401, claim→PROCESSANDO, resultado→CONCLUIDO+PDF, heartbeat→online). Build do backend OK.
+- [ ] Pendente (Fase 5): detectar AITs novas para notificações (marcado com TODO no service).
 
 ## Fase 4 — Worker (`detran-worker/`) + deploy no Windows
 - [ ] Projeto Node separado: lê `.env` (`BACKEND_URL`, `WORKER_API_KEY`), faz `claim` → executa a lib da Fase 1 → envia `resultado`/`erro`; `heartbeat` periódico.
