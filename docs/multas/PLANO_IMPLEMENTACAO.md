@@ -31,11 +31,10 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] Testado ponta a ponta (auth 401, claim→PROCESSANDO, resultado→CONCLUIDO+PDF, heartbeat→online). Build do backend OK.
 - [ ] Pendente (Fase 5): detectar AITs novas para notificações (marcado com TODO no service).
 
-## Fase 4 — Worker (`detran-worker/`) + deploy no Windows
-- [ ] Projeto Node separado: lê `.env` (`BACKEND_URL`, `WORKER_API_KEY`), faz `claim` → executa a lib da Fase 1 → envia `resultado`/`erro`; `heartbeat` periódico.
-- [ ] Deps mínimas (cliente HTTP + `cheerio` + `dotenv`).
-- [ ] Instalação no Windows como serviço (NSSM) — ver passo a passo em [ARQUITETURA_WORKER](ARQUITETURA_WORKER.md).
-- [ ] Teste ponta a ponta: backend cria job → worker processa → resultado no banco.
+## Fase 4 — Worker (`detran-worker/`) + deploy no Windows ✅ (código; deploy pendente)
+- [x] `detran-worker/src/worker.ts`: lê `.env` (`BACKEND_URL`, `WORKER_API_KEY`), loop de `claim` (long-poll) → executa a lib da Fase 1 (`consultarVeiculoCompleto`/`gerarPagamento`) → envia `resultado`/`erro`; heartbeat via claim; backoff em falha. `DadosInvalidosError` → erro permanente.
+- [x] Teste ponta a ponta local: backend cria job → worker consulta o Detran → resultado persistido. CONSULTA_VEICULO (OSU6H88: situação+2 multas+pix+boleto) e GERAR_PAGAMENTO (subconjunto) OK. Typecheck OK.
+- [ ] Instalação no Windows como serviço (NSSM) na máquina do cliente — quando for pra produção (ver [ARQUITETURA_WORKER](ARQUITETURA_WORKER.md)).
 
 ## Fase 5 — Orquestração + Scheduler + Notificações (backend)
 - [ ] Ao chegar `resultado` de `CONSULTA_VEICULO`: detectar **AITs novas** (diff antes de substituir) e disparar notificações ([NOTIFICACOES](NOTIFICACOES.md)): cliente (`multaNova`, `multaVencimento7dias`, `multaVencimentoHoje` com dedup) e admin (`consultaMultasConcluida`/`Erro`).
