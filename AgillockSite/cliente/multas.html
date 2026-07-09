@@ -37,8 +37,14 @@
     table.multas-tab { width: 100%; font-size: 13px; }
     table.multas-tab th { color: #888; font-weight: 600; font-size: 11px; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid #eee; }
     html.dark-theme table.multas-tab th { border-color: #2d3748; }
-    table.multas-tab td { padding: 8px; border-bottom: 1px solid #f4f4f4; vertical-align: top; }
+    table.multas-tab td { padding: 8px; border-bottom: 1px solid #f4f4f4; vertical-align: top; white-space: nowrap; }
     html.dark-theme table.multas-tab td { border-color: #232b36; }
+    table.multas-tab th { white-space: nowrap; }
+    table.multas-tab td.col-motivo { white-space: normal; min-width: 200px; max-width: 340px; color: #555; }
+    html.dark-theme table.multas-tab td.col-motivo { color: #aab3c0; }
+    .multas-scroll { overflow-x: auto; }
+    .multas-scroll::-webkit-scrollbar { height: 7px; }
+    .multas-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     .valor-de { color: #999; text-decoration: line-through; font-size: 11px; }
     .acoes-pag { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
     .pix-box { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin-top: 12px; }
@@ -139,16 +145,21 @@
         corpo = '<div class="sem-multa"><i class="fa fa-check-circle"></i> Nenhuma multa encontrada.</div>';
       } else {
         var linhas = v.multas.map(function(m){
-          var de = m.valor !== m.valorAPagar ? '<div class="valor-de">de '+AL.fmtMoney(m.valor)+'</div>' : '';
           return '<tr>'+
             '<td><input type="checkbox" class="chk" data-disp="'+v.dispositivoId+'" value="'+esc(m.ait)+'" checked></td>'+
-            '<td><b>'+esc(m.ait)+'</b><br><span style="color:#888;font-size:11px;">'+esc(m.motivo)+'</span></td>'+
+            '<td><b>'+esc(m.ait)+'</b></td>'+
+            '<td class="col-motivo">'+esc(m.motivo)+'</td>'+
+            '<td>'+esc(m.dataInfracao||'—')+'</td>'+
             '<td>'+esc(m.dataVencimento||'—')+'</td>'+
-            '<td style="text-align:right;"><b>'+AL.fmtMoney(m.valorAPagar)+'</b>'+de+'</td>'+
+            '<td>'+AL.fmtMoney(m.valor)+'</td>'+
+            '<td style="text-align:right;"><b>'+AL.fmtMoney(m.valorAPagar)+'</b></td>'+
           '</tr>';
         }).join('');
         corpo =
-          '<table class="multas-tab"><thead><tr><th><input type="checkbox" class="chk-todas" data-disp="'+v.dispositivoId+'" checked></th><th>Autuação</th><th>Vencimento</th><th style="text-align:right;">A pagar</th></tr></thead><tbody>'+linhas+'</tbody></table>'+
+          '<div class="multas-scroll"><table class="multas-tab"><thead><tr>'+
+          '<th><input type="checkbox" class="chk-todas" data-disp="'+v.dispositivoId+'" checked></th>'+
+          '<th>AIT</th><th>Motivo</th><th>Data Infração</th><th>Vencimento</th><th>Valor</th><th style="text-align:right;">A pagar</th>'+
+          '</tr></thead><tbody>'+linhas+'</tbody></table></div>'+
           '<div class="acoes-pag">'+
             '<button class="btn btn-primary-al btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="sel"><i class="fa fa-qrcode"></i> Pagar selecionadas</button>'+
             '<button class="btn btn-default btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="todas"><i class="fa fa-qrcode"></i> Pagar todas</button>'+
