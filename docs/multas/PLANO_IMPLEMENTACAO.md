@@ -64,8 +64,11 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] Usa `AL_CLIENTE`. Testado no navegador — prints na raiz: `print-5-cliente-multas`, `print-6-cliente-pagamento`.
 - [x] Seleção de veículo: 1 veículo abre direto; 2+ mostram um **combo com busca** + **indicador ao lado da placa** (● vermelho = tem multa, ✓ verde = sem). Print `print-7-cliente-combo`.
 
-## Fase 9 — App
-- [ ] Tela "Multas" condicional à flag; QR/Pix/copiar; download de PDF (expo-file-system v18). Ver [FRONTEND_CLIENTE_APP](FRONTEND_CLIENTE_APP.md).
+## Fase 9 — App ✅ (código; execução real no Expo pelo usuário)
+- [x] `app/src/screens/MultasScreen.tsx`: aviso 10h/17h, cards de multa (checkbox seleção), "Pagar selecionadas"/"Pagar todas" → Pix (QR + EMV selecionável + compartilhar via `Share`) + boleto PDF (`expo-file-system` classe + `expo-sharing`).
+- [x] Seletor de veículo igual à web: 1 veículo abre direto; 2+ mostram um seletor (Modal com busca + indicador ● vermelho / ✓ verde por placa).
+- [x] Item "Multas" no drawer do cliente **condicional** a `me.multasHabilitado` (exposto em `/me/permissoes`; tipo em `permissoes.ts`; ícone `gavel` em `AppNavigator`). `Multas` em `ClienteDrawerParamList`.
+- [x] `npm run typecheck` OK. Print/execução real dependem de emulador/Expo (feito pelo usuário).
 
 ## Fase 10 — Validação final
 - [ ] Worker rodando como serviço no Windows, reiniciando no boot.

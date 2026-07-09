@@ -47,6 +47,7 @@ export type MePermissoes = {
   clienteId: string;
   permissoes: PermissoesCliente;
   dispositivoIdsPermitidos: string[] | null;
+  multasHabilitado?: boolean;
 };
 
 export function permissoesTotais(): PermissoesCliente {

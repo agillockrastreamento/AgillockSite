@@ -21,6 +21,7 @@ import { CotacaoIaproScreen } from '../screens/CotacaoIaproScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { PagamentosScreen } from '../screens/PagamentosScreen';
+import { MultasScreen } from '../screens/MultasScreen';
 import { ReportScreen } from '../screens/ReportScreen';
 import { HistoricoScreen } from '../screens/HistoricoScreen';
 import { SessionLoadingScreen } from '../screens/SessionLoadingScreen';
@@ -48,6 +49,7 @@ const routeIcons: Record<keyof ClienteDrawerParamList, string> = {
   Manutencao: 'wrench-outline',
   CotacaoIapro: 'shield-car',
   Pagamentos: 'credit-card-outline',
+  Multas: 'gavel',
   Usuarios: 'account-group-outline',
 };
 
@@ -308,6 +310,9 @@ function ClienteDrawer() {
           component={PagamentosScreen}
           options={{ title: 'Pagamentos' }}
         />
+      ) : null}
+      {me?.multasHabilitado ? (
+        <Drawer.Screen name="Multas" component={MultasScreen} options={{ title: 'Multas' }} />
       ) : null}
       {responsavel ? (
         <Drawer.Screen name="Usuarios" component={UsuariosScreen} options={{ title: 'Usuários' }} />
