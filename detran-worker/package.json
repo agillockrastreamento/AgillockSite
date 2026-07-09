@@ -1,0 +1,21 @@
+{
+  "name": "detran-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Worker que executa as consultas ao Detran (roda numa maquina da rede do cliente que alcanca o Detran).",
+  "scripts": {
+    "test:ce": "tsx src/testar-ce.ts",
+    "start": "tsx src/worker.ts"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "dotenv": "^17.3.1",
+    "undici": "^6.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

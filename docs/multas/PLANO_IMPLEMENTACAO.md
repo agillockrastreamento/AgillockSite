@@ -2,58 +2,74 @@
 
 Ordem sugerida, em fases verificáveis. Commits em português, direto na `main` (convenção do projeto).
 
+Arquitetura: o fluxo do Detran roda num **worker** numa máquina Windows da rede do cliente; o **backend** (Hostinger) é o cérebro (banco, agenda, fila, notificações, telas). Ver [ARQUITETURA_WORKER](ARQUITETURA_WORKER.md).
+
 ## Fase 0 — Pré-requisitos
-- [ ] **BLOQUEANTE — conectividade do servidor:** o teste no Hostinger retornou `000` (sem conexão). Diagnosticar (DNS/firewall de saída/bloqueio do Detran) e resolver. Provável solução: **proxy BR** para as requisições do `detran-ce.service`. O service deve suportar `HTTPS_PROXY`/agente de proxy configurável por env.
-- [x] Parser de HTML: **`cheerio`** (confirmado) — adicionar à dependência do backend.
+- [x] Parser de HTML: **`cheerio`** (confirmado).
+- [x] Conectividade: servidor Hostinger **não alcança** o Detran; proxy **descartado** (IPRoyal bloqueia `.gov.br`). **Solução: worker** na rede do cliente ([ARQUITETURA_WORKER](ARQUITETURA_WORKER.md), [CONECTIVIDADE_PROXY](CONECTIVIDADE_PROXY.md)).
+- [x] `BACKEND_URL` de produção: `https://api.agillock.com.br` (validado — `/api` responde 401 = no ar).
+- [ ] Gerar a `WORKER_API_KEY` (segredo forte; vai no backend e no `.env` do worker).
 
-## Fase 1 — Integração Detran (núcleo)
-- [ ] `backend/src/services/detran-ce.service.ts` com os 6 passos do [RECONHECIMENTO](RECONHECIMENTO_DETRAN_CE.md):
-  - `criarSessao()` → cookie + CSRF
-  - `login(placa, renavamOuChassi)` → status
-  - `consultarPrincipal()` → `{ qtdMultas, possuiDebitoIpva, licenciamentoPendente }`
-  - `consultarMultas()` → `Multa[]` (com `selecaoValue`)
-  - `emitirExtrato(selecaoValues[])` → `{ extratoId, emv, qrCodeBase64 }`
-  - `gerarBoleto(extratoId?)` → `Buffer` (PDF)
-- [ ] Teste manual com a placa `OSU6H88` / renavam `01241525924` (deve retornar 2 multas + IPVA).
+## Fase 1 — Núcleo de integração Detran CE (lib compartilhada) ✅
+Código que fala com o Detran e parseia — roda no worker (projeto `detran-worker/`), desenvolvido/testado local. Ver [RECONHECIMENTO_DETRAN_CE](RECONHECIMENTO_DETRAN_CE.md).
+- [x] `detran-worker/src/detran-ce.ts` — classe `DetranCeSession` com os 6 passos (`iniciar`/`login`/`consultarPrincipal`/`consultarMultas`/`emitirExtrato`/`gerarBoleto`). HTTP via `undici` (dispatcher aceita cert do Detran) + `cheerio`.
+- [x] `consultarVeiculoCompleto(placa, renavam)` traz **TUDO** (situação + multas + pix/boleto de todas). `gerarPagamento(placa, renavam, aits?)` p/ subconjunto.
+- [x] Teste (`npm run test:ce`) com `OSU6H88` — 2 multas, valores, pix EMV, QR e boleto PDF (134 KB) OK em ~4s.
+- [x] IPVA: detecta frase "débito de IPVA" (validado; hoje sem débito pois foi pago). Multas: 100%.
+- [ ] **Pendente validar:** detecção de `licenciamentoPendente` (heurística) — precisa de um veículo com licenciamento pendente para confirmar o texto exato. IPVA em débito idem (a OSU6H88 quitou).
 
-## Fase 2 — Banco de dados
-- [ ] Modelos Prisma ([BANCO_DE_DADOS](BANCO_DE_DADOS.md)): flag em `Cliente`, `VeiculoMultaSituacao`, `Multa`, `ConsultaMultaLog`, `NotificacaoMultaEnvio`.
+## Fase 2 — Banco de dados (backend)
+- [ ] Modelos Prisma ([BANCO_DE_DADOS](BANCO_DE_DADOS.md)): flag `Cliente.multasHabilitado`, `VeiculoMultaSituacao`, `Multa`, `ConsultaMultaLog`, `NotificacaoMultaEnvio`.
+- [ ] Modelo `ConsultaJob` (fila do worker) + campo/registro de saúde do worker ([ARQUITETURA_WORKER](ARQUITETURA_WORKER.md)).
 - [ ] Migração e `db:migrate`.
 
-## Fase 3 — Orquestração + Scheduler + Notificações
-- [ ] `multas.service.ts`: `consultarVeiculo(dispositivo)` (detecta AITs novas → persiste situação/itens + pré-gera Pix/boleto das todas) e `consultarTodosHabilitados(origem)` (lote + `ConsultaMultaLog`).
-- [ ] Notificações ([NOTIFICACOES](NOTIFICACOES.md)): cliente (`multaNova`, `multaVencimento7dias`, `multaVencimentoHoje` com dedup) e admin (`consultaMultasConcluida`/`Erro`).
-- [ ] Armazenamento do PDF em `uploads/multas/...`.
-- [ ] Scheduler 10h/17h em `server.ts` ([SCHEDULER](SCHEDULER.md)).
+## Fase 3 — Backend: fila + endpoints do worker
+- [ ] Auth por `WORKER_API_KEY` (middleware separado do JWT).
+- [ ] Endpoints `/api/worker/*` ([ARQUITETURA_WORKER](ARQUITETURA_WORKER.md)): `claim` (long-poll), `jobs/:id/resultado`, `jobs/:id/erro`, `heartbeat`.
+- [ ] Ao receber `resultado`: persistir `VeiculoMultaSituacao` + `Multa`, salvar boleto em `uploads/multas/...`, guardar pix.
+- [ ] Recuperação de jobs travados (`PROCESSANDO` > N min → `PENDENTE`); status online/offline do worker.
 
-## Fase 4 — API
-- [ ] `multas.routes.ts` (admin): `GET /api/multas`, `GET /:id`, `POST /:id/consultar`, `POST /:id/pagamento`, `GET /:id/boleto`, `GET /historico`, `POST /consultar-todos`.
+## Fase 4 — Worker (`detran-worker/`) + deploy no Windows
+- [ ] Projeto Node separado: lê `.env` (`BACKEND_URL`, `WORKER_API_KEY`), faz `claim` → executa a lib da Fase 1 → envia `resultado`/`erro`; `heartbeat` periódico.
+- [ ] Deps mínimas (cliente HTTP + `cheerio` + `dotenv`).
+- [ ] Instalação no Windows como serviço (NSSM) — ver passo a passo em [ARQUITETURA_WORKER](ARQUITETURA_WORKER.md).
+- [ ] Teste ponta a ponta: backend cria job → worker processa → resultado no banco.
+
+## Fase 5 — Orquestração + Scheduler + Notificações (backend)
+- [ ] Ao chegar `resultado` de `CONSULTA_VEICULO`: detectar **AITs novas** (diff antes de substituir) e disparar notificações ([NOTIFICACOES](NOTIFICACOES.md)): cliente (`multaNova`, `multaVencimento7dias`, `multaVencimentoHoje` com dedup) e admin (`consultaMultasConcluida`/`Erro`).
+- [ ] Scheduler 10h/17h em `server.ts` ([SCHEDULER](SCHEDULER.md)): cria jobs `CONSULTA_VEICULO` para cada veículo de cliente habilitado + fecha `ConsultaMultaLog`.
+- [ ] Alerta ao admin se o worker estiver **offline** (heartbeat vencido).
+
+## Fase 6 — API (admin + cliente)
+- [ ] `multas.routes.ts` (admin): `GET /api/multas`, `GET /:id`, `POST /:id/consultar` (cria job), `POST /:id/pagamento` (cria job `GERAR_PAGAMENTO`), `GET /:id/boleto`, `GET /historico`, `POST /consultar-todos`.
 - [ ] `PATCH /api/clientes/:id/multas-habilitado` (em `clientes.routes.ts`).
-- [ ] Rotas do cliente (em `cliente-portal.routes.ts` ou `cliente-multas.routes.ts`): `GET /api/cliente/multas`, `POST /:id/pagamento`, `GET /:id/boleto`. Gate por `multasHabilitado`.
-- [ ] Expor `multasHabilitado` no payload de login/perfil do cliente.
-- [ ] Registrar rotas em `app.ts`.
+- [ ] Rotas do cliente: `GET /api/cliente/multas`, `POST /:id/pagamento`, `GET /:id/boleto`. Gate por `multasHabilitado`.
+- [ ] Expor `multasHabilitado` no login/perfil do cliente. Registrar rotas em `app.ts`.
+- [ ] Pagamento: se worker online → job `GERAR_PAGAMENTO` (valor atual); se offline → dado guardado com data ([ARQUITETURA_WORKER](ARQUITETURA_WORKER.md), cuidado com validade).
 
-## Fase 5 — Admin (web)
-- [ ] Botão `.btn-multas` em `admin/clientes.html` (toggle).
-- [ ] Tela `admin/multas.html`: aba Multas (filtros, tabela, detalhe, pagamento) + aba Histórico.
+## Fase 7 — Admin (web)
+- [ ] Botão `.btn-multas` em `admin/clientes.html` (toggle). Ver [FRONTEND_ADMIN](FRONTEND_ADMIN.md).
+- [ ] Tela `admin/multas.html`: aba Multas (filtros, tabela, detalhe, pagamento) + aba Histórico + status do worker.
 - [ ] Entrada no menu do admin.
 
-## Fase 6 — Cliente (web)
-- [ ] `multas.html` no portal do cliente + entrada de menu condicional à flag.
+## Fase 8 — Cliente (web)
+- [ ] `multas.html` no portal do cliente + menu condicional à flag. Ver [FRONTEND_CLIENTE_APP](FRONTEND_CLIENTE_APP.md).
 
-## Fase 7 — App
-- [ ] Tela "Multas" condicional à flag; QR/Pix/copiar; download de PDF (expo-file-system v18).
+## Fase 9 — App
+- [ ] Tela "Multas" condicional à flag; QR/Pix/copiar; download de PDF (expo-file-system v18). Ver [FRONTEND_CLIENTE_APP](FRONTEND_CLIENTE_APP.md).
 
-## Fase 8 — Validação final
-- [ ] Rodar consulta em lote manual (`POST /consultar-todos`) e conferir histórico.
-- [ ] Conferir Pix (pagável) e boleto (PDF abre) para "uma" e "todas".
-- [ ] Testar habilitar/desabilitar cliente → tela aparece/some no site e app.
-- [ ] `npm run typecheck` (app) e `npm run build` (backend).
-- [ ] Aplicar migração em produção (`npm run db:deploy`).
+## Fase 10 — Validação final
+- [ ] Worker rodando como serviço no Windows, reiniciando no boot.
+- [ ] Consulta em lote manual (`POST /consultar-todos`) e conferir histórico + notificações.
+- [ ] Pix (pagável) e boleto (PDF abre) para "uma" e "todas".
+- [ ] Habilitar/desabilitar cliente → tela aparece/some no site e app.
+- [ ] Derrubar o worker → admin recebe alerta de offline; jobs ficam pendentes e processam ao voltar.
+- [ ] `npm run typecheck` (app) e `npm run build` (backend). Migração em produção (`npm run db:deploy`).
 
 ## Riscos / pontos de atenção
-- **IP bloqueado em produção** (mitigação: proxy BR). Validar na Fase 0.
-- **hCaptcha** passar a ser exigido no login (hoje não é). Mitigação: monitorar; se ocorrer, avaliar fluxo alternativo.
-- **Mudança de HTML do Detran** quebra o parser. Mitigação: `cheerio` + testes do parser com HTML salvo de exemplo (guardar amostra em `docs/multas/exemplos/`).
-- **Validade do extrato/Pix:** regenerar no momento do pagamento (não confiar no Pix pré-gerado por muito tempo).
-- **Carga no Detran:** consulta sequencial com delay; evitar paralelismo agressivo.
+- **Worker/máquina offline:** consultas param. Mitigação: heartbeat + alerta ao admin; jobs não se perdem (processam ao voltar); no-break + suspensão desativada.
+- **IP residencial do worker bloqueado pelo Detran** (menos provável que datacenter). Mitigação: trocar de rede; monitorar com curl de verificação.
+- **Validade do boleto/Pix:** valor muda com o tempo → regenerar no pagamento quando o worker está online; senão exibir guardado com a data.
+- **Mudança de HTML do Detran** quebra o parser. Mitigação: `cheerio` + amostras de HTML em `docs/multas/exemplos/`.
+- **hCaptcha** passar a ser exigido no login do CE (hoje não é). Mitigação: monitorar.
+- **Carga no Detran:** consulta sequencial com pequeno delay; evitar paralelismo agressivo no worker.

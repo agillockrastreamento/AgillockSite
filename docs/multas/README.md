@@ -14,7 +14,8 @@ Documentação completa da funcionalidade de **consulta automática de multas, d
 | [API.md](API.md) | Rotas do backend (admin e cliente), payloads e respostas |
 | [SCHEDULER.md](SCHEDULER.md) | Consulta automática 2×/dia (10h e 17h), retry, logging |
 | [NOTIFICACOES.md](NOTIFICACOES.md) | Notificações ao cliente (multa nova, vencimento 7 dias e no dia) e ao admin (resumo de cada consulta) |
-| [CONECTIVIDADE_PROXY.md](CONECTIVIDADE_PROXY.md) | Bloqueio de rede do servidor → Detran, solução por proxy BR, custos e como validar |
+| [CONECTIVIDADE_PROXY.md](CONECTIVIDADE_PROXY.md) | Bloqueio de rede do servidor → Detran, tentativa de proxy BR (descartada), custos e como validar |
+| [ARQUITETURA_WORKER.md](ARQUITETURA_WORKER.md) | **Solução adotada:** mini-worker numa máquina Windows sempre ligada (agente por polling) + setup completo no Windows |
 | [FRONTEND_ADMIN.md](FRONTEND_ADMIN.md) | Botão de habilitar em clientes + tela de multas do admin + aba de histórico |
 | [FRONTEND_CLIENTE_APP.md](FRONTEND_CLIENTE_APP.md) | Tela "Multas" no site do cliente e no app |
 | [PLANO_IMPLEMENTACAO.md](PLANO_IMPLEMENTACAO.md) | Ordem de execução, fases e checklist |
