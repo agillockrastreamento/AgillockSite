@@ -46,6 +46,23 @@
     .pix-emv { font-family: monospace; font-size: 11px; word-break: break-all; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
     html.dark-theme .pix-emv { background: #0e1116; border-color: #2a3340; color: #cbd5e1; }
     .sem-multa { color: #1b7a2f; font-size: 13px; padding: 6px 2px; }
+
+    /* Combo de seleção de veículo (2+ veículos) */
+    .veic-combo { position: relative; max-width: 520px; margin: 10px 0 4px; }
+    .veic-combo .combo-ico { position: absolute; left: 12px; top: 12px; color: #aaa; }
+    #combo-busca { padding-left: 34px; height: 40px; }
+    .combo-lista { position: absolute; z-index: 30; left: 0; right: 0; top: 44px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.12); max-height: 300px; overflow-y: auto; }
+    html.dark-theme .combo-lista { background: #1e2530; border-color: #2d3748; }
+    .combo-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f4f4f4; }
+    html.dark-theme .combo-item { border-color: #232b36; }
+    .combo-item:hover { background: #f5f7fa; }
+    html.dark-theme .combo-item:hover { background: #252d3d; }
+    .combo-placa { font-weight: 700; font-size: 12px; background: #333; color: #fff; padding: 1px 8px; border-radius: 4px; letter-spacing: 1px; }
+    .combo-apelido { color: #666; font-size: 13px; flex: 1; }
+    html.dark-theme .combo-apelido { color: #9aa4b2; }
+    .combo-ind { margin-left: auto; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .combo-ind.ind-multa { color: #e74c3c; }
+    .combo-ind.ind-ok { color: #27ae60; }
   </style>
 </head>
 <body>
@@ -114,49 +131,107 @@
 
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
+    function cardHtml(v){
+      var badges = (v.possuiDebitoIpva ? '<span class="mini-badge b-err">Débito IPVA</span> ' : '') +
+                   (v.licenciamentoPendente ? '<span class="mini-badge b-err">Licenciamento pendente</span> ' : '');
+      var corpo;
+      if (!v.multas.length){
+        corpo = '<div class="sem-multa"><i class="fa fa-check-circle"></i> Nenhuma multa encontrada.</div>';
+      } else {
+        var linhas = v.multas.map(function(m){
+          var de = m.valor !== m.valorAPagar ? '<div class="valor-de">de '+AL.fmtMoney(m.valor)+'</div>' : '';
+          return '<tr>'+
+            '<td><input type="checkbox" class="chk" data-disp="'+v.dispositivoId+'" value="'+esc(m.ait)+'" checked></td>'+
+            '<td><b>'+esc(m.ait)+'</b><br><span style="color:#888;font-size:11px;">'+esc(m.motivo)+'</span></td>'+
+            '<td>'+esc(m.dataVencimento||'—')+'</td>'+
+            '<td style="text-align:right;"><b>'+AL.fmtMoney(m.valorAPagar)+'</b>'+de+'</td>'+
+          '</tr>';
+        }).join('');
+        corpo =
+          '<table class="multas-tab"><thead><tr><th><input type="checkbox" class="chk-todas" data-disp="'+v.dispositivoId+'" checked></th><th>Autuação</th><th>Vencimento</th><th style="text-align:right;">A pagar</th></tr></thead><tbody>'+linhas+'</tbody></table>'+
+          '<div class="acoes-pag">'+
+            '<button class="btn btn-primary-al btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="sel"><i class="fa fa-qrcode"></i> Pagar selecionadas</button>'+
+            '<button class="btn btn-default btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="todas"><i class="fa fa-qrcode"></i> Pagar todas</button>'+
+          '</div>'+
+          '<div class="pag-result" id="pag-'+v.dispositivoId+'"></div>';
+      }
+      return '<div class="veic-card">'+
+        '<div class="veic-head"><span class="placa">'+esc(v.placa)+'</span>'+
+        (v.apelido?'<span class="apelido">'+esc(v.apelido)+'</span>':'')+' '+badges+
+        '<span class="veic-resumo">'+(v.qtdMultas>0?('<span class="mini-badge b-err">'+v.qtdMultas+' multa'+(v.qtdMultas>1?'s':'')+'</span> · '+AL.fmtMoney(v.valorTotal)):'<span class="mini-badge b-ok">Sem multas</span>')+'</span></div>'+
+        '<div class="veic-body">'+corpo+'</div>'+
+      '</div>';
+    }
+
+    function wireCard(scope){
+      scope.querySelectorAll('.chk-todas').forEach(function(ct){
+        ct.onclick = function(){ scope.querySelectorAll('.chk[data-disp="'+ct.dataset.disp+'"]').forEach(function(c){c.checked=ct.checked;}); };
+      });
+      scope.querySelectorAll('.btn-pagar').forEach(function(b){
+        b.onclick = function(){ pagar(this.dataset.disp, this.dataset.modo, this); };
+      });
+    }
+
+    function mostrarVeiculo(v){
+      var c = document.getElementById('veic-selecionado');
+      if (!c) return;
+      c.innerHTML = cardHtml(v);
+      wireCard(c);
+    }
+
+    // ── Combo com busca (>1 veículo) + indicador de multa ao lado da placa ──
+    function opcoesHtml(veiculos, filtro){
+      var f = (filtro||'').toLowerCase();
+      var itens = veiculos.filter(function(v){
+        return !f || (v.placa && v.placa.toLowerCase().indexOf(f)>=0) || (v.apelido && v.apelido.toLowerCase().indexOf(f)>=0);
+      });
+      if (!itens.length) return '<div class="combo-item" style="color:#999;cursor:default;">Nenhum veículo encontrado</div>';
+      return itens.map(function(v){
+        var ind = v.qtdMultas>0
+          ? '<span class="combo-ind ind-multa" title="Com multas">● '+v.qtdMultas+'</span>'
+          : '<span class="combo-ind ind-ok" title="Sem multas"><i class="fa fa-check"></i></span>';
+        return '<div class="combo-item" data-disp="'+v.dispositivoId+'"><span class="combo-placa">'+esc(v.placa)+'</span>'+
+          (v.apelido?'<span class="combo-apelido">'+esc(v.apelido)+'</span>':'')+ind+'</div>';
+      }).join('');
+    }
+
+    function comboHtml(){
+      return '<div class="veic-combo">'+
+        '<i class="fa fa-search combo-ico"></i>'+
+        '<input id="combo-busca" class="form-control" autocomplete="off" placeholder="Selecione o veículo (busque por placa)…">'+
+        '<div id="combo-lista" class="combo-lista" style="display:none;"></div>'+
+      '</div>';
+    }
+
+    function wireCombo(veiculos){
+      var inp = document.getElementById('combo-busca');
+      var lista = document.getElementById('combo-lista');
+      function abrir(filtro){ lista.innerHTML = opcoesHtml(veiculos, filtro); lista.style.display='block'; wireItens(); }
+      function wireItens(){
+        lista.querySelectorAll('.combo-item[data-disp]').forEach(function(it){
+          it.onmousedown = function(e){ // mousedown (antes do blur do input)
+            e.preventDefault();
+            var v = veiculos.filter(function(x){return x.dispositivoId===it.dataset.disp;})[0];
+            inp.value = v.placa; lista.style.display='none'; mostrarVeiculo(v);
+          };
+        });
+      }
+      // Ao focar: mostra TODOS (e seleciona o texto para digitar já filtrar). Ao digitar: filtra.
+      inp.addEventListener('focus', function(){ inp.select(); abrir(''); });
+      inp.addEventListener('input', function(){ abrir(inp.value); });
+      inp.addEventListener('blur', function(){ setTimeout(function(){ lista.style.display='none'; }, 150); });
+    }
+
     function render(veiculos){
       var box = document.getElementById('lista-veiculos');
       if (!veiculos.length){ box.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">Nenhum veículo disponível.</p>'; return; }
-      box.innerHTML = veiculos.map(function(v){
-        var badges = (v.possuiDebitoIpva ? '<span class="mini-badge b-err">Débito IPVA</span> ' : '') +
-                     (v.licenciamentoPendente ? '<span class="mini-badge b-err">Licenciamento pendente</span> ' : '');
-        var corpo;
-        if (!v.multas.length){
-          corpo = '<div class="sem-multa"><i class="fa fa-check-circle"></i> Nenhuma multa encontrada.</div>';
-        } else {
-          var linhas = v.multas.map(function(m){
-            var de = m.valor !== m.valorAPagar ? '<div class="valor-de">de '+AL.fmtMoney(m.valor)+'</div>' : '';
-            return '<tr>'+
-              '<td><input type="checkbox" class="chk" data-disp="'+v.dispositivoId+'" value="'+esc(m.ait)+'" checked></td>'+
-              '<td><b>'+esc(m.ait)+'</b><br><span style="color:#888;font-size:11px;">'+esc(m.motivo)+'</span></td>'+
-              '<td>'+esc(m.dataVencimento||'—')+'</td>'+
-              '<td style="text-align:right;"><b>'+AL.fmtMoney(m.valorAPagar)+'</b>'+de+'</td>'+
-            '</tr>';
-          }).join('');
-          corpo =
-            '<table class="multas-tab"><thead><tr><th><input type="checkbox" class="chk-todas" data-disp="'+v.dispositivoId+'" checked></th><th>Autuação</th><th>Vencimento</th><th style="text-align:right;">A pagar</th></tr></thead><tbody>'+linhas+'</tbody></table>'+
-            '<div class="acoes-pag">'+
-              '<button class="btn btn-primary-al btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="sel"><i class="fa fa-qrcode"></i> Pagar selecionadas</button>'+
-              '<button class="btn btn-default btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="todas"><i class="fa fa-qrcode"></i> Pagar todas</button>'+
-            '</div>'+
-            '<div class="pag-result" id="pag-'+v.dispositivoId+'"></div>';
-        }
-        return '<div class="veic-card">'+
-          '<div class="veic-head"><span class="placa">'+esc(v.placa)+'</span>'+
-          (v.apelido?'<span class="apelido">'+esc(v.apelido)+'</span>':'')+' '+badges+
-          '<span class="veic-resumo">'+(v.qtdMultas>0?('<span class="mini-badge b-err">'+v.qtdMultas+' multa'+(v.qtdMultas>1?'s':'')+'</span> · '+AL.fmtMoney(v.valorTotal)):'<span class="mini-badge b-ok">Sem multas</span>')+'</span></div>'+
-          '<div class="veic-body">'+corpo+'</div>'+
-        '</div>';
-      }).join('');
-
-      // seleciona todas por veículo
-      box.querySelectorAll('.chk-todas').forEach(function(ct){
-        ct.onclick = function(){ box.querySelectorAll('.chk[data-disp="'+ct.dataset.disp+'"]').forEach(function(c){c.checked=ct.checked;}); };
-      });
-      // pagar
-      box.querySelectorAll('.btn-pagar').forEach(function(b){
-        b.onclick = function(){ pagar(this.dataset.disp, this.dataset.modo, this); };
-      });
+      // Um único veículo: abre direto. Vários: combo com busca + indicador de multa.
+      if (veiculos.length === 1){ box.innerHTML = '<div id="veic-selecionado"></div>'; mostrarVeiculo(veiculos[0]); return; }
+      box.innerHTML = comboHtml() + '<div id="veic-selecionado" style="margin-top:14px;"></div>';
+      wireCombo(veiculos);
+      var inicial = veiculos.filter(function(v){return v.qtdMultas>0;})[0] || veiculos[0];
+      document.getElementById('combo-busca').value = inicial.placa;
+      mostrarVeiculo(inicial);
     }
 
     function pagar(disp, modo, btn){

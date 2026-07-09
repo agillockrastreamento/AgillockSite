@@ -62,6 +62,7 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] `cliente/multas.html`: cards por veículo com tabela de multas (checkbox), aviso 10h/17h, "Pagar selecionadas"/"Pagar todas" → Pix (QR + copia-e-cola) + boleto PDF. Mostra desconto ("de R$X").
 - [x] Item "Multas" no menu de todas as páginas do cliente, **condicional** à flag: `multasHabilitado` exposto em `/api/cliente/me/permissoes` e regra `multas.html` em `aplicarPermissoesSidebar` (`auth-guard-cliente.js`).
 - [x] Usa `AL_CLIENTE`. Testado no navegador — prints na raiz: `print-5-cliente-multas`, `print-6-cliente-pagamento`.
+- [x] Seleção de veículo: 1 veículo abre direto; 2+ mostram um **combo com busca** + **indicador ao lado da placa** (● vermelho = tem multa, ✓ verde = sem). Print `print-7-cliente-combo`.
 
 ## Fase 9 — App
 - [ ] Tela "Multas" condicional à flag; QR/Pix/copiar; download de PDF (expo-file-system v18). Ver [FRONTEND_CLIENTE_APP](FRONTEND_CLIENTE_APP.md).
