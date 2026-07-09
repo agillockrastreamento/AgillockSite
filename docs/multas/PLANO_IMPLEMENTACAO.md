@@ -43,12 +43,14 @@ Código que fala com o Detran e parseia — roda no worker (projeto `detran-work
 - [x] Scheduler 10h/17h em `server.ts` (padrão `setTimeout`/SP). Testado E2E: lote→worker→log OK + resumo admin + `multaNova` com dedup.
 - [ ] Alerta ao admin se o worker ficar **offline** (heartbeat vencido) — fazer junto da tela admin (Fase 7, usa `getWorkerStatus`).
 
-## Fase 6 — API (admin + cliente)
-- [ ] `multas.routes.ts` (admin): `GET /api/multas`, `GET /:id`, `POST /:id/consultar` (cria job), `POST /:id/pagamento` (cria job `GERAR_PAGAMENTO`), `GET /:id/boleto`, `GET /historico`, `POST /consultar-todos`.
-- [ ] `PATCH /api/clientes/:id/multas-habilitado` (em `clientes.routes.ts`).
-- [ ] Rotas do cliente: `GET /api/cliente/multas`, `POST /:id/pagamento`, `GET /:id/boleto`. Gate por `multasHabilitado`.
-- [ ] Expor `multasHabilitado` no login/perfil do cliente. Registrar rotas em `app.ts`.
-- [ ] Pagamento: se worker online → job `GERAR_PAGAMENTO` (valor atual); se offline → dado guardado com data ([ARQUITETURA_WORKER](ARQUITETURA_WORKER.md), cuidado com validade).
+## Fase 6 — API (admin + cliente) ✅
+- [x] `multas-admin.routes.ts` (`/api/multas`): `GET /` (lista+filtros), `GET /:id` (detalhe), `POST /:id/consultar` (job+aguarda), `POST /:id/pagamento` (job `GERAR_PAGAMENTO`+aguarda), `GET /historico`, `GET /worker-status`, `POST /consultar-todos`.
+- [x] `PATCH /api/clientes/:id/multas-habilitado` (toggle; ao habilitar dispara consulta inicial dos veículos elegíveis).
+- [x] `cliente-multas.routes.ts` (`/api/cliente/multas`): `GET /` e `POST /:id/pagamento`. Gate `requireMultasHabilitado` + `podeAcessarDispositivo`.
+- [x] `multasHabilitado` exposto no perfil do cliente (`/api/cliente/perfil`). Rotas registradas em `app.ts`.
+- [x] Pagamento: cria job (regenera valor atual) e aguarda o worker (long-poll ~40s); 202 se ainda processando.
+- [x] Helpers no service: `criarJobConsulta`, `criarJobPagamento`, `aguardarJob`, `getDetalheVeiculo`.
+- [x] Testado E2E (backend+worker): habilitar→consulta inicial, lista, detalhe, consultar, pagamento (admin e cliente), consultar-todos+histórico, perfil.
 
 ## Fase 7 — Admin (web)
 - [ ] Botão `.btn-multas` em `admin/clientes.html` (toggle). Ver [FRONTEND_ADMIN](FRONTEND_ADMIN.md).

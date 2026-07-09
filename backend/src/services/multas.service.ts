@@ -438,3 +438,95 @@ async function notificarResumoAdmin(log: LogResumo): Promise<void> {
     data: { clienteLoginId: ref.id, tipoEvento, adminEvento: true, mensagem },
   });
 }
+
+// ─────────────────────────── Helpers para a API (jobs sob demanda + leitura) ───────────────────────────
+
+const _sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+interface DispositivoConsulta {
+  id: string;
+  placa: string | null;
+  renavam: string | null;
+  chassi: string | null;
+}
+
+/** Cria um job CONSULTA_VEICULO (sob demanda). Retorna o id do job. */
+export async function criarJobConsulta(
+  disp: DispositivoConsulta,
+  origem: 'MANUAL_ADMIN' | 'CLIENTE',
+): Promise<string> {
+  const job = await prisma.consultaJob.create({
+    data: {
+      tipo: 'CONSULTA_VEICULO',
+      uf: 'CE',
+      placa: disp.placa ?? '',
+      renavam: disp.renavam ?? disp.chassi ?? null,
+      dispositivoId: disp.id,
+      origem,
+    },
+  });
+  return job.id;
+}
+
+/** Cria um job GERAR_PAGAMENTO (sob demanda). aits vazio = todas. */
+export async function criarJobPagamento(
+  disp: DispositivoConsulta,
+  aits: string[] | undefined,
+  origem: 'MANUAL_ADMIN' | 'CLIENTE',
+): Promise<string> {
+  const job = await prisma.consultaJob.create({
+    data: {
+      tipo: 'GERAR_PAGAMENTO',
+      uf: 'CE',
+      placa: disp.placa ?? '',
+      renavam: disp.renavam ?? disp.chassi ?? null,
+      dispositivoId: disp.id,
+      aits: aits && aits.length ? aits : undefined,
+      origem,
+    },
+  });
+  return job.id;
+}
+
+/** Aguarda um job terminar (CONCLUIDO/ERRO) por até timeoutMs. Retorna o job (pode estar ainda em andamento). */
+export async function aguardarJob(jobId: string, timeoutMs = 40_000) {
+  const ate = Date.now() + timeoutMs;
+  while (Date.now() < ate) {
+    const job = await prisma.consultaJob.findUnique({ where: { id: jobId } });
+    if (!job || job.status === 'CONCLUIDO' || job.status === 'ERRO') return job;
+    await _sleep(1000);
+  }
+  return prisma.consultaJob.findUnique({ where: { id: jobId } });
+}
+
+/** Detalhe de um veículo (situação + multas + pix/boleto) para as telas. */
+export async function getDetalheVeiculo(dispositivoId: string) {
+  const sit = await prisma.veiculoMultaSituacao.findUnique({
+    where: { dispositivoId },
+    include: { multas: { orderBy: { dataVencimento: 'asc' } } },
+  });
+  if (!sit) return null;
+  return {
+    dispositivoId: sit.dispositivoId,
+    placa: sit.placa,
+    renavam: sit.renavam,
+    uf: sit.uf,
+    qtdMultas: sit.qtdMultas,
+    valorTotal: Number(sit.valorTotal),
+    possuiDebitoIpva: sit.possuiDebitoIpva,
+    licenciamentoPendente: sit.licenciamentoPendente,
+    ultimaConsultaEm: sit.ultimaConsultaEm,
+    ultimaConsultaStatus: sit.ultimaConsultaStatus,
+    multas: sit.multas.map((m) => ({
+      ait: m.ait,
+      aitOriginaria: m.aitOriginaria,
+      motivo: m.motivo,
+      dataInfracao: m.dataInfracao,
+      dataVencimento: m.dataVencimento,
+      valor: Number(m.valor),
+      valorAPagar: Number(m.valorAPagar),
+    })),
+    pix: sit.pixEmv ? { emv: sit.pixEmv, qrCodeBase64: sit.pixQrCodeBase64 } : null,
+    boletoUrl: sit.boletoArquivo,
+  };
+}

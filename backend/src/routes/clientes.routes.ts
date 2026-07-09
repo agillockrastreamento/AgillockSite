@@ -3,6 +3,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { requireRoles } from '../middleware/roles.middleware';
 import prisma from '../utils/prisma';
 import { param, query } from '../utils/params';
+import { criarJobConsulta } from '../services/multas.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -269,6 +270,34 @@ router.patch('/:id/medidores-permissao', requireRoles('ADMIN', 'COLABORADOR'), a
     data: { podeEditarMedidores: !existe.podeEditarMedidores },
     select: { id: true, nome: true, podeEditarMedidores: true },
   });
+
+  res.json(cliente);
+});
+
+// PATCH /api/clientes/:id/multas-habilitado — Toggle consulta de multas (Detran) do cliente
+router.patch('/:id/multas-habilitado', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+
+  const existe = await prisma.cliente.findUnique({ where: { id }, select: { id: true, multasHabilitado: true } });
+  if (!existe) {
+    res.status(404).json({ error: 'Cliente não encontrado.' });
+    return;
+  }
+
+  const cliente = await prisma.cliente.update({
+    where: { id },
+    data: { multasHabilitado: !existe.multasHabilitado },
+    select: { id: true, nome: true, multasHabilitado: true },
+  });
+
+  // Ao habilitar, dispara uma consulta inicial (assíncrona) dos veículos elegíveis.
+  if (cliente.multasHabilitado) {
+    const disps = await prisma.dispositivo.findMany({
+      where: { clienteId: id, ativo: true, placa: { not: null }, OR: [{ renavam: { not: null } }, { chassi: { not: null } }] },
+      select: { id: true, placa: true, renavam: true, chassi: true },
+    });
+    for (const d of disps) await criarJobConsulta(d, 'MANUAL_ADMIN');
+  }
 
   res.json(cliente);
 });

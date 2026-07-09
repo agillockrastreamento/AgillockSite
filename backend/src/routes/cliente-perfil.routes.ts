@@ -70,6 +70,7 @@ router.get('/', async (req: ClienteRequest, res: Response): Promise<void> => {
             email: true,
             telefone: true,
             cpfCnpj: true,
+            multasHabilitado: true,
           }
         }
       }
@@ -112,6 +113,7 @@ router.get('/', async (req: ClienteRequest, res: Response): Promise<void> => {
       logoUrl: clienteLogin.logoUrl,
       veiculosFaturamento: faturamentoDispositivos,
       veiculosVinculados: vinculadoDispositivos,
+      multasHabilitado: cliente.multasHabilitado,
     });
   } catch (error) {
     console.error('[Perfil Cliente] Erro ao buscar perfil:', error);
