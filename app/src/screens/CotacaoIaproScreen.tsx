@@ -750,7 +750,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
   },
   modeBtnActive: { borderColor: colors.primary, backgroundColor: 'rgba(250,179,44,0.12)' },
-  modeBtnText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  // flexShrink: no iOS o Text não encolhe por padrão e vaza para fora do botão
+  modeBtnText: { flexShrink: 1, textAlign: 'center', fontSize: 12, fontWeight: '700', color: colors.textMuted },
   modeBtnTextActive: { color: '#b9791a' },
   vehicleRow: {
     flexDirection: 'row',
@@ -892,7 +893,7 @@ const styles = StyleSheet.create({
   },
   actionWeb: { backgroundColor: colors.primary },
   actionWa: { backgroundColor: '#25d366' },
-  actionText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  actionText: { flexShrink: 1, textAlign: 'center', fontSize: 14, fontWeight: '800', color: '#fff' },
   actionTextWeb: { color: colors.primaryText },
   ctaHint: { textAlign: 'center', fontSize: 12, color: colors.textSubtle, marginTop: spacing.sm },
   sectionTitle: {
@@ -926,7 +927,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
-  guaranteeText: { fontSize: 13, color: colors.text },
+  guaranteeText: { flexShrink: 1, fontSize: 13, color: colors.text },
   finalCard: {
     marginTop: spacing.xl,
     backgroundColor: colors.surfaceMuted,
