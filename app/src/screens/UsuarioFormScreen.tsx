@@ -38,7 +38,7 @@ type Usuario = {
   dispositivoIds: string[];
 };
 
-type Tela = 'rastreamento' | 'manutencao' | 'relatorio';
+type Tela = 'rastreamento' | 'manutencao' | 'relatorio' | 'multas';
 
 const PERMISSOES_POR_TELA: Record<Tela, { label: string; acoes: { key: string; label: string }[] }> = {
   rastreamento: {
@@ -70,6 +70,10 @@ const PERMISSOES_POR_TELA: Record<Tela, { label: string; acoes: { key: string; l
     label: 'Relatório',
     acoes: [{ key: 'exportar', label: 'Exportar relatórios' }],
   },
+  multas: {
+    label: 'Multas',
+    acoes: [{ key: 'pagar', label: 'Pagar multas (gerar Pix/boleto)' }],
+  },
 };
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -80,6 +84,7 @@ function permsVazias(): Record<Tela, Record<string, boolean>> {
     rastreamento: { ver: false },
     manutencao: { ver: false },
     relatorio: { ver: false },
+    multas: { ver: false },
   };
   (Object.keys(PERMISSOES_POR_TELA) as Tela[]).forEach((tela) => {
     PERMISSOES_POR_TELA[tela].acoes.forEach(({ key }) => {

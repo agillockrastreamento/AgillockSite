@@ -134,11 +134,12 @@
     document.getElementById('sidebar-toggle').addEventListener('click', function () {
       document.getElementById('sidebar').classList.toggle('collapsed');
     });
-    AL.refreshPermissoes(); // revela o item "Multas" no menu
+    // As permissões (menu + botões de pagar) são carregadas no init, antes do primeiro render.
 
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
     function cardHtml(v){
+      var podePagar = AL.isResponsavel() || AL.can('multas.pagar');
       var badges = (v.possuiDebitoIpva ? '<span class="mini-badge b-err">Débito IPVA</span> ' : '') +
                    (v.licenciamentoPendente ? '<span class="mini-badge b-err">Licenciamento pendente</span> ' : '');
       var corpo;
@@ -161,10 +162,11 @@
           '<th><input type="checkbox" class="chk-todas" data-disp="'+v.dispositivoId+'" checked></th>'+
           '<th>AIT</th><th>Motivo</th><th>Data Infração</th><th>Vencimento</th><th>Valor</th><th style="text-align:right;">A pagar</th>'+
           '</tr></thead><tbody>'+linhas+'</tbody></table></div>'+
-          '<div class="acoes-pag">'+
-            '<button class="btn btn-primary-al btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="sel"><i class="fa fa-qrcode"></i> Pagar selecionadas</button>'+
-            '<button class="btn btn-default btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="todas"><i class="fa fa-qrcode"></i> Pagar todas</button>'+
-          '</div>'+
+          (podePagar ?
+            '<div class="acoes-pag">'+
+              '<button class="btn btn-primary-al btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="sel"><i class="fa fa-qrcode"></i> Pagar selecionadas</button>'+
+              '<button class="btn btn-default btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="todas"><i class="fa fa-qrcode"></i> Pagar todas</button>'+
+            '</div>' : '')+
           '<div class="pag-result" id="pag-'+v.dispositivoId+'"></div>';
       }
       return '<div class="veic-card">'+
@@ -280,7 +282,8 @@
         document.getElementById('lista-veiculos').innerHTML = '<p style="color:#b71c1c;text-align:center;padding:20px;">'+esc(err.message)+'</p>';
       });
     }
-    load();
+    // Carrega permissões (revela o menu + define podePagar) e então renderiza.
+    AL.refreshPermissoes().finally(load);
   })();
   </script>
 </body>

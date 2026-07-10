@@ -322,7 +322,7 @@ function ClienteDrawer() {
           options={{ title: 'Pagamentos' }}
         />
       ) : null}
-      {me?.multasHabilitado ? (
+      {me?.multasHabilitado && (responsavel || can('multas.ver')) ? (
         <Drawer.Screen name="Multas" component={MultasScreen} options={{ title: 'Multas' }} />
       ) : null}
       {responsavel && me?.dispositivosHabilitado ? (

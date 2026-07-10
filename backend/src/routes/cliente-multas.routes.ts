@@ -1,7 +1,7 @@
 // Rotas de multas do portal/app do cliente. Montadas em /api/cliente/multas.
 // Disponível apenas se o cliente tiver multasHabilitado = true.
 import { Router, Response, NextFunction } from 'express';
-import { clienteAuthMiddleware, podeAcessarDispositivo, ClienteRequest } from '../middleware/cliente-auth.middleware';
+import { clienteAuthMiddleware, podeAcessarDispositivo, requirePermission, ClienteRequest } from '../middleware/cliente-auth.middleware';
 import prisma from '../utils/prisma';
 import { criarJobPagamento, aguardarJob } from '../services/multas.service';
 
@@ -23,7 +23,8 @@ async function requireMultasHabilitado(req: ClienteRequest, res: Response, next:
 router.use(requireMultasHabilitado);
 
 // ─── GET /api/cliente/multas — situação de multas dos veículos do cliente ────
-router.get('/', async (req: ClienteRequest, res: Response): Promise<void> => {
+// Sub-usuário precisa da permissão multas.ver (responsável sempre passa).
+router.get('/', requirePermission('multas.ver'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const clienteId = req.cliente!.clienteId;
   const sits = await prisma.veiculoMultaSituacao.findMany({
     where: { clienteId },
@@ -68,7 +69,7 @@ router.get('/', async (req: ClienteRequest, res: Response): Promise<void> => {
 
 // ─── POST /api/cliente/multas/:dispositivoId/pagamento — gera Pix/boleto ─────
 // Body: { aits?: string[] } (vazio/omitido = todas). Regenera com valor atual (worker).
-router.post('/:dispositivoId/pagamento', async (req: ClienteRequest, res: Response): Promise<void> => {
+router.post('/:dispositivoId/pagamento', requirePermission('multas.pagar'), async (req: ClienteRequest, res: Response): Promise<void> => {
   const dispositivoId = String(req.params.dispositivoId);
   if (!podeAcessarDispositivo(req, dispositivoId)) {
     res.status(403).json({ error: 'Sem acesso a este veículo.' });

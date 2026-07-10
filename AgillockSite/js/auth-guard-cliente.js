@@ -35,7 +35,8 @@
       ver: true, criar: true, editar: true, excluir: true,
       criarRecorrencia: true, editarRecorrencia: true, marcarFeita: true
     },
-    relatorio: { ver: true, exportar: true }
+    relatorio: { ver: true, exportar: true },
+    multas: { ver: true, pagar: true }
   };
 
   // Permissões vazias (vinculado sem dados carregados). Default seguro: nada visível
@@ -52,7 +53,8 @@
       ver: false, criar: false, editar: false, excluir: false,
       criarRecorrencia: false, editarRecorrencia: false, marcarFeita: false
     },
-    relatorio: { ver: false, exportar: false }
+    relatorio: { ver: false, exportar: false },
+    multas: { ver: false, pagar: false }
   };
 
   // ─── Token ────────────────────────────────────────────────────────────────
@@ -141,7 +143,7 @@
       'notificacoes.html': function () { return responsavel; },
       'pagamentos.html':   function () { return responsavel; },
       'usuarios.html':     function () { return responsavel; },
-      'multas.html':       function () { var me = _cachedMe(); return !!(me && me.multasHabilitado); },
+      'multas.html':       function () { var me = _cachedMe(); return !!(me && me.multasHabilitado) && (responsavel || can('multas.ver')); },
       'dispositivos.html': function () { var me = _cachedMe(); return responsavel && !!(me && me.dispositivosHabilitado); },
     };
     nav.querySelectorAll('li').forEach(function (li) {

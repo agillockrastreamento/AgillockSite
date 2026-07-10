@@ -30,16 +30,23 @@ export type PermissoesRelatorio = {
   exportar: boolean;
 };
 
+export type PermissoesMultas = {
+  ver: boolean;
+  pagar: boolean;
+};
+
 export type PermissoesCliente = {
   rastreamento: PermissoesRastreamento;
   manutencao: PermissoesManutencao;
   relatorio: PermissoesRelatorio;
+  multas: PermissoesMultas;
 };
 
 export type PermKey =
   | `rastreamento.${keyof PermissoesRastreamento}`
   | `manutencao.${keyof PermissoesManutencao}`
-  | `relatorio.${keyof PermissoesRelatorio}`;
+  | `relatorio.${keyof PermissoesRelatorio}`
+  | `multas.${keyof PermissoesMultas}`;
 
 export type MePermissoes = {
   tipo: 'responsavel' | 'vinculado';
@@ -66,6 +73,7 @@ export function permissoesTotais(): PermissoesCliente {
       criarRecorrencia: true, editarRecorrencia: true, marcarFeita: true,
     },
     relatorio: { ver: true, exportar: true },
+    multas: { ver: true, pagar: true },
   };
 }
 

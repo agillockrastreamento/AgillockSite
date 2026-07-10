@@ -34,16 +34,23 @@ export interface PermissoesRelatorio {
   exportar: boolean;
 }
 
+export interface PermissoesMultas {
+  ver: boolean;
+  pagar: boolean;
+}
+
 export interface PermissoesCliente {
   rastreamento: PermissoesRastreamento;
   manutencao: PermissoesManutencao;
   relatorio: PermissoesRelatorio;
+  multas: PermissoesMultas;
 }
 
 export type PermKey =
   | `rastreamento.${keyof PermissoesRastreamento}`
   | `manutencao.${keyof PermissoesManutencao}`
-  | `relatorio.${keyof PermissoesRelatorio}`;
+  | `relatorio.${keyof PermissoesRelatorio}`
+  | `multas.${keyof PermissoesMultas}`;
 
 export function permissoesVazias(): PermissoesCliente {
   return {
@@ -59,6 +66,7 @@ export function permissoesVazias(): PermissoesCliente {
       criarRecorrencia: false, editarRecorrencia: false, marcarFeita: false,
     },
     relatorio: { ver: false, exportar: false },
+    multas: { ver: false, pagar: false },
   };
 }
 
@@ -76,6 +84,7 @@ export function permissoesTotais(): PermissoesCliente {
       criarRecorrencia: true, editarRecorrencia: true, marcarFeita: true,
     },
     relatorio: { ver: true, exportar: true },
+    multas: { ver: true, pagar: true },
   };
 }
 
@@ -85,7 +94,7 @@ export function normalizarPermissoes(input: unknown): PermissoesCliente {
   if (!input || typeof input !== 'object') return base as unknown as PermissoesCliente;
   const src = input as Record<string, Record<string, unknown>>;
 
-  for (const tela of ['rastreamento', 'manutencao', 'relatorio'] as const) {
+  for (const tela of ['rastreamento', 'manutencao', 'relatorio', 'multas'] as const) {
     const grupo = src[tela];
     if (!grupo || typeof grupo !== 'object') continue;
     for (const acao of Object.keys(base[tela])) {

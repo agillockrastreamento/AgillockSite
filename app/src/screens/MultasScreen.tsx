@@ -22,6 +22,7 @@ import { environment } from '../config/environment';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
+import { useAuth } from '../auth/AuthProvider';
 
 type Multa = {
   ait: string;
@@ -54,6 +55,8 @@ function fmtMoney(n: number) {
 
 export function MultasScreen() {
   const toast = useToast();
+  const { me, can } = useAuth();
+  const podePagar = me?.tipo === 'responsavel' || can('multas.pagar');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -289,18 +292,20 @@ export function MultasScreen() {
                       );
                     })}
 
-                    <View style={styles.acoes}>
-                      <Pressable style={[styles.btn, styles.btnPri]} disabled={gerando} onPress={() => pagar('sel')}>
-                        {gerando ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <Text style={styles.btnPriTxt}>Pagar selecionadas</Text>
-                        )}
-                      </Pressable>
-                      <Pressable style={[styles.btn, styles.btnSec]} disabled={gerando} onPress={() => pagar('todas')}>
-                        <Text style={styles.btnSecTxt}>Pagar todas</Text>
-                      </Pressable>
-                    </View>
+                    {podePagar ? (
+                      <View style={styles.acoes}>
+                        <Pressable style={[styles.btn, styles.btnPri]} disabled={gerando} onPress={() => pagar('sel')}>
+                          {gerando ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <Text style={styles.btnPriTxt}>Pagar selecionadas</Text>
+                          )}
+                        </Pressable>
+                        <Pressable style={[styles.btn, styles.btnSec]} disabled={gerando} onPress={() => pagar('todas')}>
+                          <Text style={styles.btnSecTxt}>Pagar todas</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
 
                     {pagamento && pagamento.pagamento ? (
                       <View style={styles.pixBox}>

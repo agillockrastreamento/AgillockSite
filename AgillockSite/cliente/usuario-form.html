@@ -511,6 +511,24 @@
               </div>
             </div>
           </div>
+
+          <!-- Multas -->
+          <div class="uf-perm-group">
+            <label class="uf-perm-group-header" for="perm-multas-ver">
+              <div class="uf-perm-group-icon"><i class="fa fa-gavel"></i></div>
+              <span class="uf-perm-group-title">Multas</span>
+              <label class="uf-switch" onclick="event.stopPropagation();">
+                <input type="checkbox" id="perm-multas-ver" data-tela="multas" data-acao="ver" />
+                <span class="uf-switch-slider"></span>
+              </label>
+            </label>
+            <div class="uf-perm-children" data-tela="multas">
+              <div class="uf-toggle-row">
+                <div style="flex:1;"><span class="uf-toggle-label">Pagar multas (gerar Pix/boleto)</span></div>
+                <label class="uf-switch"><input type="checkbox" data-tela="multas" data-acao="pagar" /><span class="uf-switch-slider"></span></label>
+              </div>
+            </div>
+          </div>
         </div>
       </form>
     </div>
@@ -678,7 +696,7 @@
           if (!permissoes[tela]) permissoes[tela] = {};
           permissoes[tela][acao] = c.checked;
         });
-        ['rastreamento', 'manutencao', 'relatorio'].forEach(function (tela) {
+        ['rastreamento', 'manutencao', 'relatorio', 'multas'].forEach(function (tela) {
           if (!permissoes[tela].ver) {
             Object.keys(permissoes[tela]).forEach(function (acao) {
               if (acao !== 'ver') permissoes[tela][acao] = false;
