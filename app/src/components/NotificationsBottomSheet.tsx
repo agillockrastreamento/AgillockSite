@@ -37,6 +37,9 @@ const EVENTO_TYPES = [
   { tipo: 'boletoVencendoHoje', label: 'Boleto Vence Hoje', color: '#f1c40f', icon: 'cash-clock' },
   { tipo: 'boletoAtrasado', label: 'Boleto em Atraso', color: '#e74c3c', icon: 'cash-remove' },
   { tipo: 'pagamentoRecebido', label: 'Pagamento Recebido', color: '#27ae60', icon: 'cash-check' },
+  { tipo: 'multaNova', label: 'Nova Multa', color: '#e74c3c', icon: 'gavel' },
+  { tipo: 'multaVencimento7dias', label: 'Multa a Vencer (7 dias)', color: '#e67e22', icon: 'gavel' },
+  { tipo: 'multaVencimentoHoje', label: 'Multa Vence Hoje', color: '#e74c3c', icon: 'gavel' },
 ];
 
 type PeriodFilter = 'hoje' | 'ontem' | '7dias' | 'custom';

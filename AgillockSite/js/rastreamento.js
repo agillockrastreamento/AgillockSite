@@ -343,6 +343,8 @@ const TIPOS_EVENTO_ADMIN = [
   { tipo: 'recorrenciaDataAlerta',   label: 'Alerta de Recorrência Data',  css: 'tipo-fuel'      },
   { tipo: 'recorrenciaDataNaoFeita', label: 'Recorrência Data Atrasada',   css: 'tipo-overspeed' },
   { tipo: 'recorrenciaDataFeita',    label: 'Recorrência Data Realizada',  css: 'tipo-ignition'  },
+  { tipo: 'consultaMultasConcluida', label: 'Consulta de Multas (Detran)',  css: 'tipo-geofence'  },
+  { tipo: 'consultaMultasErro',      label: 'Falha na Consulta de Multas',  css: 'tipo-alarm'     },
 ];
 const TIPOS_EVENTO_ADMIN_FILTRO = TIPOS_EVENTO_ADMIN
   .filter(t => t.tipo !== 'manutencao')
@@ -486,6 +488,8 @@ function _adminTemPrefsConfiguradas() {
 function _eventoPermitidoParaAdmin(evt) {
   if (!evt) return true;
   if (evt.adminEvento === false) return false;
+  // Resumo da consulta de multas (10h/17h) sempre aparece, sem depender de preferência (espelha o backend).
+  if (evt.origemTipo === 'consultaMultas') return true;
   if (!_adminTemPrefsConfiguradas()) return true;
   return _adminNotifPrefs[_tipoPreferenciaAdmin(evt.tipo)] === true;
 }
@@ -831,6 +835,8 @@ function renderEventosLista() {
       case 'veiculoMovimento': return { color: '#27ae60', icon: 'fa-location-arrow' };
       case 'motorOcioso': return { color: '#e67e22', icon: 'fa-hourglass-half' };
       case 'semAtualizacao': return { color: '#e74c3c', icon: 'fa-wifi' };
+      case 'consultaMultasConcluida': return { color: '#2980b9', icon: 'fa-gavel' };
+      case 'consultaMultasErro': return { color: '#e74c3c', icon: 'fa-gavel' };
       default: return { color: '#2980b9', icon: 'fa-bell' };
     }
   };
@@ -847,7 +853,7 @@ function renderEventosLista() {
     const style = getEventoStyle(e.tipo);
     const tempo = fmtTempoDecorrido(e.serverTime);
     const v = veiculosMap[e.dispositivoId];
-    const nomeDev = v ? v.nome : (e.dispositivoId || '—');
+    const nomeDev = v ? v.nome : (e.origemTipo === 'consultaMultas' ? 'Consulta de Multas' : (e.dispositivoId || '—'));
     const placaDev = v?.placa ? `(${v.placa})` : '';
     const textoMensagem = e.mensagem || e.tipoLabel || e.tipo;
 
