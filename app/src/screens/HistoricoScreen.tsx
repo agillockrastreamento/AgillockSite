@@ -18,6 +18,7 @@ import { radius, spacing } from '../theme/layout';
 import type { RootStackParamList } from '../navigation/routes';
 import { IDLE_ALERT_LIMIT_MIN, useIdleAlertBitmap } from '../reporting/idleAlert';
 import type { OciosoSegmento } from '../reporting/reportTypes';
+import { IconMarker } from '../tracking/IconMarker';
 
 type RouteProps = NativeStackScreenProps<RootStackParamList, 'Historico'>['route'];
 
@@ -160,11 +161,14 @@ export function HistoricoScreen() {
         provider={PROVIDER_GOOGLE}
         initialRegion={DEFAULT_REGION}
       >
+        {/* zIndex explícito: sem ele o iOS pode desenhar o rastro do período
+            por cima do traçado da viagem, escondendo a cor de destaque. */}
         {positions.length > 1 && (
           <Polyline
             coordinates={positions}
             strokeWidth={3}
             strokeColor="rgba(41,128,185,0.4)"
+            zIndex={1}
           />
         )}
         {tripPositions.length > 1 && (
@@ -172,26 +176,43 @@ export function HistoricoScreen() {
             coordinates={tripPositions}
             strokeWidth={4}
             strokeColor="rgba(230,126,34,0.9)"
+            zIndex={2}
           />
         )}
         {tripPositions.length > 0 ? (
           <>
-            <Marker coordinate={tripPositions[0]} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <IconMarker
+              signature={`trip-start-${tripPositions[0].latitude},${tripPositions[0].longitude}`}
+              coordinate={tripPositions[0]}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
               <View style={styles.tripStartDot} />
-            </Marker>
-            <Marker coordinate={tripPositions[tripPositions.length - 1]} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            </IconMarker>
+            <IconMarker
+              signature={`trip-end-${tripPositions[tripPositions.length - 1].latitude},${tripPositions[tripPositions.length - 1].longitude}`}
+              coordinate={tripPositions[tripPositions.length - 1]}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
               <View style={styles.tripEndDot} />
-            </Marker>
+            </IconMarker>
           </>
         ) : null}
         {positions.length > 0 && tripPositions.length === 0 && (
           <>
-            <Marker coordinate={positions[0]} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <IconMarker
+              signature={`start-${positions[0].latitude},${positions[0].longitude}`}
+              coordinate={positions[0]}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
               <View style={styles.startDot} />
-            </Marker>
-            <Marker coordinate={positions[positions.length - 1]} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            </IconMarker>
+            <IconMarker
+              signature={`end-${positions[positions.length - 1].latitude},${positions[positions.length - 1].longitude}`}
+              coordinate={positions[positions.length - 1]}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
               <View style={styles.endDot} />
-            </Marker>
+            </IconMarker>
           </>
         )}
         {ociosos.map((o, i) => (
