@@ -164,8 +164,9 @@
           '</tr></thead><tbody>'+linhas+'</tbody></table></div>'+
           (podePagar ?
             '<div class="acoes-pag">'+
-              '<button class="btn btn-primary-al btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="sel"><i class="fa fa-qrcode"></i> Pagar selecionadas</button>'+
-              '<button class="btn btn-default btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="todas"><i class="fa fa-qrcode"></i> Pagar todas</button>'+
+              '<button class="btn btn-primary-al btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="sel"><i class="fa fa-qrcode"></i> Pagar selecionada(s)</button>'+
+              (v.multas.length > 1 ?
+                '<button class="btn btn-default btn-pagar" data-disp="'+v.dispositivoId+'" data-modo="todas"><i class="fa fa-qrcode"></i> Pagar todas</button>' : '')+
             '</div>' : '')+
           '<div class="pag-result" id="pag-'+v.dispositivoId+'"></div>';
       }

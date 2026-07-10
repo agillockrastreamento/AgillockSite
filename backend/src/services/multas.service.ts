@@ -358,8 +358,27 @@ async function notificarConsultaCliente(
   if (!login) return;
   const hoje = inicioDiaBrasil();
 
-  // Multa nova: só a partir da 2ª consulta, para não estourar notificações ao habilitar o cliente.
-  if (!primeiraConsulta) {
+  if (primeiraConsulta) {
+    // 1ª consulta (logo após habilitar): uma notificação consolidada por veículo
+    // informando quantas multas já existem — sem tratar cada uma como "nova".
+    const todas = r.multas ?? [];
+    if (todas.length) {
+      const qtd = todas.length;
+      await notificarClienteMulta(
+        login.id,
+        dispositivoId,
+        todas.map((m) => m.ait),
+        'multaNova',
+        hoje,
+        {
+          title: 'Multas encontradas',
+          body: `${qtd} multa${qtd > 1 ? 's' : ''} encontrada${qtd > 1 ? 's' : ''} para ${r.placa}.`,
+          mensagem: `${qtd} multa${qtd > 1 ? 's' : ''} encontrada${qtd > 1 ? 's' : ''} para ${r.placa} (Detran).`,
+        },
+      );
+    }
+  } else {
+    // A partir da 2ª consulta: notifica apenas AITs que ainda não existiam.
     const novas = (r.multas ?? []).filter((m) => !aitsAntigos.has(m.ait));
     if (novas.length) {
       const qtd = novas.length;

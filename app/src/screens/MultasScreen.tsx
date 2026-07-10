@@ -298,12 +298,14 @@ export function MultasScreen() {
                           {gerando ? (
                             <ActivityIndicator color="#fff" size="small" />
                           ) : (
-                            <Text style={styles.btnPriTxt}>Pagar selecionadas</Text>
+                            <Text style={styles.btnPriTxt}>Pagar selecionada(s)</Text>
                           )}
                         </Pressable>
-                        <Pressable style={[styles.btn, styles.btnSec]} disabled={gerando} onPress={() => pagar('todas')}>
-                          <Text style={styles.btnSecTxt}>Pagar todas</Text>
-                        </Pressable>
+                        {veiculo.multas.length > 1 ? (
+                          <Pressable style={[styles.btn, styles.btnSec]} disabled={gerando} onPress={() => pagar('todas')}>
+                            <Text style={styles.btnSecTxt}>Pagar todas</Text>
+                          </Pressable>
+                        ) : null}
                       </View>
                     ) : null}
 
