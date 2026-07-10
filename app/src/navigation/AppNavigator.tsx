@@ -310,11 +310,13 @@ function ClienteDrawer() {
           options={{ title: 'Manutenção' }}
         />
       ) : null}
-      <Drawer.Screen
-        name="CotacaoIapro"
-        component={CotacaoIaproScreen}
-        options={{ title: 'Cotação Proteção Veicular' }}
-      />
+      {responsavel ? (
+        <Drawer.Screen
+          name="CotacaoIapro"
+          component={CotacaoIaproScreen}
+          options={{ title: 'Cotação Proteção Veicular' }}
+        />
+      ) : null}
       {responsavel && canAccessPayments ? (
         <Drawer.Screen
           name="Pagamentos"

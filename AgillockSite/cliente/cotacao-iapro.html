@@ -350,7 +350,7 @@
   <script src="../js/auth-guard-cliente.js"></script>
   <script>
     (function () {
-      var user = AL_CLIENTE.requireAuth();
+      var user = AL_CLIENTE.requireAuth(['responsavel']);
       if (!user) return;
 
       document.getElementById('user-nome').textContent = user.nome || '—';

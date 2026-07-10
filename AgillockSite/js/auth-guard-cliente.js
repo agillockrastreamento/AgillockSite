@@ -140,6 +140,7 @@
       'manutencoes.html':  function () { return responsavel || can('manutencao.ver'); },
       'relatorio.html':    function () { return responsavel || can('relatorio.ver'); },
       'geocercas.html':    function () { return responsavel || can('rastreamento.verCerca'); },
+      'cotacao-iapro.html':function () { return responsavel; },
       'notificacoes.html': function () { return responsavel; },
       'pagamentos.html':   function () { return responsavel; },
       'usuarios.html':     function () { return responsavel; },
