@@ -15,6 +15,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
+import { fetch as expoFetch } from 'expo/fetch';
 import * as Sharing from 'expo-sharing';
 import MapView, { AnimatedRegion, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
@@ -1008,7 +1009,7 @@ function ExportModal({
   const [formato, setFormato] = useState<ExportFormato>('xlsx');
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+      <Pressable style={styles.exportBackdrop} onPress={onClose}>
         <Pressable style={styles.exportCard}>
           <Text style={styles.exportTitle}>Exportar Relatório</Text>
 
@@ -1210,18 +1211,25 @@ export function ReportScreen() {
         : calcularIntervalo(periodo);
       const { url, token } = await getExportUrl(selectedDevice.dispositivoId, from, to, tipo, formato);
 
-      // Baixa para um arquivo com a extensão correta (importante p/ iOS abrir/compartilhar)
+      // Baixa para um arquivo com a extensão correta (importante p/ iOS abrir/compartilhar).
+      // Não usar FileSystem.downloadFileAsync: o OkHttp dele tem read timeout de 10s e o
+      // servidor leva mais que isso para gerar o PDF/XLSX (SocketTimeoutException).
       const ehPdf = formato === 'pdf';
       const nomeArquivo = `relatorio_${Date.now()}.${ehPdf ? 'pdf' : 'xlsx'}`;
+
+      const resposta = await expoFetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!resposta.ok) {
+        throw new Error(`Não foi possível gerar o relatório (erro ${resposta.status}).`);
+      }
+      const conteudo = await resposta.bytes();
+
       const destino = new FileSystem.File(FileSystem.Paths.cache, nomeArquivo);
       if (destino.exists) destino.delete();
-      const downloaded = await FileSystem.File.downloadFileAsync(url, destino, {
-        headers: { Authorization: `Bearer ${token}` },
-        idempotent: true,
-      });
+      destino.create();
+      destino.write(conteudo);
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloaded.uri, {
+        await Sharing.shareAsync(destino.uri, {
           mimeType: ehPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           dialogTitle: 'Salvar relatório',
           UTI: ehPdf ? 'com.adobe.pdf' : 'com.microsoft.excel.xlsx',
@@ -1981,6 +1989,11 @@ const styles = StyleSheet.create({
   },
 
   // Export modal
+  exportBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+  },
   exportCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,

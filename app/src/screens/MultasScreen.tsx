@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Icon } from 'react-native-paper';
 import * as FileSystem from 'expo-file-system';
+import { fetch as expoFetch } from 'expo/fetch';
 import * as Sharing from 'expo-sharing';
 
 import { apiRequest } from '../services/api/apiClient';
@@ -141,11 +142,21 @@ export function MultasScreen() {
       const base = environment.apiUrl.replace(/\/api\/?$/, '');
       const url = base + boletoUrl;
       const nome = `boleto_multa_${Date.now()}.pdf`;
+
+      // Não usar FileSystem.downloadFileAsync: o OkHttp dele tem read timeout de 10s.
+      const resposta = await expoFetch(url);
+      if (!resposta.ok) {
+        throw new Error(`Não foi possível baixar o boleto (erro ${resposta.status}).`);
+      }
+      const conteudo = await resposta.bytes();
+
       const destino = new FileSystem.File(FileSystem.Paths.cache, nome);
       if (destino.exists) destino.delete();
-      const dl = await FileSystem.File.downloadFileAsync(url, destino, { idempotent: true });
+      destino.create();
+      destino.write(conteudo);
+
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(dl.uri, { mimeType: 'application/pdf', dialogTitle: 'Boleto da multa', UTI: 'com.adobe.pdf' });
+        await Sharing.shareAsync(destino.uri, { mimeType: 'application/pdf', dialogTitle: 'Boleto da multa', UTI: 'com.adobe.pdf' });
       } else {
         toast.show({ message: 'Compartilhamento não disponível neste dispositivo.', type: 'info' });
       }
