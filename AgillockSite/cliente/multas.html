@@ -120,7 +120,6 @@
     <div id="scroll-area">
       <div class="aviso"><i class="fa fa-info-circle"></i> As multas são consultadas diretamente no <b>Detran</b>. A atualização é automática <b>2 vezes ao dia, às 10h e às 17h</b>. O boleto/Pix é gerado com o valor atualizado no momento do pagamento.</div>
       <div id="aviso-incompletos" class="aviso-warn" style="display:none;"></div>
-      <div id="aviso-aguardando" class="aviso" style="display:none;"></div>
       <div id="lista-veiculos"><p style="color:#888;text-align:center;padding:20px;">Carregando…</p></div>
     </div>
   </div>
@@ -348,16 +347,11 @@
         if (btn) btn.onclick = function(){ abrirModalDoc(incompletos[0].dispositivoId); };
       }
 
-      var aguardando = d.aguardando || [];
-      var elAg = document.getElementById('aviso-aguardando');
-      if (!aguardando.length){
-        elAg.style.display = 'none';
-      } else {
-        elAg.innerHTML = '<i class="fa fa-clock-o"></i> Consultando o Detran para '+
-          aguardando.map(function(v){ return '<b>'+esc(v.placa)+'</b>'; }).join(', ')+
-          '. O resultado aparece assim que a consulta terminar.';
-        elAg.style.display = '';
-        if (pollsRestantes > 0){ pollsRestantes--; setTimeout(load, 15000); }
+      // Veículo já com documento mas sem a 1ª consulta: recarrega em silêncio
+      // até o resultado chegar (sem aviso na tela).
+      if ((d.aguardando || []).length && pollsRestantes > 0){
+        pollsRestantes--;
+        setTimeout(load, 15000);
       }
     }
 

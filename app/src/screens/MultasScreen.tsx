@@ -313,16 +313,6 @@ export function MultasScreen() {
           </View>
         ) : null}
 
-        {aguardando.length > 0 ? (
-          <View style={styles.bannerInfo}>
-            <Icon source="clock-outline" size={16} color={colors.textMuted} />
-            <Text style={styles.bannerInfoTxt}>
-              Consultando o Detran para {aguardando.map((v) => v.placa).join(', ')}. O resultado aparece assim que a
-              consulta terminar.
-            </Text>
-          </View>
-        ) : null}
-
         {veiculos.length === 0 ? (
           incompletos.length === 0 && aguardando.length === 0 ? (
             <Text style={styles.vazio}>Nenhum veículo disponível.</Text>
@@ -643,16 +633,6 @@ const styles = StyleSheet.create({
   bannerTxt: { color: '#8a5300', fontSize: 12.5, lineHeight: 18 },
   bannerForte: { fontWeight: '700' },
   bannerBtn: { alignSelf: 'flex-start', marginTop: 10 },
-  bannerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  bannerInfoTxt: { flex: 1, color: colors.textMuted, fontSize: 12.5, lineHeight: 18 },
 
   docAjuda: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18, marginBottom: 12 },
   docLabel: { color: colors.text, fontWeight: '600', fontSize: 13, marginBottom: 6 },

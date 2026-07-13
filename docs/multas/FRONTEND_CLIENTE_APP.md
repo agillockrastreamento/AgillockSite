@@ -47,7 +47,7 @@ O Detran identifica o veículo por placa + renavam (ou chassi). Veículos sem es
 - **Banner âmbar** (`incompletos` do `GET /api/cliente/multas`): "N veículo(s) sem RENAVAM/chassi no cadastro: PLACA1, PLACA2…" + botão **"Preencher agora"** — o botão aparece conforme `podeEditarDocumentos`, que reflete a permissão granular **`multas.editarDocumentos`** (responsável sempre tem; sub-usuário depende do toggle "Preencher RENAVAM / chassi do veículo" no formulário de usuários). Sem a permissão, o banner orienta a pedir ao responsável da conta.
 - **Modal "Completar dados do veículo"**: seletor de veículo (quando há mais de um incompleto), campo RENAVAM (9–11 dígitos) e chassi (17 caracteres, opcional) → `PATCH /api/cliente/multas/:dispositivoId/documentos`.
 - Salvar **atualiza o cadastro do dispositivo** (`Dispositivo.renavam` / `Dispositivo.chassi`) e **enfileira a consulta** ao Detran na hora.
-- Enquanto a consulta roda, o veículo entra em `aguardando` e a tela mostra um aviso "Consultando o Detran para PLACA…", recarregando sozinha (poll de 15s, até 8 tentativas) até a situação aparecer.
+- Enquanto a consulta roda, o veículo entra em `aguardando` (campo do `GET`) e a tela **recarrega sozinha em silêncio** (poll de 15s, até 8 tentativas) até a situação aparecer — sem aviso de "consultando" na tela.
 
 ## Estados de UI
 - **Carregando:** skeleton/spinner.
