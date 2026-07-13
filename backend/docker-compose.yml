@@ -65,7 +65,7 @@ services:
       - SGT_PORT=5058
       - MAXTRACK_PORT=5087
       - POSITRON_PORT=5207
-      - MOBWI_PORT=5216
+      - MOBILOGIX_PORT=5216
       - OSMAND_PORT=5055
       - TIME_ZONE=America/Sao_Paulo
       - FILTER_ENABLE=true
