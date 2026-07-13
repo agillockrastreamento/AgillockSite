@@ -50,6 +50,7 @@ services:
       - "5058:5058"   # Protocolo SGT — exposto publicamente para os dispositivos GPS
       - "5087:5087"   # Protocolo Maxtrack — exposto publicamente para os dispositivos GPS
       - "5207:5207"   # Protocolo Positron — exposto publicamente para os dispositivos GPS
+      - "5216:5216"   # Protocolo Mobilogix — exposto publicamente para os dispositivos GPS
       # Porta 8082 NÃO exposta — backend acessa via rede interna Docker
     environment:
       - CONFIG_USE_ENVIRONMENT_VARIABLES=true
@@ -64,6 +65,7 @@ services:
       - SGT_PORT=5058
       - MAXTRACK_PORT=5087
       - POSITRON_PORT=5207
+      - MOBWI_PORT=5216
       - OSMAND_PORT=5055
       - TIME_ZONE=America/Sao_Paulo
       - FILTER_ENABLE=true
