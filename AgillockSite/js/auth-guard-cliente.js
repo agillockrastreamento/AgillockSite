@@ -36,7 +36,7 @@
       criarRecorrencia: true, editarRecorrencia: true, marcarFeita: true
     },
     relatorio: { ver: true, exportar: true },
-    multas: { ver: true, pagar: true }
+    multas: { ver: true, pagar: true, editarDocumentos: true }
   };
 
   // Permissões vazias (vinculado sem dados carregados). Default seguro: nada visível
@@ -54,7 +54,7 @@
       criarRecorrencia: false, editarRecorrencia: false, marcarFeita: false
     },
     relatorio: { ver: false, exportar: false },
-    multas: { ver: false, pagar: false }
+    multas: { ver: false, pagar: false, editarDocumentos: false }
   };
 
   // ─── Token ────────────────────────────────────────────────────────────────

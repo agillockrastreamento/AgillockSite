@@ -96,6 +96,9 @@ Situação de multas de **todos os veículos do cliente logado**.
 {
   "habilitado": true,
   "atualizadoEm": "2026-06-26T13:00:05-03:00",
+  "podeEditarDocumentos": true,
+  "incompletos": [{ "dispositivoId": "...", "placa": "ABC1D23", "apelido": "Fiorino" }],
+  "aguardando":  [{ "dispositivoId": "...", "placa": "XYZ4E56", "apelido": null }],
   "veiculos": [{
     "dispositivoId": "...", "placa": "OSU6H88", "apelido": "...",
     "qtdMultas": 2, "valorTotal": 267.12,
@@ -104,6 +107,17 @@ Situação de multas de **todos os veículos do cliente logado**.
   }]
 }
 ```
+- `incompletos` — veículos ativos com placa mas **sem renavam e sem chassi** (o Detran não consegue identificá-los). Alimentam o banner de "completar cadastro".
+- `aguardando` — veículos já com renavam/chassi mas **sem a 1ª consulta** ainda (job na fila do worker).
+- `podeEditarDocumentos` — reflete a permissão `multas.editarDocumentos` (responsável sempre `true`). Sem ela, o sub-usuário vê o banner, mas sem o botão.
+
+### `PATCH /api/cliente/multas/:dispositivoId/documentos`
+Grava renavam e/ou chassi no **cadastro do dispositivo** (é de lá que a consulta lê os dados) e enfileira a 1ª consulta (`ConsultaJob` com `origem="CLIENTE"`).
+
+- Exige a permissão **`multas.editarDocumentos`** (`requirePermission`) e que o dispositivo seja do próprio cliente.
+- Body: `{ "renavam": "12345678901", "chassi": "9BWZZZ377VT004251" }` — ao menos um dos dois.
+- Validação: renavam 9–11 dígitos; chassi 17 caracteres `[A-HJ-NPR-Z0-9]` (sem I, O, Q).
+- Resposta: `{ "id": "...", "dispositivoId": "...", "placa": "...", "renavam": "...", "chassi": "...", "consultaEnfileirada": true }`.
 
 ### `POST /api/cliente/multas/:dispositivoId/pagamento`
 Igual ao admin: gera Pix + boleto para `{ aits: [...] }` (vazio = todas). Valida que o dispositivo pertence ao cliente.

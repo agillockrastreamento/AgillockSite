@@ -72,7 +72,10 @@ const PERMISSOES_POR_TELA: Record<Tela, { label: string; acoes: { key: string; l
   },
   multas: {
     label: 'Multas',
-    acoes: [{ key: 'pagar', label: 'Pagar multas (gerar Pix/boleto)' }],
+    acoes: [
+      { key: 'pagar', label: 'Pagar multas (gerar Pix/boleto)' },
+      { key: 'editarDocumentos', label: 'Preencher RENAVAM / chassi do veículo' },
+    ],
   },
 };
 

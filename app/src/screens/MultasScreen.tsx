@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -46,7 +46,16 @@ type Veiculo = {
   pix: Pix;
   boletoUrl: string | null;
 };
-type MultasResp = { habilitado: boolean; atualizadoEm: string | null; veiculos: Veiculo[] };
+/** Veículo do cadastro (sem situação de multas ainda): banner de renavam/chassi e "aguardando". */
+type VeiculoSimples = { dispositivoId: string; placa: string; apelido: string | null };
+type MultasResp = {
+  habilitado: boolean;
+  atualizadoEm: string | null;
+  podeEditarDocumentos: boolean;
+  incompletos: VeiculoSimples[];
+  aguardando: VeiculoSimples[];
+  veiculos: Veiculo[];
+};
 type PagamentoResp = { pagamento: { emv: string; qrCodeBase64: string | null } | null; boletoUrl: string | null };
 
 function fmtMoney(n: number) {
@@ -70,12 +79,27 @@ export function MultasScreen() {
   const [pagamento, setPagamento] = useState<PagamentoResp | null>(null);
   const [baixando, setBaixando] = useState(false);
 
+  // Veículos sem renavam/chassi (não consultáveis no Detran) + preenchimento
+  const [incompletos, setIncompletos] = useState<VeiculoSimples[]>([]);
+  const [aguardando, setAguardando] = useState<VeiculoSimples[]>([]);
+  const [podeEditarDocumentos, setPodeEditarDocumentos] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
+  const [docDispId, setDocDispId] = useState<string | null>(null);
+  const [docRenavam, setDocRenavam] = useState('');
+  const [docChassi, setDocChassi] = useState('');
+  const [docErro, setDocErro] = useState<string | null>(null);
+  const [salvandoDoc, setSalvandoDoc] = useState(false);
+  const pollsRestantes = useRef(0);
+
   const load = useCallback(async () => {
     try {
       const d = await apiRequest<MultasResp>('/cliente/multas');
       const vs = d.veiculos ?? [];
       setVeiculos(vs);
       setAtualizadoEm(d.atualizadoEm ?? null);
+      setIncompletos(d.incompletos ?? []);
+      setAguardando(d.aguardando ?? []);
+      setPodeEditarDocumentos(!!d.podeEditarDocumentos);
       setSelId((prev) => prev ?? vs.find((v) => v.qtdMultas > 0)?.dispositivoId ?? vs[0]?.dispositivoId ?? null);
       setErro(null);
     } catch (e) {
@@ -89,6 +113,52 @@ export function MultasScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Após salvar o renavam, a consulta roda no worker: recarrega até o resultado chegar.
+  useEffect(() => {
+    if (!aguardando.length || pollsRestantes.current <= 0) return;
+    const t = setTimeout(() => {
+      pollsRestantes.current -= 1;
+      load();
+    }, 15000);
+    return () => clearTimeout(t);
+  }, [aguardando, load]);
+
+  const abrirDoc = (dispositivoId: string) => {
+    setDocDispId(dispositivoId);
+    setDocRenavam('');
+    setDocChassi('');
+    setDocErro(null);
+    setDocOpen(true);
+  };
+
+  const salvarDoc = async () => {
+    if (!docDispId) return;
+    const renavam = docRenavam.replace(/\D/g, '');
+    const chassi = docChassi.trim().toUpperCase();
+    if (!renavam && !chassi) return setDocErro('Informe o RENAVAM e/ou o chassi.');
+    if (renavam && !/^\d{9,11}$/.test(renavam)) return setDocErro('RENAVAM inválido: deve ter de 9 a 11 dígitos.');
+    if (chassi && !/^[A-HJ-NPR-Z0-9]{17}$/.test(chassi)) {
+      return setDocErro('Chassi inválido: deve ter 17 caracteres (sem as letras I, O e Q).');
+    }
+
+    setSalvandoDoc(true);
+    setDocErro(null);
+    try {
+      await apiRequest(`/cliente/multas/${docDispId}/documentos`, {
+        method: 'PATCH',
+        body: JSON.stringify({ renavam, chassi }),
+      });
+      setDocOpen(false);
+      pollsRestantes.current = 8;
+      toast.show({ message: 'Dados salvos. Consultando as multas no Detran…', type: 'success' });
+      load();
+    } catch (e) {
+      setDocErro(e instanceof Error ? e.message : 'Não foi possível salvar os dados.');
+    } finally {
+      setSalvandoDoc(false);
+    }
+  };
 
   const veiculo = useMemo(() => veiculos.find((v) => v.dispositivoId === selId) ?? null, [veiculos, selId]);
 
@@ -218,8 +288,45 @@ export function MultasScreen() {
           ) : null}
         </View>
 
+        {incompletos.length > 0 ? (
+          <View style={styles.bannerWarn}>
+            <Icon source="alert" size={18} color="#a35b00" />
+            <View style={styles.bannerTxtWrap}>
+              <Text style={styles.bannerTxt}>
+                <Text style={styles.bannerForte}>
+                  {incompletos.length} veículo{incompletos.length > 1 ? 's' : ''}
+                </Text>{' '}
+                sem RENAVAM/chassi no cadastro ({incompletos.map((v) => v.placa).join(', ')}). Sem esse dado o Detran não
+                identifica o veículo e as multas não são consultadas.
+                {podeEditarDocumentos ? '' : ' Peça ao responsável da conta para completar o cadastro.'}
+              </Text>
+              {podeEditarDocumentos ? (
+                <Pressable
+                  style={[styles.btn, styles.btnPri, styles.btnSmall, styles.bannerBtn]}
+                  onPress={() => abrirDoc(incompletos[0].dispositivoId)}
+                >
+                  <Icon source="pencil" size={14} color="#fff" />
+                  <Text style={styles.btnPriTxt}> Preencher agora</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
+        {aguardando.length > 0 ? (
+          <View style={styles.bannerInfo}>
+            <Icon source="clock-outline" size={16} color={colors.textMuted} />
+            <Text style={styles.bannerInfoTxt}>
+              Consultando o Detran para {aguardando.map((v) => v.placa).join(', ')}. O resultado aparece assim que a
+              consulta terminar.
+            </Text>
+          </View>
+        ) : null}
+
         {veiculos.length === 0 ? (
-          <Text style={styles.vazio}>Nenhum veículo disponível.</Text>
+          incompletos.length === 0 && aguardando.length === 0 ? (
+            <Text style={styles.vazio}>Nenhum veículo disponível.</Text>
+          ) : null
         ) : (
           <>
             {veiculos.length > 1 ? (
@@ -396,6 +503,80 @@ export function MultasScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Completar RENAVAM/chassi do veículo */}
+      <Modal visible={docOpen} transparent animationType="fade" onRequestClose={() => setDocOpen(false)}>
+        <Pressable style={styles.modalBg} onPress={() => setDocOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitle}>Completar dados do veículo</Text>
+              <Text style={styles.docAjuda}>
+                O Detran identifica o veículo pelo RENAVAM (ou pelo chassi). Informe pelo menos um deles: os dados são
+                salvos no cadastro do veículo e a consulta de multas passa a funcionar.
+              </Text>
+
+              {incompletos.length > 1 ? (
+                <>
+                  <Text style={styles.docLabel}>Veículo</Text>
+                  <View style={styles.chipsWrap}>
+                    {incompletos.map((v) => {
+                      const ativo = v.dispositivoId === docDispId;
+                      return (
+                        <Pressable
+                          key={v.dispositivoId}
+                          style={[styles.chip, ativo && styles.chipAtivo]}
+                          onPress={() => setDocDispId(v.dispositivoId)}
+                        >
+                          <Text style={[styles.chipTxt, ativo && styles.chipTxtAtivo]}>{v.placa}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : null}
+
+              <Text style={styles.docLabel}>RENAVAM</Text>
+              <TextInput
+                style={styles.docInput}
+                placeholder="Somente números (9 a 11 dígitos)"
+                placeholderTextColor={colors.textMuted}
+                value={docRenavam}
+                onChangeText={(t) => setDocRenavam(t.replace(/\D/g, ''))}
+                keyboardType="number-pad"
+                maxLength={11}
+              />
+              <Text style={styles.docHint}>Está no CRLV (documento do veículo), campo “CÓDIGO RENAVAM”.</Text>
+
+              <Text style={styles.docLabel}>Chassi (opcional)</Text>
+              <TextInput
+                style={styles.docInput}
+                placeholder="17 caracteres"
+                placeholderTextColor={colors.textMuted}
+                value={docChassi}
+                onChangeText={(t) => setDocChassi(t.toUpperCase())}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={17}
+              />
+
+              {docErro ? <Text style={styles.docErro}>{docErro}</Text> : null}
+
+              <View style={styles.acoes}>
+                <Pressable style={[styles.btn, styles.btnSec]} disabled={salvandoDoc} onPress={() => setDocOpen(false)}>
+                  <Text style={styles.btnSecTxt}>Cancelar</Text>
+                </Pressable>
+                <Pressable style={[styles.btn, styles.btnPri, styles.btnFlex]} disabled={salvandoDoc} onPress={salvarDoc}>
+                  {salvandoDoc ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.btnPriTxt}>Salvar e consultar multas</Text>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -448,7 +629,51 @@ const styles = StyleSheet.create({
   valorDe: { color: colors.textSubtle, fontSize: 11, textDecorationLine: 'line-through' },
   valorPagar: { fontWeight: '700', color: colors.text },
 
+  bannerWarn: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: '#fff4e0',
+    borderColor: '#f0d9a8',
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  bannerTxtWrap: { flex: 1 },
+  bannerTxt: { color: '#8a5300', fontSize: 12.5, lineHeight: 18 },
+  bannerForte: { fontWeight: '700' },
+  bannerBtn: { alignSelf: 'flex-start', marginTop: 10 },
+  bannerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  bannerInfoTxt: { flex: 1, color: colors.textMuted, fontSize: 12.5, lineHeight: 18 },
+
+  docAjuda: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18, marginBottom: 12 },
+  docLabel: { color: colors.text, fontWeight: '600', fontSize: 13, marginBottom: 6 },
+  docInput: {
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.text,
+  },
+  docHint: { color: colors.textSubtle, fontSize: 11, marginTop: 4, marginBottom: 12 },
+  docErro: { color: colors.danger, fontSize: 13, marginTop: 10 },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  chip: { borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 6 },
+  chipAtivo: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipTxt: { color: colors.text, fontWeight: '700', letterSpacing: 1, fontSize: 12 },
+  chipTxtAtivo: { color: '#fff' },
+
   acoes: { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
+  btnFlex: { flex: 1 },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10 },
   btnSmall: { paddingVertical: 8, paddingHorizontal: 10 },
   btnPri: { backgroundColor: colors.primary },

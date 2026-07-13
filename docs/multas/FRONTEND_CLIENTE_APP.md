@@ -40,8 +40,17 @@ Nova tela "Multas" na navegação do cliente (aparece condicional à flag).
 - Aviso fixo no topo: consulta no Detran, 2×/dia (10h e 17h).
 - Exibir condicional: a flag `multasHabilitado` deve vir no payload de login/perfil do cliente (como outras flags do app, ex. `podeEditarMedidores`).
 
+## Veículo sem renavam/chassi (banner + modal)
+
+O Detran identifica o veículo por placa + renavam (ou chassi). Veículos sem esses dados não são consultados. No site e no app, a tela de multas mostra o **mesmo banner do admin**, mas com ação:
+
+- **Banner âmbar** (`incompletos` do `GET /api/cliente/multas`): "N veículo(s) sem RENAVAM/chassi no cadastro: PLACA1, PLACA2…" + botão **"Preencher agora"** — o botão aparece conforme `podeEditarDocumentos`, que reflete a permissão granular **`multas.editarDocumentos`** (responsável sempre tem; sub-usuário depende do toggle "Preencher RENAVAM / chassi do veículo" no formulário de usuários). Sem a permissão, o banner orienta a pedir ao responsável da conta.
+- **Modal "Completar dados do veículo"**: seletor de veículo (quando há mais de um incompleto), campo RENAVAM (9–11 dígitos) e chassi (17 caracteres, opcional) → `PATCH /api/cliente/multas/:dispositivoId/documentos`.
+- Salvar **atualiza o cadastro do dispositivo** (`Dispositivo.renavam` / `Dispositivo.chassi`) e **enfileira a consulta** ao Detran na hora.
+- Enquanto a consulta roda, o veículo entra em `aguardando` e a tela mostra um aviso "Consultando o Detran para PLACA…", recarregando sozinha (poll de 15s, até 8 tentativas) até a situação aparecer.
+
 ## Estados de UI
 - **Carregando:** skeleton/spinner.
 - **Sem veículos consultáveis:** "Nenhum veículo habilitado para consulta de multas".
 - **Erro na última consulta** (status ERRO): mostrar dado anterior + aviso discreto "última atualização pode estar desatualizada".
-- **Veículo sem renavam/chassi:** "Cadastro do veículo incompleto — contate o suporte".
+- **Veículo sem renavam/chassi:** banner + modal de preenchimento (acima) — o cliente resolve sozinho, sem acionar o suporte.

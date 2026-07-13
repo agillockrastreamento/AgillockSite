@@ -37,6 +37,7 @@ export interface PermissoesRelatorio {
 export interface PermissoesMultas {
   ver: boolean;
   pagar: boolean;
+  editarDocumentos: boolean; // preencher renavam/chassi do veículo (cadastro do dispositivo)
 }
 
 export interface PermissoesCliente {
@@ -66,7 +67,7 @@ export function permissoesVazias(): PermissoesCliente {
       criarRecorrencia: false, editarRecorrencia: false, marcarFeita: false,
     },
     relatorio: { ver: false, exportar: false },
-    multas: { ver: false, pagar: false },
+    multas: { ver: false, pagar: false, editarDocumentos: false },
   };
 }
 
@@ -84,7 +85,7 @@ export function permissoesTotais(): PermissoesCliente {
       criarRecorrencia: true, editarRecorrencia: true, marcarFeita: true,
     },
     relatorio: { ver: true, exportar: true },
-    multas: { ver: true, pagar: true },
+    multas: { ver: true, pagar: true, editarDocumentos: true },
   };
 }
 

@@ -33,6 +33,7 @@ export type PermissoesRelatorio = {
 export type PermissoesMultas = {
   ver: boolean;
   pagar: boolean;
+  editarDocumentos: boolean; // preencher renavam/chassi do veículo
 };
 
 export type PermissoesCliente = {
@@ -73,7 +74,7 @@ export function permissoesTotais(): PermissoesCliente {
       criarRecorrencia: true, editarRecorrencia: true, marcarFeita: true,
     },
     relatorio: { ver: true, exportar: true },
-    multas: { ver: true, pagar: true },
+    multas: { ver: true, pagar: true, editarDocumentos: true },
   };
 }
 

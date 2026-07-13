@@ -22,6 +22,12 @@
     .aviso { font-size: 12.5px; color: #7a7a7a; background: #f4f6f9; border-radius: 8px; padding: 10px 14px; margin: 14px 0; }
     html.dark-theme .aviso { background: #1a212c; color: #9aa4b2; }
 
+    .aviso-warn { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; background: #fff4e0; color: #8a5300; border: 1px solid #f0d9a8; border-radius: 10px; padding: 12px 14px; margin: 14px 0; }
+    html.dark-theme .aviso-warn { background: #3a2f14; color: #e6c589; border-color: #5c4a1e; }
+    .aviso-warn .aw-txt { flex: 1; min-width: 240px; }
+    .aviso-warn .btn { white-space: nowrap; }
+    .doc-hint { font-size: 12px; color: #888; margin-top: 4px; }
+
     .veic-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.06); margin-bottom: 16px; overflow: hidden; }
     html.dark-theme .veic-card { background: #1e2530; }
     .veic-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #eef0f3; }
@@ -113,7 +119,42 @@
 
     <div id="scroll-area">
       <div class="aviso"><i class="fa fa-info-circle"></i> As multas são consultadas diretamente no <b>Detran</b>. A atualização é automática <b>2 vezes ao dia, às 10h e às 17h</b>. O boleto/Pix é gerado com o valor atualizado no momento do pagamento.</div>
+      <div id="aviso-incompletos" class="aviso-warn" style="display:none;"></div>
+      <div id="aviso-aguardando" class="aviso" style="display:none;"></div>
       <div id="lista-veiculos"><p style="color:#888;text-align:center;padding:20px;">Carregando…</p></div>
+    </div>
+  </div>
+
+  <!-- Modal: completar RENAVAM/chassi do veículo -->
+  <div class="modal fade" id="modal-doc" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title"><i class="fa fa-id-card-o"></i> Completar dados do veículo</h4>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:13px;color:#777;">O Detran identifica o veículo pelo <b>RENAVAM</b> (ou pelo <b>chassi</b>). Informe pelo menos um deles: os dados são salvos no cadastro do veículo e a consulta de multas passa a funcionar.</p>
+          <div class="form-group" id="grp-doc-veiculo">
+            <label for="doc-veiculo">Veículo</label>
+            <select id="doc-veiculo" class="form-control"></select>
+          </div>
+          <div class="form-group">
+            <label for="doc-renavam">RENAVAM</label>
+            <input type="text" id="doc-renavam" class="form-control" maxlength="11" inputmode="numeric" autocomplete="off" placeholder="Somente números (9 a 11 dígitos)" />
+            <div class="doc-hint">Está no CRLV (documento do veículo), campo “CÓDIGO RENAVAM”.</div>
+          </div>
+          <div class="form-group">
+            <label for="doc-chassi">Chassi <span style="font-weight:normal;color:#999;">(opcional)</span></label>
+            <input type="text" id="doc-chassi" class="form-control" maxlength="17" autocomplete="off" placeholder="17 caracteres" style="text-transform:uppercase;" />
+          </div>
+          <div id="doc-erro" style="color:#b71c1c;font-size:13px;display:none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary-al" id="btn-doc-salvar"><i class="fa fa-check"></i> Salvar e consultar multas</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -187,9 +228,12 @@
       });
     }
 
+    var selDispId = null; // veículo aberto no card (preservado entre recargas)
+
     function mostrarVeiculo(v){
       var c = document.getElementById('veic-selecionado');
       if (!c) return;
+      selDispId = v.dispositivoId;
       c.innerHTML = cardHtml(v);
       wireCard(c);
     }
@@ -237,14 +281,17 @@
       inp.addEventListener('blur', function(){ setTimeout(function(){ lista.style.display='none'; }, 150); });
     }
 
-    function render(veiculos){
+    function render(veiculos, temAvisos){
       var box = document.getElementById('lista-veiculos');
-      if (!veiculos.length){ box.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">Nenhum veículo disponível.</p>'; return; }
+      // Sem situação de multas: se os banners acima já explicam o porquê, não repete a mensagem.
+      if (!veiculos.length){ box.innerHTML = temAvisos ? '' : '<p style="color:#888;text-align:center;padding:20px;">Nenhum veículo disponível.</p>'; return; }
       // Um único veículo: abre direto. Vários: combo com busca + indicador de multa.
       if (veiculos.length === 1){ box.innerHTML = '<div id="veic-selecionado"></div>'; mostrarVeiculo(veiculos[0]); return; }
       box.innerHTML = comboHtml() + '<div id="veic-selecionado" style="margin-top:14px;"></div>';
       wireCombo(veiculos);
-      var inicial = veiculos.filter(function(v){return v.qtdMultas>0;})[0] || veiculos[0];
+      var inicial = veiculos.filter(function(v){return v.dispositivoId===selDispId;})[0]
+        || veiculos.filter(function(v){return v.qtdMultas>0;})[0]
+        || veiculos[0];
       document.getElementById('combo-busca').value = inicial.placa;
       mostrarVeiculo(inicial);
     }
@@ -275,10 +322,90 @@
         .then(function(){ btn.disabled=false; btn.innerHTML=old; });
     }
 
+    // ── Veículos sem renavam/chassi: banner + modal de preenchimento ──
+    var incompletos = [];
+    var podeEditarDocumentos = false;
+    var pollsRestantes = 0;
+
+    function nomeVeic(v){ return v.placa + (v.apelido ? ' · ' + v.apelido : ''); }
+
+    function renderAvisos(d){
+      incompletos = d.incompletos || [];
+      podeEditarDocumentos = !!d.podeEditarDocumentos;
+
+      var elInc = document.getElementById('aviso-incompletos');
+      if (!incompletos.length){
+        elInc.style.display = 'none';
+      } else {
+        var placas = incompletos.map(function(v){ return esc(v.placa); }).join(', ');
+        elInc.innerHTML =
+          '<div class="aw-txt"><i class="fa fa-exclamation-triangle"></i> <b>'+incompletos.length+' veículo(s)</b> sem <b>RENAVAM/chassi</b> no cadastro: '+placas+'. '+
+          'Sem esse dado o Detran não consegue identificar o veículo e as multas não são consultadas.'+
+          (podeEditarDocumentos ? '' : '<br>Peça ao responsável da conta para completar o cadastro.')+'</div>'+
+          (podeEditarDocumentos ? '<button class="btn btn-primary-al btn-sm" id="btn-abrir-doc"><i class="fa fa-pencil"></i> Preencher agora</button>' : '');
+        elInc.style.display = '';
+        var btn = document.getElementById('btn-abrir-doc');
+        if (btn) btn.onclick = function(){ abrirModalDoc(incompletos[0].dispositivoId); };
+      }
+
+      var aguardando = d.aguardando || [];
+      var elAg = document.getElementById('aviso-aguardando');
+      if (!aguardando.length){
+        elAg.style.display = 'none';
+      } else {
+        elAg.innerHTML = '<i class="fa fa-clock-o"></i> Consultando o Detran para '+
+          aguardando.map(function(v){ return '<b>'+esc(v.placa)+'</b>'; }).join(', ')+
+          '. O resultado aparece assim que a consulta terminar.';
+        elAg.style.display = '';
+        if (pollsRestantes > 0){ pollsRestantes--; setTimeout(load, 15000); }
+      }
+    }
+
+    function abrirModalDoc(dispId){
+      var sel = document.getElementById('doc-veiculo');
+      sel.innerHTML = incompletos.map(function(v){
+        return '<option value="'+v.dispositivoId+'">'+esc(nomeVeic(v))+'</option>';
+      }).join('');
+      sel.value = dispId || (incompletos[0] && incompletos[0].dispositivoId);
+      document.getElementById('grp-doc-veiculo').style.display = incompletos.length > 1 ? '' : 'none';
+      document.getElementById('doc-renavam').value = '';
+      document.getElementById('doc-chassi').value = '';
+      document.getElementById('doc-erro').style.display = 'none';
+      $('#modal-doc').modal('show');
+    }
+
+    document.getElementById('doc-renavam').addEventListener('input', function(){
+      this.value = this.value.replace(/\D/g, '');
+    });
+
+    document.getElementById('btn-doc-salvar').onclick = function(){
+      var btn = this;
+      var dispId = document.getElementById('doc-veiculo').value;
+      var renavam = document.getElementById('doc-renavam').value.replace(/\D/g, '');
+      var chassi = document.getElementById('doc-chassi').value.trim().toUpperCase();
+      var erro = document.getElementById('doc-erro');
+      erro.style.display = 'none';
+
+      function falhar(msg){ erro.textContent = msg; erro.style.display = ''; }
+      if (!renavam && !chassi) return falhar('Informe o RENAVAM e/ou o chassi.');
+      if (renavam && !/^\d{9,11}$/.test(renavam)) return falhar('RENAVAM inválido: deve ter de 9 a 11 dígitos.');
+      if (chassi && !/^[A-HJ-NPR-Z0-9]{17}$/.test(chassi)) return falhar('Chassi inválido: deve ter 17 caracteres (sem as letras I, O e Q).');
+
+      var old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando…';
+      AL.apiPatch('/api/cliente/multas/'+dispId+'/documentos', { renavam: renavam, chassi: chassi }).then(function(){
+        $('#modal-doc').modal('hide');
+        AL.showAlert('Dados salvos. Estamos consultando as multas no Detran…', 'success');
+        pollsRestantes = 8; // a consulta roda no worker; recarrega até o resultado chegar
+        load();
+      }).catch(function(err){ falhar(err.message); })
+        .then(function(){ btn.disabled = false; btn.innerHTML = old; });
+    };
+
     function load(){
       AL.apiGet('/api/cliente/multas').then(function(d){
         if (d.atualizadoEm) document.getElementById('atualizado-em').textContent = 'Atualizado em ' + AL.fmtDate(d.atualizadoEm);
-        render(d.veiculos || []);
+        renderAvisos(d);
+        render(d.veiculos || [], (d.incompletos || []).length + (d.aguardando || []).length > 0);
       }).catch(function(err){
         document.getElementById('lista-veiculos').innerHTML = '<p style="color:#b71c1c;text-align:center;padding:20px;">'+esc(err.message)+'</p>';
       });
