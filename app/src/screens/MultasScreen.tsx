@@ -151,7 +151,7 @@ export function MultasScreen() {
       });
       setDocOpen(false);
       pollsRestantes.current = 8;
-      toast.show({ message: 'Dados salvos. Consultando as multas no Detran…', type: 'success' });
+      toast.show({ message: 'Dados salvos.', type: 'success' });
       load();
     } catch (e) {
       setDocErro(e instanceof Error ? e.message : 'Não foi possível salvar os dados.');

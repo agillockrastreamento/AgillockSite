@@ -388,7 +388,7 @@
       var old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando…';
       AL.apiPatch('/api/cliente/multas/'+dispId+'/documentos', { renavam: renavam, chassi: chassi }).then(function(){
         $('#modal-doc').modal('hide');
-        AL.showAlert('Dados salvos. Estamos consultando as multas no Detran…', 'success');
+        AL.showAlert('Dados salvos.', 'success');
         pollsRestantes = 8; // a consulta roda no worker; recarrega até o resultado chegar
         load();
       }).catch(function(err){ falhar(err.message); })
