@@ -1884,6 +1884,10 @@ function _renderAlarmeBadge(id, v) {
   if (!_overlay.alarmes) return;
   if (!v?.posicao?.alarme) return;
 
+  // "Corte de energia" (powerCut) não deve ser exibido como label no mapa
+  const rotuloAlarme = v.posicao.alarme.split(', ').filter(r => r !== 'Corte de energia').join(', ');
+  if (!rotuloAlarme) return;
+
   const badge = L.marker([v.posicao.latitude, v.posicao.longitude], {
     icon: L.divIcon({
       html: `<div style="
@@ -1893,7 +1897,7 @@ function _renderAlarmeBadge(id, v) {
         white-space:nowrap;
         box-shadow:0 2px 6px rgba(0,0,0,0.3);
         display:flex;align-items:center;gap:4px;
-      "><i class="fa fa-bell" style="font-size:9px"></i> ${v.posicao.alarme}</div>`,
+      "><i class="fa fa-bell" style="font-size:9px"></i> ${rotuloAlarme}</div>`,
       className: '',
       iconAnchor: [0, 36],
       iconSize: null,

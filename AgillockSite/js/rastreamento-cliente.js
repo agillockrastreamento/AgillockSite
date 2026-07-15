@@ -1355,9 +1355,12 @@ function _renderAlarmeBadge(id, v) {
   }
   if (!_overlay.alarmes || !v?.posicao?.alarme) return;
   if (!_veiculoNoMapaAtivo(v)) return;
+  // "Corte de energia" (powerCut) não deve ser exibido como label no mapa
+  const rotuloAlarme = v.posicao.alarme.split(', ').filter(r => r !== 'Corte de energia').join(', ');
+  if (!rotuloAlarme) return;
   const badge = L.marker([v.posicao.latitude, v.posicao.longitude], {
     icon: L.divIcon({
-      html: `<div style="background:#e74c3c;color:#fff;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;gap:4px;"><i class="fa fa-bell" style="font-size:9px"></i> ${v.posicao.alarme}</div>`,
+      html: `<div style="background:#e74c3c;color:#fff;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;gap:4px;"><i class="fa fa-bell" style="font-size:9px"></i> ${rotuloAlarme}</div>`,
       className: '', iconAnchor: [0, 36], iconSize: null,
     }),
     zIndexOffset: 800, interactive: false,

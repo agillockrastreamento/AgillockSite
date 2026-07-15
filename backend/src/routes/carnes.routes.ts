@@ -275,6 +275,42 @@ async function corrigirLinksBoletos(
   }
 }
 
+// ─── Helper: manter apenas a parcela mais próxima de um carnê ─────────────────
+// Mantém a parcela pendente mais próxima do vencimento e cancela as demais na EFI
+// e no banco. Usado na re-unificação: o carnê antigo cobra mais uma última vez e o
+// novo carnê assume nos meses seguintes (sem sobreposição, sem buraco na cobrança).
+async function manterProximaParcelaECancelarResto(carneId: string): Promise<void> {
+  const carne = await prisma.carne.findUnique({
+    where: { id: carneId },
+    select: {
+      efiCarneId: true,
+      boletos: {
+        where: { status: { in: ['PENDENTE', 'ATRASADO'] } },
+        orderBy: { vencimento: 'asc' },
+        select: { id: true, numeroParcela: true },
+      },
+    },
+  });
+  if (!carne || carne.boletos.length <= 1) return; // 0 ou 1 pendente: nada a cancelar
+
+  const efiCarneId = carne.efiCarneId ? Number(carne.efiCarneId) : null;
+  const [, ...cancelar] = carne.boletos; // mantém o primeiro (mais próximo do vencimento)
+
+  for (const b of cancelar) {
+    if (efiCarneId) {
+      try {
+        await efiService.cancelarParcela(efiCarneId, b.numeroParcela);
+      } catch (e) {
+        console.error(`EFI cancelar parcela ${b.numeroParcela} do carnê ${carneId}:`, e);
+      }
+    }
+  }
+  await prisma.boleto.updateMany({
+    where: { id: { in: cancelar.map((b) => b.id) } },
+    data: { status: 'CANCELADO' },
+  });
+}
+
 // ─── GET /api/carnes/:id/pdf — Link para download do PDF ──────────────────────
 router.get('/:id/pdf', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const id = param(req, 'id');
@@ -749,38 +785,45 @@ router.post('/unificar-dispositivos', requireRoles('ADMIN', 'COLABORADOR'), asyn
     return;
   }
 
-  // Cancelar carnê UNIFICADO ativo (se existir)
-  const carneUnifExistente = await prisma.carne.findFirst({
+  // Re-unificação — carnês UNIFICADOS ativos:
+  // • Se o carnê antigo compartilha algum dispositivo com o novo conjunto, mantém apenas
+  //   a parcela mais próxima e cancela as demais (o cliente paga mais uma vez e o novo
+  //   carnê assume em seguida).
+  // • Carnês unificados SEM dispositivo em comum ficam INTACTOS — não podemos encerrar a
+  //   cobrança de dispositivos que não fazem parte desta unificação.
+  const unificadosAtivos = await prisma.carne.findMany({
     where: { clienteId, tipo: 'UNIFICADO', boletos: { some: { status: { in: ['PENDENTE', 'ATRASADO'] } } } },
-    select: { id: true, efiCarneId: true },
+    select: {
+      id: true,
+      boletos: {
+        where: { status: { in: ['PENDENTE', 'ATRASADO'] } },
+        select: { dispositivosUnificados: { select: { dispositivoId: true } } },
+      },
+    },
   });
-  if (carneUnifExistente) {
-    if (carneUnifExistente.efiCarneId) {
-      try { await efiService.cancelarCarne(Number(carneUnifExistente.efiCarneId)); } catch (e) { console.error('EFI cancel unif:', e); }
+  for (const cn of unificadosAtivos) {
+    const dispositivosDoCarne = new Set<string>();
+    for (const b of cn.boletos) {
+      for (const bd of b.dispositivosUnificados) dispositivosDoCarne.add(bd.dispositivoId);
     }
-    await prisma.boleto.updateMany({
-      where: { carneId: carneUnifExistente.id, status: { in: ['PENDENTE', 'ATRASADO'] } },
-      data: { status: 'CANCELADO' },
-    });
+    const compartilhaDispositivo = dispositivoIds.some((id: string) => dispositivosDoCarne.has(id));
+    if (compartilhaDispositivo) {
+      await manterProximaParcelaECancelarResto(cn.id);
+    }
   }
 
-  // Cancelar carnês INDIVIDUAIS ativos para os dispositivos informados
+  // Carnês INDIVIDUAIS ativos dos dispositivos informados: mesmo princípio — mantém a
+  // parcela mais próxima e cancela as demais.
   const carnesIndivDisp = await prisma.carne.findMany({
     where: {
       clienteId,
       tipo: 'INDIVIDUAL',
       boletos: { some: { dispositivoId: { in: dispositivoIds }, status: { in: ['PENDENTE', 'ATRASADO'] } } },
     },
-    select: { id: true, efiCarneId: true },
+    select: { id: true },
   });
   for (const cn of carnesIndivDisp) {
-    if (cn.efiCarneId) {
-      try { await efiService.cancelarCarne(Number(cn.efiCarneId)); } catch (e) { console.error('EFI cancel indiv:', e); }
-    }
-    await prisma.boleto.updateMany({
-      where: { carneId: cn.id, status: { in: ['PENDENTE', 'ATRASADO'] } },
-      data: { status: 'CANCELADO' },
-    });
+    await manterProximaParcelaECancelarResto(cn.id);
   }
 
   // Montar itens EFI
