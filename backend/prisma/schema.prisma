@@ -824,6 +824,13 @@ model VeiculoMultaSituacao {
   pixQrCodeBase64 String? @db.Text // PNG base64 do QR
   boletoArquivo   String? // caminho relativo em /uploads/multas/...
 
+  // Pagamento pré-gerado do LICENCIAMENTO (quando pendente)
+  licenciamentoValor           Decimal? @db.Decimal(10, 2) // total do licenciamento
+  licenciamentoItens           Json? // [{ ano, orgao, descricao, valor, valorAPagar }]
+  licenciamentoPixEmv          String?  @db.Text // Pix copia-e-cola do licenciamento
+  licenciamentoPixQrCodeBase64 String?  @db.Text // PNG base64 do QR do licenciamento
+  licenciamentoBoletoArquivo   String? // caminho relativo em /uploads/multas/...
+
   ultimaConsultaEm     DateTime?
   ultimaConsultaStatus String? // OK | ERRO | DADOS_INVALIDOS | SEM_RENAVAM
   ultimaConsultaErro   String?
@@ -884,8 +891,8 @@ model ConsultaMultaLog {
 model NotificacaoMultaEnvio {
   id             String   @id @default(uuid())
   clienteLoginId String
-  ait            String
-  tipo           String // multaNova | multaVencimento7dias | multaVencimentoHoje
+  ait            String // AIT da multa; para licenciamento usa-se a chave sintética "LIC:<ano>"
+  tipo           String // multaNova | multaVencimento7dias | multaVencimentoHoje | licenciamentoPendente
   dataReferencia DateTime // dia de referência (00:00) p/ unicidade por dia
   createdAt      DateTime @default(now())
 

@@ -138,6 +138,7 @@ const TIPOS_EVENTO_CLIENTE = [
   { tipo: 'multaNova',               label: 'Nova Multa',                  css: 'tipo-alarm'               },
   { tipo: 'multaVencimento7dias',    label: 'Multa a Vencer (7 dias)',     css: 'tipo-manutencao-alerta'   },
   { tipo: 'multaVencimentoHoje',     label: 'Multa Vence Hoje',            css: 'tipo-alarm'               },
+  { tipo: 'licenciamentoPendente',   label: 'Licenciamento Pendente',      css: 'tipo-alarm'               },
 ];
 const TIPOS_EVENTO_CLIENTE_FILTRO = TIPOS_EVENTO_CLIENTE.filter(t => t.tipo !== 'manutencao');
 
@@ -817,6 +818,7 @@ function renderEventosLista() {
       case 'pagamentoRecebido': return { cls: 'success', color: '#27ae60', icon: 'fa-check-circle' };
       case 'multaNova': case 'multaVencimentoHoje': return { cls: 'danger', color: '#e74c3c', icon: 'fa-gavel' };
       case 'multaVencimento7dias': return { cls: 'warning', color: '#e67e22', icon: 'fa-gavel' };
+      case 'licenciamentoPendente': return { cls: 'danger', color: '#e74c3c', icon: 'fa-id-card-o' };
       case 'veiculoMovimento': return { cls: 'success', color: '#27ae60', icon: 'fa-location-arrow' };
       case 'motorOcioso': return { cls: 'warning', color: '#e67e22', icon: 'fa-hourglass-half' };
       case 'semAtualizacao': return { cls: 'danger', color: '#e74c3c', icon: 'fa-wifi' };

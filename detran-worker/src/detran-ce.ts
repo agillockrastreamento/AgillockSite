@@ -35,6 +35,21 @@ export interface Pagamento {
   qrCodeBase64: string; // PNG do QR Pix em base64
 }
 
+export interface LicenciamentoItem {
+  ano: string; // "Data" da tabela (na prática o ano, ex.: "2026")
+  orgao: string | null;
+  descricao: string; // ex.: "Licenciamento 2026", "Expedição de CRV/CRLV 2026"
+  valor: number;
+  valorAPagar: number;
+}
+
+export interface PagamentoLicenciamento {
+  itens: LicenciamentoItem[];
+  total: number;
+  emv: string; // Pix copia-e-cola
+  qrCodeBase64: string; // PNG do QR Pix em base64 (sem o prefixo data:)
+}
+
 export interface ConsultaCompleta {
   placa: string;
   renavam: string;
@@ -42,6 +57,8 @@ export interface ConsultaCompleta {
   multas: MultaItem[];
   pagamentoTodas: Pagamento | null; // null quando não há multas
   boletoPdfBase64: string | null; // boleto de todas as multas (null se não há multas)
+  pagamentoLicenciamento: PagamentoLicenciamento | null; // null quando licenciamento não está pendente
+  boletoLicenciamentoPdfBase64: string | null; // boleto do licenciamento (null se não pendente)
   consultadoEm: string; // ISO
 }
 
@@ -225,6 +242,50 @@ export class DetranCeSession {
     }
     return buf;
   }
+
+  /**
+   * Passo licenciamento: `GET /veiculos/licenciamento` → itens + Pix (copia-e-cola) + QR.
+   * O fragmento HTML já traz tudo (input#pix, img#qrCodeImage, tabela #emissao-multas) e
+   * prepara a sessão para o `gerarBoleto()` seguinte devolver o PDF do licenciamento.
+   */
+  async emitirLicenciamento(): Promise<PagamentoLicenciamento> {
+    const res = await this.req(`${BASE}/veiculos/licenciamento`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest', Referer: `${BASE}/veiculos/principal` },
+    });
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    const emv = ($('#pix').attr('value') ?? '').trim();
+    const qrCodeBase64 = ($('#qrCodeImage').attr('src') ?? '')
+      .replace(/^data:image\/png;base64,\s*/i, '')
+      .trim();
+    if (!emv && !qrCodeBase64) {
+      throw new Error('Licenciamento sem Pix/QR (layout mudou ou sem débito?)');
+    }
+
+    const itens: LicenciamentoItem[] = [];
+    let total = 0;
+    $('#emissao-multas tr').each((_i, tr) => {
+      const tds = $(tr).find('td');
+      if (tds.length < 5) {
+        // linha de TOTAL: <td colspan=4>TOTAL</td><td id="total">R$ ...</td>
+        const t = $(tr).find('#total').text();
+        if (t.trim()) total = parseDinheiro(t);
+        return;
+      }
+      const cell = (i: number) => $(tds[i]).text().trim();
+      itens.push({
+        ano: cell(0),
+        orgao: cell(1) || null,
+        descricao: cell(2),
+        valor: parseDinheiro(cell(3)),
+        valorAPagar: parseDinheiro(cell(4)),
+      });
+    });
+    if (!total) total = itens.reduce((s, it) => s + it.valorAPagar, 0);
+
+    return { itens, total, emv, qrCodeBase64 };
+  }
 }
 
 /** Consulta completa de um veículo — traz TUDO (situação + multas + pix/boleto de todas). */
@@ -242,6 +303,21 @@ export async function consultarVeiculoCompleto(placa: string, renavam: string): 
     boletoPdfBase64 = (await s.gerarBoleto()).toString('base64');
   }
 
+  // Licenciamento: só quando pendente. emitirLicenciamento prepara a sessão e o
+  // gerarBoleto seguinte devolve o PDF do licenciamento (mantidos em par e nesta ordem,
+  // depois do par de multas, pois cada emitir* redefine o estado do gerar_boleto).
+  let pagamentoLicenciamento: PagamentoLicenciamento | null = null;
+  let boletoLicenciamentoPdfBase64: string | null = null;
+  if (situacao.licenciamentoPendente) {
+    try {
+      pagamentoLicenciamento = await s.emitirLicenciamento();
+      boletoLicenciamentoPdfBase64 = (await s.gerarBoleto()).toString('base64');
+    } catch (e) {
+      // Não derruba a consulta inteira se o licenciamento falhar; multas/situação seguem.
+      console.warn(`[detran-ce] Falha ao emitir licenciamento de ${placa}: ${(e as Error).message}`);
+    }
+  }
+
   return {
     placa: placa.toUpperCase().trim(),
     renavam,
@@ -249,6 +325,8 @@ export async function consultarVeiculoCompleto(placa: string, renavam: string): 
     multas,
     pagamentoTodas,
     boletoPdfBase64,
+    pagamentoLicenciamento,
+    boletoLicenciamentoPdfBase64,
     consultadoEm: new Date().toISOString(),
   };
 }

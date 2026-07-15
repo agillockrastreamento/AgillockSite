@@ -33,6 +33,14 @@ type Multa = {
   valorAPagar: number;
 };
 type Pix = { emv: string; qrCodeBase64: string | null } | null;
+type LicenciamentoItem = { ano: string; orgao: string | null; descricao: string; valor: number; valorAPagar: number };
+type Licenciamento = {
+  pendente: boolean;
+  valor: number | null;
+  itens: LicenciamentoItem[] | null;
+  pix: Pix;
+  boletoUrl: string | null;
+};
 type Veiculo = {
   dispositivoId: string;
   placa: string;
@@ -45,6 +53,7 @@ type Veiculo = {
   multas: Multa[];
   pix: Pix;
   boletoUrl: string | null;
+  licenciamento?: Licenciamento | null;
 };
 /** Veículo do cadastro (sem situação de multas ainda): banner de renavam/chassi e "aguardando". */
 type VeiculoSimples = { dispositivoId: string; placa: string; apelido: string | null };
@@ -100,7 +109,7 @@ export function MultasScreen() {
       setIncompletos(d.incompletos ?? []);
       setAguardando(d.aguardando ?? []);
       setPodeEditarDocumentos(!!d.podeEditarDocumentos);
-      setSelId((prev) => prev ?? vs.find((v) => v.qtdMultas > 0)?.dispositivoId ?? vs[0]?.dispositivoId ?? null);
+      setSelId((prev) => prev ?? vs.find((v) => v.qtdMultas > 0 || v.licenciamento?.pendente)?.dispositivoId ?? vs[0]?.dispositivoId ?? null);
       setErro(null);
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao carregar multas.');
@@ -331,7 +340,11 @@ export function MultasScreen() {
                 <Text style={styles.seletorTxt} numberOfLines={1}>
                   {veiculo ? veiculo.placa + (veiculo.apelido ? ' · ' + veiculo.apelido : '') : 'Selecionar veículo'}
                 </Text>
-                {veiculo && veiculo.qtdMultas > 0 ? <Text style={styles.indMulta}>● {veiculo.qtdMultas}</Text> : null}
+                {veiculo && veiculo.qtdMultas > 0 ? (
+                  <Text style={styles.indMulta}>● {veiculo.qtdMultas}</Text>
+                ) : veiculo && veiculo.licenciamento?.pendente ? (
+                  <Text style={styles.indMulta}>●</Text>
+                ) : null}
                 <Icon source="chevron-down" size={20} color={colors.textMuted} />
               </Pressable>
             ) : null}
@@ -346,8 +359,8 @@ export function MultasScreen() {
                       <Text style={styles.resumoMulta}>
                         {veiculo.qtdMultas} multa{veiculo.qtdMultas > 1 ? 's' : ''} · {fmtMoney(veiculo.valorTotal)}
                       </Text>
-                    ) : (
-                      <Text style={styles.resumoOk}>Sem multas</Text>
+                    ) : veiculo.licenciamento?.pendente || veiculo.possuiDebitoIpva ? null : (
+                      <Text style={styles.resumoOk}>Sem pendências</Text>
                     )}
                   </View>
                 </View>
@@ -447,6 +460,64 @@ export function MultasScreen() {
                     ) : null}
                   </>
                 )}
+
+                {veiculo.licenciamento?.pendente ? (
+                  <View style={styles.licBox}>
+                    <Text style={styles.licTitle}>
+                      Licenciamento{veiculo.licenciamento.itens?.[0]?.ano ? ' ' + veiculo.licenciamento.itens[0].ano : ''} pendente
+                      {veiculo.licenciamento.valor ? ' · ' + fmtMoney(veiculo.licenciamento.valor) : ''}
+                    </Text>
+                    {(veiculo.licenciamento.itens ?? []).map((it, i) => (
+                      <View key={i} style={styles.licItemRow}>
+                        <Text style={styles.licItemDesc} numberOfLines={2}>{it.descricao}</Text>
+                        <Text style={styles.licItemVal}>{fmtMoney(it.valorAPagar)}</Text>
+                      </View>
+                    ))}
+                    {veiculo.licenciamento.pix || veiculo.licenciamento.boletoUrl ? (
+                      <View style={styles.pixBox}>
+                        {veiculo.licenciamento.pix?.qrCodeBase64 ? (
+                          <Image
+                            source={{ uri: 'data:image/png;base64,' + veiculo.licenciamento.pix.qrCodeBase64 }}
+                            style={styles.qr}
+                          />
+                        ) : null}
+                        <Text style={styles.pixLabel}>Pague o licenciamento com Pix</Text>
+                        {veiculo.licenciamento.pix?.emv ? (
+                          <Text style={styles.pixEmv} selectable>
+                            {veiculo.licenciamento.pix.emv}
+                          </Text>
+                        ) : null}
+                        <View style={styles.pixAcoes}>
+                          {veiculo.licenciamento.pix?.emv ? (
+                            <Pressable
+                              style={[styles.btn, styles.btnSec, styles.btnSmall]}
+                              onPress={() => compartilharPix(veiculo.licenciamento!.pix!.emv)}
+                            >
+                              <Icon source="content-copy" size={15} color={colors.text} />
+                              <Text style={styles.btnSecTxt}> Compartilhar código Pix</Text>
+                            </Pressable>
+                          ) : null}
+                          {veiculo.licenciamento.boletoUrl ? (
+                            <Pressable
+                              style={[styles.btn, styles.btnPri, styles.btnSmall]}
+                              disabled={baixando}
+                              onPress={() => baixarBoleto(veiculo.licenciamento!.boletoUrl!)}
+                            >
+                              {baixando ? (
+                                <ActivityIndicator color="#fff" size="small" />
+                              ) : (
+                                <>
+                                  <Icon source="file-pdf-box" size={15} color="#fff" />
+                                  <Text style={styles.btnPriTxt}> Baixar boleto (PDF)</Text>
+                                </>
+                              )}
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
             ) : null}
           </>
@@ -483,6 +554,8 @@ export function MultasScreen() {
                   </Text>
                   {v.qtdMultas > 0 ? (
                     <Text style={styles.indMulta}>● {v.qtdMultas}</Text>
+                  ) : v.licenciamento?.pendente ? (
+                    <Text style={styles.indMulta}>●</Text>
                   ) : (
                     <Icon source="check" size={16} color={colors.success} />
                   )}
@@ -609,6 +682,12 @@ const styles = StyleSheet.create({
   badgeErr: { fontSize: 11, fontWeight: '700', color: '#b71c1c', backgroundColor: '#fdecea', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
 
   semMulta: { color: colors.success, paddingVertical: 8 },
+
+  licBox: { marginTop: 12, borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12 },
+  licTitle: { color: colors.danger, fontWeight: '700', fontSize: 13, marginBottom: 6 },
+  licItemRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingVertical: 4 },
+  licItemDesc: { flex: 1, color: colors.textMuted, fontSize: 12.5 },
+  licItemVal: { fontWeight: '700', color: colors.text, fontSize: 12.5 },
 
   multaRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 10, borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth },
   multaInfo: { flex: 1 },

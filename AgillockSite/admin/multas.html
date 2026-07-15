@@ -317,6 +317,24 @@
           (d.licenciamentoPendente?'<span class="mini-badge b-err">Licenciamento pendente</span>':'<span class="mini-badge b-neutral">Licenciamento em dia</span>')+
           ' &nbsp; <span class="mini-badge b-neutral">Atualizado: '+(d.ultimaConsultaEm?AL.fmtDate(d.ultimaConsultaEm):'—')+'</span></p>'+
           tabela+
+          (function(){
+            var L = d.licenciamento;
+            if (!L || !L.pendente) return '';
+            var ano = (L.itens && L.itens[0] && L.itens[0].ano) || '';
+            var itens = (L.itens||[]).map(function(it){ return '<tr><td>'+esc(it.descricao)+'</td><td style="text-align:right;">'+AL.fmtMoney(it.valorAPagar)+'</td></tr>'; }).join('');
+            var tab = itens ? '<div class="table-responsive" style="box-shadow:none;"><table class="admin-table table"><thead><tr><th>Descrição</th><th style="text-align:right;">Valor</th></tr></thead><tbody>'+itens+'</tbody></table></div>' : '';
+            var qr = (L.pix && L.pix.qrCodeBase64) ? '<img src="data:image/png;base64,'+L.pix.qrCodeBase64+'" style="width:180px;height:180px;" alt="QR Pix licenciamento">' : '';
+            var emv = (L.pix && L.pix.emv) ? L.pix.emv : '';
+            var pixBox = (emv||qr||L.boletoUrl) ? '<div class="pix-box"><div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">'+
+              '<div>'+qr+'</div>'+
+              '<div style="flex:1;min-width:220px;">'+
+                '<div style="font-weight:600;margin-bottom:6px;">Pix copia-e-cola (licenciamento)</div>'+
+                (emv?'<div class="pix-emv" id="lic-pix-emv">'+esc(emv)+'</div>':'')+
+                (emv?'<button class="btn btn-xs btn-default" style="margin-top:6px;" onclick="(function(){var t=document.getElementById(\'lic-pix-emv\').textContent;navigator.clipboard&&navigator.clipboard.writeText(t);AL.showAlert(\'Pix copiado!\',\'success\');})()"><i class="fa fa-copy"></i> Copiar</button> ':'')+
+                (L.boletoUrl?'<a class="btn btn-xs btn-primary" style="margin-top:6px;" href="'+API+esc(L.boletoUrl)+'" target="_blank"><i class="fa fa-file-pdf-o"></i> Baixar boleto (PDF)</a>':'')+
+              '</div></div></div>' : '';
+            return '<div style="margin-top:14px;"><div style="font-weight:600;color:#b71c1c;margin-bottom:6px;"><i class="fa fa-id-card-o"></i> Licenciamento '+esc(ano)+' pendente'+(L.valor?(' · '+AL.fmtMoney(L.valor)):'')+'</div>'+tab+pixBox+'</div>';
+          })()+
           (d.multas.length?'<div style="margin-top:10px;"><button class="btn btn-primary-al" id="btn-gerar-pag"><i class="fa fa-qrcode"></i> Gerar pagamento das selecionadas</button></div>':'')+
           '<div id="pag-resultado"></div>';
         var chkTodas = document.getElementById('chk-todas');
