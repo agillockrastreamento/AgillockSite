@@ -40,6 +40,7 @@ const EVENTO_TYPES = [
   { tipo: 'multaNova', label: 'Nova Multa', color: '#e74c3c', icon: 'gavel' },
   { tipo: 'multaVencimento7dias', label: 'Multa a Vencer (7 dias)', color: '#e67e22', icon: 'gavel' },
   { tipo: 'multaVencimentoHoje', label: 'Multa Vence Hoje', color: '#e74c3c', icon: 'gavel' },
+  { tipo: 'licenciamentoPendente', label: 'Licenciamento Pendente', color: '#e74c3c', icon: 'card-account-details-outline' },
 ];
 
 type PeriodFilter = 'hoje' | 'ontem' | '7dias' | 'custom';

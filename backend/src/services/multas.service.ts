@@ -4,6 +4,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
 import { UPLOADS_DIR } from '../utils/upload-paths';
 import ExpoPushService from './expo-push.service';
@@ -29,6 +30,19 @@ interface PagamentoResult {
   emv: string;
   qrCodeBase64: string;
 }
+interface LicenciamentoItemResult {
+  ano: string;
+  orgao: string | null;
+  descricao: string;
+  valor: number;
+  valorAPagar: number;
+}
+interface PagamentoLicenciamentoResult {
+  itens: LicenciamentoItemResult[];
+  total: number;
+  emv: string;
+  qrCodeBase64: string;
+}
 export interface ConsultaResult {
   placa: string;
   renavam: string;
@@ -36,6 +50,8 @@ export interface ConsultaResult {
   multas: MultaResult[];
   pagamentoTodas: PagamentoResult | null;
   boletoPdfBase64: string | null;
+  pagamentoLicenciamento: PagamentoLicenciamentoResult | null;
+  boletoLicenciamentoPdfBase64: string | null;
 }
 interface PagamentoJobResult {
   pagamento: PagamentoResult;
@@ -147,17 +163,22 @@ async function persistirConsulta(dispositivoId: string | null, uf: string, r: Co
   });
   if (!disp?.clienteId) throw new Error('Dispositivo sem cliente para a situação de multas');
 
-  // Estado anterior (para detectar multas novas) antes de substituir.
+  // Estado anterior (para detectar multas novas + transição do licenciamento) antes de substituir.
   const sitAntes = await prisma.veiculoMultaSituacao.findUnique({
     where: { dispositivoId },
-    select: { multas: { select: { ait: true } } },
+    select: { licenciamentoPendente: true, multas: { select: { ait: true } } },
   });
   const primeiraConsulta = !sitAntes;
   const aitsAntigos = new Set((sitAntes?.multas ?? []).map((m) => m.ait));
+  const licenciamentoPendenteAntes = sitAntes?.licenciamentoPendente ?? false;
 
   let boletoArquivo: string | null = null;
   if (r.boletoPdfBase64 && r.pagamentoTodas) {
     boletoArquivo = salvarBoleto(dispositivoId, `Extrato_${r.pagamentoTodas.extratoId}.pdf`, r.boletoPdfBase64);
+  }
+  let licenciamentoBoletoArquivo: string | null = null;
+  if (r.boletoLicenciamentoPdfBase64 && r.situacao.licenciamentoPendente) {
+    licenciamentoBoletoArquivo = salvarBoleto(dispositivoId, `Licenciamento_${r.placa}.pdf`, r.boletoLicenciamentoPdfBase64);
   }
   const valorTotal = (r.multas ?? []).reduce((s, m) => s + Number(m.valorAPagar ?? 0), 0);
 
@@ -173,6 +194,14 @@ async function persistirConsulta(dispositivoId: string | null, uf: string, r: Co
     pixEmv: r.pagamentoTodas?.emv ?? null,
     pixQrCodeBase64: r.pagamentoTodas?.qrCodeBase64 ?? null,
     boletoArquivo,
+    // Licenciamento (limpo quando não pendente para não deixar dado velho)
+    licenciamentoValor: r.pagamentoLicenciamento?.total ?? null,
+    licenciamentoItens: r.pagamentoLicenciamento
+      ? (r.pagamentoLicenciamento.itens as unknown as Prisma.InputJsonValue)
+      : Prisma.DbNull,
+    licenciamentoPixEmv: r.pagamentoLicenciamento?.emv ?? null,
+    licenciamentoPixQrCodeBase64: r.pagamentoLicenciamento?.qrCodeBase64 ?? null,
+    licenciamentoBoletoArquivo,
     ultimaConsultaEm: new Date(),
     ultimaConsultaStatus: 'OK',
     ultimaConsultaErro: null,
@@ -202,7 +231,7 @@ async function persistirConsulta(dispositivoId: string | null, uf: string, r: Co
     }
   });
 
-  await notificarConsultaCliente(disp.clienteId, dispositivoId, r, aitsAntigos, primeiraConsulta);
+  await notificarConsultaCliente(disp.clienteId, dispositivoId, r, aitsAntigos, primeiraConsulta, licenciamentoPendenteAntes);
 }
 
 // ─────────────────────────── Saúde do worker (heartbeat) ───────────────────────────
@@ -350,6 +379,7 @@ async function notificarConsultaCliente(
   r: ConsultaResult,
   aitsAntigos: Set<string>,
   primeiraConsulta: boolean,
+  licenciamentoPendenteAntes: boolean,
 ): Promise<void> {
   const login = await prisma.clienteLogin.findFirst({
     where: { clienteId, tipo: 'responsavel', ativo: true },
@@ -416,6 +446,27 @@ async function notificarConsultaCliente(
       });
     }
   }
+
+  // Licenciamento pendente: notifica só na transição (não-pendente → pendente) ou na
+  // 1ª consulta se já vier pendente. Sem lembrete de vencimento (o Detran não informa data).
+  if (r.situacao.licenciamentoPendente && (primeiraConsulta || !licenciamentoPendenteAntes)) {
+    const ano = r.pagamentoLicenciamento?.itens?.[0]?.ano || String(new Date().getFullYear());
+    const valor = r.pagamentoLicenciamento?.total;
+    const valorTxt = typeof valor === 'number' && valor > 0 ? ` (R$ ${valor.toFixed(2)})` : '';
+    await notificarClienteMulta(
+      login.id,
+      dispositivoId,
+      [`LIC:${ano}`],
+      'licenciamentoPendente',
+      hoje,
+      {
+        title: 'Licenciamento pendente',
+        body: `${r.placa}: licenciamento ${ano} pendente${valorTxt}.`,
+        mensagem: `Licenciamento pendente: ${r.placa} — licenciamento ${ano}${valorTxt} (Detran).`,
+      },
+      'licenciamento',
+    );
+  }
 }
 
 /**
@@ -427,9 +478,10 @@ async function notificarClienteMulta(
   clienteLoginId: string,
   dispositivoId: string,
   aits: string[],
-  tipo: 'multaNova' | 'multaVencimento7dias' | 'multaVencimentoHoje',
+  tipo: 'multaNova' | 'multaVencimento7dias' | 'multaVencimentoHoje' | 'licenciamentoPendente',
   dataReferencia: Date,
   payload: { title: string; body: string; mensagem: string },
+  origemTipo: 'multa' | 'licenciamento' = 'multa',
 ): Promise<void> {
   let algumNovo = false;
   for (const ait of aits) {
@@ -447,7 +499,7 @@ async function notificarClienteMulta(
       clienteLoginId,
       dispositivoId,
       tipoEvento: tipo,
-      origemTipo: 'multa',
+      origemTipo,
       origemId: aits.join(','),
       mensagem: payload.mensagem,
     },
@@ -591,5 +643,16 @@ export async function getDetalheVeiculo(dispositivoId: string) {
     })),
     pix: sit.pixEmv ? { emv: sit.pixEmv, qrCodeBase64: sit.pixQrCodeBase64 } : null,
     boletoUrl: sit.boletoArquivo,
+    licenciamento: {
+      pendente: sit.licenciamentoPendente,
+      valor: sit.licenciamentoValor != null ? Number(sit.licenciamentoValor) : null,
+      itens: (sit.licenciamentoItens as unknown as
+        | { ano: string; orgao: string | null; descricao: string; valor: number; valorAPagar: number }[]
+        | null) ?? null,
+      pix: sit.licenciamentoPixEmv
+        ? { emv: sit.licenciamentoPixEmv, qrCodeBase64: sit.licenciamentoPixQrCodeBase64 }
+        : null,
+      boletoUrl: sit.licenciamentoBoletoArquivo,
+    },
   };
 }

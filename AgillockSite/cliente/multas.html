@@ -178,6 +178,37 @@
 
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
+    // Bloco do licenciamento (Pix/QR/boleto já pré-gerados na consulta).
+    function licenciamentoHtml(v){
+      var L = v.licenciamento;
+      if (!L || !L.pendente) return '';
+      var ano = (L.itens && L.itens[0] && L.itens[0].ano) || '';
+      var itens = (L.itens || []).map(function(it){
+        return '<tr><td>'+esc(it.descricao)+'</td><td style="text-align:right;">'+AL.fmtMoney(it.valorAPagar)+'</td></tr>';
+      }).join('');
+      var tabela = itens
+        ? '<div class="multas-scroll"><table class="multas-tab"><thead><tr><th>Descrição</th><th style="text-align:right;">Valor</th></tr></thead><tbody>'+itens+'</tbody></table></div>'
+        : '';
+      var qr = (L.pix && L.pix.qrCodeBase64) ? '<img src="data:image/png;base64,'+L.pix.qrCodeBase64+'" style="width:180px;height:180px;" alt="QR Pix licenciamento">' : '';
+      var emv = (L.pix && L.pix.emv) ? L.pix.emv : '';
+      var pixBox = (emv || qr || L.boletoUrl)
+        ? '<div class="pix-box"><div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">'+
+            '<div>'+qr+'</div>'+
+            '<div style="flex:1;min-width:220px;">'+
+              '<div style="font-weight:600;margin-bottom:6px;">Pague o licenciamento com Pix</div>'+
+              (emv?'<div class="pix-emv" id="lic-emv-'+v.dispositivoId+'">'+esc(emv)+'</div>':'')+
+              '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">'+
+                (emv?'<button class="btn btn-xs btn-default" onclick="(function(){var t=document.getElementById(\'lic-emv-'+v.dispositivoId+'\').textContent;navigator.clipboard&&navigator.clipboard.writeText(t);AL_CLIENTE.showAlert(\'Pix copiado!\',\'success\');})()"><i class="fa fa-copy"></i> Copiar código Pix</button>':'')+
+                (L.boletoUrl?'<a class="btn btn-xs btn-primary" href="'+API+esc(L.boletoUrl)+'" target="_blank"><i class="fa fa-file-pdf-o"></i> Baixar boleto (PDF)</a>':'')+
+              '</div>'+
+            '</div></div></div>'
+        : '';
+      return '<div class="lic-box" style="margin-top:14px;">'+
+        '<div style="font-weight:600;margin-bottom:6px;color:#b71c1c;"><i class="fa fa-id-card-o"></i> Licenciamento '+esc(ano)+' pendente'+(L.valor?(' · '+AL.fmtMoney(L.valor)):'')+'</div>'+
+        tabela+pixBox+
+      '</div>';
+    }
+
     function cardHtml(v){
       var podePagar = AL.isResponsavel() || AL.can('multas.pagar');
       var badges = (v.possuiDebitoIpva ? '<span class="mini-badge b-err">Débito IPVA</span> ' : '') +
@@ -210,11 +241,15 @@
             '</div>' : '')+
           '<div class="pag-result" id="pag-'+v.dispositivoId+'"></div>';
       }
+      var licPend = !!(v.licenciamento && v.licenciamento.pendente);
+      var resumo = v.qtdMultas>0
+        ? '<span class="mini-badge b-err">'+v.qtdMultas+' multa'+(v.qtdMultas>1?'s':'')+'</span> · '+AL.fmtMoney(v.valorTotal)
+        : (licPend || v.possuiDebitoIpva ? '' : '<span class="mini-badge b-ok">Sem pendências</span>');
       return '<div class="veic-card">'+
         '<div class="veic-head"><span class="placa">'+esc(v.placa)+'</span>'+
         (v.apelido?'<span class="apelido">'+esc(v.apelido)+'</span>':'')+' '+badges+
-        '<span class="veic-resumo">'+(v.qtdMultas>0?('<span class="mini-badge b-err">'+v.qtdMultas+' multa'+(v.qtdMultas>1?'s':'')+'</span> · '+AL.fmtMoney(v.valorTotal)):'<span class="mini-badge b-ok">Sem multas</span>')+'</span></div>'+
-        '<div class="veic-body">'+corpo+'</div>'+
+        '<span class="veic-resumo">'+resumo+'</span></div>'+
+        '<div class="veic-body">'+corpo+licenciamentoHtml(v)+'</div>'+
       '</div>';
     }
 
@@ -245,9 +280,12 @@
       });
       if (!itens.length) return '<div class="combo-item" style="color:#999;cursor:default;">Nenhum veículo encontrado</div>';
       return itens.map(function(v){
+        var licPend = !!(v.licenciamento && v.licenciamento.pendente);
         var ind = v.qtdMultas>0
           ? '<span class="combo-ind ind-multa" title="Com multas">● '+v.qtdMultas+'</span>'
-          : '<span class="combo-ind ind-ok" title="Sem multas"><i class="fa fa-check"></i></span>';
+          : (licPend
+            ? '<span class="combo-ind ind-multa" title="Licenciamento pendente">● <i class="fa fa-id-card-o"></i></span>'
+            : '<span class="combo-ind ind-ok" title="Sem pendências"><i class="fa fa-check"></i></span>');
         return '<div class="combo-item" data-disp="'+v.dispositivoId+'"><span class="combo-placa">'+esc(v.placa)+'</span>'+
           (v.apelido?'<span class="combo-apelido">'+esc(v.apelido)+'</span>':'')+ind+'</div>';
       }).join('');
@@ -289,7 +327,7 @@
       box.innerHTML = comboHtml() + '<div id="veic-selecionado" style="margin-top:14px;"></div>';
       wireCombo(veiculos);
       var inicial = veiculos.filter(function(v){return v.dispositivoId===selDispId;})[0]
-        || veiculos.filter(function(v){return v.qtdMultas>0;})[0]
+        || veiculos.filter(function(v){return v.qtdMultas>0 || (v.licenciamento && v.licenciamento.pendente);})[0]
         || veiculos[0];
       document.getElementById('combo-busca').value = inicial.placa;
       mostrarVeiculo(inicial);

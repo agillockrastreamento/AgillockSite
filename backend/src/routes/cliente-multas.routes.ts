@@ -97,6 +97,17 @@ router.get('/', requirePermission('multas.ver'), async (req: ClienteRequest, res
       })),
       pix: s.pixEmv ? { emv: s.pixEmv, qrCodeBase64: s.pixQrCodeBase64 } : null,
       boletoUrl: s.boletoArquivo,
+      licenciamento: {
+        pendente: s.licenciamentoPendente,
+        valor: s.licenciamentoValor != null ? Number(s.licenciamentoValor) : null,
+        itens: (s.licenciamentoItens as unknown as
+          | { ano: string; orgao: string | null; descricao: string; valor: number; valorAPagar: number }[]
+          | null) ?? null,
+        pix: s.licenciamentoPixEmv
+          ? { emv: s.licenciamentoPixEmv, qrCodeBase64: s.licenciamentoPixQrCodeBase64 }
+          : null,
+        boletoUrl: s.licenciamentoBoletoArquivo,
+      },
     })),
   });
 });

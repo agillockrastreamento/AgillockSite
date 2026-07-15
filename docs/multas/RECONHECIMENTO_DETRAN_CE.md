@@ -41,7 +41,8 @@ Retorna HTML com a situação. Trechos relevantes a parsear:
 - **IPVA:** `Seu veículo possui débito(s) de IPVA. Clique AQUI para emitir o boleto.` → presença = possui débito.
 - **Licenciamento:** `Clique AQUI se deseja imprimir seu licenciamento.` → indica situação de licenciamento.
 
-> Para esta feature, IPVA e licenciamento são apenas **informativos** (possui / não possui). Não geramos boleto deles.
+> IPVA é apenas **informativo** (possui / não possui). O **licenciamento**, quando pendente,
+> agora também gera **Pix + boleto** (ver passo 7). Não geramos boleto de IPVA.
 
 ### 4. `GET /central/veiculos/multas` — tabela de multas (HTML)
 Enviar header `X-Requested-With: XMLHttpRequest`. Retorna um `<table>` com as colunas:
@@ -86,6 +87,21 @@ multas[VM00311778]=213890*VM00311778*5550*0
 - É o "Baixar boleto para pagamento à vista".
 
 > Parcelamento (não usado nesta feature): `GET /central/servicos/inicia_parcelamento_veiculo?extrato=<id>`.
+
+### 7. `GET /central/veiculos/licenciamento` — Pix + boleto do licenciamento (HTML)
+Quando o `principal` indica licenciamento pendente (`div.links-veiculo.licenciamento` com `alert-danger`),
+este endpoint devolve um **fragmento HTML** (o conteúdo do modal) que já traz tudo:
+- Tabela `#emissao-multas`: itens (ex.: "Licenciamento 2026", "Expedição de CRV/CRLV 2026"), valores e `#total`.
+- **Pix copia-e-cola**: `input#pix` (atributo `value`).
+- **QR Code**: `img#qrCodeImage` (`src="data:image/png;base64, ..."` — atenção ao espaço após a vírgula).
+- Form `#extrato_licenciamento` (action `/veiculos/gerar_boleto`, POST) com `authenticity_token`.
+
+Enviar header `X-Requested-With: XMLHttpRequest`. Este GET **prepara a sessão**: em seguida,
+`GET /central/veiculos/gerar_boleto` (o mesmo do passo 6) devolve o **PDF do boleto do licenciamento**
+(`application/pdf`, ~134 KB). Testado com a placa `PMX1H85` (licenciamento 2026, total R$ 220,45).
+
+> O Detran **não informa data de vencimento** do licenciamento (só o ano e o valor) — por isso não há
+> notificação de "7 dias / no dia" para licenciamento, apenas o aviso de "licenciamento pendente".
 
 ---
 
