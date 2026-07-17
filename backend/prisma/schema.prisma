@@ -80,6 +80,31 @@ model User {
   contratosCriados      Contrato[]                  @relation("ContratoCriador")
   adminPreferencia      AdminPreferencia?
   dispositivosResgate   UsuarioResgateDispositivo[]
+  reapontamentos        ReaponteHistorico[]         @relation("ReaponteCriador")
+}
+
+// Auditoria de cada envio de comando para o sistema anterior (monitorando.me),
+// feito pela tela admin "Trazer Dispositivos do Sistema Anterior". Guarda o
+// resumo (X OK / Y erro) e o log item a item para consulta posterior. A marca
+// "cliente já reapontado" é derivada do registro mais recente por clienteNome.
+model ReaponteHistorico {
+  id          String   @id @default(uuid())
+  clienteNome String // nome do cliente como veio do sistema anterior
+  clienteId   String? // Cliente daqui, quando o nome casa com um cadastro
+  comando     String // comando enviado (troca de servidor ou personalizado)
+  total       Int
+  ok          Int
+  erro        Int
+  itens       Json // [{ id, name, uniqueId, status, http, ok, entrega, resp }]
+  createdAt   DateTime @default(now())
+
+  criadoPorId String
+  criadoPor   User     @relation("ReaponteCriador", fields: [criadoPorId], references: [id])
+  cliente     Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  @@index([clienteNome])
+  @@index([clienteId])
+  @@index([createdAt])
 }
 
 model AdminPreferencia {
@@ -153,6 +178,7 @@ model Cliente {
   iaproVeiculos          IaproVeiculo[]
   motoristas             Motorista[]
   veiculosMultaSituacao  VeiculoMultaSituacao[]
+  reapontamentos         ReaponteHistorico[]
 }
 
 // Veículo de um contrato da IAPRO sincronizado via API. Enquanto não houver um

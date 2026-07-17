@@ -463,12 +463,12 @@
           '<span style="flex:1">IAPRO</span>' +
           '<span class="sidebar-badge" id="iapro-sidebar-badge" style="display:none;">0</span>' +
         '</a>';
-        // Insere logo após o item "Clientes"
-        var itemClientes = Array.prototype.find.call(navIapro.children, function (li) {
+        // Insere logo após o item "Cobranças"
+        var itemAncora = Array.prototype.find.call(navIapro.children, function (li) {
           var a = li.querySelector(':scope > a');
-          return a && /clientes\.html$/.test(a.getAttribute('href') || '');
+          return a && /cobrancas\.html$/.test(a.getAttribute('href') || '');
         });
-        if (itemClientes && itemClientes.nextSibling) navIapro.insertBefore(liIapro, itemClientes.nextSibling);
+        if (itemAncora && itemAncora.nextSibling) navIapro.insertBefore(liIapro, itemAncora.nextSibling);
         else navIapro.appendChild(liIapro);
 
         // Badge: quantidade de veículos da IAPRO ainda sem rastreador instalado

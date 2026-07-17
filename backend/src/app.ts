@@ -30,6 +30,7 @@ import usuariosResgateRoutes from './routes/usuarios-resgate.routes';
 import tagsBleRoutes from './routes/tags-ble.routes';
 import appResgateRoutes from './routes/app-resgate.routes';
 import integracaoIaproRoutes from './routes/integracao-iapro.routes';
+import integracaoAnteriorRoutes from './routes/integracao-anterior.routes';
 import iaproRoutes from './routes/iapro.routes';
 import workerRoutes from './routes/worker.routes';
 import multasAdminRoutes from './routes/multas-admin.routes';
@@ -101,6 +102,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/compartilhamento', compartilhamentoRoutes); // público — ANTES de routers com authMiddleware global
 app.use('/api/integracao/iapro', integracaoIaproRoutes);  // server-to-server IAPRO (API key própria)
+app.use('/api/integracao/anterior', integracaoAnteriorRoutes); // proxy sistema anterior (JWT ADMIN/COLABORADOR)
 app.use('/api/worker', workerRoutes);                     // server-to-server worker de multas (WORKER_API_KEY)
 app.use('/api/iapro', iaproRoutes);                       // tela IAPRO do painel admin (JWT)
 app.use('/api/multas', multasAdminRoutes);                // multas — painel admin (JWT ADMIN/COLABORADOR)

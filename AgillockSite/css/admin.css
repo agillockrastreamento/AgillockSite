@@ -915,8 +915,15 @@ html.dark-theme .filter-bar { background: #1e2530; }
     .admin-sidebar {
         transform: translateX(-240px);
         -webkit-overflow-scrolling: touch;
-        /* Scroll isolado apenas nos links de menu, como no desktop */
+        /* No mobile a sidebar inteira rola (brand + nav + rodapé). Sem isto, em
+           telas baixas (tablet em retrato) o conteúdo passa da altura e o rodapé
+           era cortado, pois o .sidebar-nav perde o scroll (flex:none abaixo). */
+        overflow-y: auto;
     }
+    /* Anula o overflow:hidden do desktop no sidebar do cliente (com wrapper) e
+       deixa o scroll único ser o da própria .admin-sidebar. */
+    .admin-sidebar:has(> .sidebar-scroll) { overflow-y: auto; }
+    .sidebar-scroll { flex: 0 0 auto; overflow: visible; min-height: 0; }
     .admin-sidebar.open {
         transform: translateX(0);
         box-shadow: 4px 0 20px rgba(0,0,0,.3);

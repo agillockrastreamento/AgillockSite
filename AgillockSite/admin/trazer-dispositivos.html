@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>if(localStorage.getItem('al-theme')==='dark')document.documentElement.classList.add('dark-theme');</script>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+  <title>Trazer do Sistema Anterior — AgilLock Admin</title>
+  <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/admin.css" />
+  <style>
+    .mt-tabs { border-bottom:2px solid #e5e7eb; margin-bottom:14px; }
+    .mt-tabs a { display:inline-block; padding:8px 16px; color:#555; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:600; }
+    .mt-tabs a.active { color:#0a58ca; border-bottom-color:#0a58ca; }
+    html.dark-theme .mt-tabs a { color:#9aa4b2; }
+    html.dark-theme .mt-tabs a.active { color:#6ea8fe; border-bottom-color:#6ea8fe; }
+    .mini-badge { font-size:11px; padding:2px 7px; border-radius:10px; font-weight:600; white-space:nowrap; }
+    .b-ok { background:#e3f9e5; color:#1b7a2f; } .b-err { background:#fdecea; color:#b71c1c; }
+    .b-warn { background:#fff4e0; color:#a35b00; } .b-neutral { background:#eceff3; color:#556; }
+    .b-info { background:#e6f0ff; color:#0a58ca; }
+    html.dark-theme .b-neutral { background:#222a35; color:#9aa4b2; }
+    html.dark-theme .b-info { background:#16233a; color:#8bb4ff; }
+    .step-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:16px 18px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+    html.dark-theme .step-card { background:#141820; border-color:#2a3340; }
+    .step-tag { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.5px; padding:2px 8px; border-radius:6px; background:#0a58ca; color:#fff; margin-right:8px; vertical-align:middle; }
+    .step-tag.s2 { background:#a35b00; }
+    .step-title { font-size:16px; font-weight:700; margin:0 0 4px; }
+    .step-sub { font-size:12px; color:#777; margin:0 0 12px; }
+    html.dark-theme .step-sub { color:#9aa4b2; }
+    .counters { display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 4px; }
+    .counter { flex:1; min-width:120px; background:#f7f8fa; border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; text-align:center; }
+    html.dark-theme .counter { background:#0e1116; border-color:#2a3340; }
+    .counter .num { font-size:22px; font-weight:700; line-height:1; }
+    .counter .lbl { font-size:11px; color:#777; margin-top:4px; }
+    html.dark-theme .counter .lbl { color:#9aa4b2; }
+    .cli-card { background:#f7f8fa; border:1px solid #e5e7eb; border-radius:8px; padding:12px 14px; margin-bottom:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+    html.dark-theme .cli-card { background:#0e1116; border-color:#2a3340; }
+    .cli-nome { font-weight:700; font-size:15px; }
+    .cli-meta { font-size:12px; color:#777; }
+    html.dark-theme .cli-meta { color:#9aa4b2; }
+    .btn-wa { background:#25d366; border-color:#25d366; color:#fff; }
+    .btn-wa:hover { background:#1eb257; color:#fff; }
+    .table-responsive { background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+    html.dark-theme .table-responsive { background:#141820; }
+    .adv-toggle { font-size:13px; color:#0a58ca; cursor:pointer; user-select:none; }
+    html.dark-theme .adv-toggle { color:#6ea8fe; }
+    .log-panel { background:#0e1116; color:#cbd5e1; font-family:monospace; font-size:12px; border-radius:8px; padding:12px; max-height:340px; overflow:auto; white-space:pre-wrap; }
+    .log-ok { color:#7ee2a0; } .log-queue { color:#e6c589; } .log-err { color:#ff9c9c; }
+    .code-inline { font-family:monospace; background:#f1f3f5; padding:2px 6px; border-radius:4px; font-size:12px; }
+    html.dark-theme .code-inline { background:#0e1116; color:#cbd5e1; }
+    .msg-box { width:100%; min-height:200px; font-family:monospace; font-size:12px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../img/logo_agillock_white_new.png" alt="AgilLock" style="height:36px;vertical-align:middle;" onerror="this.style.display='none'" />
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="dashboard.html"><i class="fa fa-tachometer fa-fw"></i> Dashboard</a></li>
+      <li><a href="clientes.html"><i class="fa fa-users fa-fw"></i> Clientes</a></li>
+      <li><a href="dispositivos.html"><i class="fa fa-microchip fa-fw"></i> Dispositivos</a></li>
+      <li class="active"><a href="trazer-dispositivos.html"><i class="fa fa-download fa-fw"></i> Trazer do Sistema Anterior</a></li>
+      <li class="sidebar-dropdown">
+        <a href="#" class="dropdown-toggle-link">
+          <i class="fa fa-tv fa-fw"></i>
+          <span style="flex:1">Área de Controle</span>
+          <i class="fa fa-chevron-down sidebar-arrow"></i>
+        </a>
+        <ul class="sidebar-submenu">
+          <li><a href="rastreamento.html"><i class="fa fa-map-marker fa-fw"></i> Rastreamento</a></li>
+          <li><a href="relatorio.html"><i class="fa fa-bar-chart fa-fw"></i> Relatório</a></li>
+          <li><a href="comandos.html"><i class="fa fa-terminal fa-fw"></i> Comandos</a></li>
+          <li><a href="motoristas.html"><i class="fa fa-id-card-o fa-fw"></i> Motoristas</a></li>
+          <li><a href="logs-dispositivos.html"><i class="fa fa-file-text-o fa-fw"></i> Logs Dispositivos</a></li>
+          <li><a href="manutencoes.html"><i class="fa fa-wrench fa-fw"></i> Manutenções</a></li>
+          <li><a href="notificacoes.html"><i class="fa fa-bell fa-fw"></i> Notificações</a></li>
+          <li><a href="usuarios-resgate.html"><i class="fa fa-life-ring fa-fw"></i> Usuários Resgate</a></li>
+          <li><a href="geocerca.html"><i class="fa fa-object-group fa-fw"></i> Geocercas</a></li>
+        </ul>
+      </li>
+      <li><a href="gerar-cobranca.html"><i class="fa fa-file-text fa-fw"></i> Gerar Cobrança</a></li>
+      <li><a href="cobrancas.html"><i class="fa fa-money fa-fw"></i> Cobranças</a></li>
+      <li><a href="multas.html"><i class="fa fa-gavel fa-fw"></i> Multas</a></li>
+      <li><a href="contratos.html"><i class="fa fa-pencil-square-o fa-fw"></i> Contratos</a></li>
+      <li><a href="colaboradores.html"><i class="fa fa-user fa-fw"></i> Colaboradores</a></li>
+      <li><a href="vendedores.html"><i class="fa fa-handshake-o fa-fw"></i> Vendedores</a></li>
+      <li><a href="configuracoes.html"><i class="fa fa-cog fa-fw"></i> Configurações</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <span id="user-nome" class="sidebar-user-nome">—</span>
+        <span id="user-badge" class="al-badge" style="margin-top:4px;"></span>
+      </div>
+      <button id="btn-tema" class="btn-tema-sidebar"></button>
+      <button id="btn-logout" class="btn-logout"><i class="fa fa-sign-out"></i> Sair</button>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Conteúdo principal -->
+  <div class="admin-content">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+        <h2 class="topbar-title">Trazer do Sistema Anterior</h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="conf-status" class="mini-badge b-neutral">verificando…</span>
+      </div>
+    </div>
+
+    <div id="al-alert-container"></div>
+
+    <div class="step-sub" style="margin-bottom:12px;">
+      <i class="fa fa-info-circle"></i> Consulte os dispositivos de um cliente no sistema antigo (monitorando), reaponte os rastreadores para a AgilLock e envie o acesso ao cliente pelo WhatsApp.
+    </div>
+
+    <!-- Abas -->
+    <div class="mt-tabs">
+      <a href="#" data-tab="reapontar" class="active">Reapontar</a>
+      <a href="#" data-tab="historico">Histórico</a>
+    </div>
+
+    <!-- ===================== ABA REAPONTAR ===================== -->
+    <div id="tab-reapontar">
+
+      <!-- ETAPA 1 -->
+      <div class="step-card">
+        <p class="step-title"><span class="step-tag">ETAPA 1</span> Consultar cliente no sistema anterior</p>
+        <p class="step-sub">Casa pelo nome (ignora acento/maiúsculas) e aceita nome parcial. Nada é enviado nesta etapa — é só consulta.</p>
+        <div class="row">
+          <div class="col-sm-8" style="margin-bottom:8px;">
+            <input type="text" id="in-cliente" class="form-control" placeholder="Nome do cliente (ex: CONCEPT RENT A CAR)" />
+          </div>
+          <div class="col-sm-4" style="margin-bottom:8px;">
+            <button class="btn btn-primary-al btn-block" id="btn-consultar"><i class="fa fa-search"></i> Consultar</button>
+          </div>
+        </div>
+        <span class="adv-toggle" id="adv-toggle"><i class="fa fa-sliders"></i> Opções avançadas</span>
+        <div id="adv-box" style="display:none;margin-top:10px;">
+          <div class="row">
+            <div class="col-sm-3" style="margin-bottom:8px;">
+              <label style="font-size:12px;">Dígitos do IMEI</label>
+              <input type="number" id="in-digitos" class="form-control" value="15" min="0" />
+              <span class="step-sub">15 = rastreadores GT06 reais. 0 = todos.</span>
+            </div>
+            <div class="col-sm-9" style="margin-bottom:8px;">
+              <label style="font-size:12px;">Placas específicas (opcional, separadas por vírgula)</label>
+              <input type="text" id="in-placas" class="form-control" placeholder="ABC1234, XYZ9876 — vazio = todos os veículos do cliente" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTADO DA CONSULTA -->
+      <div id="consulta-resultado" style="display:none;">
+
+        <div class="step-card">
+          <p class="step-title" style="margin-bottom:10px;"><i class="fa fa-list"></i> Resultado da consulta</p>
+          <div class="counters" id="counters"></div>
+          <div id="clientes-locais" style="margin-top:12px;"></div>
+
+          <div class="table-responsive" style="margin-top:12px;">
+            <table class="admin-table table">
+              <thead><tr>
+                <th style="width:34px;text-align:center;"><input type="checkbox" id="chk-todos" checked></th>
+                <th>IMEI</th><th>Veículo</th><th style="text-align:center;">Status</th>
+                <th>Cliente</th><th style="text-align:center;">Existe aqui</th>
+              </tr></thead>
+              <tbody id="tbody-alvos"></tbody>
+            </table>
+          </div>
+          <div class="step-sub" style="margin-top:6px;"><span id="sel-count">0</span> selecionado(s) de <span id="tot-count">0</span>.
+            <a href="#" id="sel-todos">Selecionar todos</a> · <a href="#" id="sel-nenhum">limpar</a></div>
+        </div>
+
+        <!-- ETAPA 2 -->
+        <div class="step-card">
+          <p class="step-title"><span class="step-tag s2">ETAPA 2</span> Enviar comando aos dispositivos selecionados</p>
+          <p class="step-sub">Por padrão envia o comando de <b>troca de servidor</b> (traz o rastreador para a AgilLock). Você também pode enviar um <b>comando personalizado</b> para um, vários ou todos os dispositivos selecionados do cliente.</p>
+
+          <div style="margin-bottom:8px;">
+            <label style="font-size:12px;"><input type="radio" name="modo-cmd" value="padrao" checked> Trazer para a AgilLock (troca de servidor)</label>
+            &nbsp;&nbsp;
+            <label style="font-size:12px;"><input type="radio" name="modo-cmd" value="custom"> Comando personalizado</label>
+          </div>
+          <div id="cmd-padrao-box" class="step-sub">Comando: <span class="code-inline" id="cmd-padrao-txt">SERVER,0,72.62.13.73,5023,0#</span></div>
+          <div id="cmd-custom-box" style="display:none;">
+            <label style="font-size:12px;"><i class="fa fa-star-o"></i> Comandos favoritos</label>
+            <select id="in-favorito" class="form-control" style="margin-bottom:8px;">
+              <option value="">— escolher um comando pronto —</option>
+            </select>
+            <input type="text" id="in-comando" class="form-control" placeholder="Ex: RELAY,1#  ou  ST300NTW;${dispositivo};02;..." />
+            <span class="step-sub">Use <span class="code-inline">${dispositivo}</span> para inserir o IMEI de cada equipamento no comando (ex: Suntech).</span>
+          </div>
+
+          <div style="margin-top:12px;">
+            <button class="btn btn-primary-al" id="btn-reapontar"><i class="fa fa-bolt"></i> Enviar para <span id="btn-reapontar-n">0</span> dispositivo(s)</button>
+          </div>
+        </div>
+
+        <!-- LOG -->
+        <div class="step-card" id="log-card" style="display:none;">
+          <p class="step-title" style="margin-bottom:10px;"><i class="fa fa-terminal"></i> Log do envio</p>
+          <div class="log-panel" id="log-panel"></div>
+          <div id="log-resumo" style="margin-top:10px;font-weight:700;"></div>
+          <div style="margin-top:10px;">
+            <button class="btn btn-default" id="btn-planilha"><i class="fa fa-file-excel-o"></i> Baixar planilha (.xlsx)</button>
+            <button class="btn btn-default" id="btn-copiar-log"><i class="fa fa-copy"></i> Copiar log</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===================== ABA HISTÓRICO ===================== -->
+    <div id="tab-historico" style="display:none;">
+      <div class="table-responsive">
+        <table class="admin-table table">
+          <thead><tr>
+            <th>Data</th><th>Cliente</th><th>Por</th><th>Comando</th>
+            <th style="text-align:center;">Total</th><th style="text-align:center;">OK</th><th style="text-align:center;">Erro</th>
+          </tr></thead>
+          <tbody id="tbody-historico"><tr><td colspan="7" style="text-align:center;color:#888;">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal confirmação -->
+  <div class="modal fade" id="modal-confirmar" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header"><button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title"><i class="fa fa-exclamation-triangle" style="color:#a35b00;"></i> Confirmar envio</h4></div>
+        <div class="modal-body" id="confirmar-body">…</div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary-al" id="btn-confirmar-envio"><i class="fa fa-bolt"></i> Enviar agora</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal WhatsApp -->
+  <div class="modal fade" id="modal-wa" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header"><button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title"><i class="fa fa-whatsapp" style="color:#25d366;"></i> Enviar acesso pelo WhatsApp</h4></div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-sm-6" style="margin-bottom:8px;">
+              <label style="font-size:12px;">Telefone (com DDD)</label>
+              <input type="text" id="wa-tel" class="form-control" placeholder="(85) 99999-9999" />
+            </div>
+            <div class="col-sm-6" style="margin-bottom:8px;">
+              <label style="font-size:12px;">Login (e-mail do cliente)</label>
+              <input type="text" id="wa-login" class="form-control" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-sm-6" style="margin-bottom:8px;">
+              <label style="font-size:12px;">Senha</label>
+              <div style="display:flex;gap:6px;">
+                <input type="text" id="wa-senha" class="form-control" />
+                <button class="btn btn-default" id="wa-gerar-senha" title="Sugerir senha"><i class="fa fa-random"></i></button>
+              </div>
+            </div>
+            <div class="col-sm-6" style="margin-bottom:8px;padding-top:22px;">
+              <button class="btn btn-default btn-block" id="wa-definir-senha"><i class="fa fa-key"></i> Definir esta senha no login do cliente</button>
+            </div>
+          </div>
+          <label style="font-size:12px;">Mensagem</label>
+          <textarea id="wa-msg" class="form-control msg-box"></textarea>
+          <span class="step-sub">Os campos <span class="code-inline">Login</span> e <span class="code-inline">Senha</span> acima atualizam a mensagem automaticamente.</span>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>
+          <button type="button" class="btn btn-wa" id="wa-abrir"><i class="fa fa-whatsapp"></i> Abrir no WhatsApp</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/jquery.js"></script>
+  <script src="../js/bootstrap.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/auth-guard.js"></script>
+  <script>
+  (function () {
+    var API = window.API_URL || '';
+    var CMD_PADRAO = 'SERVER,0,72.62.13.73,5023,0#';
+
+    // Comandos favoritos (presets prontos). Suntech usa ${dispositivo} = IMEI do equipamento.
+    var FAVORITOS = [
+      { grupo: 'GT06 (porta 5023)', itens: [
+        { label: 'Troca de servidor — SERVER', valor: 'SERVER,0,72.62.13.73,5023,0#' },
+        { label: 'Troca de servidor — #IP (senha 888888)', valor: '#IP,888888,72.62.13.73,5023,1#' },
+      ] },
+      { grupo: 'Suntech (porta 5011)', itens: [
+        { label: 'ST300 — troca de servidor (usa IMEI)', valor: 'ST300NTW;${dispositivo};02;-;-;-;-;72.62.13.73;-;-;-;;' },
+      ] },
+      { grupo: 'STG (porta 5058)', itens: [
+        { label: 'Troca de servidor — AS1234', valor: 'AS1234*269#1,72.62.13.73,5058,1#' },
+        { label: 'Troca de servidor — SPJLX', valor: '*SPJLX*P:753869*U:72.62.13.73,5058,1,#' },
+      ] },
+    ];
+
+    var currentUser = AL.requireAuth(['ADMIN', 'COLABORADOR']);
+    if (!currentUser) return;
+    document.getElementById('user-nome').textContent = currentUser.nome || '—';
+    var ub = document.getElementById('user-badge');
+    ub.textContent = currentUser.role;
+    ub.className = 'al-badge ' + (currentUser.role === 'ADMIN' ? 'badge-ativo' : 'badge-pendente');
+    document.getElementById('sidebar-toggle').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    });
+    document.getElementById('btn-logout').addEventListener('click', AL.logout);
+    AL.initThemeToggle('btn-tema');
+
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+    // Estado
+    var consulta = null;      // resposta da /consultar
+    var ultimoResultado = null; // resposta da /reapontar (para planilha/copiar)
+
+    // ── Abas ──
+    document.querySelectorAll('.mt-tabs a').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        document.querySelectorAll('.mt-tabs a').forEach(function(x){x.classList.remove('active');});
+        this.classList.add('active');
+        var tab = this.dataset.tab;
+        document.getElementById('tab-reapontar').style.display = tab==='reapontar'?'':'none';
+        document.getElementById('tab-historico').style.display = tab==='historico'?'':'none';
+        if (tab==='historico') loadHistorico();
+      });
+    });
+
+    // ── Status da integração ──
+    AL.apiGet('/api/integracao/anterior/status').then(function(s){
+      var el = document.getElementById('conf-status');
+      if (s.configurado){ el.className='mini-badge b-ok'; el.innerHTML='<i class="fa fa-plug"></i> Conectado ao sistema anterior'; }
+      else { el.className='mini-badge b-err'; el.innerHTML='<i class="fa fa-plug"></i> Credencial não configurada'; }
+    }).catch(function(){});
+
+    // ── Opções avançadas ──
+    document.getElementById('adv-toggle').addEventListener('click', function(){
+      var b = document.getElementById('adv-box');
+      b.style.display = b.style.display==='none' ? '' : 'none';
+    });
+
+    // ── Modo do comando (padrão x custom) ──
+    document.querySelectorAll('input[name="modo-cmd"]').forEach(function(r){
+      r.addEventListener('change', function(){
+        var custom = document.querySelector('input[name="modo-cmd"]:checked').value === 'custom';
+        document.getElementById('cmd-custom-box').style.display = custom ? '' : 'none';
+        document.getElementById('cmd-padrao-box').style.display = custom ? 'none' : '';
+      });
+    });
+
+    // ── Comandos favoritos ──
+    (function initFavoritos(){
+      var sel = document.getElementById('in-favorito');
+      FAVORITOS.forEach(function(g){
+        var og = document.createElement('optgroup');
+        og.label = g.grupo;
+        g.itens.forEach(function(it){
+          var op = document.createElement('option');
+          op.value = it.valor;
+          op.textContent = it.label;
+          og.appendChild(op);
+        });
+        sel.appendChild(og);
+      });
+      sel.addEventListener('change', function(){
+        if (!this.value) return;
+        document.getElementById('in-comando').value = this.value;
+      });
+    })();
+
+    // ── Consultar ──
+    document.getElementById('btn-consultar').addEventListener('click', consultar);
+    document.getElementById('in-cliente').addEventListener('keydown', function(e){ if(e.key==='Enter') consultar(); });
+
+    function consultar(){
+      var nome = document.getElementById('in-cliente').value.trim();
+      if (!nome){ AL.showAlert('Digite o nome do cliente.'); return; }
+      var digitos = document.getElementById('in-digitos').value;
+      var placas = document.getElementById('in-placas').value.trim();
+      var qs = '?cliente=' + encodeURIComponent(nome) + '&digitos=' + encodeURIComponent(digitos || '15');
+      if (placas) qs += '&placa=' + encodeURIComponent(placas);
+
+      var btn = document.getElementById('btn-consultar');
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Consultando…';
+      AL.apiGet('/api/integracao/anterior/consultar'+qs).then(function(d){
+        consulta = d;
+        renderConsulta(d);
+        document.getElementById('consulta-resultado').style.display='';
+        document.getElementById('log-card').style.display='none';
+        ultimoResultado = null;
+      }).catch(function(err){ AL.showAlert(err.message); })
+        .then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    }
+
+    function renderConsulta(d){
+      // Contadores
+      document.getElementById('counters').innerHTML =
+        counter(d.totalNaConta, 'No sistema antigo') +
+        counter(d.encontrados, 'Alvos (IMEI ' + d.digitos + ' díg)') +
+        counter(d.online, 'Online') +
+        counter(d.offline, 'Offline') +
+        counter(d.excluidosPorTamanho, 'Excluídos (IMEI ≠ ' + d.digitos + ')');
+
+      // Cartões de cliente (match local + WhatsApp)
+      var locais = d.clientesLocais || [];
+      document.getElementById('clientes-locais').innerHTML = locais.map(function(c){
+        var jaRe = c.ultimoReaponte ? '<span class="mini-badge b-info" title="'+esc(c.ultimoReaponte.ok)+' OK / '+esc(c.ultimoReaponte.erro)+' erro">Reapontado em '+AL.fmtDate(c.ultimoReaponte.createdAt)+'</span>' : '<span class="mini-badge b-warn">Nunca reapontado</span>';
+        var existe = c.clienteId ? '<span class="mini-badge b-ok">Cadastrado aqui · '+esc(c.dispositivosLocais)+' disp.</span>' : '<span class="mini-badge b-neutral">Sem cadastro aqui</span>';
+        var waBtn = (c.clienteId && c.telefone)
+          ? '<button class="btn btn-xs btn-wa btn-wa-open" data-nome="'+esc(c.nome)+'"><i class="fa fa-whatsapp"></i> Enviar acesso</button>'
+          : '<button class="btn btn-xs btn-default" disabled title="Sem cadastro/telefone aqui"><i class="fa fa-whatsapp"></i> Enviar acesso</button>';
+        return '<div class="cli-card">'+
+          '<div><div class="cli-nome">'+esc(c.nome)+'</div>'+
+            '<div class="cli-meta">'+(c.telefone?('<i class="fa fa-phone"></i> '+esc(c.telefone)+' &nbsp; '):'')+ (c.loginEmail?('<i class="fa fa-user"></i> '+esc(c.loginEmail)):'') +'</div>'+
+            '<div style="margin-top:4px;">'+existe+' '+jaRe+'</div></div>'+
+          '<div>'+waBtn+'</div></div>';
+      }).join('');
+      document.querySelectorAll('.btn-wa-open').forEach(function(b){ b.onclick=function(){ abrirWhatsApp(this.dataset.nome); }; });
+
+      // Tabela de alvos
+      var tb = document.getElementById('tbody-alvos');
+      if (!d.alvos.length){ tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#888;">Nenhum dispositivo encontrado para este cliente/critério.</td></tr>'; }
+      else {
+        tb.innerHTML = d.alvos.map(function(a){
+          var st = a.status==='online' ? '<span class="mini-badge b-ok">online</span>' : '<span class="mini-badge b-neutral">offline</span>';
+          var existe = a.existeAqui
+            ? '<span class="mini-badge b-ok" title="IMEI já importado na AgilLock"><i class="fa fa-check"></i> Já existe</span>'
+            : '<span class="mini-badge b-warn" title="IMEI ainda não importado na AgilLock"><i class="fa fa-plus"></i> Novo</span>';
+          return '<tr>'+
+            '<td style="text-align:center;"><input type="checkbox" class="chk-alvo" data-id="'+a.id+'" checked></td>'+
+            '<td><code>'+esc(a.uniqueId)+'</code></td>'+
+            '<td>'+esc(a.name)+'</td>'+
+            '<td style="text-align:center;">'+st+'</td>'+
+            '<td>'+esc(a.cliente)+'</td>'+
+            '<td style="text-align:center;">'+existe+'</td>'+
+          '</tr>';
+        }).join('');
+      }
+      document.getElementById('chk-todos').checked = true;
+      document.querySelectorAll('.chk-alvo').forEach(function(c){ c.addEventListener('change', atualizarSelecao); });
+      atualizarSelecao();
+    }
+
+    function counter(num, lbl){
+      return '<div class="counter"><div class="num">'+esc(num)+'</div><div class="lbl">'+esc(lbl)+'</div></div>';
+    }
+
+    function alvosSelecionados(){
+      if (!consulta) return [];
+      var ids = {};
+      document.querySelectorAll('.chk-alvo:checked').forEach(function(c){ ids[c.dataset.id]=true; });
+      return consulta.alvos.filter(function(a){ return ids[String(a.id)]; });
+    }
+
+    function atualizarSelecao(){
+      var n = document.querySelectorAll('.chk-alvo:checked').length;
+      var tot = document.querySelectorAll('.chk-alvo').length;
+      document.getElementById('sel-count').textContent = n;
+      document.getElementById('tot-count').textContent = tot;
+      document.getElementById('btn-reapontar-n').textContent = n;
+    }
+
+    document.getElementById('chk-todos').addEventListener('change', function(){
+      var v = this.checked;
+      document.querySelectorAll('.chk-alvo').forEach(function(c){ c.checked=v; });
+      atualizarSelecao();
+    });
+    document.getElementById('sel-todos').addEventListener('click', function(e){ e.preventDefault(); document.getElementById('chk-todos').checked=true; document.querySelectorAll('.chk-alvo').forEach(function(c){c.checked=true;}); atualizarSelecao(); });
+    document.getElementById('sel-nenhum').addEventListener('click', function(e){ e.preventDefault(); document.getElementById('chk-todos').checked=false; document.querySelectorAll('.chk-alvo').forEach(function(c){c.checked=false;}); atualizarSelecao(); });
+
+    // ── Reapontar (com confirmação) ──
+    function comandoEscolhido(){
+      var custom = document.querySelector('input[name="modo-cmd"]:checked').value === 'custom';
+      if (!custom) return null; // null = usa o padrão no backend
+      var c = document.getElementById('in-comando').value.trim();
+      return c || null;
+    }
+
+    document.getElementById('btn-reapontar').addEventListener('click', function(){
+      var alvos = alvosSelecionados();
+      if (!alvos.length){ AL.showAlert('Selecione ao menos um dispositivo.'); return; }
+      var cmd = comandoEscolhido();
+      var custom = document.querySelector('input[name="modo-cmd"]:checked').value === 'custom';
+      if (custom && !cmd){ AL.showAlert('Digite o comando personalizado.'); return; }
+      document.getElementById('confirmar-body').innerHTML =
+        '<p>Vai enviar o comando <span class="code-inline">'+esc(cmd || CMD_PADRAO)+'</span> para <b>'+alvos.length+' dispositivo(s)</b>.</p>'+
+        (custom ? '<p style="color:#a35b00;"><i class="fa fa-exclamation-triangle"></i> Comando personalizado — confira antes de enviar.</p>' : '<p class="step-sub">Os online recebem na hora; os offline ficam enfileirados e recebem ao reconectar.</p>');
+      $('#modal-confirmar').modal('show');
+    });
+
+    document.getElementById('btn-confirmar-envio').addEventListener('click', function(){
+      $('#modal-confirmar').modal('hide');
+      enviarReaponte();
+    });
+
+    function enviarReaponte(){
+      var alvos = alvosSelecionados();
+      var cmd = comandoEscolhido();
+      var btn = document.getElementById('btn-reapontar');
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Enviando…';
+      document.getElementById('log-card').style.display='';
+      document.getElementById('log-panel').textContent = 'Enviando comando para '+alvos.length+' dispositivo(s)…';
+      document.getElementById('log-resumo').textContent = '';
+      var payload = { alvos: alvos.map(function(a){ return { id:a.id, name:a.name, uniqueId:a.uniqueId, status:a.status, cliente:a.cliente }; }) };
+      if (cmd) payload.comando = cmd;
+      AL.apiPost('/api/integracao/anterior/reapontar', payload).then(function(r){
+        ultimoResultado = r;
+        renderLog(r);
+      }).catch(function(err){
+        document.getElementById('log-panel').innerHTML = '<span class="log-err">'+esc(err.message)+'</span>';
+      }).then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    }
+
+    function renderLog(r){
+      var linhas = r.itens.map(function(i, idx){
+        var cls = !i.ok ? 'log-err' : (i.entrega==='enfileirado' ? 'log-queue' : 'log-ok');
+        var tag = !i.ok ? ('ERRO '+(i.http||'')) : ('OK '+(i.http||'')+' ('+i.entrega+')');
+        return '<span class="'+cls+'">['+ (idx+1) +'/'+r.total+'] '+esc(tag)+'  '+esc(i.uniqueId||'')+'  '+esc(i.name||'')+ (i.resp?('  '+esc(i.resp)):'') +'</span>';
+      }).join('\n');
+      document.getElementById('log-panel').innerHTML = linhas;
+      var cls = r.erro===0 ? 'b-ok' : (r.ok===0 ? 'b-err' : 'b-warn');
+      document.getElementById('log-resumo').innerHTML = '<span class="mini-badge '+cls+'">RESUMO: '+r.ok+' OK, '+r.erro+' com erro (de '+r.total+')</span>';
+    }
+
+    // ── Planilha (.xlsx) ──
+    document.getElementById('btn-planilha').addEventListener('click', function(){
+      if (!ultimoResultado){ AL.showAlert('Nada para exportar.'); return; }
+      var nome = (consulta && consulta.clientes && consulta.clientes[0]) || 'reapontamento';
+      var btn = this; var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i>';
+      fetch(API + '/api/integracao/anterior/planilha', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+localStorage.getItem('al_token') },
+        body: JSON.stringify({ itens: ultimoResultado.itens, clienteNome: nome, comando: ultimoResultado.comando })
+      }).then(function(res){ if(!res.ok) throw new Error('Falha ao gerar planilha'); return res.blob(); })
+        .then(function(blob){
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href=url; a.download='reaponte_'+String(nome).replace(/[^a-z0-9]+/gi,'_').toLowerCase()+'.xlsx';
+          document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        }).catch(function(err){ AL.showAlert(err.message); })
+        .then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    });
+
+    document.getElementById('btn-copiar-log').addEventListener('click', function(){
+      var t = document.getElementById('log-panel').textContent;
+      if (navigator.clipboard) navigator.clipboard.writeText(t);
+      AL.showAlert('Log copiado!', 'success');
+    });
+
+    // ── WhatsApp ──
+    function suggestSenha(){ return 'agil' + Math.floor(1000 + Math.random()*9000); }
+    function montarMensagem(login, senha){
+      return 'Seja bem-vindo(a) à Ágil Lock! 🚗📍\n\n' +
+        'Baixe o app e acesse sua conta:\n\n' +
+        '📱 iOS\n' +
+        'https://apps.apple.com/br/app/%C3%A1gil-lock-gest%C3%A3o-de-risco/id6774812970\n\n' +
+        '🤖 Android\n' +
+        'https://play.google.com/store/apps/details?id=br.com.agillock.cliente\n\n' +
+        '💻 Acesso Web\n' +
+        'www.agillock.com.br\n\n' +
+        'Login: ' + (login || '') + '\n' +
+        'Senha: ' + (senha || '');
+    }
+    var waClienteId = null;
+    function abrirWhatsApp(nome){
+      var c = (consulta.clientesLocais || []).filter(function(x){ return x.nome===nome; })[0];
+      if (!c){ AL.showAlert('Cliente não encontrado.'); return; }
+      waClienteId = c.clienteId;
+      document.getElementById('wa-tel').value = c.telefone || '';
+      document.getElementById('wa-login').value = c.loginEmail || '';
+      var senha = suggestSenha();
+      document.getElementById('wa-senha').value = senha;
+      document.getElementById('wa-msg').value = montarMensagem(c.loginEmail || '', senha);
+      $('#modal-wa').modal('show');
+    }
+    function refreshMsg(){
+      document.getElementById('wa-msg').value = montarMensagem(document.getElementById('wa-login').value, document.getElementById('wa-senha').value);
+    }
+    document.getElementById('wa-login').addEventListener('input', refreshMsg);
+    document.getElementById('wa-senha').addEventListener('input', refreshMsg);
+    document.getElementById('wa-gerar-senha').addEventListener('click', function(){ document.getElementById('wa-senha').value = suggestSenha(); refreshMsg(); });
+    document.getElementById('wa-definir-senha').addEventListener('click', function(){
+      var senha = document.getElementById('wa-senha').value;
+      if (!waClienteId){ AL.showAlert('Cliente sem cadastro aqui.'); return; }
+      if (!senha || senha.length<6){ AL.showAlert('A senha deve ter ao menos 6 caracteres.'); return; }
+      var btn=this; var old=btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i>';
+      AL.apiPut('/api/clientes/'+waClienteId+'/login', { senha: senha }).then(function(){
+        AL.showAlert('Senha definida no login do cliente.', 'success');
+      }).catch(function(err){ AL.showAlert(err.message); }).then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    });
+    document.getElementById('wa-abrir').addEventListener('click', function(){
+      var tel = (document.getElementById('wa-tel').value || '').replace(/\D/g,'');
+      if (!tel){ AL.showAlert('Informe o telefone.'); return; }
+      if (tel.length <= 11) tel = '55' + tel; // adiciona DDI Brasil se veio só com DDD
+      var msg = encodeURIComponent(document.getElementById('wa-msg').value);
+      window.open('https://wa.me/'+tel+'?text='+msg, '_blank');
+    });
+
+    // ── Histórico ──
+    function loadHistorico(){
+      var tb = document.getElementById('tbody-historico');
+      tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888;">Carregando…</td></tr>';
+      AL.apiGet('/api/integracao/anterior/historico').then(function(rows){
+        if (!rows.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888;">Nenhum reapontamento registrado.</td></tr>'; return; }
+        tb.innerHTML = rows.map(function(h){
+          var cls = h.erro===0 ? 'b-ok' : (h.ok===0 ? 'b-err' : 'b-warn');
+          return '<tr>'+
+            '<td>'+AL.fmtDate(h.createdAt)+'</td>'+
+            '<td>'+esc(h.clienteNome)+'</td>'+
+            '<td>'+esc(h.criadoPor && h.criadoPor.nome || '—')+'</td>'+
+            '<td><code style="font-size:11px;">'+esc(h.comando)+'</code></td>'+
+            '<td style="text-align:center;">'+h.total+'</td>'+
+            '<td style="text-align:center;"><span class="mini-badge '+cls+'">'+h.ok+'</span></td>'+
+            '<td style="text-align:center;">'+h.erro+'</td>'+
+          '</tr>';
+        }).join('');
+      }).catch(function(err){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#b71c1c;">'+esc(err.message)+'</td></tr>'; });
+    }
+
+  })();
+  </script>
+</body>
+</html>
