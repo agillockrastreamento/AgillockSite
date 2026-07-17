@@ -3,7 +3,7 @@ import EmailService from './email.service';
 import { reverseGeocode } from '../utils/reverse-geocode';
 import ExpoPushService from './expo-push.service';
 
-type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null; clienteId?: string | null };
+type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null; clienteId?: string | null; eventosAdminHabilitado?: boolean };
 
 const MOTOR_OCIOSO_LIMITE_MS = 5 * 60 * 1000;          // 5 min parado com motor ligado
 const MOVIMENTO_COOLDOWN_MS = 5 * 60 * 1000;           // intervalo mínimo entre alertas de movimento
@@ -342,7 +342,7 @@ class NotificationService {
         return wsEvent;
       }
 
-      if ((tipo === 'geofenceEnter' || tipo === 'geofenceExit') && (dados.origemTipo === 'ADMIN' || dados.origemTipo === 'CLIENTE')) {
+      if (dispositivo.eventosAdminHabilitado !== false && (tipo === 'geofenceEnter' || tipo === 'geofenceExit') && (dados.origemTipo === 'ADMIN' || dados.origemTipo === 'CLIENTE')) {
         const clienteAdminRef = (dados.origemTipo === 'CLIENTE' && dados.clienteId)
           ? clientesParaProcessar.find(c => c.id === dados.clienteId)
           : clientesParaProcessar[0];
@@ -368,8 +368,9 @@ class NotificationService {
         }
       }
 
-      // Cria evento admin para tipos não-geocerca (geocerca já tem bloco dedicado acima)
-      if (tipo !== 'geofenceEnter' && tipo !== 'geofenceExit') {
+      // Cria evento admin para tipos não-geocerca (geocerca já tem bloco dedicado acima).
+      // Dispositivo com eventos-admin desativados não notifica o admin (o cliente segue normal).
+      if (dispositivo.eventosAdminHabilitado !== false && tipo !== 'geofenceEnter' && tipo !== 'geofenceExit') {
         await this._criarEventoAdmin(tipo, dispositivo, dados, clientesMap).catch(
           err => console.error('[Notif] Erro ao criar evento admin:', err.message),
         );

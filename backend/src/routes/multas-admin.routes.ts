@@ -55,7 +55,9 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '30'), 10) || 30));
   const busca = String(req.query.busca ?? '').trim();
 
-  const where: any = {};
+  // Só veículos habilitados para multas — os desabilitados somem da tela sem perder
+  // o histórico já coletado (voltam a aparecer se o admin religar o switch).
+  const where: any = { dispositivo: { is: { multasHabilitado: true } } };
   if (req.query.clienteId) where.clienteId = String(req.query.clienteId);
   if (req.query.status) where.ultimaConsultaStatus = String(req.query.status);
   if (req.query.comMultas === 'true') where.qtdMultas = { gt: 0 };
@@ -111,10 +113,14 @@ router.post('/:dispositivoId/consultar', async (req: AuthRequest, res: Response)
   const dispositivoId = String(req.params.dispositivoId);
   const disp = await prisma.dispositivo.findUnique({
     where: { id: dispositivoId },
-    select: { id: true, placa: true, renavam: true, chassi: true },
+    select: { id: true, placa: true, renavam: true, chassi: true, multasHabilitado: true },
   });
   if (!disp) {
     res.status(404).json({ error: 'Dispositivo não encontrado.' });
+    return;
+  }
+  if (!disp.multasHabilitado) {
+    res.status(403).json({ error: 'Consulta de multas não habilitada para este veículo.' });
     return;
   }
   const jobId = await criarJobConsulta(disp, 'MANUAL_ADMIN');
@@ -136,10 +142,14 @@ router.post('/:dispositivoId/pagamento', async (req: AuthRequest, res: Response)
   const aits = Array.isArray(req.body?.aits) ? (req.body.aits as string[]) : undefined;
   const disp = await prisma.dispositivo.findUnique({
     where: { id: dispositivoId },
-    select: { id: true, placa: true, renavam: true, chassi: true },
+    select: { id: true, placa: true, renavam: true, chassi: true, multasHabilitado: true },
   });
   if (!disp) {
     res.status(404).json({ error: 'Dispositivo não encontrado.' });
+    return;
+  }
+  if (!disp.multasHabilitado) {
+    res.status(403).json({ error: 'Consulta de multas não habilitada para este veículo.' });
     return;
   }
   const jobId = await criarJobPagamento(disp, aits, 'MANUAL_ADMIN');

@@ -5,7 +5,7 @@ import { initTraccarWebSocket, broadcastTrackingEvents } from './services/tracca
 import FinanceiroNotificationService from './services/financeiro-notification.service';
 import ContratoClicksignSyncService from './services/contrato-clicksign-sync.service';
 import NotificationService from './services/notification.service';
-import { iniciarConsultaLote } from './services/multas.service';
+import { iniciarConsultaLote, fecharLotesExpirados } from './services/multas.service';
 
 const PORT = process.env.PORT || 3000;
 
@@ -77,6 +77,17 @@ function agendarConsultaMultas() {
   }, delay);
 }
 agendarConsultaMultas();
+
+// Fecha lotes de multas que ficaram abertos (worker offline não reivindica os jobs, então
+// nada os contabiliza). É o que garante o resumo ao admin mesmo quando a consulta não roda.
+function agendarFechamentoLotesMultas(delayMs: number) {
+  setTimeout(() => {
+    fecharLotesExpirados()
+      .catch((err) => console.error('[Multas] Erro ao fechar lotes expirados:', err))
+      .finally(() => agendarFechamentoLotesMultas(15 * 60 * 1000));
+  }, delayMs);
+}
+agendarFechamentoLotesMultas(3 * 60 * 1000);
 
 httpServer.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);

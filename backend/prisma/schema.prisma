@@ -329,6 +329,17 @@ model Dispositivo {
   // Padrão desativado: só aparece no mapa da IAPRO quando o admin ativar explicitamente.
   exibirNoMapaIapro Boolean @default(false)
 
+  // Consulta de multas (Detran): recorte por veículo dentro de um cliente já habilitado
+  // (Cliente.multasHabilitado). Um cliente pode ter 10 veículos e querer consultar só 3.
+  // Padrão desativado: o veículo só entra no lote quando o admin ativar explicitamente.
+  // Desativado = não é consultado e não aparece na tela de multas do site/app.
+  multasHabilitado Boolean @default(false)
+
+  // Eventos/notificações deste dispositivo para o ADMIN (área de eventos + tempo real).
+  // Desativado, o admin para de receber os eventos deste veículo; o CLIENTE continua
+  // recebendo normalmente conforme as preferências dele (PreferenciaNotificacao).
+  eventosAdminHabilitado Boolean @default(true)
+
   clienteId   String?
   cliente     Cliente? @relation(fields: [clienteId], references: [id])
   vendedorId  String?

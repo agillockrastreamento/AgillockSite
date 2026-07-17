@@ -389,6 +389,32 @@
         <p style="margin-top:10px;font-size:13px;color:#888;margin-bottom:0;">Quando o cliente é da IAPRO, este dispositivo aparece no Mapa de Veículos da IAPRO somente se estiver marcado. Desmarque para veículos do cliente que não são protegidos pela IAPRO.</p>
       </div>
 
+      <!-- Card Multas -->
+      <div class="card-section">
+        <h5><i class="fa fa-gavel"></i> Consulta de Multas</h5>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="d-multas-habilitado" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="d-multas-habilitado-label" style="font-size:13px;font-weight:600;">Não consultar multas deste veículo</span>
+        </div>
+        <p style="margin-top:10px;font-size:13px;color:#888;margin-bottom:0;">Quando ativo, este veículo entra na consulta automática de multas do Detran (placa + RENAVAM) e aparece na tela de Multas do site e do app. Desativado, o veículo é ignorado na consulta e não aparece para o cliente. Requer o cliente também habilitado para multas.</p>
+      </div>
+
+      <!-- Card Eventos (admin) -->
+      <div class="card-section">
+        <h5><i class="fa fa-bell"></i> Eventos (admin)</h5>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="d-eventos-admin" checked />
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="d-eventos-admin-label" style="font-size:13px;font-weight:600;">Enviando eventos ao admin</span>
+        </div>
+        <p style="margin-top:10px;font-size:13px;color:#888;margin-bottom:0;">Quando ativo, os eventos/notificações deste dispositivo chegam ao painel do admin. Ao desativar, o admin para de receber os eventos deste veículo — o cliente continua recebendo normalmente conforme as preferências dele.</p>
+      </div>
+
       <!-- Card Imagem -->
       <div class="card-section">
         <h5><i class="fa fa-image"></i> Imagem</h5>
@@ -625,6 +651,16 @@
       document.getElementById('d-exibir-iapro-label').textContent = this.checked ? 'Exibir no mapa da IAPRO' : 'Oculto no mapa da IAPRO';
     });
 
+    // ── Toggle Multas ─────────────────────────────────────────────────────
+    document.getElementById('d-multas-habilitado').addEventListener('change', function() {
+      document.getElementById('d-multas-habilitado-label').textContent = this.checked ? 'Consultar multas deste veículo' : 'Não consultar multas deste veículo';
+    });
+
+    // ── Toggle Eventos (admin) ────────────────────────────────────────────
+    document.getElementById('d-eventos-admin').addEventListener('change', function() {
+      document.getElementById('d-eventos-admin-label').textContent = this.checked ? 'Enviando eventos ao admin' : 'Eventos ao admin desativados';
+    });
+
     // ── Busca de clientes ─────────────────────────────────────────────────
     var clienteTimer = null;
     document.getElementById('d-cliente-busca').addEventListener('input', function() {
@@ -820,6 +856,12 @@
       var exibirIapro = d.exibirNoMapaIapro !== false;
       document.getElementById('d-exibir-iapro').checked = exibirIapro;
       document.getElementById('d-exibir-iapro-label').textContent = exibirIapro ? 'Exibir no mapa da IAPRO' : 'Oculto no mapa da IAPRO';
+      var multasHab = d.multasHabilitado === true;
+      document.getElementById('d-multas-habilitado').checked = multasHab;
+      document.getElementById('d-multas-habilitado-label').textContent = multasHab ? 'Consultar multas deste veículo' : 'Não consultar multas deste veículo';
+      var eventosAdmin = d.eventosAdminHabilitado !== false;
+      document.getElementById('d-eventos-admin').checked = eventosAdmin;
+      document.getElementById('d-eventos-admin-label').textContent = eventosAdmin ? 'Enviando eventos ao admin' : 'Eventos ao admin desativados';
       // Imagem existente
       if (d.imagemUrl) {
         document.getElementById('img-preview-wrap').innerHTML =
@@ -880,6 +922,8 @@
       formData.append('ignorarOdometro', document.getElementById('d-ignorar-odometro').checked ? 'true' : 'false');
       formData.append('manutencaoAtiva', document.getElementById('d-manutencao-ativa').checked ? 'true' : 'false');
       formData.append('exibirNoMapaIapro', document.getElementById('d-exibir-iapro').checked ? 'true' : 'false');
+      formData.append('multasHabilitado', document.getElementById('d-multas-habilitado').checked ? 'true' : 'false');
+      formData.append('eventosAdminHabilitado', document.getElementById('d-eventos-admin').checked ? 'true' : 'false');
       formData.append('mapa', document.getElementById('d-mapa').value || '1');
       formData.append('clienteId', document.getElementById('d-cliente-id').value);
       formData.append('clientesExtras', JSON.stringify(clientesExtras.map(function(c){ return c.id; })));

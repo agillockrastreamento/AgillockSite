@@ -38,14 +38,15 @@ router.get('/', requirePermission('multas.ver'), async (req: ClienteRequest, res
   const clienteId = req.cliente!.clienteId;
   const [sits, dispositivos] = await Promise.all([
     prisma.veiculoMultaSituacao.findMany({
-      where: { clienteId },
+      // Só veículos habilitados pelo admin para consulta de multas.
+      where: { clienteId, dispositivo: { is: { multasHabilitado: true } } },
       include: {
         multas: { orderBy: { dataVencimento: 'asc' } },
         dispositivo: { select: { apelidoCliente: true, nome: true } },
       },
     }),
     prisma.dispositivo.findMany({
-      where: { clienteId, ativo: true, placa: { not: null } },
+      where: { clienteId, ativo: true, placa: { not: null }, multasHabilitado: true },
       select: {
         id: true, placa: true, apelidoCliente: true, nome: true,
         renavam: true, chassi: true,
@@ -124,10 +125,14 @@ router.patch('/:dispositivoId/documentos', requirePermission('multas.editarDocum
   }
   const disp = await prisma.dispositivo.findFirst({
     where: { id: dispositivoId, clienteId: req.cliente!.clienteId },
-    select: { id: true, placa: true, renavam: true, chassi: true },
+    select: { id: true, placa: true, renavam: true, chassi: true, multasHabilitado: true },
   });
   if (!disp) {
     res.status(404).json({ error: 'Veículo não encontrado.' });
+    return;
+  }
+  if (!disp.multasHabilitado) {
+    res.status(403).json({ error: 'Consulta de multas não habilitada para este veículo.' });
     return;
   }
 
@@ -179,10 +184,14 @@ router.post('/:dispositivoId/pagamento', requirePermission('multas.pagar'), asyn
   }
   const disp = await prisma.dispositivo.findFirst({
     where: { id: dispositivoId, clienteId: req.cliente!.clienteId },
-    select: { id: true, placa: true, renavam: true, chassi: true },
+    select: { id: true, placa: true, renavam: true, chassi: true, multasHabilitado: true },
   });
   if (!disp) {
     res.status(404).json({ error: 'Veículo não encontrado.' });
+    return;
+  }
+  if (!disp.multasHabilitado) {
+    res.status(403).json({ error: 'Consulta de multas não habilitada para este veículo.' });
     return;
   }
   const aits = Array.isArray(req.body?.aits) ? (req.body.aits as string[]) : undefined;

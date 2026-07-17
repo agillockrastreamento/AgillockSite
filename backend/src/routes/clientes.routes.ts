@@ -290,10 +290,11 @@ router.patch('/:id/multas-habilitado', requireRoles('ADMIN', 'COLABORADOR'), asy
     select: { id: true, nome: true, multasHabilitado: true },
   });
 
-  // Ao habilitar, dispara uma consulta inicial (assíncrona) dos veículos elegíveis.
+  // Ao habilitar, dispara uma consulta inicial (assíncrona) dos veículos elegíveis —
+  // só os que também estão habilitados individualmente para multas.
   if (cliente.multasHabilitado) {
     const disps = await prisma.dispositivo.findMany({
-      where: { clienteId: id, ativo: true, placa: { not: null }, OR: [{ renavam: { not: null } }, { chassi: { not: null } }] },
+      where: { clienteId: id, ativo: true, placa: { not: null }, multasHabilitado: true, OR: [{ renavam: { not: null } }, { chassi: { not: null } }] },
       select: { id: true, placa: true, renavam: true, chassi: true },
     });
     for (const d of disps) await criarJobConsulta(d, 'MANUAL_ADMIN');

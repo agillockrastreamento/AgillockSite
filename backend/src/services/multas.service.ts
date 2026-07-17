@@ -8,10 +8,12 @@ import { Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
 import { UPLOADS_DIR } from '../utils/upload-paths';
 import ExpoPushService from './expo-push.service';
+import { broadcastTrackingEvents } from './traccar.ws';
 
 const MULTAS_DIR = path.join(UPLOADS_DIR, 'multas');
 const MAX_TENTATIVAS = 5;
 const TRAVADO_MIN = 10; // job PROCESSANDO parado há mais de X min = worker travou
+const LOTE_TIMEOUT_MIN = 120; // lote EM_ANDAMENTO por mais de X min = worker nunca pegou os jobs
 
 // ─────────────────────────── Tipos do resultado do worker ───────────────────────────
 
@@ -76,10 +78,41 @@ export async function recuperarJobsTravados(): Promise<void> {
     where: { status: 'PROCESSANDO', claimedEm: { lt: limite }, tentativas: { lt: MAX_TENTATIVAS } },
     data: { status: 'PENDENTE' },
   });
-  await prisma.consultaJob.updateMany({
+
+  // Excedeu as tentativas: encerra em ERRO — mas um a um, porque cada job precisa ser
+  // contabilizado no log do seu lote. Sem isso o log fica preso em EM_ANDAMENTO e o
+  // resumo nunca chega ao admin.
+  const desistidos = await prisma.consultaJob.findMany({
     where: { status: 'PROCESSANDO', claimedEm: { lt: limite }, tentativas: { gte: MAX_TENTATIVAS } },
-    data: { status: 'ERRO', erro: 'Excedeu tentativas (worker travou?)' },
+    select: { id: true, logId: true },
   });
+  for (const job of desistidos) {
+    const upd = await prisma.consultaJob.updateMany({
+      where: { id: job.id, status: 'PROCESSANDO' },
+      data: { status: 'ERRO', erro: 'Excedeu tentativas (worker travou?)' },
+    });
+    if (upd.count === 1 && job.logId) await contabilizarNoLog(job.logId, false, 0);
+  }
+}
+
+/**
+ * Fecha lotes parados em EM_ANDAMENTO há tempo demais. Com o worker offline os jobs
+ * nunca são reivindicados, então nada os contabiliza: sem este fechamento o log fica
+ * aberto para sempre e o admin não recebe o resumo de que a consulta não aconteceu.
+ */
+export async function fecharLotesExpirados(): Promise<void> {
+  const limite = new Date(Date.now() - LOTE_TIMEOUT_MIN * 60_000);
+  const lotes = await prisma.consultaMultaLog.findMany({
+    where: { status: 'EM_ANDAMENTO', inicioEm: { lt: limite } },
+    select: { id: true },
+  });
+  for (const lote of lotes) {
+    const orfaos = await prisma.consultaJob.updateMany({
+      where: { logId: lote.id, status: { in: ['PENDENTE', 'PROCESSANDO'] } },
+      data: { status: 'ERRO', erro: `Lote expirado após ${LOTE_TIMEOUT_MIN} min (worker offline?)` },
+    });
+    await contabilizarNoLog(lote.id, false, 0, orfaos.count, true);
+  }
 }
 
 /** Reivindica o próximo job PENDENTE de forma atômica. Retorna null se não houver. */
@@ -256,7 +289,20 @@ export async function getWorkerStatus() {
 // ─────────────────────────── Lote agendado + histórico (ConsultaMultaLog) ───────────────────────────
 
 /**
- * Cria um lote de consulta: 1 job CONSULTA_VEICULO por veículo de cliente habilitado
+ * Um veículo só entra na consulta de multas quando o CLIENTE está habilitado
+ * (Cliente.multasHabilitado) E o próprio veículo está habilitado pelo admin
+ * (Dispositivo.multasHabilitado, padrão desligado) — assim um cliente com 10
+ * veículos pode ter só 3 consultados. Mesmo recorte usado nas telas do cliente.
+ */
+export const WHERE_VEICULO_MULTAS = {
+  ativo: true,
+  placa: { not: null },
+  multasHabilitado: true,
+  cliente: { is: { multasHabilitado: true } },
+} satisfies Prisma.DispositivoWhereInput;
+
+/**
+ * Cria um lote de consulta: 1 job CONSULTA_VEICULO por veículo habilitado
  * (com placa + renavam/chassi). Veículos habilitados SEM renavam/chassi são ignorados
  * (não dá para consultar no Detran). Ver docs/multas/SCHEDULER.md.
  */
@@ -265,9 +311,7 @@ export async function iniciarConsultaLote(
 ): Promise<{ logId: string; elegiveis: number; ignorados: number }> {
   const dispositivos = await prisma.dispositivo.findMany({
     where: {
-      ativo: true,
-      placa: { not: null },
-      cliente: { is: { multasHabilitado: true } },
+      ...WHERE_VEICULO_MULTAS,
       OR: [{ renavam: { not: null } }, { chassi: { not: null } }],
     },
     select: { id: true, clienteId: true, placa: true, renavam: true, chassi: true },
@@ -275,13 +319,7 @@ export async function iniciarConsultaLote(
 
   // Veículos habilitados que NÃO podem ser consultados por falta de renavam/chassi.
   const ignorados = await prisma.dispositivo.count({
-    where: {
-      ativo: true,
-      placa: { not: null },
-      cliente: { is: { multasHabilitado: true } },
-      renavam: null,
-      chassi: null,
-    },
+    where: { ...WHERE_VEICULO_MULTAS, renavam: null, chassi: null },
   });
 
   const clientesDistintos = new Set(dispositivos.map((d) => d.clienteId)).size;
@@ -295,10 +333,9 @@ export async function iniciarConsultaLote(
   });
 
   if (dispositivos.length === 0) {
-    await prisma.consultaMultaLog.update({
-      where: { id: log.id },
-      data: { status: 'OK', fimEm: new Date(), duracaoMs: 0 },
-    });
+    // Nada a consultar: fecha pelo mesmo caminho dos demais lotes, para o admin ser
+    // avisado de que a rodada aconteceu sem veículos elegíveis.
+    await fecharLog(log);
     return { logId: log.id, elegiveis: 0, ignorados };
   }
 
@@ -316,43 +353,52 @@ export async function iniciarConsultaLote(
   return { logId: log.id, elegiveis: dispositivos.length, ignorados };
 }
 
-/** Veículos de clientes habilitados que estão sem renavam/chassi (não consultáveis). */
+/** Veículos habilitados que estão sem renavam/chassi (não consultáveis). */
 export async function listarVeiculosIncompletos() {
   const disp = await prisma.dispositivo.findMany({
-    where: {
-      ativo: true,
-      placa: { not: null },
-      renavam: null,
-      chassi: null,
-      cliente: { is: { multasHabilitado: true } },
-    },
+    where: { ...WHERE_VEICULO_MULTAS, renavam: null, chassi: null },
     select: { id: true, placa: true, cliente: { select: { nome: true } } },
     orderBy: { placa: 'asc' },
   });
   return disp.map((d) => ({ dispositivoId: d.id, placa: d.placa, clienteNome: d.cliente?.nome ?? '' }));
 }
 
-/** Contabiliza um veículo no log do lote e fecha o log (+ notifica admin) quando todos terminam. */
-async function contabilizarNoLog(logId: string, sucesso: boolean, multasCount: number): Promise<void> {
-  await prisma.consultaMultaLog.update({
-    where: { id: logId },
-    data: {
-      veiculosComSucesso: sucesso ? { increment: 1 } : undefined,
-      veiculosComErro: sucesso ? undefined : { increment: 1 },
-      multasColetadas: sucesso && multasCount ? { increment: multasCount } : undefined,
-    },
-  });
+/**
+ * Contabiliza veículo(s) no log do lote e fecha o log (+ notifica o admin) quando todos
+ * terminam. `quantidade` > 1 e `forcarFechamento` servem ao fechamento por expiração,
+ * onde vários jobs órfãos caem de uma vez e o lote fecha mesmo incompleto.
+ */
+async function contabilizarNoLog(
+  logId: string,
+  sucesso: boolean,
+  multasCount: number,
+  quantidade = 1,
+  forcarFechamento = false,
+): Promise<void> {
+  if (quantidade > 0) {
+    await prisma.consultaMultaLog.update({
+      where: { id: logId },
+      data: {
+        veiculosComSucesso: sucesso ? { increment: quantidade } : undefined,
+        veiculosComErro: sucesso ? undefined : { increment: quantidade },
+        multasColetadas: sucesso && multasCount ? { increment: multasCount } : undefined,
+      },
+    });
+  }
 
   const log = await prisma.consultaMultaLog.findUnique({ where: { id: logId } });
   if (!log) return;
-  if (log.veiculosComSucesso + log.veiculosComErro < log.veiculosConsultados) return;
+  if (!forcarFechamento && log.veiculosComSucesso + log.veiculosComErro < log.veiculosConsultados) return;
+  await fecharLog(log);
+}
 
+/** Fecha o log do lote e notifica o admin. O guard EM_ANDAMENTO → status garante 1 notificação. */
+async function fecharLog(log: LogResumo & { id: string }): Promise<void> {
   const status = log.veiculosComErro === 0 ? 'OK' : log.veiculosComSucesso === 0 ? 'ERRO' : 'PARCIAL';
   const fimEm = new Date();
   const duracaoMs = fimEm.getTime() - new Date(log.inicioEm).getTime();
-  // guard: só quem efetivamente fecha (EM_ANDAMENTO → status) notifica o admin
   const upd = await prisma.consultaMultaLog.updateMany({
-    where: { id: logId, status: 'EM_ANDAMENTO' },
+    where: { id: log.id, status: 'EM_ANDAMENTO' },
     data: { status, fimEm, duracaoMs },
   });
   if (upd.count === 1) await notificarResumoAdmin({ ...log, status, duracaoMs });
@@ -494,7 +540,7 @@ async function notificarClienteMulta(
   }
   if (!algumNovo) return;
 
-  await prisma.eventoNotificacao.create({
+  const evento = await prisma.eventoNotificacao.create({
     data: {
       clienteLoginId,
       dispositivoId,
@@ -509,6 +555,26 @@ async function notificarClienteMulta(
     body: payload.body,
     data: { tipo, ait: aits.join(',') },
   });
+
+  // Portal do cliente aberto recebe na hora (o push cobre só o app).
+  const disp = await prisma.dispositivo.findUnique({
+    where: { id: dispositivoId },
+    select: { traccarId: true },
+  });
+  if (disp?.traccarId) {
+    broadcastTrackingEvents([
+      {
+        deviceId: disp.traccarId,
+        type: tipo,
+        tipoLabel: payload.title,
+        serverTime: evento.createdAt.toISOString(),
+        mensagem: payload.mensagem,
+        origemTipo,
+        origemId: aits.join(','),
+        adminEvento: false,
+      },
+    ]);
+  }
 }
 
 interface LogResumo {
@@ -522,14 +588,19 @@ interface LogResumo {
   multasColetadas: number;
 }
 
-/** Evento de resumo ao admin (área de eventos do admin), sem push. */
+/** Evento de resumo ao admin: grava no histórico e envia em tempo real pelo WS. */
 async function notificarResumoAdmin(log: LogResumo): Promise<void> {
   const ref = await prisma.clienteLogin.findFirst({
     where: { tipo: 'responsavel' },
     select: { id: true },
     orderBy: { createdAt: 'asc' },
   });
-  if (!ref) return; // sem nenhum login de cliente, não há como ancorar o evento
+  if (!ref) {
+    // EventoNotificacao.clienteLoginId é obrigatório e serve de âncora; sem nenhum
+    // login de cliente no sistema não há onde ancorar o resumo.
+    console.warn('[Multas] Resumo do lote não notificado: nenhum login de cliente para ancorar o evento.');
+    return;
+  }
 
   const hora = new Date(log.inicioEm).toLocaleTimeString('pt-BR', {
     timeZone: 'America/Sao_Paulo',
@@ -543,15 +614,31 @@ async function notificarResumoAdmin(log: LogResumo): Promise<void> {
   if (log.status === 'ERRO') {
     tipoEvento = 'consultaMultasErro';
     mensagem = `Consulta de multas (${hora}): FALHOU — ${log.veiculosComErro} veículo(s) com erro.`;
+  } else if (log.veiculosConsultados === 0) {
+    tipoEvento = 'consultaMultasConcluida';
+    mensagem = `Consulta de multas (${hora}): concluída — nenhum veículo habilitado para consulta.`;
   } else {
     tipoEvento = 'consultaMultasConcluida';
     const rot = log.status === 'PARCIAL' ? 'parcial' : 'concluída';
     mensagem = `Consulta de multas (${hora}): ${rot} — ${log.multasColetadas} multas de ${log.clientesConsultados} cliente(s) (${log.veiculosConsultados} veículos: ${log.veiculosComSucesso} ok, ${log.veiculosComErro} erro) em ${dur}.`;
   }
 
-  await prisma.eventoNotificacao.create({
+  const evento = await prisma.eventoNotificacao.create({
     data: { clienteLoginId: ref.id, tipoEvento, adminEvento: true, origemTipo: 'consultaMultas', mensagem },
   });
+
+  // Sem o broadcast o admin só via o resumo ao recarregar a tela de rastreamento.
+  // Evento sem deviceId: o filtro por dispositivo do WS o entrega apenas ao admin.
+  broadcastTrackingEvents([
+    {
+      type: tipoEvento,
+      tipoLabel: tipoEvento === 'consultaMultasErro' ? 'Falha na Consulta de Multas' : 'Consulta de Multas (Detran)',
+      serverTime: evento.createdAt.toISOString(),
+      mensagem,
+      origemTipo: 'consultaMultas',
+      adminEvento: true,
+    },
+  ]);
 }
 
 // ─────────────────────────── Helpers para a API (jobs sob demanda + leitura) ───────────────────────────

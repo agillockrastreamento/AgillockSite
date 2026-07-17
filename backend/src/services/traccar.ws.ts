@@ -26,6 +26,7 @@ const WS_TRACCAR_URL = TRACCAR_URL.replace('http://', 'ws://').replace('https://
 interface FrontendClientContext {
   dispositivoIdsPermitidos: Set<string> | null;
   filtraBoletos: boolean; // vinculados não veem boletos
+  ehAdmin?: boolean; // conexão de admin/colaborador — filtra eventos de dispositivos com eventos-admin desligados
   // Preferências de notificação web do admin (mapa tipoEvento → habilitado).
   // Presente só quando o admin desabilitou ao menos um tipo; aí os eventos cujo
   // tipo está marcado como `false` não são enviados a essa conexão.
@@ -89,7 +90,7 @@ function filtrarPorContexto<T>(
 }
 
 function payloadParaContexto(payload: Record<string, unknown>, ctx: FrontendClientContext): Record<string, unknown> | null {
-  if (ctx.dispositivoIdsPermitidos === null && !ctx.filtraBoletos && !ctx.adminPrefs) return payload;
+  if (ctx.dispositivoIdsPermitidos === null && !ctx.filtraBoletos && !ctx.adminPrefs && !ctx.ehAdmin) return payload;
   const result: Record<string, unknown> = {};
   if (Array.isArray(payload.positions)) {
     const f = filtrarPorContexto(payload.positions as Array<{ deviceId?: number }>, ctx, (p) => p.deviceId ?? null);
@@ -100,8 +101,14 @@ function payloadParaContexto(payload: Record<string, unknown>, ctx: FrontendClie
     if (f.length) result.devices = f;
   }
   if (Array.isArray(payload.events)) {
-    let evts = payload.events as Array<{ deviceId?: number; type?: string; tipo?: string }>;
-    
+    let evts = payload.events as Array<{ deviceId?: number; type?: string; tipo?: string; eventosAdminHabilitado?: boolean }>;
+
+    // Dispositivo com eventos-admin desligados: o admin não recebe os eventos dele em
+    // tempo real (o cliente continua recebendo, pois o filtro só vale para conexões admin).
+    if (ctx.ehAdmin) {
+      evts = evts.filter((e) => e.eventosAdminHabilitado !== false);
+    }
+
     if (ctx.adminPrefs) {
       evts = evts.filter((e) => {
         const t = (e.type || e.tipo || '').toString();
@@ -200,6 +207,7 @@ async function resolveContexto(token: string | null): Promise<FrontendClientCont
     return {
       dispositivoIdsPermitidos: null,
       filtraBoletos: false,
+      ehAdmin: true,
       adminPrefs,
     };
   } catch {}
@@ -368,6 +376,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       select: {
         identificador: true,
         id: true,
+        eventosAdminHabilitado: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } },
         clientesVinculados: { include: { cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } } } },
@@ -600,6 +609,8 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       evt.lat = pos?.latitude ?? null;
       evt.lng = pos?.longitude ?? null;
       evt.endereco = enderecoEvento;
+      // Propaga o flag para o filtro de broadcast (suprime o evento nas conexões admin).
+      (evt as any).eventosAdminHabilitado = localPorIdentificador.get(identificador)?.eventosAdminHabilitado ?? true;
       const norm = pos ? normalizeAttributes(pos.attributes ?? {}) : {};
       const dados = {
         traccarDeviceId: evt.deviceId,
