@@ -135,7 +135,8 @@
         <p class="step-sub">Casa pelo nome (ignora acento/maiúsculas) e aceita nome parcial. Nada é enviado nesta etapa — é só consulta.</p>
         <div class="row">
           <div class="col-sm-8" style="margin-bottom:8px;">
-            <input type="text" id="in-cliente" class="form-control" placeholder="Nome do cliente (ex: CONCEPT RENT A CAR)" />
+            <input type="text" id="in-cliente" class="form-control" placeholder="Nome do cliente (ex: CONCEPT RENT A CAR)" list="lista-clientes" autocomplete="off" />
+            <datalist id="lista-clientes"></datalist>
           </div>
           <div class="col-sm-4" style="margin-bottom:8px;">
             <button class="btn btn-primary-al btn-block" id="btn-consultar"><i class="fa fa-search"></i> Consultar</button>
@@ -389,6 +390,18 @@
         document.getElementById('in-comando').value = this.value;
       });
     })();
+
+    // ── Autocomplete de nomes do sistema anterior (carrega uma vez, no 1º foco) ──
+    var nomesCarregados = false;
+    function carregarNomes(){
+      if (nomesCarregados) return;
+      nomesCarregados = true;
+      AL.apiGet('/api/integracao/anterior/clientes').then(function(nomes){
+        var dl = document.getElementById('lista-clientes');
+        dl.innerHTML = (nomes || []).map(function(n){ return '<option value="'+esc(n)+'"></option>'; }).join('');
+      }).catch(function(){ nomesCarregados = false; }); // deixa tentar de novo se falhar
+    }
+    document.getElementById('in-cliente').addEventListener('focus', carregarNomes);
 
     // ── Consultar ──
     document.getElementById('btn-consultar').addEventListener('click', consultar);

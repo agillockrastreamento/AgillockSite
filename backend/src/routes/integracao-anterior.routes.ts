@@ -7,6 +7,7 @@ import {
   consultarCliente,
   reapontarDispositivos,
   gerarPlanilhaReaponte,
+  listarClientesAnteriores,
   normalizarNome,
   ReaponteItem,
 } from '../services/reaponte-anterior.service';
@@ -48,6 +49,19 @@ async function casarClienteLocal(nomeAntigo: string) {
 // Status da integração (a tela usa para avisar se falta configurar credencial).
 router.get('/status', (_req: AuthRequest, res: Response) => {
   res.json({ configurado: integracaoAnteriorConfigurada() });
+});
+
+// Nomes de clientes do sistema anterior (autocomplete do campo de busca).
+// GET /api/integracao/anterior/clientes
+router.get('/clientes', async (_req: AuthRequest, res: Response) => {
+  try {
+    const nomes = await listarClientesAnteriores();
+    res.json(nomes);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Erro ao listar clientes do sistema anterior.';
+    const status = /não configurada/i.test(msg) ? 503 : 502;
+    res.status(status).json({ error: msg });
+  }
 });
 
 // Consulta (dry-run) — lista os dispositivos do cliente no sistema anterior.

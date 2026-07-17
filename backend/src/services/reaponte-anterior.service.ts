@@ -134,6 +134,50 @@ async function listarDispositivos(cfg: AnteriorConfig): Promise<DeviceAnterior[]
   return (await res.json()) as DeviceAnterior[];
 }
 
+// A conta do sistema anterior tem ~1000 dispositivos; um cache curto evita
+// refazer a chamada a cada consulta e a cada carga do autocomplete de nomes.
+let devicesCache: { at: number; data: DeviceAnterior[] } | null = null;
+const DEVICES_TTL_MS = 120_000;
+
+async function listarDispositivosCache(cfg: AnteriorConfig): Promise<DeviceAnterior[]> {
+  if (devicesCache && Date.now() - devicesCache.at < DEVICES_TTL_MS) return devicesCache.data;
+  const data = await listarDispositivos(cfg);
+  devicesCache = { at: Date.now(), data };
+  return data;
+}
+
+/** Deriva o nome do cliente a partir do campo `contact` (prefixo antes da 1ª barra). */
+function nomeDoContato(contact?: string | null): string | null {
+  if (!contact) return null;
+  const nome = contact
+    .split('/')[0] // prefixo antes da 1ª barra
+    .replace(/\d{5,}/g, ' ') // remove telefones/sequências longas de dígitos (colados ou no início)
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Precisa ter ao menos uma letra e 3+ caracteres (evita telefones/rótulos vazios).
+  if (nome.length < 3 || !/[a-zA-ZÀ-ÿ]/.test(nome)) return null;
+  return nome;
+}
+
+/**
+ * Lista os nomes de clientes distintos do sistema anterior (para o autocomplete
+ * da tela). Deriva do prefixo do campo `contact`, dedup por nome normalizado.
+ */
+export async function listarClientesAnteriores(): Promise<string[]> {
+  const cfg = anteriorConfig();
+  if (!cfg) throw new Error('Integração com o sistema anterior não configurada (ANTERIOR_API_URL/USER/PASS).');
+
+  const devices = await listarDispositivosCache(cfg);
+  const vistos = new Map<string, string>(); // normalizado -> exibição
+  for (const d of devices) {
+    const nome = nomeDoContato(d.contact);
+    if (!nome) continue;
+    const chave = norm(nome);
+    if (!vistos.has(chave)) vistos.set(chave, nome);
+  }
+  return [...vistos.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
 /**
  * Consulta (dry-run) os dispositivos de um ou mais clientes no sistema anterior,
  * aplicando o filtro de dígitos do IMEI e, opcionalmente, de placas específicas.
@@ -149,7 +193,7 @@ export async function consultarCliente(
   const alvosNorm: Array<[string, string]> = clientes.map((c) => [c, norm(c)]);
   const placasNorm = (opts.placas || []).map((p) => norm(p).replace(/\s+/g, '')).filter(Boolean);
 
-  const devices = await listarDispositivos(cfg);
+  const devices = await listarDispositivosCache(cfg);
 
   const alvos: DispositivoAlvo[] = [];
   let excluidosPorTamanho = 0;
