@@ -357,9 +357,10 @@ model Dispositivo {
 
   // Consulta de multas (Detran): recorte por veículo dentro de um cliente já habilitado
   // (Cliente.multasHabilitado). Um cliente pode ter 10 veículos e querer consultar só 3.
-  // Padrão desativado: o veículo só entra no lote quando o admin ativar explicitamente.
-  // Desativado = não é consultado e não aparece na tela de multas do site/app.
-  multasHabilitado Boolean @default(false)
+  // Padrão ativado (facilita a gestão): o veículo já entra no lote; o admin desativa
+  // individualmente os que não quer consultar. Desativado = não é consultado e não
+  // aparece na tela de multas do site/app.
+  multasHabilitado Boolean @default(true)
 
   // Eventos/notificações deste dispositivo para o ADMIN (área de eventos + tempo real).
   // Desativado, o admin para de receber os eventos deste veículo; o CLIENTE continua
