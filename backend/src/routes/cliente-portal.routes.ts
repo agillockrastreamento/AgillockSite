@@ -58,6 +58,7 @@ import {
   TipoRelatorio,
 } from '../services/relatorio-export.service';
 import { CLIENTE_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
+import { reverseGeocode } from '../utils/reverse-geocode';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
@@ -106,70 +107,6 @@ function temEndereco(valor?: string | null): valor is string {
 function parseDeviceIdsParam(deviceIds: string[] | string): string[] {
   const valores = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
   return [...new Set(valores.flatMap(valor => String(valor).split(',')).map(valor => valor.trim()).filter(Boolean))];
-}
-
-function formatarEnderecoNominatim(address: Record<string, unknown> = {}): string {
-  const partes: string[] = [];
-  const texto = (valor: unknown) => typeof valor === 'string' && valor.trim() ? valor.trim() : '';
-  const amenity = texto(address.amenity);
-  const road = texto(address.road);
-  const houseNumber = texto(address.house_number);
-  const bairro = texto(address.suburb) || texto(address.neighbourhood) || texto(address.quarter);
-  const cidade = texto(address.city) || texto(address.town) || texto(address.village) || texto(address.municipality);
-  const state = texto(address.state);
-  const postcode = texto(address.postcode);
-  const country = texto(address.country);
-  if (amenity) partes.push(amenity);
-  if (road) partes.push(houseNumber ? `${road}, ${houseNumber}` : road);
-  if (bairro) partes.push(bairro);
-  if (cidade) partes.push(cidade);
-  if (state) partes.push(state);
-  if (postcode) partes.push(postcode);
-  if (country) partes.push(country);
-  return partes.join(', ');
-}
-
-async function reverseGeocode(lat: number, lon: number): Promise<string> {
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
-    throw new Error('Coordenadas inválidas.');
-  }
-  const googleKey = process.env.GOOGLE_MAPS_GEOCODING_API_KEY || process.env.GOOGLE_MAPS_JS_API_KEY;
-  if (googleKey) {
-    try {
-      const googleParams = new URLSearchParams({
-        latlng: `${lat},${lon}`,
-        language: 'pt-BR',
-        key: googleKey,
-      });
-      const googleRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${googleParams.toString()}`);
-      if (googleRes.ok) {
-        const googleData = await googleRes.json() as { status?: string; results?: Array<{ formatted_address?: string }> };
-        const enderecoGoogle = googleData.status === 'OK' ? googleData.results?.[0]?.formatted_address : '';
-        if (enderecoGoogle) return enderecoGoogle;
-      }
-    } catch {
-      // fallback abaixo
-    }
-  }
-  const params = new URLSearchParams({
-    format: 'jsonv2',
-    lat: String(lat),
-    lon: String(lon),
-    'accept-language': 'pt-BR',
-  });
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
-      headers: {
-        'User-Agent': 'AgilLockRastreamento/1.0 (https://agillock.com.br)',
-        'Accept': 'application/json',
-      },
-    });
-    if (!res.ok) return '';
-    const data = await res.json() as { display_name?: string; address?: Record<string, unknown> };
-    return formatarEnderecoNominatim(data.address) || data.display_name || '';
-  } catch {
-    return '';
-  }
 }
 
 async function responderReverseGeocode(req: ClienteRequest, res: Response): Promise<void> {

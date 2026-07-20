@@ -969,3 +969,16 @@ model WorkerStatus {
   info            Json?
   updatedAt       DateTime  @updatedAt
 }
+
+// Cache persistente de reverse geocoding. Evita repetir a chamada ao provedor
+// para a mesma coordenada (veículo parado gera centenas de eventos no mesmo
+// ponto). `provedor` permite invalidar só um provedor ao migrar, sem zerar tudo.
+model GeocodeCache {
+  chave    String   @id // "lat,lon" com 4 casas decimais (~11 m)
+  endereco String
+  provedor String // google | nominatim | photon
+  criadoEm DateTime @default(now())
+
+  @@index([criadoEm])
+  @@index([provedor])
+}

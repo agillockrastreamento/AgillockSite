@@ -9,7 +9,7 @@ import {
   sincronizarDispositivosComPosicoes,
   decorarPosicaoComMedidores,
 } from '../services/medidores.service';
-import { reverseGeocode } from './rastreamento.routes';
+import { reverseGeocode } from '../utils/reverse-geocode';
 
 /**
  * Rotas chamadas PELA IAPRO (server-to-server, autenticadas por API key).

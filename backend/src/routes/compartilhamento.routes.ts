@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { signShareToken, verifyShareToken } from '../utils/jwt';
 import prisma from '../utils/prisma';
+import { reverseGeocode } from '../utils/reverse-geocode';
 import {
   traccarGetDevices,
   traccarGetDeviceByImei,
@@ -155,28 +156,7 @@ router.get('/:token/geocode', async (req: Request, res: Response): Promise<void>
   }
 
   try {
-    const googleKey = process.env.GOOGLE_MAPS_GEOCODING_API_KEY || process.env.GOOGLE_MAPS_JS_API_KEY;
-    if (googleKey) {
-      const params = new URLSearchParams({ latlng: `${lat},${lon}`, language: 'pt-BR', key: googleKey });
-      const r = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params}`);
-      if (r.ok) {
-        const d = await r.json() as { status?: string; results?: Array<{ formatted_address?: string }> };
-        if (d.status === 'OK' && d.results?.[0]?.formatted_address) {
-          res.json({ endereco: d.results[0].formatted_address });
-          return;
-        }
-      }
-    }
-    const params = new URLSearchParams({ format: 'jsonv2', lat: String(lat), lon: String(lon), 'accept-language': 'pt-BR' });
-    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`, {
-      headers: { 'User-Agent': 'AgilLockRastreamento/1.0', 'Accept': 'application/json' },
-    });
-    if (r.ok) {
-      const d = await r.json() as { display_name?: string };
-      res.json({ endereco: d.display_name || '' });
-    } else {
-      res.json({ endereco: '' });
-    }
+    res.json({ endereco: await reverseGeocode(lat, lon) });
   } catch {
     res.json({ endereco: '' });
   }
