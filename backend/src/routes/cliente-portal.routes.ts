@@ -267,9 +267,16 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
   // Permissão (definida pelo admin) de o cliente editar odômetro/horímetro.
   const clienteAtual = await prisma.cliente.findUnique({
     where: { id: clienteId },
-    select: { podeEditarMedidores: true },
+    select: { podeEditarMedidores: true, dispositivosHabilitado: true },
   });
   const podeEditarMedidores = clienteAtual?.podeEditarMedidores === true;
+
+  // Quem gerencia os próprios dispositivos (tela "Dispositivos" habilitada pelo
+  // admin, só para o responsável) recebe no card os mesmos dados técnicos que o
+  // admin vê: IMEI, telefone/operadora do rastreador e o atalho para a tela do
+  // dispositivo. Para os demais esses campos nem saem do backend.
+  const podeGerenciarDispositivos = clienteAtual?.dispositivosHabilitado === true
+    && req.cliente!.tipo === 'responsavel';
 
   // Busca dispositivos do cliente (responsável direto + vinculados)
   const [dispoResult, traccarResult] = await Promise.allSettled([
@@ -282,7 +289,7 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
         id: true, nome: true, identificador: true, placa: true,
         categoria: true, marca: true, modeloVeiculo: true, cor: true,
         limiteVelocidade: true, imagemUrlCliente: true, apelidoCliente: true, clienteId: true, manutencaoAtiva: true,
-        mapa: true,
+        mapa: true, telefoneRastreador: true, operadora: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
         cliente: { select: { id: true, nome: true } },
         motoristasVinculados: {
@@ -339,6 +346,10 @@ router.get('/rastreamento/posicoes', async (req: ClienteRequest, res: Response):
       cor: d.cor,
       limiteVelocidade: d.limiteVelocidade,
       mapa: d.mapa,
+      podeGerenciarDispositivos,
+      identificador: podeGerenciarDispositivos ? d.identificador : null,
+      telefoneRastreador: podeGerenciarDispositivos ? d.telefoneRastreador : null,
+      operadora: podeGerenciarDispositivos ? d.operadora : null,
       podeGerenciarManutencao: d.clienteId === clienteId,
       // Só o cliente titular (responsável) do dispositivo pode editar os medidores,
       // e apenas quando o admin habilitou a permissão para este cliente.

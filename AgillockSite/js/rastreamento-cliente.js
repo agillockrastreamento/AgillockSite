@@ -2668,12 +2668,45 @@ function mostrarCardDispositivo(id) {
 
   const apelidoFocado = _getCardApelido(v.dispositivoId);
 
+  // Cliente com a tela "Dispositivos" habilitada enxerga os mesmos dados técnicos
+  // do card do admin: IMEI, telefone/operadora do rastreador, atalho para a tela
+  // do dispositivo e os horários de servidor/GPS. Backend só envia se permitido.
+  const gerencia = v.podeGerenciarDispositivos === true;
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  const tagBg = isDark ? '#2d3748' : '#f0f2f5';
+  const tagColor = isDark ? '#adb5bd' : '#666';
+
+  const rastreadorInfo = [];
+  if (gerencia && v.telefoneRastreador) rastreadorInfo.push(`<span><i class="fa fa-phone"></i> ${esc(v.telefoneRastreador)}</span>`);
+  if (gerencia && v.operadora) rastreadorInfo.push(`<span><i class="fa fa-signal"></i> ${esc(v.operadora)}</span>`);
+
+  const apelidoHtml = `<span class="dcard-apelido" style="color:#fab32c;font-weight:700;font-size:12px;${apelidoFocado ? '' : 'display:none'}">${apelidoFocado ? esc(apelidoFocado) : ''}</span>`;
+  const placaHtml = v.placa ? `<span class="v-placa" style="margin:0">${v.placa}</span>` : '';
+  // Com o IMEI e a engrenagem no cabeçalho não cabe tudo em uma linha só: quem
+  // gerencia dispositivos usa o layout de duas linhas do admin (nome em cima,
+  // etiquetas embaixo); os demais mantêm a linha única de sempre.
+  const headerHtml = gerencia
+    ? `<div class="v-nome">${v.nome}</div>
+       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px">
+         ${placaHtml}
+         ${v.identificador ? `<span class="v-placa" style="margin:0;font-family:monospace;background:${tagBg};color:${tagColor}">${esc(v.identificador)}</span>` : ''}
+         <a href="dispositivo.html?id=${v.dispositivoId}" title="Mais detalhes" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#e8f4fd;border-radius:50%;color:#2980b9;font-size:11px;text-decoration:none;flex-shrink:0" class="btn-dcard-gear"><i class="fa fa-cog"></i></a>
+         ${apelidoHtml}
+       </div>`
+    : `<div class="v-nome" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+         ${v.nome}
+         ${placaHtml}
+         ${apelidoHtml}
+       </div>`;
+
   const ico = 'display:inline-block;width:14px;text-align:center;color:#7f8c8d;font-size:13px;flex-shrink:0';
   const horasHtml = `
     <div class="dcard-section dcard-val" style="font-size:10px">
       <div class="dcard-section-title">Última Atualização</div>
       ${p ? `
+        ${gerencia ? `<div style="margin-bottom:2px; margin-left:-4px"><i class="fa fa-server" style="${ico}"></i> <span style="margin-left:-2px" class="dcard-lbl">Servidor:</span> <span id="dcard-ts-srv">${fmtGPSTimeSec(p.serverTime)}</span></div>` : ''}
         <div style="margin-bottom:2px; margin-left:-4px"><i class="fa fa-mobile" style="${ico}"></i> <span style="margin-left:-2px" class="dcard-lbl">Dispositivo:</span> <span id="dcard-ts-dev">${fmtGPSTimeSec(p.deviceTime)}</span></div>
+        ${gerencia ? `<div style="margin-left:-4px"><i class="fa fa-crosshairs" style="${ico}"></i> <span style="margin-left:-2px" class="dcard-lbl">GPS:</span> <span id="dcard-ts-gps">${fmtGPSTimeSec(p.fixTime)}</span></div>` : ''}
       ` : ''}
     </div>`;
 
@@ -2683,15 +2716,12 @@ function mostrarCardDispositivo(id) {
     ${imgHtml}
     <div class="dcard-header">
       <div style="flex:1;min-width:0">
-        <div class="v-nome" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          ${v.nome}
-          ${v.placa ? `<span class="v-placa" style="margin:0">${v.placa}</span>` : ''}
-          <span class="dcard-apelido" style="color:#fab32c;font-weight:700;font-size:12px;${apelidoFocado ? '' : 'display:none'}">${apelidoFocado ? esc(apelidoFocado) : ''}</span>
-        </div>
+        ${headerHtml}
       </div>
       <button class="dcard-fechar" onclick="fecharCardDispositivo()" title="Fechar">×</button>
     </div>
     <div class="dcard-body">
+      ${rastreadorInfo.length ? `<div class="dcard-tracker-meta">${rastreadorInfo.join('')}</div>` : ''}
       <div class="dcard-section-title">Informações do Dispositivo</div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:4px">
         <div id="dcard-status" style="font-size:12px;display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">${buildStatusHtmlCliente(p, bat, batFa, batCor, v)}</div>
