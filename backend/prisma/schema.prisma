@@ -336,6 +336,13 @@ model Dispositivo {
   telemetriaUltimaLongitude Float?
   telemetriaUltimaIgnicao   Boolean?
 
+  // Último cartão RFID de motorista lido pelo rastreador. O leitor só envia o cartão
+  // no login/logout da jornada, então a posição ATUAL quase nunca traz o número —
+  // guardar aqui é o que permite ao card do veículo mostrar o mesmo motorista que o
+  // relatório (que varre o histórico). Zerado no logout (fim de jornada).
+  ultimoCartaoMotorista     String?
+  ultimoCartaoMotoristaEm   DateTime?
+
   // Imagem
   imagemUrl        String?
   imagemUrlCliente String?

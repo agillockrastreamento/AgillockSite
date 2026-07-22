@@ -24,7 +24,6 @@ import {
   traccarUnlinkGeofenceFromDevice,
   traccarGetServerLog,
   normalizeAttributes,
-  cartaoDaPosicao,
   EVENT_TYPE_LABELS,
 } from '../services/traccar.service';
 import {
@@ -45,6 +44,7 @@ import {
 } from '../services/medidores.service';
 import {
   carregarResolvedorMotoristas,
+  motoristaAtualDoDispositivo,
   cartaoDaViagem,
   cartaoAntesDe,
 } from '../services/motoristas.service';
@@ -173,10 +173,7 @@ router.get('/posicoes', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRe
     const traccar = traccarByImei.get(d.identificador);
     const posicao = traccar ? posicaoPorDeviceId.get(traccar.id) : undefined;
     const estado = estadosAtualizados.get(d.identificador) ?? d;
-    // Prioriza o motorista que passou o cartão RFID (última posição); só cai no
-    // primeiro vínculo do veículo quando não há leitura de cartão identificada.
-    const motoristaVinculado = d.motoristasVinculados && d.motoristasVinculados.length > 0 ? d.motoristasVinculados[0].motorista : null;
-    const motorista = resolverMotorista(cartaoDaPosicao(posicao?.attributes)?.cartao) ?? motoristaVinculado;
+    const motorista = motoristaAtualDoDispositivo(resolverMotorista, estado, posicao);
 
     return {
       dispositivoId: d.id,
@@ -624,12 +621,7 @@ router.get('/dispositivos/:id/detalhe', requireRoles('ADMIN', 'COLABORADOR'), as
 
   const attrs = posicao?.attributes ?? {};
   const resolverMotorista = await carregarResolvedorMotoristas();
-  // Prioriza o motorista que passou o cartão RFID (última posição); só cai no
-  // primeiro vínculo do veículo quando não há leitura de cartão identificada.
-  const motoristaVinculado = dispositivo.motoristasVinculados && dispositivo.motoristasVinculados.length > 0
-    ? dispositivo.motoristasVinculados[0].motorista
-    : null;
-  const motorista = resolverMotorista(cartaoDaPosicao(attrs)?.cartao) ?? motoristaVinculado;
+  const motorista = motoristaAtualDoDispositivo(resolverMotorista, dispositivo, posicao);
 
   res.json({
     dispositivo: {

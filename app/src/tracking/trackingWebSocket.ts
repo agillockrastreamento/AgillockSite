@@ -21,6 +21,8 @@ export type WsPosition = {
   sinal?: number | null;
   odometro?: number | null;
   horas_motor?: number | null;
+  /** Motorista do cartão RFID em efeito agora (resolvido no backend). */
+  motorista?: { id: string; nome: string } | null;
 };
 
 export type WsEvent = {

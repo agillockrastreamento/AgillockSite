@@ -2048,7 +2048,11 @@ function processarMensagemWs(msg) {
         horas_motor: pos.horas_motor,
         bloqueado: pos.bloqueado,
         endereco: pos.endereco,
+        motorista_id: pos.motorista_id,
       };
+
+      // Motorista do cartão RFID: acompanha a troca de motorista sem recarregar
+      if ('motorista' in pos) veiculosMap[dispositivoId].motorista = pos.motorista;
 
       atualizarMarcador(dispositivoId);
       atualizarCardAtivo(dispositivoId);

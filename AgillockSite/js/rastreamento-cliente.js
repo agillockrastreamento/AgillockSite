@@ -1603,7 +1603,10 @@ function processarMensagemWs(msg) {
         horas_motor: pos.horas_motor ?? (antiga.horas_motor ?? null), 
         bloqueado: pos.bloqueado !== null ? pos.bloqueado : (antiga.bloqueado ?? null), 
         endereco: pos.endereco ?? (antiga.endereco ?? null),
+        motorista_id: pos.motorista_id ?? (antiga.motorista_id ?? null),
       };
+      // Motorista do cartão RFID: acompanha a troca de motorista sem recarregar
+      if ('motorista' in pos) veiculosMap[did].motorista = pos.motorista;
       atualizarMarcador(did); atualizarCardAtivo(did); atualizarCardBarra(did);
       if (_overlay.alarmes) _renderAlarmeBadge(did, veiculosMap[did]);
       if (_overlay.rastro && _rastros[did]) _rastros[did].linha.addLatLng([pos.latitude, pos.longitude]);

@@ -1,6 +1,6 @@
 import prisma from '../utils/prisma';
 import type { TraccarPosition, TraccarSummary, TraccarStop, TraccarTrip } from './traccar.service';
-import { normalizeAttributes, traccarGetPositions, traccarGetDeviceByImei } from './traccar.service';
+import { normalizeAttributes, traccarGetPositions, traccarGetDeviceByImei, cartaoDaPosicao } from './traccar.service';
 
 const MAX_ENGINE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const MIN_DISTANCE_METERS = 10;
@@ -14,6 +14,8 @@ export const DISPOSITIVO_MEDIDORES_SELECT = {
   telemetriaUltimaLatitude: true,
   telemetriaUltimaLongitude: true,
   telemetriaUltimaIgnicao: true,
+  ultimoCartaoMotorista: true,
+  ultimoCartaoMotoristaEm: true,
 } as const;
 
 type DispositivoMedidores = {
@@ -26,6 +28,8 @@ type DispositivoMedidores = {
   telemetriaUltimaLatitude: number | null;
   telemetriaUltimaLongitude: number | null;
   telemetriaUltimaIgnicao: boolean | null;
+  ultimoCartaoMotorista?: string | null;
+  ultimoCartaoMotoristaEm?: Date | null;
 };
 
 type PosicaoDecorada = ReturnType<typeof normalizeAttributes> & {
@@ -199,10 +203,23 @@ function aplicarPosicaoAoEstado(
     }
   }
 
+  // Cartão RFID: o leitor só envia no login/logout da jornada, então a maioria das
+  // posições não traz nada — nesse caso mantém o cartão já registrado. No logout
+  // (fim de jornada) o cartão é zerado, pois não há mais motorista ao volante.
+  const leitura = cartaoDaPosicao(posicao.attributes);
+  let ultimoCartaoMotorista = dispositivo.ultimoCartaoMotorista ?? null;
+  let ultimoCartaoMotoristaEm = dispositivo.ultimoCartaoMotoristaEm ?? null;
+  if (leitura) {
+    ultimoCartaoMotorista = leitura.inicio ? leitura.cartao : null;
+    ultimoCartaoMotoristaEm = instanteAtual;
+  }
+
   return {
     ...dispositivo,
     odometroSistemaMetros,
     horimetroSistemaSegundos,
+    ultimoCartaoMotorista,
+    ultimoCartaoMotoristaEm,
     telemetriaUltimaPosicaoEm: instanteAtual,
     telemetriaUltimaLatitude: posicao.valid ? posicao.latitude : dispositivo.telemetriaUltimaLatitude,
     telemetriaUltimaLongitude: posicao.valid ? posicao.longitude : dispositivo.telemetriaUltimaLongitude,
@@ -233,7 +250,8 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
       || proximoEstado.telemetriaUltimaPosicaoEm?.getTime() !== dispositivo.telemetriaUltimaPosicaoEm?.getTime()
       || proximoEstado.telemetriaUltimaLatitude !== dispositivo.telemetriaUltimaLatitude
       || proximoEstado.telemetriaUltimaLongitude !== dispositivo.telemetriaUltimaLongitude
-      || proximoEstado.telemetriaUltimaIgnicao !== dispositivo.telemetriaUltimaIgnicao;
+      || proximoEstado.telemetriaUltimaIgnicao !== dispositivo.telemetriaUltimaIgnicao
+      || proximoEstado.ultimoCartaoMotorista !== dispositivo.ultimoCartaoMotorista;
 
     if (!mudou) continue;
 
@@ -242,6 +260,8 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
       data: {
         odometroSistemaMetros: proximoEstado.odometroSistemaMetros,
         horimetroSistemaSegundos: proximoEstado.horimetroSistemaSegundos,
+        ultimoCartaoMotorista: proximoEstado.ultimoCartaoMotorista ?? null,
+        ultimoCartaoMotoristaEm: proximoEstado.ultimoCartaoMotoristaEm ?? null,
         telemetriaUltimaPosicaoEm: proximoEstado.telemetriaUltimaPosicaoEm,
         telemetriaUltimaLatitude: proximoEstado.telemetriaUltimaLatitude,
         telemetriaUltimaLongitude: proximoEstado.telemetriaUltimaLongitude,

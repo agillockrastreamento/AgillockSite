@@ -13,6 +13,7 @@ import {
   sincronizarDispositivosComPosicoes,
   decorarPosicaoComMedidores,
 } from './medidores.service';
+import { carregarResolvedorMotoristas, motoristaAtualDoDispositivo } from './motoristas.service';
 import NotificationService from './notification.service';
 import { reverseGeocode } from '../utils/reverse-geocode';
 import { verifyClienteToken, verifyToken } from '../utils/jwt';
@@ -378,6 +379,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         id: true,
         eventosAdminHabilitado: true,
         ...DISPOSITIVO_MEDIDORES_SELECT,
+        motoristasVinculados: { include: { motorista: { select: { id: true, nome: true } } } },
         cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } },
         clientesVinculados: { include: { cliente: { include: { logins: { where: { tipo: 'responsavel', ativo: true }, take: 1 } } } } },
       },
@@ -480,6 +482,10 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
   }
 
   if (msg.positions?.length) {
+    // Motorista do cartão RFID: enviado junto com a posição para que o card do
+    // veículo no mapa acompanhe a troca de motorista sem recarregar a página.
+    const resolverMotorista = await carregarResolvedorMotoristas().catch(() => null);
+
     result.positions = msg.positions.map(p => ({
       deviceId: p.deviceId,
       ...(() => {
@@ -500,7 +506,12 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
             ...normalizeAttributes(p.attributes ?? {}),
           };
         }
-        return decorarPosicaoComMedidores(dispositivo, p as any);
+        return {
+          ...decorarPosicaoComMedidores(dispositivo, p as any),
+          motorista: resolverMotorista
+            ? motoristaAtualDoDispositivo(resolverMotorista, dispositivo as any, p as any)
+            : null,
+        };
       })(),
     }));
 

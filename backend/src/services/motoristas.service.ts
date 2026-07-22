@@ -39,6 +39,27 @@ export async function carregarResolvedorMotoristas(): Promise<ResolvedorMotorist
   };
 }
 
+// Motorista "atual" de um dispositivo — usado no card do veículo focado no mapa.
+// Ordem de prioridade:
+//   1. cartão na posição de agora (raro: só chega no login/logout da jornada);
+//   2. último cartão lido, persistido no dispositivo a cada posição recebida — é o
+//      que mantém o card em sincronia com o relatório, que varre o histórico;
+//   3. primeiro vínculo cadastrado do veículo (quando nunca houve leitura de cartão).
+export function motoristaAtualDoDispositivo<TVinculo extends { id: string; nome: string }>(
+  resolver: ResolvedorMotorista,
+  dispositivo: { ultimoCartaoMotorista?: string | null; motoristasVinculados?: Array<{ motorista: TVinculo }> | null },
+  posicao: { attributes?: TraccarPosition['attributes'] } | null | undefined,
+): MotoristaResumo | TVinculo | null {
+  const leitura = cartaoDaPosicao(posicao?.attributes);
+  // Logout (fim de jornada) tem cartão, mas não há mais motorista ao volante.
+  if (leitura && !leitura.inicio) return null;
+  const cartao = leitura?.cartao ?? dispositivo.ultimoCartaoMotorista ?? null;
+  const porCartao = resolver(cartao);
+  if (porCartao) return porCartao;
+  if (cartao) return null; // houve leitura, mas o cartão não está cadastrado — não usar o vínculo
+  return dispositivo.motoristasVinculados?.[0]?.motorista ?? null;
+}
+
 function tempoPosicaoMs(posicao: TraccarPosition): number | null {
   const raw = posicao.deviceTime || posicao.fixTime || posicao.serverTime;
   if (!raw) return null;

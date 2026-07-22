@@ -64,6 +64,8 @@ export function updateDeviceFromMessage(
     return {
       ...device,
       status: 'online',
+      // Motorista do cartão RFID: acompanha a troca de motorista sem recarregar
+      motorista: 'motorista' in position ? position.motorista ?? null : device.motorista,
       posicao: {
         latitude: position.latitude,
         longitude: position.longitude,
