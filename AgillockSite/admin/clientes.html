@@ -389,6 +389,10 @@
         var multasOn = c.multasHabilitado === true;
         var gdOn = c.dispositivosHabilitado === true;
         var gdLimite = c.limiteDispositivos || 0;
+        // Eventos-admin é um flag por dispositivo: o botão do cliente reflete "ainda
+        // há algum veículo enviando eventos ao admin?" e alterna todos de uma vez.
+        var disps = c.dispositivos || [];
+        var evOn = disps.some(function (d) { return d.eventosAdminHabilitado !== false; });
         var acoes = '<button class="btn btn-xs btn-default btn-editar" data-id="' + c.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' +
           '<button class="btn btn-xs ' + (c.status === 'ATIVO' ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + c.id + '" data-status="' + c.status + '" title="' + (c.status === 'ATIVO' ? 'Inativar' : 'Ativar') + '">' +
           '<i class="fa fa-power-off"></i></button> ' +
@@ -398,6 +402,10 @@
           '<i class="fa fa-gavel"></i></button> ' +
           '<button class="btn btn-xs ' + (gdOn ? 'btn-success' : 'btn-default') + ' btn-dispositivos" data-id="' + c.id + '" data-nome="' + c.nome + '" data-on="' + (gdOn ? '1' : '0') + '" data-limite="' + gdLimite + '" title="' + (gdOn ? 'Tela de dispositivos HABILITADA (limite: ' + gdLimite + ') — clique para desabilitar' : 'Tela de dispositivos desabilitada — clique para habilitar') + '">' +
           '<i class="fa fa-microchip"></i>' + (gdOn ? ' <strong>' + gdLimite + '</strong>' : '') + '</button> ' +
+          '<button class="btn btn-xs ' + (evOn ? 'btn-success' : 'btn-default') + ' btn-eventos-admin" data-id="' + c.id + '" data-nome="' + c.nome + '" data-on="' + (evOn ? '1' : '0') + '" data-qtd="' + disps.length + '"' +
+          ' title="' + (!disps.length ? 'Cliente sem veículos próprios' : evOn ? 'Eventos no painel do admin ATIVOS — clique para silenciar os veículos deste cliente' : 'Eventos deste cliente silenciados no painel do admin — clique para reativar') + '"' +
+          (disps.length ? '' : ' disabled') + '>' +
+          '<i class="fa fa-' + (evOn ? 'bell' : 'bell-slash') + '"></i></button> ' +
           '<button class="btn btn-xs btn-default btn-iapro" data-id="' + c.id + '" data-nome="' + c.nome + '" title="Compartilhar com a IAPRO" style="padding:1px 4px;">' +
           '<img src="../img/logo_iapro.jpeg" alt="IAPRO" style="height:16px;border-radius:3px;vertical-align:middle;" /></button>';
         if (isAdmin) {
@@ -478,6 +486,40 @@
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
           abrirModalGestaoDispositivos(this.dataset.id, this.dataset.nome, this.dataset.on === '1', this.dataset.limite);
+        });
+      });
+
+      // Silenciar/reativar os eventos deste cliente no painel do admin
+      tbody.querySelectorAll('.btn-eventos-admin').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var id = this.dataset.id;
+          var nome = this.dataset.nome;
+          var ligado = this.dataset.on === '1';
+          var qtd = Number(this.dataset.qtd) || 0;
+          var veiculos = qtd + (qtd === 1 ? ' veículo' : ' veículos');
+
+          AL.confirmar(ligado ? {
+            titulo: 'Silenciar eventos no painel do admin',
+            mensagem: 'Parar de receber os eventos dos <strong>' + veiculos + '</strong> de <strong>' + nome + '</strong> no painel de eventos do admin?',
+            consequencias: 'O admin deixa de receber notificações e eventos em tempo real desses veículos. O <strong>cliente continua recebendo normalmente</strong> — muda apenas o painel do admin. Dá para reverter a qualquer momento por este mesmo botão.',
+            btnTexto: '<i class="fa fa-bell-slash"></i> Silenciar',
+          } : {
+            titulo: 'Reativar eventos no painel do admin',
+            mensagem: 'Voltar a receber os eventos dos <strong>' + veiculos + '</strong> de <strong>' + nome + '</strong> no painel de eventos do admin?',
+            btnTexto: '<i class="fa fa-bell"></i> Reativar',
+            btnClasse: 'btn-success',
+          }).then(function (ok) {
+            if (!ok) return;
+            AL.apiPatch('/api/clientes/' + id + '/eventos-admin')
+              .then(function (data) {
+                AL.showAlert(data.eventosAdminHabilitado
+                  ? 'Eventos reativados no painel do admin (' + data.dispositivosAfetados + ' veículo(s)).'
+                  : 'Eventos silenciados no painel do admin (' + data.dispositivosAfetados + ' veículo(s)). O cliente continua recebendo.', 'success');
+                loadClientes();
+              })
+              .catch(function (err) { AL.showAlert(err.message); });
+          });
         });
       });
 

@@ -32,7 +32,7 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
       vendedor: { select: { id: true, nome: true } },
       criadoPor: { select: { id: true, nome: true } },
       placas: { where: { ativo: true }, select: { id: true, placa: true, descricao: true } },
-      dispositivos: { select: { id: true, nome: true, identificador: true, placa: true, categoria: true, ativo: true } },
+      dispositivos: { select: { id: true, nome: true, identificador: true, placa: true, categoria: true, ativo: true, eventosAdminHabilitado: true } },
       _count: { select: { dispositivosVinculados: true } },
     },
     orderBy: { nome: 'asc' },
@@ -301,6 +301,36 @@ router.patch('/:id/multas-habilitado', requireRoles('ADMIN', 'COLABORADOR'), asy
   }
 
   res.json(cliente);
+});
+
+// PATCH /api/clientes/:id/eventos-admin — Liga/desliga os eventos-admin de TODOS os
+// dispositivos do cliente de uma vez (o mesmo interruptor do card em admin/dispositivo.html,
+// que só dá para acionar veículo a veículo). Desligado, o admin para de receber os eventos
+// desses veículos no painel e em tempo real; o CLIENTE continua recebendo normalmente.
+//
+// Só afeta os dispositivos em que este cliente é o titular — um dispositivo apenas
+// vinculado pertence a outro cliente e silenciá-lo aqui afetaria o painel do dono.
+router.patch('/:id/eventos-admin', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = param(req, 'id');
+
+  const existe = await prisma.cliente.findUnique({ where: { id }, select: { id: true, nome: true } });
+  if (!existe) {
+    res.status(404).json({ error: 'Cliente não encontrado.' });
+    return;
+  }
+
+  // Auto-toggle igual aos demais botões da tela de clientes: se ainda há algum
+  // veículo enviando eventos ao admin, silencia todos; se todos já estão
+  // silenciados, religa todos.
+  const ligados = await prisma.dispositivo.count({ where: { clienteId: id, eventosAdminHabilitado: true } });
+  const ligar = ligados === 0;
+
+  const { count } = await prisma.dispositivo.updateMany({
+    where: { clienteId: id },
+    data: { eventosAdminHabilitado: ligar },
+  });
+
+  res.json({ id: existe.id, nome: existe.nome, eventosAdminHabilitado: ligar, dispositivosAfetados: count });
 });
 
 // PATCH /api/clientes/:id/dispositivos-habilitado — Habilita a tela de dispositivos do cliente
