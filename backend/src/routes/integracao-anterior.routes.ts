@@ -11,6 +11,8 @@ import {
   normalizarNome,
   ReaponteItem,
 } from '../services/reaponte-anterior.service';
+import { buildTraccarDeviceSyncData, syncTraccarAccumulators } from '../utils/dispositivo-sync';
+import { traccarCreateDevice } from '../services/traccar.service';
 
 /**
  * Rotas do painel admin para a tela "Trazer Dispositivos do Sistema Anterior".
@@ -44,6 +46,15 @@ async function casarClienteLocal(nomeAntigo: string) {
     if (!parcial && (n.includes(alvo) || alvo.includes(n))) parcial = c;
   }
   return exato || parcial;
+}
+
+// Extrai uma placa (padrão BR antigo ABC1234 ou Mercosul ABC1D23) do nome do
+// veículo vindo do sistema antigo, para pré-preencher o cadastro do dispositivo.
+const PLACA_RE = /[A-Z]{3}[- ]?\d[A-Z0-9]\d{2}/;
+function extrairPlaca(nome?: string | null): string | null {
+  if (!nome) return null;
+  const m = String(nome).toUpperCase().match(PLACA_RE);
+  return m ? m[0].replace(/[- ]/g, '') : null;
 }
 
 // Status da integração (a tela usa para avisar se falta configurar credencial).
@@ -188,6 +199,119 @@ router.post('/reapontar', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Importa cliente/dispositivos do sistema anterior para a AgilLock (cadastra o
+// que ainda é "Novo"). Cria o Cliente (se não existir aqui, casando por nome) e
+// cada Dispositivo cujo IMEI ainda não existe — vinculado ao cliente e
+// registrado no Traccar (best-effort, igual ao CRUD normal de dispositivos).
+// POST /api/integracao/anterior/importar
+// body: { alvos: [{ id, name?, uniqueId, status?, cliente, contact? }], criarClientes? }
+router.post('/importar', async (req: AuthRequest, res: Response) => {
+  if (req.user!.role === 'COLABORADOR' && !req.user!.podeCriarDispositivo) {
+    res.status(403).json({ error: 'Sem permissão para criar dispositivos.' });
+    return;
+  }
+  const alvos = Array.isArray(req.body?.alvos) ? req.body.alvos : [];
+  if (!alvos.length) {
+    res.status(400).json({ error: 'Nenhum dispositivo informado em alvos.' });
+    return;
+  }
+  const criarClientes = req.body?.criarClientes !== false; // default: cria o cliente se faltar
+
+  // Agrupa os alvos por nome de cliente do sistema antigo.
+  const porCliente = new Map<string, typeof alvos>();
+  for (const a of alvos) {
+    const chave = (a?.cliente && String(a.cliente).trim()) || '(sem cliente)';
+    if (!porCliente.has(chave)) porCliente.set(chave, []);
+    porCliente.get(chave)!.push(a);
+  }
+
+  const resumo = {
+    clientesCriados: 0,
+    clientesExistentes: 0,
+    dispositivosCriados: 0,
+    dispositivosVinculados: 0,
+    dispositivosExistentes: 0,
+    erros: 0,
+    itens: [] as Array<{ imei: string | null; nome: string | null; cliente: string; status: string; detalhe?: string }>,
+  };
+
+  try {
+    for (const [nome, itens] of porCliente) {
+      // 1) Cliente: casa pelo nome; cria se não existir aqui (e for permitido).
+      let local = await casarClienteLocal(nome);
+      if (!local) {
+        if (!criarClientes) {
+          for (const a of itens) {
+            resumo.itens.push({ imei: a.uniqueId ?? null, nome: a.name ?? null, cliente: nome, status: 'ignorado', detalhe: 'Cliente sem cadastro aqui.' });
+          }
+          continue;
+        }
+        const criado = await prisma.cliente.create({
+          data: { nome: nome === '(sem cliente)' ? 'Cliente sem nome' : nome, criadoPorId: req.user!.userId },
+          select: { id: true, nome: true, telefone: true, status: true },
+        });
+        local = criado;
+        resumo.clientesCriados++;
+      } else {
+        resumo.clientesExistentes++;
+      }
+
+      // 2) Dispositivos: cria os que ainda não existem; vincula os órfãos.
+      for (const a of itens) {
+        const identificador = a?.uniqueId ? String(a.uniqueId).trim() : '';
+        if (!identificador) {
+          resumo.erros++;
+          resumo.itens.push({ imei: null, nome: a?.name ?? null, cliente: nome, status: 'erro', detalhe: 'Dispositivo sem IMEI.' });
+          continue;
+        }
+
+        const existente = await prisma.dispositivo.findUnique({
+          where: { identificador },
+          select: { id: true, clienteId: true },
+        });
+
+        if (existente) {
+          // Já existe: se estiver sem dono, vincula a este cliente; senão só reporta.
+          if (!existente.clienteId) {
+            await prisma.dispositivo.update({ where: { id: existente.id }, data: { clienteId: local.id } });
+            resumo.dispositivosVinculados++;
+            resumo.itens.push({ imei: identificador, nome: a?.name ?? null, cliente: nome, status: 'vinculado', detalhe: 'IMEI já existia; vinculado ao cliente.' });
+          } else {
+            resumo.dispositivosExistentes++;
+            resumo.itens.push({ imei: identificador, nome: a?.name ?? null, cliente: nome, status: 'existente', detalhe: 'IMEI já cadastrado.' });
+          }
+          continue;
+        }
+
+        // Novo: cadastra o dispositivo.
+        const nomeDisp = (a?.name && String(a.name).trim()) || identificador;
+        const dispositivo = await prisma.dispositivo.create({
+          data: {
+            nome: nomeDisp,
+            identificador,
+            categoria: 'car',
+            contato: a?.contact ? String(a.contact) : null,
+            placa: extrairPlaca(a?.name),
+            clienteId: local.id,
+            criadoPorId: req.user!.userId,
+          },
+        });
+        resumo.dispositivosCriados++;
+        resumo.itens.push({ imei: identificador, nome: nomeDisp, cliente: nome, status: 'criado' });
+
+        // Traccar (best-effort — não bloqueia a importação).
+        traccarCreateDevice(buildTraccarDeviceSyncData(dispositivo))
+          .then((td) => syncTraccarAccumulators(td.id, dispositivo))
+          .catch((err) => console.error('[Traccar] Falha ao criar dispositivo importado:', err.message));
+      }
+    }
+
+    res.json(resumo);
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Erro ao importar do sistema anterior.' });
+  }
+});
+
 // Baixar a planilha (.xlsx) de um resultado de envio.
 // POST /api/integracao/anterior/planilha  body: { itens: ReaponteItem[], clienteNome?, comando? }
 router.post('/planilha', async (req: AuthRequest, res: Response) => {
@@ -236,6 +360,34 @@ router.get('/historico/:id', async (req: AuthRequest, res: Response) => {
     return;
   }
   res.json(registro);
+});
+
+// Baixar a planilha (.xlsx) de um registro do histórico (rever item a item com cores).
+// GET /api/integracao/anterior/historico/:id/planilha
+router.get('/historico/:id/planilha', async (req: AuthRequest, res: Response) => {
+  const registro = await prisma.reaponteHistorico.findUnique({ where: { id: String(req.params.id) } });
+  if (!registro) {
+    res.status(404).json({ error: 'Registro não encontrado.' });
+    return;
+  }
+  const itens = Array.isArray(registro.itens) ? (registro.itens as unknown as ReaponteItem[]) : [];
+  if (!itens.length) {
+    res.status(400).json({ error: 'Este registro não tem itens para exportar.' });
+    return;
+  }
+  try {
+    const buffer = await gerarPlanilhaReaponte(itens, {
+      clienteNome: registro.clienteNome,
+      comando: registro.comando,
+    });
+    const data = registro.createdAt.toISOString().slice(0, 10);
+    const base = normalizarNome(registro.clienteNome || 'reapontamento').replace(/[^a-z0-9]+/g, '_').slice(0, 40);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="reaponte_${base || 'resultado'}_${data}.xlsx"`);
+    res.send(buffer);
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Erro ao gerar planilha.' });
+  }
 });
 
 export default router;

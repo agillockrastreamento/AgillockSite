@@ -226,8 +226,9 @@
           <thead><tr>
             <th>Data</th><th>Cliente</th><th>Por</th><th>Comando</th>
             <th style="text-align:center;">Total</th><th style="text-align:center;">OK</th><th style="text-align:center;">Erro</th>
+            <th style="text-align:center;">Planilha</th>
           </tr></thead>
-          <tbody id="tbody-historico"><tr><td colspan="7" style="text-align:center;color:#888;">Carregando…</td></tr></tbody>
+          <tbody id="tbody-historico"><tr><td colspan="8" style="text-align:center;color:#888;">Carregando…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -444,13 +445,15 @@
         var waBtn = (c.clienteId && c.telefone)
           ? '<button class="btn btn-xs btn-wa btn-wa-open" data-nome="'+esc(c.nome)+'"><i class="fa fa-whatsapp"></i> Enviar acesso</button>'
           : '<button class="btn btn-xs btn-default" disabled title="Sem cadastro/telefone aqui"><i class="fa fa-whatsapp"></i> Enviar acesso</button>';
+        var impBtn = '<button class="btn btn-xs btn-primary-al btn-importar" data-nome="'+esc(c.nome)+'" title="Cadastra o cliente (se ainda não existir), cadastra os dispositivos NOVOS selecionados e envia o comando de reapontamento a todos os selecionados"><i class="fa fa-download"></i> Trazer para a AgilLock</button>';
         return '<div class="cli-card">'+
           '<div><div class="cli-nome">'+esc(c.nome)+'</div>'+
             '<div class="cli-meta">'+(c.telefone?('<i class="fa fa-phone"></i> '+esc(c.telefone)+' &nbsp; '):'')+ (c.loginEmail?('<i class="fa fa-user"></i> '+esc(c.loginEmail)):'') +'</div>'+
             '<div style="margin-top:4px;">'+existe+' '+jaRe+'</div></div>'+
-          '<div>'+waBtn+'</div></div>';
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+impBtn+waBtn+'</div></div>';
       }).join('');
       document.querySelectorAll('.btn-wa-open').forEach(function(b){ b.onclick=function(){ abrirWhatsApp(this.dataset.nome); }; });
+      document.querySelectorAll('.btn-importar').forEach(function(b){ b.onclick=function(){ importarCliente(this.dataset.nome, this); }; });
 
       // Tabela de alvos
       var tb = document.getElementById('tbody-alvos');
@@ -528,20 +531,27 @@
       enviarReaponte();
     });
 
-    function enviarReaponte(){
-      var alvos = alvosSelecionados();
-      var cmd = comandoEscolhido();
-      var btn = document.getElementById('btn-reapontar');
-      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Enviando…';
+    // Reaponta uma lista específica de alvos (usado pelo botão da Etapa 2 e pelo
+    // fluxo "Trazer para a AgilLock", que cadastra e depois reaponta).
+    function reapontarAlvos(alvos, cmd){
       document.getElementById('log-card').style.display='';
       document.getElementById('log-panel').textContent = 'Enviando comando para '+alvos.length+' dispositivo(s)…';
       document.getElementById('log-resumo').textContent = '';
       var payload = { alvos: alvos.map(function(a){ return { id:a.id, name:a.name, uniqueId:a.uniqueId, status:a.status, cliente:a.cliente }; }) };
       if (cmd) payload.comando = cmd;
-      AL.apiPost('/api/integracao/anterior/reapontar', payload).then(function(r){
+      return AL.apiPost('/api/integracao/anterior/reapontar', payload).then(function(r){
         ultimoResultado = r;
         renderLog(r);
-      }).catch(function(err){
+        return r;
+      });
+    }
+
+    function enviarReaponte(){
+      var alvos = alvosSelecionados();
+      var cmd = comandoEscolhido();
+      var btn = document.getElementById('btn-reapontar');
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Enviando…';
+      reapontarAlvos(alvos, cmd).catch(function(err){
         document.getElementById('log-panel').innerHTML = '<span class="log-err">'+esc(err.message)+'</span>';
       }).then(function(){ btn.disabled=false; btn.innerHTML=old; });
     }
@@ -580,6 +590,41 @@
       if (navigator.clipboard) navigator.clipboard.writeText(t);
       AL.showAlert('Log copiado!', 'success');
     });
+
+    // ── Trazer para a AgilLock (cadastra cliente + dispositivos novos e reaponta) ──
+    function importarCliente(nome, btn){
+      if (!consulta) return;
+      var doCliente = alvosSelecionados().filter(function(a){ return a.cliente === nome; });
+      if (!doCliente.length){ AL.showAlert('Selecione ao menos um dispositivo deste cliente na tabela.'); return; }
+      var novos = doCliente.filter(function(a){ return !a.existeAqui; }).length;
+      var cmd = comandoEscolhido();
+      var custom = document.querySelector('input[name="modo-cmd"]:checked').value === 'custom';
+      if (custom && !cmd){ AL.showAlert('Digite o comando personalizado na Etapa 2.'); return; }
+      var msg = 'Trazer para a AgilLock:\n\n' +
+        'Cliente: ' + nome + '\n' +
+        doCliente.length + ' dispositivo(s) selecionado(s) — ' + novos + ' novo(s) a cadastrar.\n' +
+        'Comando de reapontamento: ' + (cmd || CMD_PADRAO) + '\n\n' +
+        'O cliente será criado se não existir, os dispositivos novos serão cadastrados e o comando de reapontamento será enviado a todos os selecionados. Continuar?';
+      if (!window.confirm(msg)) return;
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Cadastrando…';
+      var payload = { alvos: doCliente.map(function(a){ return { id:a.id, name:a.name, uniqueId:a.uniqueId, status:a.status, cliente:a.cliente, contact:a.contact }; }) };
+      // 1) cadastra o cliente (se preciso) e os dispositivos novos
+      AL.apiPost('/api/integracao/anterior/importar', payload).then(function(r){
+        var parts = [];
+        if (r.clientesCriados) parts.push(r.clientesCriados+' cliente(s) criado(s)');
+        parts.push(r.dispositivosCriados+' dispositivo(s) criado(s)');
+        if (r.dispositivosVinculados) parts.push(r.dispositivosVinculados+' vinculado(s)');
+        if (r.dispositivosExistentes) parts.push(r.dispositivosExistentes+' já existia(m)');
+        if (r.erros) parts.push(r.erros+' erro(s)');
+        AL.showAlert('Cadastro: ' + parts.join(', ') + '. Enviando comando…', r.erros ? 'error' : 'success');
+        // 2) reaponta todos os selecionados do cliente
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Reapontando…';
+        return reapontarAlvos(doCliente, cmd);
+      }).then(function(rr){
+        if (rr) AL.showAlert('Concluído: cadastro + reapontamento ('+rr.ok+' OK, '+rr.erro+' com erro).', rr.erro ? 'error' : 'success');
+      }).catch(function(err){ AL.showAlert(err.message); })
+        .then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    }
 
     // ── WhatsApp ──
     function suggestSenha(){ return 'agil' + Math.floor(1000 + Math.random()*9000); }
@@ -633,9 +678,9 @@
     // ── Histórico ──
     function loadHistorico(){
       var tb = document.getElementById('tbody-historico');
-      tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888;">Carregando…</td></tr>';
+      tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#888;">Carregando…</td></tr>';
       AL.apiGet('/api/integracao/anterior/historico').then(function(rows){
-        if (!rows.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888;">Nenhum reapontamento registrado.</td></tr>'; return; }
+        if (!rows.length){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#888;">Nenhum reapontamento registrado.</td></tr>'; return; }
         tb.innerHTML = rows.map(function(h){
           var cls = h.erro===0 ? 'b-ok' : (h.ok===0 ? 'b-err' : 'b-warn');
           return '<tr>'+
@@ -646,9 +691,27 @@
             '<td style="text-align:center;">'+h.total+'</td>'+
             '<td style="text-align:center;"><span class="mini-badge '+cls+'">'+h.ok+'</span></td>'+
             '<td style="text-align:center;">'+h.erro+'</td>'+
+            '<td style="text-align:center;"><button class="btn btn-xs btn-default btn-hist-xlsx" data-id="'+esc(h.id)+'" data-nome="'+esc(h.clienteNome)+'" title="Baixar planilha (.xlsx) deste apontamento"><i class="fa fa-file-excel-o"></i></button></td>'+
           '</tr>';
         }).join('');
-      }).catch(function(err){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#b71c1c;">'+esc(err.message)+'</td></tr>'; });
+        document.querySelectorAll('.btn-hist-xlsx').forEach(function(b){
+          b.addEventListener('click', function(){ baixarPlanilhaHistorico(this.dataset.id, this.dataset.nome, this); });
+        });
+      }).catch(function(err){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#b71c1c;">'+esc(err.message)+'</td></tr>'; });
+    }
+
+    function baixarPlanilhaHistorico(id, nome, btn){
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i>';
+      fetch(API + '/api/integracao/anterior/historico/'+encodeURIComponent(id)+'/planilha', {
+        headers:{ 'Authorization':'Bearer '+localStorage.getItem('al_token') }
+      }).then(function(res){ if(!res.ok) throw new Error('Falha ao gerar planilha'); return res.blob(); })
+        .then(function(blob){
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href=url;
+          a.download='reaponte_'+String(nome||'apontamento').replace(/[^a-z0-9]+/gi,'_').toLowerCase()+'.xlsx';
+          document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        }).catch(function(err){ AL.showAlert(err.message); })
+        .then(function(){ btn.disabled=false; btn.innerHTML=old; });
     }
 
   })();
