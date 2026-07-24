@@ -116,15 +116,6 @@ export interface ReaponteResultado {
 
 // ─── Chamadas à API do sistema anterior ─────────────────────────────────────
 
-/** O nome do cliente fica no PREFIXO do campo `contact` do dispositivo. */
-function clienteDoDispositivo(dev: DeviceAnterior, alvosNorm: Array<[string, string]>): string | null {
-  const c = norm(dev.contact);
-  for (const [orig, an] of alvosNorm) {
-    if (an && c.includes(an)) return orig;
-  }
-  return null;
-}
-
 async function listarDispositivos(cfg: AnteriorConfig): Promise<DeviceAnterior[]> {
   const res = await fetch(`${cfg.base}/devices?all=true`, {
     headers: { Accept: 'application/json', Authorization: authHeader(cfg) },
@@ -148,6 +139,60 @@ async function listarDispositivosCache(cfg: AnteriorConfig): Promise<DeviceAnter
   return data;
 }
 
+// ─── Usuários (contas do painel antigo) ─────────────────────────────────────
+// Muitos clientes têm o `contact` do dispositivo genérico (nome da loja, ex.:
+// "ATUAL CAR"), mas a CONTA de usuário tem o nome real do cliente. Buscar pela
+// conta traz os devices exatos dela via /devices?userId=, sem misturar com
+// outras contas que compartilham o mesmo texto de contato.
+interface UsuarioAnterior {
+  id: number;
+  name: string;
+  email?: string | null;
+}
+
+let usuariosCache: { at: number; data: UsuarioAnterior[] } | null = null;
+
+async function listarUsuariosCache(cfg: AnteriorConfig): Promise<UsuarioAnterior[]> {
+  if (usuariosCache && Date.now() - usuariosCache.at < DEVICES_TTL_MS) return usuariosCache.data;
+  const res = await fetch(`${cfg.base}/users`, {
+    headers: { Accept: 'application/json', Authorization: authHeader(cfg) },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Falha ao listar usuários do sistema anterior: HTTP ${res.status} ${txt.slice(0, 200)}`);
+  }
+  const data = ((await res.json()) as UsuarioAnterior[]).filter((u) => u && u.name);
+  usuariosCache = { at: Date.now(), data };
+  return data;
+}
+
+/** Dispositivos de uma conta específica do painel antigo (isola o cliente certo). */
+async function devicesDoUsuario(cfg: AnteriorConfig, userId: number): Promise<DeviceAnterior[]> {
+  const res = await fetch(`${cfg.base}/devices?userId=${encodeURIComponent(String(userId))}`, {
+    headers: { Accept: 'application/json', Authorization: authHeader(cfg) },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Falha ao listar dispositivos do usuário ${userId}: HTTP ${res.status} ${txt.slice(0, 200)}`);
+  }
+  return (await res.json()) as DeviceAnterior[];
+}
+
+/**
+ * Resolve um nome buscado para uma conta de usuário do sistema antigo.
+ * Prioriza match exato (nome escolhido no autocomplete); cai para parcial só
+ * quando houver exatamente 1 candidato (evita ambiguidade com 1000+ contas).
+ */
+function resolverUsuario(usuarios: UsuarioAnterior[], nome: string): UsuarioAnterior | null {
+  const alvo = norm(nome);
+  if (!alvo) return null;
+  const exatos = usuarios.filter((u) => norm(u.name) === alvo);
+  if (exatos.length) return exatos[0];
+  if (alvo.length < 6) return null; // curto demais para um parcial seguro
+  const parciais = usuarios.filter((u) => norm(u.name).includes(alvo));
+  return parciais.length === 1 ? parciais[0] : null;
+}
+
 /** Deriva o nome do cliente a partir do campo `contact` (prefixo antes da 1ª barra). */
 function nomeDoContato(contact?: string | null): string | null {
   if (!contact) return null;
@@ -169,14 +214,28 @@ export async function listarClientesAnteriores(): Promise<string[]> {
   const cfg = anteriorConfig();
   if (!cfg) throw new Error('Integração com o sistema anterior não configurada (ANTERIOR_API_URL/USER/PASS).');
 
-  const devices = await listarDispositivosCache(cfg);
   const vistos = new Map<string, string>(); // normalizado -> exibição
+
+  // 1) Nomes das CONTAS de usuário do painel antigo (nome real do cliente).
+  try {
+    const usuarios = await listarUsuariosCache(cfg);
+    for (const u of usuarios) {
+      const chave = norm(u.name);
+      if (chave && !vistos.has(chave)) vistos.set(chave, u.name.trim());
+    }
+  } catch {
+    // se /users falhar, segue só com os nomes derivados do contato
+  }
+
+  // 2) Nomes derivados do `contact` dos dispositivos (compat / fallback).
+  const devices = await listarDispositivosCache(cfg);
   for (const d of devices) {
     const nome = nomeDoContato(d.contact);
     if (!nome) continue;
     const chave = norm(nome);
     if (!vistos.has(chave)) vistos.set(chave, nome);
   }
+
   return [...vistos.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
@@ -192,30 +251,54 @@ export async function consultarCliente(
   if (!cfg) throw new Error('Integração com o sistema anterior não configurada (ANTERIOR_API_URL/USER/PASS).');
 
   const digitos = opts.digitos ?? 15;
-  const alvosNorm: Array<[string, string]> = clientes.map((c) => [c, norm(c)]);
   const placasNorm = (opts.placas || []).map((p) => norm(p).replace(/\s+/g, '')).filter(Boolean);
 
-  const devices = await listarDispositivosCache(cfg);
+  const todosDevices = await listarDispositivosCache(cfg);
+  const usuarios = await listarUsuariosCache(cfg).catch(() => [] as UsuarioAnterior[]);
+
+  // Monta os candidatos (dispositivo + rótulo do cliente) para cada nome buscado.
+  // Se o nome casa uma CONTA de usuário, traz os devices exatos dela
+  // (/devices?userId=); senão, casa pelo prefixo do `contact` (jeito antigo).
+  const candidatos: Array<{ d: DeviceAnterior; label: string }> = [];
+  const idsVistos = new Set<number>();
+
+  for (const nomeBusca of clientes) {
+    const user = resolverUsuario(usuarios, nomeBusca);
+    if (user) {
+      const devs = await devicesDoUsuario(cfg, user.id).catch(() => [] as DeviceAnterior[]);
+      for (const d of devs) {
+        if (idsVistos.has(d.id)) continue;
+        idsVistos.add(d.id);
+        candidatos.push({ d, label: user.name });
+      }
+    } else {
+      const an = norm(nomeBusca);
+      if (!an) continue;
+      for (const d of todosDevices) {
+        if (idsVistos.has(d.id)) continue;
+        if (norm(d.contact).includes(an)) {
+          idsVistos.add(d.id);
+          candidatos.push({ d, label: nomeBusca });
+        }
+      }
+    }
+  }
 
   const alvos: DispositivoAlvo[] = [];
   let excluidosPorTamanho = 0;
 
-  for (const d of devices) {
-    const cli = clienteDoDispositivo(d, alvosNorm);
-    if (!cli) continue;
-
+  for (const { d, label } of candidatos) {
     if (placasNorm.length) {
       const nomeNorm = norm(d.name).replace(/\s+/g, '');
       if (!placasNorm.some((p) => nomeNorm.includes(p))) continue;
     }
-
     if (digitos === 0 || soDigitos(d.uniqueId).length === digitos) {
       alvos.push({
         id: d.id,
         name: d.name ?? null,
         uniqueId: d.uniqueId ?? null,
         status: d.status ?? null,
-        cliente: cli,
+        cliente: label,
         contact: d.contact ?? null,
         category: d.category ?? null,
       });
@@ -232,7 +315,7 @@ export async function consultarCliente(
     clientes,
     placas: opts.placas || [],
     digitos,
-    totalNaConta: devices.length,
+    totalNaConta: todosDevices.length,
     encontrados: alvos.length,
     excluidosPorTamanho,
     online,
