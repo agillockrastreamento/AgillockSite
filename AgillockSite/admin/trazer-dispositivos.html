@@ -51,6 +51,8 @@
     .code-inline { font-family:monospace; background:#f1f3f5; padding:2px 6px; border-radius:4px; font-size:12px; }
     html.dark-theme .code-inline { background:#0e1116; color:#cbd5e1; }
     .msg-box { width:100%; min-height:200px; font-family:monospace; font-size:12px; }
+    .novos-box { margin-top:10px; padding:8px 10px; background:#e6f0ff; border:1px solid #b6d4fe; border-radius:6px; }
+    html.dark-theme .novos-box { background:#16233a; border-color:#2a4a6a; }
   </style>
 </head>
 <body>
@@ -203,6 +205,7 @@
           <div style="margin-top:12px;">
             <button class="btn btn-primary-al" id="btn-reapontar"><i class="fa fa-bolt"></i> Enviar para <span id="btn-reapontar-n">0</span> dispositivo(s)</button>
           </div>
+          <p class="step-sub" style="margin-top:8px;"><i class="fa fa-info-circle"></i> Os dispositivos marcados como <b>Novo</b> (e o cliente, se ainda não existir aqui) são cadastrados no sistema atual junto com o envio do comando.</p>
         </div>
 
         <!-- LOG -->
@@ -445,15 +448,13 @@
         var waBtn = (c.clienteId && c.telefone)
           ? '<button class="btn btn-xs btn-wa btn-wa-open" data-nome="'+esc(c.nome)+'"><i class="fa fa-whatsapp"></i> Enviar acesso</button>'
           : '<button class="btn btn-xs btn-default" disabled title="Sem cadastro/telefone aqui"><i class="fa fa-whatsapp"></i> Enviar acesso</button>';
-        var impBtn = '<button class="btn btn-xs btn-primary-al btn-importar" data-nome="'+esc(c.nome)+'" title="Cadastra o cliente (se ainda não existir), cadastra os dispositivos NOVOS selecionados e envia o comando de reapontamento a todos os selecionados"><i class="fa fa-download"></i> Trazer para a AgilLock</button>';
         return '<div class="cli-card">'+
           '<div><div class="cli-nome">'+esc(c.nome)+'</div>'+
             '<div class="cli-meta">'+(c.telefone?('<i class="fa fa-phone"></i> '+esc(c.telefone)+' &nbsp; '):'')+ (c.loginEmail?('<i class="fa fa-user"></i> '+esc(c.loginEmail)):'') +'</div>'+
             '<div style="margin-top:4px;">'+existe+' '+jaRe+'</div></div>'+
-          '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+impBtn+waBtn+'</div></div>';
+          '<div>'+waBtn+'</div></div>';
       }).join('');
       document.querySelectorAll('.btn-wa-open').forEach(function(b){ b.onclick=function(){ abrirWhatsApp(this.dataset.nome); }; });
-      document.querySelectorAll('.btn-importar').forEach(function(b){ b.onclick=function(){ importarCliente(this.dataset.nome, this); }; });
 
       // Tabela de alvos
       var tb = document.getElementById('tbody-alvos');
@@ -514,15 +515,39 @@
       return c || null;
     }
 
+    // Clientes desta seleção que ainda não existem aqui (serão criados).
+    function clientesParaCriar(alvos){
+      var locais = (consulta && consulta.clientesLocais) || [];
+      var mapa = {};
+      locais.forEach(function(c){ mapa[c.nome] = c.clienteId; });
+      var vistos = {}, res = [];
+      alvos.forEach(function(a){
+        if (vistos[a.cliente]) return;
+        vistos[a.cliente] = true;
+        if (!mapa[a.cliente]) res.push(a.cliente); // sem clienteId (ou não listado) = criar
+      });
+      return res;
+    }
+
     document.getElementById('btn-reapontar').addEventListener('click', function(){
       var alvos = alvosSelecionados();
       if (!alvos.length){ AL.showAlert('Selecione ao menos um dispositivo.'); return; }
       var cmd = comandoEscolhido();
       var custom = document.querySelector('input[name="modo-cmd"]:checked').value === 'custom';
       if (custom && !cmd){ AL.showAlert('Digite o comando personalizado.'); return; }
-      document.getElementById('confirmar-body').innerHTML =
-        '<p>Vai enviar o comando <span class="code-inline">'+esc(cmd || CMD_PADRAO)+'</span> para <b>'+alvos.length+' dispositivo(s)</b>.</p>'+
-        (custom ? '<p style="color:#a35b00;"><i class="fa fa-exclamation-triangle"></i> Comando personalizado — confira antes de enviar.</p>' : '<p class="step-sub">Os online recebem na hora; os offline ficam enfileirados e recebem ao reconectar.</p>');
+
+      var novos = alvos.filter(function(a){ return !a.existeAqui; });
+      var criarCli = clientesParaCriar(alvos);
+      var html = '<p>Vai enviar o comando <span class="code-inline">'+esc(cmd || CMD_PADRAO)+'</span> para <b>'+alvos.length+' dispositivo(s)</b>.</p>';
+      if (novos.length || criarCli.length){
+        html += '<div class="novos-box"><b><i class="fa fa-plus-circle"></i> Antes do envio, será cadastrado no sistema atual:</b>'+
+          '<ul style="margin:6px 0 0 18px;">'+
+          (criarCli.length ? '<li><b>'+criarCli.length+'</b> cliente(s): '+esc(criarCli.join(', '))+'</li>' : '')+
+          (novos.length ? '<li><b>'+novos.length+'</b> dispositivo(s) novo(s)</li>' : '')+
+          '</ul></div>';
+      }
+      html += (custom ? '<p style="color:#a35b00;"><i class="fa fa-exclamation-triangle"></i> Comando personalizado — confira antes de enviar.</p>' : '<p class="step-sub">Os online recebem na hora; os offline ficam enfileirados e recebem ao reconectar.</p>');
+      document.getElementById('confirmar-body').innerHTML = html;
       $('#modal-confirmar').modal('show');
     });
 
@@ -531,8 +556,7 @@
       enviarReaponte();
     });
 
-    // Reaponta uma lista específica de alvos (usado pelo botão da Etapa 2 e pelo
-    // fluxo "Trazer para a AgilLock", que cadastra e depois reaponta).
+    // Reaponta uma lista específica de alvos (envia o comando).
     function reapontarAlvos(alvos, cmd){
       document.getElementById('log-card').style.display='';
       document.getElementById('log-panel').textContent = 'Enviando comando para '+alvos.length+' dispositivo(s)…';
@@ -546,12 +570,44 @@
       });
     }
 
+    // Cadastra cliente(s) + dispositivos novos da seleção (backend ignora os que já existem).
+    function importarAlvos(alvos){
+      var payload = { alvos: alvos.map(function(a){ return { id:a.id, name:a.name, uniqueId:a.uniqueId, status:a.status, cliente:a.cliente, contact:a.contact, category:a.category }; }) };
+      return AL.apiPost('/api/integracao/anterior/importar', payload);
+    }
+
     function enviarReaponte(){
       var alvos = alvosSelecionados();
       var cmd = comandoEscolhido();
+      var precisaCadastrar = alvos.some(function(a){ return !a.existeAqui; }) || clientesParaCriar(alvos).length > 0;
       var btn = document.getElementById('btn-reapontar');
-      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Enviando…';
-      reapontarAlvos(alvos, cmd).catch(function(err){
+      var old = btn.innerHTML; btn.disabled=true;
+
+      var etapa1;
+      if (precisaCadastrar){
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Cadastrando…';
+        document.getElementById('log-card').style.display='';
+        document.getElementById('log-panel').textContent = 'Cadastrando no sistema atual…';
+        document.getElementById('log-resumo').textContent = '';
+        etapa1 = importarAlvos(alvos).then(function(r){
+          var parts = [];
+          if (r.clientesCriados) parts.push(r.clientesCriados+' cliente(s) criado(s)');
+          if (r.dispositivosCriados) parts.push(r.dispositivosCriados+' dispositivo(s) cadastrado(s)');
+          if (r.dispositivosVinculados) parts.push(r.dispositivosVinculados+' vinculado(s)');
+          if (r.erros) parts.push(r.erros+' erro(s)');
+          if (parts.length) AL.showAlert('Cadastro: '+parts.join(', ')+'.', r.erros ? 'error' : 'success');
+          // marca localmente como já existente p/ refletir e evitar recadastro se reenviar
+          alvos.forEach(function(a){ a.existeAqui = true; });
+        });
+      } else {
+        etapa1 = Promise.resolve();
+      }
+
+      etapa1.then(function(){
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando…';
+        return reapontarAlvos(alvos, cmd);
+      }).catch(function(err){
+        document.getElementById('log-card').style.display='';
         document.getElementById('log-panel').innerHTML = '<span class="log-err">'+esc(err.message)+'</span>';
       }).then(function(){ btn.disabled=false; btn.innerHTML=old; });
     }
@@ -590,41 +646,6 @@
       if (navigator.clipboard) navigator.clipboard.writeText(t);
       AL.showAlert('Log copiado!', 'success');
     });
-
-    // ── Trazer para a AgilLock (cadastra cliente + dispositivos novos e reaponta) ──
-    function importarCliente(nome, btn){
-      if (!consulta) return;
-      var doCliente = alvosSelecionados().filter(function(a){ return a.cliente === nome; });
-      if (!doCliente.length){ AL.showAlert('Selecione ao menos um dispositivo deste cliente na tabela.'); return; }
-      var novos = doCliente.filter(function(a){ return !a.existeAqui; }).length;
-      var cmd = comandoEscolhido();
-      var custom = document.querySelector('input[name="modo-cmd"]:checked').value === 'custom';
-      if (custom && !cmd){ AL.showAlert('Digite o comando personalizado na Etapa 2.'); return; }
-      var msg = 'Trazer para a AgilLock:\n\n' +
-        'Cliente: ' + nome + '\n' +
-        doCliente.length + ' dispositivo(s) selecionado(s) — ' + novos + ' novo(s) a cadastrar.\n' +
-        'Comando de reapontamento: ' + (cmd || CMD_PADRAO) + '\n\n' +
-        'O cliente será criado se não existir, os dispositivos novos serão cadastrados e o comando de reapontamento será enviado a todos os selecionados. Continuar?';
-      if (!window.confirm(msg)) return;
-      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Cadastrando…';
-      var payload = { alvos: doCliente.map(function(a){ return { id:a.id, name:a.name, uniqueId:a.uniqueId, status:a.status, cliente:a.cliente, contact:a.contact, category:a.category }; }) };
-      // 1) cadastra o cliente (se preciso) e os dispositivos novos
-      AL.apiPost('/api/integracao/anterior/importar', payload).then(function(r){
-        var parts = [];
-        if (r.clientesCriados) parts.push(r.clientesCriados+' cliente(s) criado(s)');
-        parts.push(r.dispositivosCriados+' dispositivo(s) criado(s)');
-        if (r.dispositivosVinculados) parts.push(r.dispositivosVinculados+' vinculado(s)');
-        if (r.dispositivosExistentes) parts.push(r.dispositivosExistentes+' já existia(m)');
-        if (r.erros) parts.push(r.erros+' erro(s)');
-        AL.showAlert('Cadastro: ' + parts.join(', ') + '. Enviando comando…', r.erros ? 'error' : 'success');
-        // 2) reaponta todos os selecionados do cliente
-        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Reapontando…';
-        return reapontarAlvos(doCliente, cmd);
-      }).then(function(rr){
-        if (rr) AL.showAlert('Concluído: cadastro + reapontamento ('+rr.ok+' OK, '+rr.erro+' com erro).', rr.erro ? 'error' : 'success');
-      }).catch(function(err){ AL.showAlert(err.message); })
-        .then(function(){ btn.disabled=false; btn.innerHTML=old; });
-    }
 
     // ── WhatsApp ──
     function suggestSenha(){ return 'agil' + Math.floor(1000 + Math.random()*9000); }
