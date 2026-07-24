@@ -9,6 +9,7 @@ import {
   gerarPlanilhaReaponte,
   listarClientesAnteriores,
   normalizarNome,
+  mapaOdometros,
   ReaponteItem,
 } from '../services/reaponte-anterior.service';
 import { buildTraccarDeviceSyncData, syncTraccarAccumulators } from '../utils/dispositivo-sync';
@@ -223,8 +224,16 @@ router.post('/importar', async (req: AuthRequest, res: Response) => {
     dispositivosCriados: 0,
     dispositivosVinculados: 0,
     dispositivosExistentes: 0,
+    odometrosPreenchidos: 0,
     erros: 0,
     itens: [] as Array<{ imei: string | null; nome: string | null; cliente: string; status: string; detalhe?: string }>,
+  };
+
+  // Odômetro (km) de cada dispositivo do sistema anterior (metros), p/ trazer junto.
+  const odom = await mapaOdometros().catch(() => new Map<number, number>());
+  const odometroMetrosDe = (id: unknown): number | null => {
+    const m = typeof id === 'number' ? odom.get(id) : undefined;
+    return typeof m === 'number' ? Math.round(m) : null;
   };
 
   try {
@@ -257,9 +266,11 @@ router.post('/importar', async (req: AuthRequest, res: Response) => {
           continue;
         }
 
+        const odomMetros = odometroMetrosDe(a?.id);
+
         const existente = await prisma.dispositivo.findUnique({
           where: { identificador },
-          select: { id: true, clienteId: true },
+          select: { id: true, clienteId: true, odometroSistemaMetros: true, traccarId: true },
         });
 
         if (existente) {
@@ -271,6 +282,15 @@ router.post('/importar', async (req: AuthRequest, res: Response) => {
           } else {
             resumo.dispositivosExistentes++;
             resumo.itens.push({ imei: identificador, nome: a?.name ?? null, cliente: nome, status: 'existente', detalhe: 'IMEI já cadastrado.' });
+          }
+          // Preenche o km (odômetro) se ainda estiver vazio aqui — traz do sistema anterior.
+          if (existente.odometroSistemaMetros == null && odomMetros != null) {
+            await prisma.dispositivo.update({ where: { id: existente.id }, data: { odometroSistemaMetros: odomMetros } });
+            resumo.odometrosPreenchidos++;
+            if (existente.traccarId != null) {
+              syncTraccarAccumulators(existente.traccarId, { odometroSistemaMetros: odomMetros })
+                .catch((err) => console.error('[Traccar] Falha ao sincronizar odômetro:', err.message));
+            }
           }
           continue;
         }
@@ -296,11 +316,13 @@ router.post('/importar', async (req: AuthRequest, res: Response) => {
             placa: norm.placa,
             marca: norm.marca,
             modeloVeiculo: norm.modeloVeiculo,
+            odometroSistemaMetros: odomMetros, // km trazido do sistema anterior
             clienteId: local.id,
             criadoPorId: req.user!.userId,
           },
         });
         resumo.dispositivosCriados++;
+        if (odomMetros != null) resumo.odometrosPreenchidos++;
         resumo.itens.push({ imei: identificador, nome: dispositivo.nome, cliente: nome, status: 'criado' });
 
         // Traccar (best-effort — não bloqueia a importação).

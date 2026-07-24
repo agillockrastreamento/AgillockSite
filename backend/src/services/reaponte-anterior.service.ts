@@ -193,6 +193,33 @@ function resolverUsuario(usuarios: UsuarioAnterior[], nome: string): UsuarioAnte
   return parciais.length === 1 ? parciais[0] : null;
 }
 
+// ─── Odômetro (km) das últimas posições ─────────────────────────────────────
+// O km fica em attributes.totalDistance (metros) da última posição de cada
+// dispositivo. Um único GET /positions traz a última posição de todos.
+let odometrosCache: { at: number; data: Map<number, number> } | null = null;
+
+/** Mapa: id do dispositivo no sistema anterior → odômetro em METROS. */
+export async function mapaOdometros(): Promise<Map<number, number>> {
+  const cfg = anteriorConfig();
+  if (!cfg) return new Map();
+  if (odometrosCache && Date.now() - odometrosCache.at < DEVICES_TTL_MS) return odometrosCache.data;
+  const res = await fetch(`${cfg.base}/positions`, {
+    headers: { Accept: 'application/json', Authorization: authHeader(cfg) },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Falha ao listar posições do sistema anterior: HTTP ${res.status} ${txt.slice(0, 200)}`);
+  }
+  const arr = (await res.json()) as Array<{ deviceId: number; attributes?: Record<string, unknown> }>;
+  const map = new Map<number, number>();
+  for (const p of arr) {
+    const td = p?.attributes?.totalDistance;
+    if (typeof td === 'number' && Number.isFinite(td) && td >= 0) map.set(p.deviceId, td);
+  }
+  odometrosCache = { at: Date.now(), data: map };
+  return map;
+}
+
 /** Deriva o nome do cliente a partir do campo `contact` (prefixo antes da 1ª barra). */
 function nomeDoContato(contact?: string | null): string | null {
   if (!contact) return null;

@@ -205,7 +205,7 @@
           <div style="margin-top:12px;">
             <button class="btn btn-primary-al" id="btn-reapontar"><i class="fa fa-bolt"></i> Enviar para <span id="btn-reapontar-n">0</span> dispositivo(s)</button>
           </div>
-          <p class="step-sub" style="margin-top:8px;"><i class="fa fa-info-circle"></i> Os dispositivos marcados como <b>Novo</b> (e o cliente, se ainda não existir aqui) são cadastrados no sistema atual junto com o envio do comando.</p>
+          <p class="step-sub" style="margin-top:8px;"><i class="fa fa-info-circle"></i> Os dispositivos marcados como <b>Novo</b> (e o cliente, se ainda não existir aqui) são cadastrados no sistema atual junto com o envio do comando. O <b>km (odômetro)</b> é trazido do sistema anterior.</p>
         </div>
 
         <!-- LOG -->
@@ -594,6 +594,7 @@
           if (r.clientesCriados) parts.push(r.clientesCriados+' cliente(s) criado(s)');
           if (r.dispositivosCriados) parts.push(r.dispositivosCriados+' dispositivo(s) cadastrado(s)');
           if (r.dispositivosVinculados) parts.push(r.dispositivosVinculados+' vinculado(s)');
+          if (r.odometrosPreenchidos) parts.push(r.odometrosPreenchidos+' com km preenchido');
           if (r.erros) parts.push(r.erros+' erro(s)');
           if (parts.length) AL.showAlert('Cadastro: '+parts.join(', ')+'.', r.erros ? 'error' : 'success');
           // marca localmente como já existente p/ refletir e evitar recadastro se reenviar
