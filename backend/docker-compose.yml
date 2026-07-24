@@ -46,6 +46,7 @@ services:
     ports:
       - "5023:5023"   # Protocolo GT06 — exposto publicamente para os dispositivos GPS
       - "5011:5011"   # Protocolo Suntech (ST300, ST310, etc.)
+      - "5013:5013"   # Rastreador SGT T10 — protocolo padrão do Traccar na porta 5013
       - "5001:5001"   # Protocolo TK — exposto publicamente para os dispositivos GPS
       - "5058:5058"   # Protocolo SGT — exposto publicamente para os dispositivos GPS
       - "5087:5087"   # Protocolo Maxtrack — exposto publicamente para os dispositivos GPS
