@@ -68,7 +68,10 @@ export const MARCAS = [
 ];
 
 // Regex de placa BR (antiga ABC1234 e Mercosul ABC1D23), ancorada no FIM do nome.
-const PLACA_FIM = /^(.*?)[\s-]*([A-Z]{3}[- ]?\d[A-Z0-9]\d{2})\s*$/;
+// A placa precisa ser um TOKEN separado (precedido por espaço/hífen) — senão o
+// regex casaria um trecho colado a uma palavra (ex.: "CARGO 2422" → "RGO 2422"),
+// corrompendo o nome numa nova execução.
+const PLACA_FIM = /^(?:(.*?)[\s-]+)?([A-Z]{3}[- ]?\d[A-Z0-9]\d{2})\s*$/;
 
 /** Normaliza espaços e maiúsculas para o parsing. */
 function up(s: string | null | undefined): string {
@@ -94,7 +97,7 @@ export function parseNome(nome: string | null | undefined): ParseNome {
   let base = n;
   let placa: string | null = null;
   const m = n.match(PLACA_FIM);
-  if (m && m[1].trim()) {
+  if (m && m[1] && m[1].trim()) {
     // Só considera "placa" se sobrar texto antes dela (evita nome = só placa).
     placa = m[2].replace(/[- ]/g, '');
     base = m[1].trim();
