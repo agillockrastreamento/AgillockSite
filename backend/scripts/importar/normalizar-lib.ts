@@ -78,26 +78,29 @@ function up(s: string | null | undefined): string {
 export interface ParseNome {
   placa: string | null;       // placa extraída do fim do nome (ou null)
   marca: string | null;       // marca conhecida detectada no início (ou null)
-  modelo: string | null;      // o que resta = modelo do veículo (ou null)
+  modelo: string | null;      // o que resta depois de tirar marca = modelo (ou null)
+  base: string | null;        // nome sem a placa (marca + modelo), p/ limpar o nome
   soImei: boolean;            // nome é só o IMEI (sequência de dígitos)
 }
 
 /** Quebra o nome "MODELO PLACA" (com marca opcional) em placa/marca/modelo. */
 export function parseNome(nome: string | null | undefined): ParseNome {
   const n = up(nome);
-  if (!n) return { placa: null, marca: null, modelo: null, soImei: false };
+  if (!n) return { placa: null, marca: null, modelo: null, base: null, soImei: false };
   // Nome que é só o IMEI (dígitos) — nada de modelo/placa para extrair.
-  if (/^\d{6,}$/.test(n)) return { placa: null, marca: null, modelo: null, soImei: true };
+  if (/^\d{6,}$/.test(n)) return { placa: null, marca: null, modelo: null, base: null, soImei: true };
 
-  let resto = n;
+  // `base` = nome sem a placa (o que vira o nome limpo). Sem placa, é o nome todo.
+  let base = n;
   let placa: string | null = null;
   const m = n.match(PLACA_FIM);
   if (m && m[1].trim()) {
-    // Só considera "placa" se sobrar um modelo antes dela (evita nome = só placa).
+    // Só considera "placa" se sobrar texto antes dela (evita nome = só placa).
     placa = m[2].replace(/[- ]/g, '');
-    resto = m[1].trim();
+    base = m[1].trim();
   }
 
+  let resto = base;
   let marca: string | null = null;
   for (const mk of MARCAS) {
     if (resto === mk || resto.startsWith(mk + ' ')) {
@@ -107,7 +110,7 @@ export function parseNome(nome: string | null | undefined): ParseNome {
     }
   }
 
-  return { placa, marca, modelo: resto || null, soImei: false };
+  return { placa, marca, modelo: resto || null, base: base || null, soImei: false };
 }
 
 /** Estado (parcial) de um dispositivo relevante para a normalização. */
@@ -160,11 +163,13 @@ export function planejarAjuste(d: DispParaNormalizar): PlanoAjuste {
   let modeloVeiculo = d.modeloVeiculo;
   if (!modeloVeiculo && p.modelo) { modeloVeiculo = p.modelo; motivos.push('modelo do nome'); }
 
-  // ── Nome (sempre vira só o modelo, sem placa/marca) ──
+  // ── Nome: tira a placa; fica o modelo (ou a marca, se não sobrar modelo) ──
+  // Nunca deixa a placa no nome nem esvazia o nome.
   let nome = d.nome;
-  if (!p.soImei && p.modelo && up(nome) !== p.modelo) {
-    nome = p.modelo;
-    motivos.push('nome limpo (só modelo)');
+  const nomeAlvo = p.modelo || p.base; // base = nome sem placa (marca+modelo)
+  if (!p.soImei && nomeAlvo && up(nome) !== nomeAlvo) {
+    nome = nomeAlvo;
+    motivos.push('nome limpo (sem placa)');
   }
 
   const depois = { nome, categoria, placa, marca, modeloVeiculo };
