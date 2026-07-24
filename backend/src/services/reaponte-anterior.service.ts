@@ -66,6 +66,7 @@ interface DeviceAnterior {
   uniqueId?: string;
   status?: string;
   contact?: string;
+  category?: string;
   lastUpdate?: string;
 }
 
@@ -76,6 +77,7 @@ export interface DispositivoAlvo {
   status: string | null;
   cliente: string;
   contact: string | null;
+  category: string | null; // categoria do Traccar antigo (car, motorcycle, ...) p/ normalizar na importação
   // Preenchido no endpoint: se o IMEI já existe como Dispositivo na AgilLock.
   existeAqui?: boolean;
 }
@@ -215,6 +217,7 @@ export async function consultarCliente(
         status: d.status ?? null,
         cliente: cli,
         contact: d.contact ?? null,
+        category: d.category ?? null,
       });
     } else {
       excluidosPorTamanho++;

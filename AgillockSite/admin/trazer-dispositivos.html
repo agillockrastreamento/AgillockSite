@@ -607,7 +607,7 @@
         'O cliente será criado se não existir, os dispositivos novos serão cadastrados e o comando de reapontamento será enviado a todos os selecionados. Continuar?';
       if (!window.confirm(msg)) return;
       var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Cadastrando…';
-      var payload = { alvos: doCliente.map(function(a){ return { id:a.id, name:a.name, uniqueId:a.uniqueId, status:a.status, cliente:a.cliente, contact:a.contact }; }) };
+      var payload = { alvos: doCliente.map(function(a){ return { id:a.id, name:a.name, uniqueId:a.uniqueId, status:a.status, cliente:a.cliente, contact:a.contact, category:a.category }; }) };
       // 1) cadastra o cliente (se preciso) e os dispositivos novos
       AL.apiPost('/api/integracao/anterior/importar', payload).then(function(r){
         var parts = [];

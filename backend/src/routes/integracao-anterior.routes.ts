@@ -13,6 +13,7 @@ import {
 } from '../services/reaponte-anterior.service';
 import { buildTraccarDeviceSyncData, syncTraccarAccumulators } from '../utils/dispositivo-sync';
 import { traccarCreateDevice } from '../services/traccar.service';
+import { planejarAjuste } from '../utils/normalizar-dispositivo';
 
 /**
  * Rotas do painel admin para a tela "Trazer Dispositivos do Sistema Anterior".
@@ -46,15 +47,6 @@ async function casarClienteLocal(nomeAntigo: string) {
     if (!parcial && (n.includes(alvo) || alvo.includes(n))) parcial = c;
   }
   return exato || parcial;
-}
-
-// Extrai uma placa (padrão BR antigo ABC1234 ou Mercosul ABC1D23) do nome do
-// veículo vindo do sistema antigo, para pré-preencher o cadastro do dispositivo.
-const PLACA_RE = /[A-Z]{3}[- ]?\d[A-Z0-9]\d{2}/;
-function extrairPlaca(nome?: string | null): string | null {
-  if (!nome) return null;
-  const m = String(nome).toUpperCase().match(PLACA_RE);
-  return m ? m[0].replace(/[- ]/g, '') : null;
 }
 
 // Status da integração (a tela usa para avisar se falta configurar credencial).
@@ -283,21 +275,33 @@ router.post('/importar', async (req: AuthRequest, res: Response) => {
           continue;
         }
 
-        // Novo: cadastra o dispositivo.
-        const nomeDisp = (a?.name && String(a.name).trim()) || identificador;
+        // Novo: cadastra o dispositivo já no padrão do sistema atual
+        // (categoria pt-BR, nome sem placa, placa/marca/modelo separados) —
+        // mesma normalização do ajuste em lote (utils/normalizar-dispositivo).
+        const catAnterior = a?.category ?? a?.categoria ?? 'car';
+        const norm = planejarAjuste({
+          identificador,
+          nome: a?.name ?? null,
+          categoria: catAnterior ? String(catAnterior) : 'car',
+          placa: null,
+          marca: null,
+          modeloVeiculo: null,
+        }).depois;
         const dispositivo = await prisma.dispositivo.create({
           data: {
-            nome: nomeDisp,
+            nome: norm.nome || identificador,
             identificador,
-            categoria: 'car',
+            categoria: norm.categoria || 'carro',
             contato: a?.contact ? String(a.contact) : null,
-            placa: extrairPlaca(a?.name),
+            placa: norm.placa,
+            marca: norm.marca,
+            modeloVeiculo: norm.modeloVeiculo,
             clienteId: local.id,
             criadoPorId: req.user!.userId,
           },
         });
         resumo.dispositivosCriados++;
-        resumo.itens.push({ imei: identificador, nome: nomeDisp, cliente: nome, status: 'criado' });
+        resumo.itens.push({ imei: identificador, nome: dispositivo.nome, cliente: nome, status: 'criado' });
 
         // Traccar (best-effort — não bloqueia a importação).
         traccarCreateDevice(buildTraccarDeviceSyncData(dispositivo))
