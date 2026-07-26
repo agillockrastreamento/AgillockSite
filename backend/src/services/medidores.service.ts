@@ -14,6 +14,7 @@ export const DISPOSITIVO_MEDIDORES_SELECT = {
   telemetriaUltimaLatitude: true,
   telemetriaUltimaLongitude: true,
   telemetriaUltimaIgnicao: true,
+  telemetriaUltimoBloqueio: true,
   ultimoCartaoMotorista: true,
   ultimoCartaoMotoristaEm: true,
 } as const;
@@ -28,6 +29,7 @@ type DispositivoMedidores = {
   telemetriaUltimaLatitude: number | null;
   telemetriaUltimaLongitude: number | null;
   telemetriaUltimaIgnicao: boolean | null;
+  telemetriaUltimoBloqueio: boolean | null;
   ultimoCartaoMotorista?: string | null;
   ultimoCartaoMotoristaEm?: Date | null;
 };
@@ -224,6 +226,9 @@ function aplicarPosicaoAoEstado(
     telemetriaUltimaLatitude: posicao.valid ? posicao.latitude : dispositivo.telemetriaUltimaLatitude,
     telemetriaUltimaLongitude: posicao.valid ? posicao.longitude : dispositivo.telemetriaUltimaLongitude,
     telemetriaUltimaIgnicao: toBoolean(posicao.attributes?.ignition) ?? dispositivo.telemetriaUltimaIgnicao ?? false,
+    // 'blocked' não vem em todo pacote (some no movimento). Guarda o último estado
+    // REAL conhecido; fica null até o rastreador reportar pela 1ª vez (não fabrica "desbloqueado").
+    telemetriaUltimoBloqueio: toBoolean(posicao.attributes?.blocked) ?? dispositivo.telemetriaUltimoBloqueio ?? null,
   };
 }
 
@@ -251,6 +256,7 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
       || proximoEstado.telemetriaUltimaLatitude !== dispositivo.telemetriaUltimaLatitude
       || proximoEstado.telemetriaUltimaLongitude !== dispositivo.telemetriaUltimaLongitude
       || proximoEstado.telemetriaUltimaIgnicao !== dispositivo.telemetriaUltimaIgnicao
+      || proximoEstado.telemetriaUltimoBloqueio !== dispositivo.telemetriaUltimoBloqueio
       || proximoEstado.ultimoCartaoMotorista !== dispositivo.ultimoCartaoMotorista;
 
     if (!mudou) continue;
@@ -266,6 +272,7 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
         telemetriaUltimaLatitude: proximoEstado.telemetriaUltimaLatitude,
         telemetriaUltimaLongitude: proximoEstado.telemetriaUltimaLongitude,
         telemetriaUltimaIgnicao: proximoEstado.telemetriaUltimaIgnicao,
+        telemetriaUltimoBloqueio: proximoEstado.telemetriaUltimoBloqueio,
       },
     }));
   }
@@ -278,7 +285,7 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
 }
 
 export function decorarPosicaoComMedidores(
-  dispositivo: Pick<DispositivoMedidores, 'ignorarOdometro' | 'odometroSistemaMetros' | 'horimetroSistemaSegundos' | 'telemetriaUltimaIgnicao'>,
+  dispositivo: Pick<DispositivoMedidores, 'ignorarOdometro' | 'odometroSistemaMetros' | 'horimetroSistemaSegundos' | 'telemetriaUltimaIgnicao' | 'telemetriaUltimoBloqueio'>,
   posicao: TraccarPosition,
 ): PosicaoDecorada {
   const normalizado = normalizeAttributes(posicao.attributes ?? {});
@@ -313,6 +320,8 @@ export function decorarPosicaoComMedidores(
     horas_motor,
     // Se o 'ignicao' veio nulo no normalizado (Traccar não enviou no pacote), usamos o do sistema
     ignicao: normalizado.ignicao !== null ? normalizado.ignicao : dispositivo.telemetriaUltimaIgnicao,
+    // Idem 'bloqueado': se a posição atual não trouxe 'blocked', usa o último estado persistido
+    bloqueado: normalizado.bloqueado !== null ? normalizado.bloqueado : dispositivo.telemetriaUltimoBloqueio,
   };
 }
 

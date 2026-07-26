@@ -123,8 +123,16 @@ router.post('/veiculo/:placa/comando', async (req: Request, res: Response) => {
       while (Date.now() < fim) {
         await new Promise((r) => setTimeout(r, 5_000));
         const posicoes = await traccarGetPositions([traccarDevice.id]).catch(() => []);
-        const p = posicoes[0] ? decorarPosicaoComMedidores(dispositivo, posicoes[0]) : null;
-        bloqueado = (p as { bloqueado?: boolean | null } | null)?.bloqueado ?? null;
+        if (!posicoes[0]) continue;
+        // Persiste o último 'blocked' conhecido (o Traccar não manda em todo pacote) e
+        // lê o estado decorado já com o fallback aplicado.
+        const atualizados = await sincronizarDispositivosComPosicoes(
+          [dispositivo],
+          new Map([[dispositivo.identificador, posicoes[0]]]),
+        );
+        Object.assign(dispositivo, atualizados.get(dispositivo.identificador) ?? dispositivo);
+        const p = decorarPosicaoComMedidores(dispositivo, posicoes[0]);
+        bloqueado = (p as { bloqueado?: boolean | null }).bloqueado ?? null;
         if (bloqueado === alvo) {
           confirmado = true;
           break;

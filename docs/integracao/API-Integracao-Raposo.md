@@ -44,7 +44,7 @@ KM, velocidade, estado de bloqueio e posição do veículo. Resolve o dispositiv
 
 - `km` = `Math.round(odometroMetros / 1000)` — a Ágil Lock guarda o odômetro em **metros**; a conversão para km acontece aqui, na borda.
 - `velocidade` em km/h. `null` quando não há posição recente.
-- `bloqueado` reflete a última posição conhecida (`null` se desconhecido).
+- `bloqueado` — o Traccar **não envia `blocked` em todo pacote** (some em pacote de movimento). Para não "sumir e voltar", persistimos o **último estado real** em `Dispositivo.telemetriaUltimoBloqueio` e usamos como fallback (mesmo padrão de `telemetriaUltimaIgnicao`). Fica `null` só até o rastreador reportar `blocked` pela **primeira vez** — nunca fabricamos "desbloqueado". Se um device específico jamais reportar `blocked`, o campo permanece `null` e a confirmação de comando cai em `confirmado: false` (o comando ainda é enfileirado).
 
 **404** `{ "error": "Veículo não encontrado para a placa informada." }` — placa sem dispositivo ativo.
 **500** erro ao consultar.

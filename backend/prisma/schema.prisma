@@ -335,6 +335,7 @@ model Dispositivo {
   telemetriaUltimaLatitude  Float?
   telemetriaUltimaLongitude Float?
   telemetriaUltimaIgnicao   Boolean?
+  telemetriaUltimoBloqueio  Boolean?
 
   // Último cartão RFID de motorista lido pelo rastreador. O leitor só envia o cartão
   // no login/logout da jornada, então a posição ATUAL quase nunca traz o número —
