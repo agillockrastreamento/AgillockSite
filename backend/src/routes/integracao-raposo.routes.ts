@@ -146,4 +146,68 @@ router.post('/veiculo/:placa/comando', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/integracao/raposo/veiculo/:placa/manutencoes
+ * Devolve os PLANOS (recorrências por KM e por data) e os REGISTROS de manutenção do
+ * veículo (por placa). O Raposo importa isso: recorrência → plano_manutencao
+ * (agillock_recorrencia_id), registro → manutencao (origem IMPORTADO_AGILLOCK). Ver
+ * docs/integracao/API-Integracao-Raposo.md §manutenções. Somente leitura.
+ */
+router.get('/veiculo/:placa/manutencoes', async (req: Request, res: Response) => {
+  try {
+    const dispositivo = await resolverDispositivoPorPlaca(String(req.params.placa));
+    if (!dispositivo) {
+      res.status(404).json({ error: 'Veículo não encontrado para a placa informada.' });
+      return;
+    }
+    const [recorrencias, recorrenciasData, registros] = await Promise.all([
+      prisma.manutencaoRecorrencia.findMany({
+        where: { dispositivoId: dispositivo.id, ativa: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.manutencaoRecorrenciaData.findMany({
+        where: { dispositivoId: dispositivo.id, ativa: true },
+        orderBy: { dataReferencia: 'asc' },
+      }),
+      prisma.manutencaoRegistro.findMany({
+        where: { dispositivoId: dispositivo.id },
+        orderBy: { dataRealizacao: 'desc' },
+        take: 100,
+      }),
+    ]);
+    res.json({
+      placa: dispositivo.placa,
+      dispositivoId: dispositivo.id,
+      recorrencias: recorrencias.map((r) => ({
+        id: r.id,
+        titulo: r.titulo,
+        descricao: r.descricao,
+        intervaloKm: r.intervaloKm,
+        kmBase: r.kmBase,
+      })),
+      recorrenciasData: recorrenciasData.map((r) => ({
+        id: r.id,
+        titulo: r.titulo,
+        descricao: r.descricao,
+        tipoRecorrencia: r.tipoRecorrencia,
+        dataReferencia: r.dataReferencia,
+        intervaloDias: r.intervaloDias,
+      })),
+      registros: registros.map((r) => ({
+        id: r.id,
+        titulo: r.titulo,
+        tipo: r.tipo,
+        descricao: r.descricao,
+        dataRealizacao: r.dataRealizacao,
+        kmRealizacao: r.kmRealizacao,
+        custo: r.custo,
+        oficina: r.oficina,
+      })),
+    });
+  } catch (err) {
+    console.error('[integracao-raposo] manutencoes:', err);
+    res.status(500).json({ error: 'Erro ao consultar as manutenções do veículo.' });
+  }
+});
+
 export default router;

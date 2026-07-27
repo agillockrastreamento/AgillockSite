@@ -70,6 +70,22 @@ Bloqueia (`engineStop`) ou desbloqueia (`engineResume`) o motor. **Não há ACK 
 
 > ⚠️ Este endpoint **corta/religa motor de verdade**. Do lado do Raposo, em dev/teste o cliente opera em **modo fake** e nunca chega aqui. Só produção com `AGILLOCK_API_KEY` setada dispara a chamada real.
 
+### `GET /veiculo/:placa/manutencoes`
+
+Devolve os **planos** (recorrências por KM e por data) e os **registros** de manutenção do veículo, por placa. O Raposo importa isto: recorrência → `plano_manutencao` (`agillock_recorrencia_id`); registro → `manutencao` (origem `IMPORTADO_AGILLOCK`, `agillock_registro_id`), **idempotente** pelas chaves.
+
+```json
+{
+  "placa": "ABC1D23",
+  "dispositivoId": "...",
+  "recorrencias": [{ "id": "...", "titulo": "Óleo 5000km", "descricao": null, "intervaloKm": 5000, "kmBase": 12000 }],
+  "recorrenciasData": [{ "id": "...", "titulo": "Revisão anual", "tipoRecorrencia": "ANUAL", "dataReferencia": "2026-12-01T...", "intervaloDias": null }],
+  "registros": [{ "id": "...", "titulo": "Troca de óleo", "tipo": "preventiva", "dataRealizacao": "2026-02-01T...", "kmRealizacao": 5000, "custo": 120.5, "oficina": "Oficina X" }]
+}
+```
+
+**404** placa sem dispositivo. **Sincronização (decisão de desenho):** as **recorrências (planos) são bidirecionais** — o Raposo também vai **criar/editar/marcar-feito** recorrências aqui (endpoints de escrita `POST /veiculo/:placa/manutencoes/recorrencia` e `.../recorrencia/:id/feito`, a criar). Os **registros** são import **one-way** (carga de histórico). O "feito" vindo da Ágil Lock **não** cria lançamento no Raposo automaticamente: lá ele vira uma **pendência** para o operador confirmar responsável/custo (o efeito financeiro é decisão humana do Raposo). Reconciliação contínua por job; webhook em tempo real é o próximo passo.
+
 ## Como o Raposo consome
 
 `apps/api/src/integrations/agillock.ts`:
