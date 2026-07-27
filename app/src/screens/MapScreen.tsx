@@ -1192,7 +1192,12 @@ export function MapScreen() {
             isSpiderMarker: boolean,
           ) => {
             const color = getMarkerColor(device);
-            const curso = device.posicao?.curso ?? 0;
+            // Arredondado em 15°, igual ao bitmap do Android e à assinatura do
+            // iOS. Desenhar o ângulo cru aqui deixava o ícone fora de sincronia
+            // com o que dispara o re-snapshot: no iOS o mapa só refotografa a
+            // view quando a assinatura muda, então um ângulo intermediário
+            // capturado no meio da janela aparecia como tremido.
+            const curso = cursoDoCard(device);
             const label = device.placa ?? device.nome ?? '';
             // Construído sob demanda: no Android a maioria dos marcadores usa o
             // bitmap e não desenha filho nenhum — montar essa árvore para todos
@@ -1229,10 +1234,10 @@ export function MapScreen() {
               return (
                 <IconMarker
                   key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}`}
-                  // Mesma granularidade de 15° usada no bitmap do Android: cada
-                  // mudança de assinatura liga `tracksViewChanges` por meio
-                  // segundo, e no iOS isso é o principal custo do mapa.
-                  signature={`${color}|${cursoDoCard(device)}|${label}|${showLabels ? 1 : 0}`}
+                  // Cada mudança de assinatura liga `tracksViewChanges` por meio
+                  // segundo, e no iOS isso é o principal custo do mapa — daí o
+                  // curso entrar já arredondado em 15°.
+                  signature={`${color}|${curso}|${label}|${showLabels ? 1 : 0}`}
                   coordinate={coord}
                   anchor={{ x: 0.5, y: 0.5 }}
                   zIndex={isSpiderMarker ? 1000 : 100}
