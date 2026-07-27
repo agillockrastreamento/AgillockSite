@@ -426,7 +426,15 @@ export function MapScreen() {
   // fim dele). Cada marcador é uma view nativa: criar centenas delas fora da
   // tela era desperdício puro — quem está longe volta a aparecer no zoom out,
   // agrupado em cluster.
+  //
+  // SÓ NO ANDROID. No iOS o react-native-maps roda pelo interop de views
+  // legadas do Fabric, que adia a montagem de todo filho inserido fora do fim
+  // da lista; se o marcador ainda não tem `contentView`, o mapa recebe nil e o
+  // app morre com NSInvalidArgumentException em insertReactSubview. Filtrar por
+  // viewport muda a composição da lista a cada gesto, o que multiplica essas
+  // inserções no meio — no iOS o conjunto fica estável e o mapa só reagrupa.
   const devicesNaViewport = useMemo(() => {
+    if (isIOS) return locatedDevices;
     const { latitude, longitude, latitudeDelta, longitudeDelta } = currentRegion;
     if (!Number.isFinite(latitudeDelta) || !Number.isFinite(longitudeDelta)) {
       return locatedDevices;
@@ -561,7 +569,8 @@ export function MapScreen() {
   // recebia TODOS os dispositivos e capturava um bitmap para cada um, mesmo os
   // que estavam escondidos dentro de um cluster.
   const markerDevices = useMemo(() => {
-    if (mainCardVisible && selectedDevice) return [selectedDevice];
+    // Espelha a regra do render: só o Android colapsa para o veículo focado.
+    if (!isIOS && mainCardVisible && selectedDevice) return [selectedDevice];
     const lista: TrackingDevice[] = [];
     for (const group of clusterGroups) {
       if (group.devices.length === 1) lista.push(group.devices[0]);
@@ -1233,7 +1242,12 @@ export function MapScreen() {
             if (isIOS) {
               return (
                 <IconMarker
-                  key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}`}
+                  // Sem o sufixo de spider de propósito: o mesmo veículo dentro
+                  // e fora do spider reusa o marcador (só muda a coordenada).
+                  // Com o sufixo, abrir/fechar o spider destruía e recriava
+                  // marcadores — e é justamente a inserção de marcador novo que
+                  // esbarra no interop do Fabric e derruba o app.
+                  key={`dev-${device.dispositivoId}`}
                   // Cada mudança de assinatura liga `tracksViewChanges` por meio
                   // segundo, e no iOS isso é o principal custo do mapa — daí o
                   // curso entrar já arredondado em 15°.
@@ -1276,7 +1290,14 @@ export function MapScreen() {
             );
           };
 
-          if (mainCardVisible && selectedDevice) {
+          // Com o card aberto o Android desenha só o veículo focado (menos
+          // bitmaps na tela). No iOS não dá: colapsar para um marcador e depois
+          // voltar para a lista inteira ao fechar o card recria dezenas de
+          // marcadores de uma vez, e é essa rajada de inserção que estoura o
+          // interop do Fabric (insertReactSubview com view nula). Lá os
+          // marcadores continuam montados — sai mais barato do que destruir e
+          // recriar tudo duas vezes por toque.
+          if (!isIOS && mainCardVisible && selectedDevice) {
             const coord = getDeviceCoordinate(selectedDevice);
             return coord ? renderDeviceMarker(selectedDevice, coord, false) : null;
           }
