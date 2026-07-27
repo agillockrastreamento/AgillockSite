@@ -8,6 +8,7 @@ import {
 import EmailService from '../services/email.service';
 import ExpoPushService from '../services/expo-push.service';
 import { periodoKmOuPadrao } from '../services/notification.service';
+import { salvarPreferenciasEmMassa } from '../utils/preferencias-notificacao';
 
 const router = Router();
 
@@ -83,6 +84,79 @@ router.delete('/app-tokens', clienteAuthMiddleware, async (req: any, res) => {
   }
 });
 
+// Monta o formato que as telas consomem a partir das linhas do banco.
+function montarPreferencias(prefs: Array<Record<string, any>>) {
+  const result: any = { preferencias: {} };
+  prefs.forEach(p => {
+    result.preferencias[p.tipoEvento] = { web: p.web, app: p.app, email: p.email };
+    if (p.tipoEvento === 'overspeed') {
+      result.overspeedLimit = p.overspeedLimit;
+    }
+    if (p.tipoEvento === 'kmExcedida') {
+      result.kmExcedida = {
+        kmMaximo30Dias: p.kmMaximo30Dias,
+        diaRenovacaoMes: p.diaRenovacaoMes,
+        diaSemanaRenovacao: p.diaSemanaRenovacao,
+        periodo: periodoKmOuPadrao(p.kmPeriodo, 'kmExcedida'),
+      };
+    }
+    if (p.tipoEvento === 'kmReduzida') {
+      result.kmReduzida = {
+        kmMinimo7Dias: p.kmMinimo7Dias,
+        diaSemanaRenovacao: p.diaSemanaRenovacao,
+        diaRenovacaoMes: p.diaRenovacaoMes,
+        periodo: periodoKmOuPadrao(p.kmPeriodo, 'kmReduzida'),
+      };
+    }
+    if (p.tipoEvento === 'trocaOleo') {
+      result.kmTrocaOleo = p.kmTrocaOleo;
+    }
+    if (p.tipoEvento === 'semAtualizacao') {
+      result.semAtualizacaoHoras = p.semAtualizacaoHoras;
+    }
+  });
+  return result;
+}
+
+// Preferências de TODOS os dispositivos do cliente numa tacada.
+// O "Configurar todos" da tela precisa do conjunto inteiro para mostrar o
+// denominador comum; antes ele fazia uma requisição por veículo (com 300
+// veículos eram 300 chamadas simultâneas, e os cards demoravam a aparecer).
+router.get('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
+  try {
+    const clienteLoginId = req.cliente.sub;
+
+    const dispositivos = await prisma.dispositivo.findMany({
+      where: whereDispositivosDoCliente(req),
+      select: { id: true },
+    });
+    const ids = dispositivos.map(d => d.id);
+
+    const prefs = ids.length
+      ? await prisma.preferenciaNotificacao.findMany({
+        where: { clienteLoginId, dispositivoId: { in: ids } },
+      })
+      : [];
+
+    // Agrupa numa passada só, em vez de varrer a lista inteira por dispositivo.
+    const agrupado = new Map<string, Array<Record<string, any>>>();
+    for (const p of prefs) {
+      const lista = agrupado.get(p.dispositivoId);
+      if (lista) lista.push(p as any);
+      else agrupado.set(p.dispositivoId, [p as any]);
+    }
+
+    // Todo dispositivo aparece no retorno, mesmo sem preferência salva.
+    const porDispositivo: Record<string, any> = {};
+    for (const id of ids) porDispositivo[id] = montarPreferencias(agrupado.get(id) ?? []);
+
+    res.json({ porDispositivo });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao obter preferências.' });
+  }
+});
+
 // Obter preferências de um dispositivo
 router.get('/preferencias/:dispositivoId', clienteAuthMiddleware, async (req: any, res) => {
   try {
@@ -93,37 +167,7 @@ router.get('/preferencias/:dispositivoId', clienteAuthMiddleware, async (req: an
       where: { clienteLoginId, dispositivoId },
     });
 
-    const result: any = { preferencias: {} };
-    prefs.forEach(p => {
-      result.preferencias[p.tipoEvento] = { web: p.web, app: p.app, email: p.email };
-      if (p.tipoEvento === 'overspeed') {
-        result.overspeedLimit = p.overspeedLimit;
-      }
-      if (p.tipoEvento === 'kmExcedida') {
-        result.kmExcedida = {
-          kmMaximo30Dias: p.kmMaximo30Dias,
-          diaRenovacaoMes: p.diaRenovacaoMes,
-          diaSemanaRenovacao: p.diaSemanaRenovacao,
-          periodo: periodoKmOuPadrao(p.kmPeriodo, 'kmExcedida'),
-        };
-      }
-      if (p.tipoEvento === 'kmReduzida') {
-        result.kmReduzida = {
-          kmMinimo7Dias: p.kmMinimo7Dias,
-          diaSemanaRenovacao: p.diaSemanaRenovacao,
-          diaRenovacaoMes: p.diaRenovacaoMes,
-          periodo: periodoKmOuPadrao(p.kmPeriodo, 'kmReduzida'),
-        };
-      }
-      if (p.tipoEvento === 'trocaOleo') {
-        result.kmTrocaOleo = p.kmTrocaOleo;
-      }
-      if (p.tipoEvento === 'semAtualizacao') {
-        result.semAtualizacaoHoras = p.semAtualizacaoHoras;
-      }
-    });
-
-    res.json(result);
+    res.json(montarPreferencias(prefs as any));
   } catch (error) {
     res.status(500).json({ message: 'Erro ao obter preferências.' });
   }
@@ -160,42 +204,14 @@ router.post('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
       return;
     }
 
-    const operacoes = alvos.flatMap(alvoId =>
-      Object.keys(preferencias).map(tipo => {
-        const extra: any = {};
-        if (tipo === 'overspeed') extra.overspeedLimit = overspeedLimit ?? 100;
-        // A referência (dia do mês ou dia da semana) depende do período escolhido,
-        // então as duas são gravadas nos dois tipos.
-        if (tipo === 'kmExcedida') {
-          extra.kmMaximo30Dias = kmExcedida?.kmMaximo30Dias ?? null;
-          extra.diaRenovacaoMes = kmExcedida?.diaRenovacaoMes ?? null;
-          extra.diaSemanaRenovacao = kmExcedida?.diaSemanaRenovacao ?? null;
-          extra.kmPeriodo = periodoKmOuPadrao(kmExcedida?.periodo, 'kmExcedida');
-        }
-        if (tipo === 'kmReduzida') {
-          extra.kmMinimo7Dias = kmReduzida?.kmMinimo7Dias ?? null;
-          extra.diaSemanaRenovacao = kmReduzida?.diaSemanaRenovacao ?? null;
-          extra.diaRenovacaoMes = kmReduzida?.diaRenovacaoMes ?? null;
-          extra.kmPeriodo = periodoKmOuPadrao(kmReduzida?.periodo, 'kmReduzida');
-        }
-        if (tipo === 'trocaOleo') {
-          extra.kmTrocaOleo = kmTrocaOleo ?? null;
-        }
-        if (tipo === 'semAtualizacao') {
-          extra.semAtualizacaoHoras = semAtualizacaoHoras ?? 3;
-        }
-
-        return prisma.preferenciaNotificacao.upsert({
-          where: {
-            clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: alvoId, tipoEvento: tipo },
-          },
-          update: { web: preferencias[tipo].web, app: preferencias[tipo].app, email: preferencias[tipo].email, ...extra },
-          create: { clienteLoginId, dispositivoId: alvoId, tipoEvento: tipo, web: preferencias[tipo].web, app: preferencias[tipo].app, email: preferencias[tipo].email, ...extra },
-        });
-      })
-    );
-
-    await prisma.$transaction(operacoes);
+    // Gravação em massa: um upsert por linha numa transação só estourava o
+    // timeout de 5 s quando o cliente configurava todos os veículos de uma vez.
+    await salvarPreferenciasEmMassa({
+      clienteLoginId,
+      dispositivoIds: alvos,
+      preferencias,
+      extras: { overspeedLimit, kmTrocaOleo, semAtualizacaoHoras, kmExcedida, kmReduzida },
+    });
 
     res.json({ message: 'Preferências salvas com sucesso!', dispositivosAtualizados: alvos.length });
   } catch (error) {

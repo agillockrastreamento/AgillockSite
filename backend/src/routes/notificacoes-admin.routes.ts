@@ -3,6 +3,7 @@ import prisma from '../utils/prisma';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
 import { periodoKmOuPadrao } from '../services/notification.service';
+import { salvarPreferenciasEmMassa } from '../utils/preferencias-notificacao';
 
 function tipoPreferenciaAdmin(tipoEvento: string) {
   if (tipoEvento === 'manutencaoAlerta' || tipoEvento === 'manutencaoAtrasada' || tipoEvento === 'manutencaoFeita') return 'manutencao';
@@ -161,23 +162,14 @@ router.post('/clientes/:clienteLoginId/preferencias', async (req, res) => {
     const { clienteLoginId } = req.params;
     const { dispositivoId, preferencias, overspeedLimit, kmExcedida, kmReduzida, kmTrocaOleo, semAtualizacaoHoras } = req.body;
 
-    await prisma.$transaction(
-      Object.keys(preferencias).map(tipo => {
-        const extra: any = {};
-        if (tipo === 'overspeed')  extra.overspeedLimit = overspeedLimit ?? 100;
-        // Grava as duas referências (dia do mês e dia da semana) porque a usada
-        // depende do período escolhido.
-        if (tipo === 'kmExcedida') { extra.kmMaximo30Dias = kmExcedida?.kmMaximo30Dias ?? null; extra.diaRenovacaoMes = kmExcedida?.diaRenovacaoMes ?? null; extra.diaSemanaRenovacao = kmExcedida?.diaSemanaRenovacao ?? null; extra.kmPeriodo = periodoKmOuPadrao(kmExcedida?.periodo, 'kmExcedida'); }
-        if (tipo === 'kmReduzida') { extra.kmMinimo7Dias = kmReduzida?.kmMinimo7Dias ?? null; extra.diaSemanaRenovacao = kmReduzida?.diaSemanaRenovacao ?? null; extra.diaRenovacaoMes = kmReduzida?.diaRenovacaoMes ?? null; extra.kmPeriodo = periodoKmOuPadrao(kmReduzida?.periodo, 'kmReduzida'); }
-        if (tipo === 'trocaOleo')  extra.kmTrocaOleo = kmTrocaOleo ?? null;
-        if (tipo === 'semAtualizacao') extra.semAtualizacaoHoras = semAtualizacaoHoras ?? 3;
-        return prisma.preferenciaNotificacao.upsert({
-          where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: tipo } },
-          update: { web: preferencias[tipo].web, app: preferencias[tipo].app, email: preferencias[tipo].email, ...extra },
-          create: { clienteLoginId, dispositivoId, tipoEvento: tipo, web: preferencias[tipo].web, app: preferencias[tipo].app, email: preferencias[tipo].email, ...extra },
-        });
-      })
-    );
+    // Mesmo caminho de gravação do portal do cliente (ver o helper: um upsert
+    // por linha estourava o timeout da transação quando eram muitos veículos).
+    await salvarPreferenciasEmMassa({
+      clienteLoginId,
+      dispositivoIds: [dispositivoId],
+      preferencias,
+      extras: { overspeedLimit, kmTrocaOleo, semAtualizacaoHoras, kmExcedida, kmReduzida },
+    });
 
     res.json({ message: 'Preferências salvas com sucesso!' });
   } catch (err) {

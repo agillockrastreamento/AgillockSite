@@ -162,6 +162,30 @@
     document.getElementById('aviso-modo-todos').classList.remove('visivel');
   }
 
+  // Botão em estado de carregando: com muitos veículos o preparo da grade não é
+  // instantâneo, e sem isso a tela parecia travada depois do clique.
+  function marcarBotaoTodosCarregando(carregando) {
+    const btn = document.getElementById('btn-configurar-todos');
+    if (!btn) return;
+    if (carregando) {
+      btn.dataset.htmlOriginal = btn.dataset.htmlOriginal || btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Carregando...';
+      return;
+    }
+    btn.disabled = false;
+    if (btn.dataset.htmlOriginal) btn.innerHTML = btn.dataset.htmlOriginal;
+  }
+
+  function mostrarGridCarregando(mensagem) {
+    const grid = document.getElementById('grid-notificacoes');
+    if (!grid) return;
+    grid.innerHTML =
+      '<div class="text-center text-muted" style="padding:28px 12px;grid-column:1/-1;">' +
+      '<i class="fa fa-spinner fa-spin fa-2x"></i>' +
+      '<p style="margin-top:10px;">' + mensagem + '</p></div>';
+  }
+
   async function entrarModoTodos() {
     if (veiculos.length < 2) return;
     modoTodos = true;
@@ -177,7 +201,15 @@
       'Depois, para configurar um deles de forma diferente, basta selecioná-lo na lista.';
     document.getElementById('aviso-modo-todos').classList.add('visivel');
 
-    await carregarPreferenciasTodos();
+    marcarBotaoTodosCarregando(true);
+    document.getElementById('notif-container').style.display = 'block';
+    document.getElementById('notif-vazio').style.display = 'none';
+    mostrarGridCarregando(`Carregando a configuração dos ${veiculos.length} dispositivos...`);
+    try {
+      await carregarPreferenciasTodos();
+    } finally {
+      marcarBotaoTodosCarregando(false);
+    }
   }
 
   function bindEvents() {
@@ -252,9 +284,11 @@
   // preenchidos se o valor for o mesmo em todos.
   async function carregarPreferenciasTodos() {
     try {
-      const todas = await Promise.all(
-        veiculos.map(v => AL_CLIENTE.apiGet(`/api/cliente/notificacoes/preferencias/${v.dispositivoId}`))
-      );
+      // Uma requisição para todos os veículos. Antes era uma por veículo — com
+      // centenas de dispositivos a tela ficava vários segundos sem os cards.
+      const resposta = await AL_CLIENTE.apiGet('/api/cliente/notificacoes/preferencias');
+      const porDispositivo = resposta?.porDispositivo || {};
+      const todas = veiculos.map(v => porDispositivo[v.dispositivoId] || { preferencias: {} });
 
       const ligadoEmTodos = (tipo, canal) =>
         todas.every(d => d?.preferencias?.[tipo]?.[canal] === true);
@@ -303,6 +337,14 @@
       document.getElementById('notif-container').style.display = 'block';
       document.getElementById('notif-vazio').style.display = 'none';
     } catch (err) {
+      // Sem isto o spinner da grade ficaria girando para sempre.
+      const grid = document.getElementById('grid-notificacoes');
+      if (grid) {
+        grid.innerHTML =
+          '<div class="text-center text-muted" style="padding:28px 12px;grid-column:1/-1;">' +
+          '<i class="fa fa-exclamation-triangle fa-2x"></i>' +
+          '<p style="margin-top:10px;">Não foi possível carregar a configuração dos dispositivos.</p></div>';
+      }
       AL_CLIENTE.showAlert('Erro ao carregar preferências dos dispositivos.');
     }
   }
