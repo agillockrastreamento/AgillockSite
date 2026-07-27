@@ -210,4 +210,95 @@ router.get('/veiculo/:placa/manutencoes', async (req: Request, res: Response) =>
   }
 });
 
+/** km atual do veículo (odômetro em km), best-effort. */
+async function kmAtualDoVeiculo(dispositivo: Dispositivo): Promise<number | null> {
+  const { posicao } = await posicaoAtual(dispositivo).catch(() => ({ posicao: null }));
+  const odo = (posicao as { odometro?: number | null } | null)?.odometro ?? null;
+  return odo != null ? Math.round(odo / 1000) : null;
+}
+
+/**
+ * POST /api/integracao/raposo/veiculo/:placa/manutencoes/recorrencia
+ * body: { titulo, descricao?, intervaloKm } → cria uma recorrência por KM (origem RAPOSO).
+ * É a direção Raposo → Ágil Lock: criar plano no Raposo reflete aqui.
+ */
+router.post('/veiculo/:placa/manutencoes/recorrencia', async (req: Request, res: Response) => {
+  try {
+    const { titulo, descricao, intervaloKm } = req.body || {};
+    if (!titulo || !intervaloKm) {
+      res.status(400).json({ error: 'titulo e intervaloKm são obrigatórios.' });
+      return;
+    }
+    const dispositivo = await resolverDispositivoPorPlaca(String(req.params.placa));
+    if (!dispositivo) {
+      res.status(404).json({ error: 'Veículo não encontrado para a placa informada.' });
+      return;
+    }
+    const kmBase = (await kmAtualDoVeiculo(dispositivo)) ?? 0;
+    const rec = await prisma.manutencaoRecorrencia.create({
+      data: {
+        dispositivoId: dispositivo.id,
+        titulo: String(titulo),
+        descricao: descricao ? String(descricao) : null,
+        intervaloKm: parseInt(String(intervaloKm), 10),
+        kmBase,
+        origem: 'RAPOSO',
+      },
+    });
+    res.status(201).json({ id: rec.id, kmBase });
+  } catch (err) {
+    console.error('[integracao-raposo] criar recorrência:', err);
+    res.status(500).json({ error: 'Erro ao criar a recorrência.' });
+  }
+});
+
+/**
+ * POST /api/integracao/raposo/veiculo/:placa/manutencoes/recorrencia/:id/feito
+ * Marca a recorrência como feita: reseta o contador (kmBase = km atual) e cria o
+ * registro. É o "reset" que o Raposo empurra ao marcar o plano feito — o efeito
+ * financeiro (responsável/lançamento) fica no Raposo, não aqui.
+ */
+router.post('/veiculo/:placa/manutencoes/recorrencia/:id/feito', async (req: Request, res: Response) => {
+  try {
+    const dispositivo = await resolverDispositivoPorPlaca(String(req.params.placa));
+    if (!dispositivo) {
+      res.status(404).json({ error: 'Veículo não encontrado para a placa informada.' });
+      return;
+    }
+    const rec = await prisma.manutencaoRecorrencia.findFirst({
+      where: { id: String(req.params.id), dispositivoId: dispositivo.id },
+    });
+    if (!rec) {
+      res.status(404).json({ error: 'Recorrência não encontrada.' });
+      return;
+    }
+    const kmAtual = (await kmAtualDoVeiculo(dispositivo)) ?? rec.kmBase;
+    await prisma.manutencaoRecorrencia.update({
+      where: { id: rec.id },
+      data: {
+        kmBase: kmAtual,
+        alerta50Enviado: false,
+        alerta25Enviado: false,
+        alerta0Enviado: false,
+        ultimaAlertaPostDueKm: -1,
+      },
+    });
+    await prisma.manutencaoRegistro.create({
+      data: {
+        dispositivoId: dispositivo.id,
+        titulo: `${rec.titulo} — confirmado (Raposo)`,
+        tipo: 'recorrencia',
+        descricao: `Recorrência "${rec.titulo}" marcada como feita pelo Raposo Motors.`,
+        dataRealizacao: new Date(),
+        kmRealizacao: kmAtual,
+        origem: 'RAPOSO',
+      },
+    });
+    res.json({ ok: true, kmBase: kmAtual });
+  } catch (err) {
+    console.error('[integracao-raposo] recorrência feito:', err);
+    res.status(500).json({ error: 'Erro ao marcar a recorrência como feita.' });
+  }
+});
+
 export default router;
