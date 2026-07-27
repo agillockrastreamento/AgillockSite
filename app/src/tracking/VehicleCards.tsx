@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { Image, Linking, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, Icon, IconButton } from 'react-native-paper';
 import Svg, { Path, Text as SvgText } from 'react-native-svg';
@@ -141,7 +141,7 @@ function VehiclePhoto({ device, size = 62 }: { device: TrackingDevice; size?: nu
   );
 }
 
-export function QuickVehicleCard({
+function QuickVehicleCardBase({
   device,
   selected,
   onPress,
@@ -170,6 +170,10 @@ export function QuickVehicleCard({
     </Pressable>
   );
 }
+
+// A lista de veículos é virtualizada; o memo impede que todas as células
+// visíveis sejam redesenhadas a cada posição recebida do WebSocket.
+export const QuickVehicleCard = memo(QuickVehicleCardBase);
 
 const _geocodeCache: Record<string, string> = {};
 
@@ -933,7 +937,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   quickCard: {
-    width: '48%',
+    // A largura vem do container (célula da grade virtualizada).
+    width: '100%',
+    height: '100%',
     minHeight: 108,
     flexDirection: 'row',
     alignItems: 'flex-start',

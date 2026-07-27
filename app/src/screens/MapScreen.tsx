@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  FlatList,
   Image,
+  type ListRenderItemInfo,
   PanResponder,
   Platform,
   Pressable,
@@ -36,7 +38,7 @@ import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
-import { useTrackingWebSocket, updateDeviceFromMessage } from '../tracking/useTrackingWebSocket';
+import { useTrackingWebSocket, aplicarPosicoesEmLote } from '../tracking/useTrackingWebSocket';
 import {
   buildTraccarDeviceIndex,
   getTrackingAccessStatus,
@@ -84,6 +86,17 @@ const MAIN_CARD_PEEK_HEIGHT = 76; // mostra apenas alça + header (nome/placa + 
 const MAP_PREFERENCES_KEY = 'agillock_map_preferences_v1';
 const CLUSTER_PX = 40;
 const SPIDER_RADIUS_PX = 55;
+// Posições do WebSocket são acumuladas e aplicadas de uma vez. Com centenas de
+// veículos chegavam dezenas de mensagens por segundo, cada uma re-renderizando
+// a tela inteira (marcadores + lista + clusters).
+const WS_FLUSH_MS = 700;
+// Acima disto o marcador não renderiza o ícone como filho enquanto o bitmap não
+// fica pronto: `tracksViewChanges` obriga o mapa a re-fotografar cada view a
+// cada frame — com centenas de marcadores isso trava e derruba o app.
+const MARKER_CHILDREN_LIMIT = 60;
+// Altura fixa dos cards da lista de veículos (2 por linha).
+const QUICK_CARD_HEIGHT = 108;
+const QUICK_ROW_HEIGHT = QUICK_CARD_HEIGHT + spacing.sm;
 
 function getMapaDoDevice(d: TrackingDevice): 1 | 2 {
   const m = Number(d.mapa);
@@ -245,10 +258,6 @@ export function MapScreen() {
   // Track last centered position to avoid redundant map moves
   const lastCenteredKey = useRef('');
 
-  // No iOS o ícone é renderizado como filho do Marker (sem bitmap) — desliga a
-  // captura para não rodar captureRef em massa (custo/crash sob Fabric).
-  const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, showLabels, !isIOS);
-
   useEffect(() => {
     let cancelled = false;
     const loadMapPreferences = async () => {
@@ -399,44 +408,74 @@ export function MapScreen() {
   const pxToLatDeg = currentRegion.latitudeDelta / SCREEN_HEIGHT;
   const pxToLngDeg = currentRegion.longitudeDelta / SCREEN_WIDTH;
 
+  // Agrupamento por grade: cada veículo só é comparado com os das 9 células
+  // vizinhas, em vez de com todos os outros. A versão anterior era O(n²) —
+  // com 300 veículos eram ~45 mil comparações a cada posição recebida e a cada
+  // movimento do mapa, o que segurava a thread de JS.
   const clusterGroups = useMemo(() => {
-    if (!locatedDevices.length) return [] as Array<{
-      key: string;
-      devices: TrackingDevice[];
-      lat: number;
-      lng: number;
-    }>;
+    type Grupo = { key: string; devices: TrackingDevice[]; lat: number; lng: number };
+    if (!locatedDevices.length) return [] as Grupo[];
+
+    const latPorPx = pxToLatDeg || 1;
+    const lngPorPx = pxToLngDeg || 1;
+    const celulaLat = latPorPx * CLUSTER_PX;
+    const celulaLng = lngPorPx * CLUSTER_PX;
+
+    type Entrada = { device: TrackingDevice; lat: number; lng: number; gx: number; gy: number };
+    const entradas: Entrada[] = [];
+    const celulas = new Map<string, Entrada[]>();
+
+    for (const device of locatedDevices) {
+      const coord = getDeviceCoordinate(device);
+      if (!coord) continue;
+      const gx = Math.floor(coord.longitude / celulaLng);
+      const gy = Math.floor(coord.latitude / celulaLat);
+      const entrada: Entrada = { device, lat: coord.latitude, lng: coord.longitude, gx, gy };
+      entradas.push(entrada);
+      const chave = `${gx}:${gy}`;
+      const lista = celulas.get(chave);
+      if (lista) lista.push(entrada);
+      else celulas.set(chave, [entrada]);
+    }
 
     const visited = new Set<string>();
-    const groups: Array<{
-      key: string;
-      devices: TrackingDevice[];
-      lat: number;
-      lng: number;
-    }> = [];
+    const groups: Grupo[] = [];
 
-    locatedDevices.forEach((device) => {
-      if (visited.has(device.dispositivoId)) return;
-      const baseCoord = getDeviceCoordinate(device);
-      if (!baseCoord) return;
-      const group: TrackingDevice[] = [device];
-      visited.add(device.dispositivoId);
-      locatedDevices.forEach((other) => {
-        if (visited.has(other.dispositivoId)) return;
-        const otherCoord = getDeviceCoordinate(other);
-        if (!otherCoord) return;
-        const dxPx = (otherCoord.longitude - baseCoord.longitude) / (pxToLngDeg || 1);
-        const dyPx = (otherCoord.latitude - baseCoord.latitude) / (pxToLatDeg || 1);
-        if (Math.hypot(dxPx, dyPx) <= CLUSTER_PX) {
-          group.push(other);
-          visited.add(other.dispositivoId);
+    for (const base of entradas) {
+      if (visited.has(base.device.dispositivoId)) continue;
+      visited.add(base.device.dispositivoId);
+      const group: TrackingDevice[] = [base.device];
+      let somaLat = base.lat;
+      let somaLng = base.lng;
+      let menorId = base.device.dispositivoId;
+
+      for (let dx = -1; dx <= 1; dx += 1) {
+        for (let dy = -1; dy <= 1; dy += 1) {
+          const vizinhos = celulas.get(`${base.gx + dx}:${base.gy + dy}`);
+          if (!vizinhos) continue;
+          for (const outro of vizinhos) {
+            if (visited.has(outro.device.dispositivoId)) continue;
+            const dxPx = (outro.lng - base.lng) / lngPorPx;
+            const dyPx = (outro.lat - base.lat) / latPorPx;
+            if (Math.hypot(dxPx, dyPx) > CLUSTER_PX) continue;
+            visited.add(outro.device.dispositivoId);
+            group.push(outro.device);
+            somaLat += outro.lat;
+            somaLng += outro.lng;
+            if (outro.device.dispositivoId < menorId) menorId = outro.device.dispositivoId;
+          }
         }
+      }
+
+      groups.push({
+        // Chave estável para o conjunto (usada pelo spider) sem concatenar
+        // centenas de ids a cada recálculo.
+        key: `${menorId}|${group.length}`,
+        devices: group,
+        lat: somaLat / group.length,
+        lng: somaLng / group.length,
       });
-      const lat = group.reduce((s, d) => s + (d.posicao?.latitude ?? 0), 0) / group.length;
-      const lng = group.reduce((s, d) => s + (d.posicao?.longitude ?? 0), 0) / group.length;
-      const key = group.map((d) => d.dispositivoId).sort().join('|');
-      groups.push({ key, devices: group, lat, lng });
-    });
+    }
 
     return groups;
   }, [locatedDevices, pxToLatDeg, pxToLngDeg]);
@@ -468,6 +507,26 @@ export function MapScreen() {
       };
     });
   }, [spiderClusterKey, clusterGroups, pxToLatDeg, pxToLngDeg]);
+
+  // Só os veículos que viram um marcador individual na tela. Antes o hook
+  // recebia TODOS os dispositivos e capturava um bitmap para cada um, mesmo os
+  // que estavam escondidos dentro de um cluster.
+  const markerDevices = useMemo(() => {
+    if (mainCardVisible && selectedDevice) return [selectedDevice];
+    const lista: TrackingDevice[] = [];
+    for (const group of clusterGroups) {
+      if (group.devices.length === 1) lista.push(group.devices[0]);
+      else if (spiderClusterKey === group.key) lista.push(...group.devices);
+    }
+    return lista;
+  }, [clusterGroups, spiderClusterKey, mainCardVisible, selectedDevice]);
+
+  // No iOS o ícone é renderizado como filho do Marker (sem bitmap) — desliga a
+  // captura para não rodar captureRef em massa (custo/crash sob Fabric).
+  const { getBitmap } = useMarkerBitmaps(markerDevices, showLabels, !isIOS);
+  // Com muitos marcadores na tela, o fallback "ícone como filho" (que exige
+  // tracksViewChanges) é caro demais — nesse caso esperamos o bitmap.
+  const usarIconeComoFilho = markerDevices.length <= MARKER_CHILDREN_LIMIT;
 
   const handleRegionChangeComplete = useCallback(
     (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => {
@@ -753,6 +812,35 @@ export function MapScreen() {
     });
   }, []);
 
+  // Ref mantém a identidade do renderItem estável — trocá-lo faz a FlatList
+  // re-renderizar todas as células visíveis.
+  const focusDeviceRef = useRef(focusDevice);
+  focusDeviceRef.current = focusDevice;
+
+  const renderQuickCard = useCallback(
+    ({ item }: ListRenderItemInfo<TrackingDevice>) => (
+      <View style={styles.quickGridItem}>
+        <QuickVehicleCard
+          device={item}
+          selected={selectedDeviceId === item.dispositivoId}
+          onPress={() => focusDeviceRef.current(item, true)}
+        />
+      </View>
+    ),
+    [selectedDeviceId],
+  );
+
+  const quickKeyExtractor = useCallback((item: TrackingDevice) => item.dispositivoId, []);
+
+  const quickGetItemLayout = useCallback(
+    (_data: ArrayLike<TrackingDevice> | null | undefined, index: number) => ({
+      length: QUICK_ROW_HEIGHT,
+      offset: QUICK_ROW_HEIGHT * index,
+      index,
+    }),
+    [],
+  );
+
   const loadSnapshot = useCallback(async (silent = false) => {
     if (silent) setIsRefreshing(true);
     else setIsLoading(true);
@@ -828,6 +916,17 @@ export function MapScreen() {
     getGeofences().then(setGeofences).catch(() => {});
   }, [showFences, canVerCerca]);
 
+  // Identidade estável da lista de dispositivos localizados. `locatedDevices`
+  // muda de referência a cada posição recebida; usá-lo como dependência fazia o
+  // rastro recarregar o histórico de TODOS os veículos (uma requisição por
+  // veículo) a cada atualização do WebSocket.
+  const locatedDevicesKey = useMemo(
+    () => locatedDevices.map((d) => d.dispositivoId).join(','),
+    [locatedDevices],
+  );
+  const locatedDevicesRef = useRef(locatedDevices);
+  locatedDevicesRef.current = locatedDevices;
+
   useEffect(() => {
     if (!showTracks) { setTracks([]); return; }
     const loadAllTracks = async () => {
@@ -836,7 +935,7 @@ export function MapScreen() {
         const now = new Date();
         const from = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString();
         const to = now.toISOString();
-        const trackPromises = locatedDevices.map(async (device) => {
+        const trackPromises = locatedDevicesRef.current.map(async (device) => {
           try {
             const data = await apiRequest<{ posicoes: { latitude: number; longitude: number }[] }>(
               `/cliente/rastreamento/dispositivos/${device.dispositivoId}/historico?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
@@ -858,19 +957,41 @@ export function MapScreen() {
       }
     };
     loadAllTracks();
-  }, [showTracks, locatedDevices]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTracks, locatedDevicesKey]);
 
   const handleGeofenceCreated = useCallback(() => {
     setShowFences(true);
     getGeofences().then(setGeofences).catch(() => {});
   }, []);
 
+  // Acumula as posições recebidas e aplica todas de uma vez a cada WS_FLUSH_MS.
+  // Antes cada posição disparava um setDevices próprio: com 300 veículos isso
+  // recriava a lista inteira dezenas de vezes por segundo, e cada recriação
+  // reprocessava clusters, marcadores e a lista da gaveta.
+  const wsBufferRef = useRef(new Map<string, import('../tracking/trackingWebSocket').WsPosition>());
+  const wsFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushWsBuffer = useCallback(() => {
+    wsFlushTimerRef.current = null;
+    const buffer = wsBufferRef.current;
+    if (buffer.size === 0) return;
+    wsBufferRef.current = new Map();
+    setDevices((current) => aplicarPosicoesEmLote(current, buffer));
+  }, []);
+
   const handleWebSocketMessage = useCallback(
     (position: import('../tracking/trackingWebSocket').WsPosition, dispositivoId: string) => {
-      setDevices((current) => updateDeviceFromMessage(current, dispositivoId, position));
+      wsBufferRef.current.set(dispositivoId, position);
+      if (wsFlushTimerRef.current) return;
+      wsFlushTimerRef.current = setTimeout(flushWsBuffer, WS_FLUSH_MS);
     },
-    [],
+    [flushWsBuffer],
   );
+
+  useEffect(() => () => {
+    if (wsFlushTimerRef.current) clearTimeout(wsFlushTimerRef.current);
+  }, []);
 
   const handleWebSocketEvent = useCallback(() => {
     if (notificationsSheetVisible) return;
@@ -962,7 +1083,7 @@ export function MapScreen() {
             const curso = device.posicao?.curso ?? 0;
             const label = device.placa ?? device.nome ?? '';
             const markerContent = (
-              <View style={styles.markerContainer}>
+              <View style={styles.markerContainer} collapsable={false}>
                 <View style={styles.markerWrap}>
                   <VehicleIcon
                     categoria={device.categoria}
@@ -1010,20 +1131,24 @@ export function MapScreen() {
             // Android: o `image` não reaplica em update — o bitmap entra na key
             // para remontar quando o ícone muda (remontar é seguro no Android).
             const bitmapUri = getBitmap(device);
+            // Sem bitmap ainda: só desenhamos o ícone como filho (o que exige
+            // tracksViewChanges) quando há poucos marcadores. Com muitos, o
+            // marcador padrão aparece por um instante até o bitmap ficar pronto.
+            const desenharFilho = !bitmapUri && usarIconeComoFilho;
             return (
               <Marker
                 key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}-${bitmapUri ?? 'pending'}`}
                 coordinate={coord}
                 image={bitmapUri ? { uri: bitmapUri } : undefined}
                 anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={!bitmapUri}
+                tracksViewChanges={desenharFilho}
                 zIndex={isSpiderMarker ? 1000 : 100}
                 onPress={() => {
                   if (isSpiderMarker) closeSpiderFromMarker();
                   focusDevice(device, true);
                 }}
               >
-                {!bitmapUri ? markerContent : null}
+                {desenharFilho ? markerContent : null}
               </Marker>
             );
           };
@@ -1134,7 +1259,7 @@ export function MapScreen() {
         })}
       </MapView>
 
-      <OffscreenCapturePool pending={pending} onReady={onReady} />
+      <OffscreenCapturePool enabled={!isIOS} />
       <ClusterCapturePool pending={clusterPending} onReady={onClusterReady} />
 
       <View style={styles.mapControls}>
@@ -1257,22 +1382,30 @@ export function MapScreen() {
                   )}
                 </Pressable>
               </View>
-              <ScrollView
-                showsVerticalScrollIndicator={quickSheetMode === 'expanded'}
-                contentContainerStyle={[
-                  styles.quickList,
-                  filteredDevices.length === 1 && styles.quickListCenter,
+              <FlatList
+                // A virtualização depende de conhecer a altura do viewport —
+                // dentro da gaveta de altura animada, o flex garante isso.
+                style={styles.quickListWrap}
+                data={filteredDevices}
+                renderItem={renderQuickCard}
+                keyExtractor={quickKeyExtractor}
+                getItemLayout={quickGetItemLayout}
+                extraData={selectedDeviceId}
+                numColumns={2}
+                columnWrapperStyle={[
+                  styles.quickRow,
+                  // Veículo único: centraliza a célula (que ocupa metade da
+                  // largura) em vez de deixá-la encostada à esquerda.
+                  filteredDevices.length === 1 && styles.quickRowCenter,
                 ]}
-              >
-                {filteredDevices.map((device) => (
-                  <QuickVehicleCard
-                    key={device.dispositivoId}
-                    device={device}
-                    selected={selectedDeviceId === device.dispositivoId}
-                    onPress={() => focusDevice(device, true)}
-                  />
-                ))}
-              </ScrollView>
+                showsVerticalScrollIndicator={quickSheetMode === 'expanded'}
+                contentContainerStyle={styles.quickList}
+                initialNumToRender={6}
+                maxToRenderPerBatch={6}
+                updateCellsBatchingPeriod={60}
+                windowSize={5}
+                removeClippedSubviews
+              />
             </>
           ) : null}
         </Animated.View>
@@ -1642,15 +1775,23 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     backgroundColor: colors.primary,
   },
+  quickListWrap: {
+    flex: 1,
+  },
   quickList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
     paddingBottom: spacing.lg,
   },
-  quickListCenter: {
+  quickRow: {
+    gap: spacing.sm,
+  },
+  quickRowCenter: {
     justifyContent: 'center',
-    alignItems: 'center',
+  },
+  quickGridItem: {
+    flex: 1,
+    maxWidth: '50%',
+    height: QUICK_CARD_HEIGHT,
+    marginBottom: spacing.sm,
   },
   badge: {
     position: 'absolute',

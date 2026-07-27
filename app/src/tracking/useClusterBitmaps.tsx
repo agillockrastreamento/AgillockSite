@@ -5,6 +5,10 @@ import Svg, { Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 
 const CLUSTER_BITMAP_VERSION = 1;
 
+// Mesma razão do pool de marcadores: `captureRef` em rajada estoura a memória.
+// Com muitos veículos aparecem clusters de dezenas de tamanhos diferentes.
+const MAX_CONCURRENT_CLUSTER_CAPTURES = 4;
+
 const clusterBitmapCache = new Map<number, string>();
 
 export type PendingClusterCapture = {
@@ -37,20 +41,25 @@ function ClusterCapture({
   onReady,
 }: {
   count: number;
-  onReady(count: number, uri: string): void;
+  onReady(count: number, uri: string | null): void;
 }) {
   const viewRef = useRef<View>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!viewRef.current) return;
+      if (!viewRef.current) {
+        onReady(count, null);
+        return;
+      }
       captureRef(viewRef, {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
       })
         .then((uri) => onReady(count, uri))
-        .catch(() => {});
+        // Falha não pode deixar a entrada presa na fila (ela bloquearia os
+        // próximos clusters, já que só capturamos alguns por vez).
+        .catch(() => onReady(count, null));
     }, 100);
     return () => clearTimeout(timer);
   }, [count, onReady]);
@@ -67,12 +76,12 @@ export function ClusterCapturePool({
   onReady,
 }: {
   pending: PendingClusterCapture[];
-  onReady(count: number, uri: string): void;
+  onReady(count: number, uri: string | null): void;
 }) {
   if (pending.length === 0) return null;
   return (
     <View style={styles.capturePool} pointerEvents="none">
-      {pending.map((entry) => (
+      {pending.slice(0, MAX_CONCURRENT_CLUSTER_CAPTURES).map((entry) => (
         <ClusterCapture key={entry.count} count={entry.count} onReady={onReady} />
       ))}
     </View>
@@ -100,11 +109,11 @@ export function useClusterBitmaps(counts: number[], enabled = true) {
     }
   }, [distinctCounts, enabled]);
 
-  const onReady = useCallback((count: number, uri: string) => {
-    clusterBitmapCache.set(count, uri);
+  const onReady = useCallback((count: number, uri: string | null) => {
+    if (uri) clusterBitmapCache.set(count, uri);
     pendingCountsRef.current.delete(count);
-    setBitmaps(new Map(clusterBitmapCache));
     setPending((prev) => prev.filter((e) => e.count !== count));
+    if (uri) setBitmaps(new Map(clusterBitmapCache));
   }, []);
 
   const getClusterBitmap = useCallback(

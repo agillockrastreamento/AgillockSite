@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { memo, useId } from 'react';
 import Svg, {
   Circle,
   Defs,
@@ -172,7 +172,7 @@ function MachineShape({ color, ids }: { color: string; ids: GradientIds }) {
   );
 }
 
-export function VehicleIcon({
+function VehicleIconBase({
   categoria,
   color,
   course,
@@ -220,4 +220,8 @@ export function VehicleIcon({
     </Svg>
   );
 }
+
+// O SVG do veículo é caro (dezenas de nós + gradientes). Em listas com centenas
+// de veículos ele era remontado a cada re-render da tela; o memo corta isso.
+export const VehicleIcon = memo(VehicleIconBase);
 

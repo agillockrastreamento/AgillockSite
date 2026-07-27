@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
@@ -11,6 +11,21 @@ import { getMarkerColor } from './VehicleCards';
 export const MARKER_ICON_SIZE = 58;
 const COURSE_STEP = 10;
 const MARKER_BITMAP_VERSION = 2.5;
+
+// Quantas capturas rodam ao mesmo tempo. `captureRef` é uma operação nativa
+// cara (renderiza a view + lê o framebuffer); disparar centenas de uma vez
+// estoura a memória e derruba o app no Android.
+const MAX_CONCURRENT_CAPTURES = 6;
+
+// Acima disto não capturamos a variante COM etiqueta (uma por veículo, já que
+// a placa entra na chave). Só o ícone, cujas combinações são poucas e ficam em
+// cache. Com centenas de veículos na tela a etiqueta é ilegível de qualquer
+// forma, e capturar uma por veículo é o que travava o mapa.
+const LABEL_BITMAP_LIMIT = 120;
+
+// Agrupa as notificações de "bitmap pronto" — sem isso cada captura provocava
+// um re-render da tela inteira do mapa (N capturas x N marcadores).
+const BITMAP_FLUSH_MS = 220;
 
 function roundCourse(course: number): number {
   return ((Math.round(course / COURSE_STEP) * COURSE_STEP) % 360 + 360) % 360;
@@ -31,6 +46,9 @@ export function makeCaptureKey(
 // Module-level cache — persists across re-mounts of MapScreen
 const bitmapCache = new Map<string, string>();
 
+// Per-device last-known bitmap URI (module-level, persists across re-mounts)
+const lastBitmapByDevice = new Map<string, string>();
+
 export type PendingCapture = {
   key: string;
   categoria: string | null | undefined;
@@ -40,6 +58,39 @@ export type PendingCapture = {
   showLabel: boolean;
 };
 
+// ─── Fila global de capturas ─────────────────────────────────────────────────
+// Vive fora do React: enfileirar/desenfileirar não pode re-renderizar a tela.
+
+const captureQueue: PendingCapture[] = [];
+const queuedKeys = new Set<string>();
+const falhasPorChave = new Map<string, number>();
+const queueSubscribers = new Set<() => void>();
+const bitmapSubscribers = new Set<() => void>();
+
+const MAX_TENTATIVAS = 3;
+
+function enqueueCapture(entry: PendingCapture): boolean {
+  if (bitmapCache.has(entry.key) || queuedKeys.has(entry.key)) return false;
+  if ((falhasPorChave.get(entry.key) ?? 0) >= MAX_TENTATIVAS) return false;
+  queuedKeys.add(entry.key);
+  captureQueue.push(entry);
+  return true;
+}
+
+function notifyQueue() {
+  queueSubscribers.forEach((fn) => fn());
+}
+
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleBitmapFlush() {
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    bitmapSubscribers.forEach((fn) => fn());
+  }, BITMAP_FLUSH_MS);
+}
+
 // ─── OffscreenCapture ────────────────────────────────────────────────────────
 // Renders one icon in a hidden view, captures it as PNG, calls onReady.
 
@@ -48,21 +99,24 @@ function OffscreenCapture({
   onReady,
 }: {
   entry: PendingCapture;
-  onReady(key: string, uri: string): void;
+  onReady(key: string, uri: string | null): void;
 }) {
   const viewRef = useRef<View>(null);
   const { key, categoria, color, course, label, showLabel } = entry;
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!viewRef.current) return;
+      if (!viewRef.current) {
+        onReady(key, null);
+        return;
+      }
       captureRef(viewRef, {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
       })
         .then((uri) => onReady(key, uri))
-        .catch(() => {});
+        .catch(() => onReady(key, null));
     }, 100);
     return () => clearTimeout(timer);
   }, [key, onReady]);
@@ -90,20 +144,60 @@ function OffscreenCapture({
 }
 
 // ─── OffscreenCapturePool ────────────────────────────────────────────────────
-// Renders all pending captures in a hidden, non-interactive container.
+// Consome a fila global mantendo no máximo MAX_CONCURRENT_CAPTURES capturas em
+// voo. O estado fica aqui dentro para que o avanço da fila não re-renderize a
+// tela do mapa (só este componente).
 
-export function OffscreenCapturePool({
-  pending,
-  onReady,
-}: {
-  pending: PendingCapture[];
-  onReady(key: string, uri: string): void;
-}) {
-  if (pending.length === 0) return null;
+export function OffscreenCapturePool({ enabled = true }: { enabled?: boolean }) {
+  const [inflight, setInflight] = useState<PendingCapture[]>([]);
+  const inflightRef = useRef(inflight);
+  inflightRef.current = inflight;
+
+  const pump = useCallback(() => {
+    const livres = MAX_CONCURRENT_CAPTURES - inflightRef.current.length;
+    if (livres <= 0 || captureQueue.length === 0) return;
+    const next = captureQueue.splice(0, livres);
+    if (next.length > 0) setInflight((prev) => [...prev, ...next]);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    queueSubscribers.add(pump);
+    pump();
+    return () => {
+      queueSubscribers.delete(pump);
+    };
+  }, [enabled, pump]);
+
+  // Ao liberar um slot, puxa os próximos da fila.
+  useEffect(() => {
+    if (enabled) pump();
+  }, [inflight, enabled, pump]);
+
+  // Ao sair da tela, devolve as capturas em voo para a fila — do contrário
+  // suas chaves ficariam marcadas como "já enfileiradas" para sempre e o ícone
+  // nunca mais seria gerado.
+  useEffect(() => () => {
+    for (const entry of inflightRef.current) {
+      queuedKeys.delete(entry.key);
+    }
+  }, []);
+
+  const handleReady = useCallback((key: string, uri: string | null) => {
+    if (uri) bitmapCache.set(key, uri);
+    // Falha: libera a chave para nova tentativa, até MAX_TENTATIVAS — sem isso
+    // uma captura que sempre falha seria re-enfileirada para sempre.
+    else falhasPorChave.set(key, (falhasPorChave.get(key) ?? 0) + 1);
+    queuedKeys.delete(key);
+    setInflight((prev) => prev.filter((e) => e.key !== key));
+    if (uri) scheduleBitmapFlush();
+  }, []);
+
+  if (!enabled || inflight.length === 0) return null;
   return (
     <View style={styles.capturePool} pointerEvents="none">
-      {pending.map((entry) => (
-        <OffscreenCapture key={entry.key} entry={entry} onReady={onReady} />
+      {inflight.map((entry) => (
+        <OffscreenCapture key={entry.key} entry={entry} onReady={handleReady} />
       ))}
     </View>
   );
@@ -111,53 +205,72 @@ export function OffscreenCapturePool({
 
 // ─── useMarkerBitmaps ────────────────────────────────────────────────────────
 
-// Per-device last-known bitmap URI (module-level, persists across re-mounts)
-const lastBitmapByDevice = new Map<string, string>();
-
 export function useMarkerBitmaps(
   devices: TrackingDevice[],
   showLabels: boolean,
   enabled = true,
 ) {
-  const [bitmaps, setBitmaps] = useState<ReadonlyMap<string, string>>(bitmapCache);
-  const [pending, setPending] = useState<PendingCapture[]>([]);
-  const pendingKeysRef = useRef(new Set<string>());
+  // Contador de versão em vez de copiar o Map inteiro a cada bitmap pronto.
+  const [version, setVersion] = useState(0);
 
-  // Queue any new icon configurations for capture.
+  useEffect(() => {
+    const notificar = () => setVersion((v) => v + 1);
+    bitmapSubscribers.add(notificar);
+    return () => {
+      bitmapSubscribers.delete(notificar);
+    };
+  }, []);
+
+  const comEtiqueta = showLabels && devices.length <= LABEL_BITMAP_LIMIT;
+
+  // Enfileira as configurações de ícone que ainda não estão em cache.
   // No iOS os marcadores renderizam o ícone como filho (sem bitmap), então não
   // capturamos nada — evita captureRef em massa (custo/crash sob Fabric).
   useEffect(() => {
     if (!enabled) return;
-    const toAdd: PendingCapture[] = [];
+    let adicionou = false;
+
+    // 1º as variantes SEM etiqueta: são poucas combinações (categoria x cor x
+    // curso), aquecem o cache rápido e servem de fallback imediato para todos
+    // os marcadores — é o que evita o mapa aparecer só com "pontinhos".
     for (const device of devices) {
       const color = getMarkerColor(device);
       const course = device.posicao?.curso ?? 0;
-      const label = device.placa ?? device.nome ?? null;
-      const key = makeCaptureKey(device.categoria, color, course, label, showLabels);
-      if (!bitmapCache.has(key) && !pendingKeysRef.current.has(key)) {
-        pendingKeysRef.current.add(key);
-        toAdd.push({ key, categoria: device.categoria, color, course, label, showLabel: showLabels });
+      const key = makeCaptureKey(device.categoria, color, course, null, false);
+      if (enqueueCapture({ key, categoria: device.categoria, color, course, label: null, showLabel: false })) {
+        adicionou = true;
       }
     }
-    if (toAdd.length > 0) {
-      setPending((prev) => [...prev, ...toAdd]);
-    }
-  }, [devices, showLabels, enabled]);
 
-  const onReady = useCallback((key: string, uri: string) => {
-    bitmapCache.set(key, uri);
-    pendingKeysRef.current.delete(key);
-    setBitmaps(new Map(bitmapCache));
-    setPending((prev) => prev.filter((e) => e.key !== key));
-  }, []);
+    // 2º as variantes COM etiqueta (uma por veículo).
+    if (comEtiqueta) {
+      for (const device of devices) {
+        const color = getMarkerColor(device);
+        const course = device.posicao?.curso ?? 0;
+        const label = device.placa ?? device.nome ?? null;
+        if (!label) continue;
+        const key = makeCaptureKey(device.categoria, color, course, label, true);
+        if (enqueueCapture({ key, categoria: device.categoria, color, course, label, showLabel: true })) {
+          adicionou = true;
+        }
+      }
+    }
+
+    if (adicionou) notifyQueue();
+  }, [devices, comEtiqueta, enabled]);
 
   const getBitmap = useCallback(
     (device: TrackingDevice): string | undefined => {
       const color = getMarkerColor(device);
       const course = device.posicao?.curso ?? 0;
       const label = device.placa ?? device.nome ?? null;
-      const key = makeCaptureKey(device.categoria, color, course, label, showLabels);
-      const uri = bitmaps.get(key);
+
+      const uri =
+        (comEtiqueta && label
+          ? bitmapCache.get(makeCaptureKey(device.categoria, color, course, label, true))
+          : undefined) ??
+        bitmapCache.get(makeCaptureKey(device.categoria, color, course, null, false));
+
       if (uri) {
         // Update last-known bitmap for this device
         lastBitmapByDevice.set(device.dispositivoId, uri);
@@ -167,10 +280,12 @@ export function useMarkerBitmaps(
       // the new bitmap (e.g. updated course angle) is being captured
       return lastBitmapByDevice.get(device.dispositivoId);
     },
-    [bitmaps, showLabels],
+    // `version` entra de propósito: renova a identidade quando chegam bitmaps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [comEtiqueta, version],
   );
 
-  return { getBitmap, pending, onReady };
+  return { getBitmap };
 }
 
 const styles = StyleSheet.create({

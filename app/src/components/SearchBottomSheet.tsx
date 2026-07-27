@@ -1,5 +1,14 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  FlatList,
+  Image,
+  type ListRenderItemInfo,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Icon, IconButton } from 'react-native-paper';
 
 import { BottomSheet } from './BottomSheet';
@@ -19,18 +28,22 @@ type SearchBottomSheetProps = {
   onSelectDevice(device: TrackingDevice): void;
 };
 
-function SearchCard({
+// Altura fixa do card — a lista é virtualizada, então cada linha precisa de
+// altura previsível para não "pular" ao rolar.
+const CARD_HEIGHT = 108;
+
+function SearchCardBase({
   device,
   onPress,
 }: {
   device: TrackingDevice;
-  onPress(): void;
+  onPress(device: TrackingDevice): void;
 }) {
   const statusColor = getMarkerColor(device);
   const imageUrl = resolveUploadUrl(device.imagemUrlCliente);
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable style={styles.card} onPress={() => onPress(device)}>
       <View style={styles.cardPhotoCol}>
         <View style={[styles.cardPhoto, { backgroundColor: statusColor + '20' }]}>
           {imageUrl ? (
@@ -60,6 +73,8 @@ function SearchCard({
   );
 }
 
+const SearchCard = memo(SearchCardBase);
+
 export function SearchBottomSheet({
   visible,
   devices,
@@ -69,25 +84,73 @@ export function SearchBottomSheet({
   onSelectDevice,
 }: SearchBottomSheetProps) {
   const [query, setQuery] = useState('');
+  // O texto digitado atualiza o campo na hora; o filtro (que re-renderiza a
+  // lista inteira) só roda depois da pausa — sem isso, cada tecla percorria e
+  // remontava centenas de cards.
+  const [queryAplicada, setQueryAplicada] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setQueryAplicada(query), 140);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const filteredDevices = useMemo(() => {
-    if (!query.trim()) return devices;
+    const q = queryAplicada.toLowerCase().trim();
+    if (!q) return devices;
 
-    const q = query.toLowerCase().trim();
     return devices.filter(
       (d) =>
         d.nome.toLowerCase().includes(q) ||
         (d.placa?.toLowerCase().includes(q) ?? false) ||
         (d.apelidoCliente?.toLowerCase().includes(q) ?? false),
     );
-  }, [devices, query]);
+  }, [devices, queryAplicada]);
 
-  const handleSelect = useCallback(
-    (device: TrackingDevice) => {
-      onSelectDevice(device);
-      onClose();
-    },
-    [onSelectDevice, onClose],
+  const onSelectRef = useRef(onSelectDevice);
+  onSelectRef.current = onSelectDevice;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Identidade estável: evita invalidar o memo de todos os cards a cada render.
+  const handleSelect = useCallback((device: TrackingDevice) => {
+    onSelectRef.current(device);
+    onCloseRef.current();
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<TrackingDevice>) => (
+      <View style={styles.gridItem}>
+        <SearchCard device={item} onPress={handleSelect} />
+      </View>
+    ),
+    [handleSelect],
+  );
+
+  const keyExtractor = useCallback((item: TrackingDevice) => item.dispositivoId, []);
+
+  const header = (
+    <View style={styles.searchBoxSticky}>
+      <View style={styles.searchBox}>
+        <Icon source="magnify" size={20} color={colors.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={searchPlaceholder}
+          placeholderTextColor={colors.textMuted}
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="characters"
+          autoCorrect={false}
+        />
+        {query.length > 0 ? (
+          <IconButton
+            icon="close-circle"
+            size={18}
+            iconColor={colors.textMuted}
+            onPress={() => setQuery('')}
+          />
+        ) : null}
+      </View>
+    </View>
   );
 
   return (
@@ -97,54 +160,31 @@ export function SearchBottomSheet({
       heightPercent={0.7}
       onClose={onClose}
     >
-      <ScrollView
+      <FlatList
         style={styles.content}
+        data={filteredDevices}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="always"
-        keyboardDismissMode="none"
+        ListHeaderComponent={header}
         stickyHeaderIndices={[0]}
-      >
-        <View style={styles.searchBoxSticky}>
-          <View style={styles.searchBox}>
-            <Icon source="magnify" size={20} color={colors.textMuted} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={searchPlaceholder}
-              placeholderTextColor={colors.textMuted}
-              value={query}
-              onChangeText={setQuery}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            {query.length > 0 ? (
-              <IconButton
-                icon="close-circle"
-                size={18}
-                iconColor={colors.textMuted}
-                onPress={() => setQuery('')}
-              />
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.grid}>
-          {filteredDevices.map((device) => (
-            <View key={device.dispositivoId} style={styles.gridItem}>
-              <SearchCard
-                device={device}
-                onPress={() => handleSelect(device)}
-              />
-            </View>
-          ))}
-        </View>
-        {filteredDevices.length === 0 && (
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Icon source="car-off" size={40} color={colors.textMuted} />
             <Text style={styles.emptyText}>Nenhum veículo encontrado</Text>
           </View>
-        )}
-      </ScrollView>
+        }
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
+        initialNumToRender={8}
+        maxToRenderPerBatch={6}
+        updateCellsBatchingPeriod={60}
+        windowSize={5}
+        removeClippedSubviews
+      />
     </BottomSheet>
   );
 }
@@ -176,17 +216,18 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     backgroundColor: colors.surface,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  row: {
     gap: spacing.sm,
   },
   gridItem: {
-    width: '48%',
+    flex: 1,
+    maxWidth: '50%',
+    height: CARD_HEIGHT,
+    marginBottom: spacing.sm,
   },
   card: {
     width: '100%',
-    minHeight: 108,
+    height: CARD_HEIGHT,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,

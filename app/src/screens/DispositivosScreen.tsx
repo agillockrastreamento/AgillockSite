@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -136,21 +136,28 @@ export function DispositivosScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
+      {/* Virtualizada: com centenas de dispositivos a lista inteira era
+          montada de uma vez ao abrir a tela. */}
+      <FlatList
+        data={dispositivos}
+        keyExtractor={(d) => d.id}
         contentContainerStyle={styles.scroll}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => carregar('refresh')} />
         }
-      >
-        {dispositivos.length === 0 ? (
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Icon source="chip" size={48} color={colors.textMuted} />
             <Text style={styles.emptyText}>
               Nenhum dispositivo cadastrado. Toque em "Novo Dispositivo" para cadastrar o seu rastreador.
             </Text>
           </View>
-        ) : (
-          dispositivos.map((d) => (
+        }
+        renderItem={({ item: d }) => (
             <Pressable
               key={d.id}
               style={styles.card}
@@ -227,9 +234,8 @@ export function DispositivosScreen() {
                 </Pressable>
               </View>
             </Pressable>
-          ))
         )}
-      </ScrollView>
+      />
     </View>
   );
 }

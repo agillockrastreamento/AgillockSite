@@ -280,7 +280,7 @@ export function RescueMapScreen() {
   useTrackingWebSocket(devices, traccarDeviceIndex, handleWsMessage);
 
   // Bitmaps dos marcadores (renderizados offscreen e cacheados como PNG)
-  const { getBitmap, pending, onReady } = useMarkerBitmaps(devices, false);
+  const { getBitmap } = useMarkerBitmaps(devices, false);
 
   // Snap o split para uma das três posições padrão
   const snapToPosition = useCallback((target: number) => {
@@ -538,7 +538,7 @@ export function RescueMapScreen() {
           })}
         </MapView>
 
-        <OffscreenCapturePool pending={pending} onReady={onReady} />
+        <OffscreenCapturePool />
 
         {/* Hamburger flutuante (sem header padrão) — abaixo da status bar */}
         <Pressable
