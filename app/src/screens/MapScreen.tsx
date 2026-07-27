@@ -57,6 +57,7 @@ import { IconMarker } from '../tracking/IconMarker';
 import { useMarkerBitmaps, OffscreenCapturePool } from '../tracking/useMarkerBitmaps';
 import { useClusterBitmaps, ClusterCapturePool, ClusterIcon } from '../tracking/useClusterBitmaps';
 import {
+  cursoDoCard,
   formatSpeed,
   getStatusColor,
   getMarkerColor,
@@ -67,6 +68,7 @@ import {
   deleteVehiclePhoto,
   uploadVehiclePhoto,
 } from '../tracking/vehiclePhotoService';
+import { useValorEspacado } from '../utils/useValorEspacado';
 import type { ClienteDrawerParamList, RootStackParamList } from '../navigation/routes';
 
 const DEFAULT_REGION = {
@@ -97,6 +99,14 @@ const MARKER_CHILDREN_LIMIT = 60;
 // Altura fixa dos cards da lista de veículos (2 por linha).
 const QUICK_CARD_HEIGHT = 108;
 const QUICK_ROW_HEIGHT = QUICK_CARD_HEIGHT + spacing.sm;
+// A gaveta de veículos e o modal de busca mostram nome, placa, velocidade e
+// ícone — nada que precise acompanhar o mapa em tempo real. Espaçar as
+// atualizações libera a thread de JS justamente enquanto o usuário rola.
+const LISTA_INTERVALO_MS = 3000;
+// Rastro ("Rastro" na gaveta de camadas): acima deste número de veículos só o
+// focado ganha rota, e as requisições saem em blocos.
+const TRACKS_LIMITE = 40;
+const TRACKS_CONCORRENCIA = 6;
 
 function getMapaDoDevice(d: TrackingDevice): 1 | 2 {
   const m = Number(d.mapa);
@@ -238,6 +248,8 @@ export function MapScreen() {
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [notificationsSheetVisible, setNotificationsSheetVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  // Eventos recebidos aguardando o próximo lote do WebSocket (ver flushWsBuffer).
+  const eventosPendentesRef = useRef(0);
   const [layersDrawerVisible, setLayersDrawerVisible] = useState(false);
   const [currentRegion, setCurrentRegion] = useState<{
     latitude: number;
@@ -349,7 +361,10 @@ export function MapScreen() {
   }, [canVerEventos]);
 
   useEffect(() => {
-    if (notificationsSheetVisible) setUnreadCount(0);
+    if (!notificationsSheetVisible) return;
+    // Descarta também o que estava só acumulado à espera do próximo lote.
+    eventosPendentesRef.current = 0;
+    setUnreadCount(0);
   }, [notificationsSheetVisible]);
 
   const mapasUsados = useMemo(() => {
@@ -370,6 +385,16 @@ export function MapScreen() {
   const filteredDevices = useMemo(
     () => devices.filter((device) => getMapaDoDevice(device) === mapaAtivo),
     [devices, mapaAtivo],
+  );
+
+  // Versão da lista para os cards (gaveta e modais). O mapa continua usando
+  // `filteredDevices`, que acompanha cada posição recebida.
+  // Trocar de mapa ou ganhar/perder um veículo aparece na hora; só as
+  // atualizações de posição é que são espaçadas.
+  const devicesParaLista = useValorEspacado(
+    filteredDevices,
+    LISTA_INTERVALO_MS,
+    `${mapaAtivo}:${filteredDevices.length}`,
   );
 
   const filteredGeofences = useMemo(
@@ -395,6 +420,30 @@ export function MapScreen() {
     () => filteredDevices.filter((device) => !!getDeviceCoordinate(device)),
     [filteredDevices],
   );
+
+  // Só vira marcador quem está na área visível (com folga de 75% para o ícone
+  // não "pipocar" na borda durante o gesto, já que a região só é reportada ao
+  // fim dele). Cada marcador é uma view nativa: criar centenas delas fora da
+  // tela era desperdício puro — quem está longe volta a aparecer no zoom out,
+  // agrupado em cluster.
+  const devicesNaViewport = useMemo(() => {
+    const { latitude, longitude, latitudeDelta, longitudeDelta } = currentRegion;
+    if (!Number.isFinite(latitudeDelta) || !Number.isFinite(longitudeDelta)) {
+      return locatedDevices;
+    }
+    const margemLat = latitudeDelta * 0.75;
+    const margemLng = longitudeDelta * 0.75;
+    const minLat = latitude - latitudeDelta / 2 - margemLat;
+    const maxLat = latitude + latitudeDelta / 2 + margemLat;
+    const minLng = longitude - longitudeDelta / 2 - margemLng;
+    const maxLng = longitude + longitudeDelta / 2 + margemLng;
+
+    return locatedDevices.filter((device) => {
+      const lat = device.posicao?.latitude as number;
+      const lng = device.posicao?.longitude as number;
+      return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+    });
+  }, [locatedDevices, currentRegion]);
   const selectedDevice = useMemo(
     () => devices.find((device) => device.dispositivoId === selectedDeviceId) ?? null,
     [devices, selectedDeviceId],
@@ -414,7 +463,7 @@ export function MapScreen() {
   // movimento do mapa, o que segurava a thread de JS.
   const clusterGroups = useMemo(() => {
     type Grupo = { key: string; devices: TrackingDevice[]; lat: number; lng: number };
-    if (!locatedDevices.length) return [] as Grupo[];
+    if (!devicesNaViewport.length) return [] as Grupo[];
 
     const latPorPx = pxToLatDeg || 1;
     const lngPorPx = pxToLngDeg || 1;
@@ -425,7 +474,7 @@ export function MapScreen() {
     const entradas: Entrada[] = [];
     const celulas = new Map<string, Entrada[]>();
 
-    for (const device of locatedDevices) {
+    for (const device of devicesNaViewport) {
       const coord = getDeviceCoordinate(device);
       if (!coord) continue;
       const gx = Math.floor(coord.longitude / celulaLng);
@@ -478,7 +527,7 @@ export function MapScreen() {
     }
 
     return groups;
-  }, [locatedDevices, pxToLatDeg, pxToLngDeg]);
+  }, [devicesNaViewport, pxToLatDeg, pxToLngDeg]);
 
   const clusterCounts = useMemo(
     () => clusterGroups.filter((g) => g.devices.length > 1).map((g) => g.devices.length),
@@ -812,10 +861,20 @@ export function MapScreen() {
     });
   }, []);
 
-  // Ref mantém a identidade do renderItem estável — trocá-lo faz a FlatList
+  // Refs mantêm a identidade do renderItem estável — trocá-la faz a FlatList
   // re-renderizar todas as células visíveis.
   const focusDeviceRef = useRef(focusDevice);
   focusDeviceRef.current = focusDevice;
+  const devicesRef = useRef(devices);
+  devicesRef.current = devices;
+
+  // A célula pode não ter sido redesenhada desde a última posição recebida, e a
+  // lista é atualizada de forma espaçada — por isso buscamos o dispositivo
+  // atual pelo id em vez de usar o objeto capturado na closure.
+  const focusDeviceById = useCallback((dispositivoId: string) => {
+    const atual = devicesRef.current.find((d) => d.dispositivoId === dispositivoId);
+    if (atual) focusDeviceRef.current(atual, true);
+  }, []);
 
   const renderQuickCard = useCallback(
     ({ item }: ListRenderItemInfo<TrackingDevice>) => (
@@ -823,11 +882,11 @@ export function MapScreen() {
         <QuickVehicleCard
           device={item}
           selected={selectedDeviceId === item.dispositivoId}
-          onPress={() => focusDeviceRef.current(item, true)}
+          onPress={() => focusDeviceById(item.dispositivoId)}
         />
       </View>
     ),
-    [selectedDeviceId],
+    [selectedDeviceId, focusDeviceById],
   );
 
   const quickKeyExtractor = useCallback((item: TrackingDevice) => item.dispositivoId, []);
@@ -927,15 +986,47 @@ export function MapScreen() {
   const locatedDevicesRef = useRef(locatedDevices);
   locatedDevicesRef.current = locatedDevices;
 
+  // Com muitos veículos o rastro segue a seleção, então o veículo focado entra
+  // nas dependências. Com poucos, todos têm rota e trocar de foco não deve
+  // recarregar nada.
+  const muitosParaRastro = locatedDevices.length > TRACKS_LIMITE;
+  const rastroSegueSelecao = muitosParaRastro ? selectedDeviceId ?? '' : '';
+  const avisoRastroMostradoRef = useRef(false);
+  useEffect(() => {
+    if (!showTracks) avisoRastroMostradoRef.current = false;
+  }, [showTracks]);
+
   useEffect(() => {
     if (!showTracks) { setTracks([]); return; }
+    let cancelado = false;
+
     const loadAllTracks = async () => {
       setIsLoadingTracks(true);
       try {
         const now = new Date();
         const from = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString();
         const to = now.toISOString();
-        const trackPromises = locatedDevicesRef.current.map(async (device) => {
+
+        // Acima do teto, o rastro sai só do veículo focado. Buscar o histórico
+        // de centenas de veículos são centenas de requisições e centenas de
+        // polylines no mapa — trava o app e castiga o servidor à toa.
+        const todos = locatedDevicesRef.current;
+        const focado = selectedDeviceRef.current;
+        const alvos = todos.length > TRACKS_LIMITE
+          ? (focado ? [focado] : [])
+          : todos;
+
+        if (todos.length > TRACKS_LIMITE && !avisoRastroMostradoRef.current) {
+          avisoRastroMostradoRef.current = true;
+          toast.show({
+            message: focado
+              ? 'Muitos veículos: mostrando o rastro apenas do veículo selecionado.'
+              : 'Muitos veículos: selecione um veículo para ver o rastro dele.',
+            type: 'info',
+          });
+        }
+
+        const carregarUm = async (device: TrackingDevice) => {
           try {
             const data = await apiRequest<{ posicoes: { latitude: number; longitude: number }[] }>(
               `/cliente/rastreamento/dispositivos/${device.dispositivoId}/historico?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
@@ -949,16 +1040,27 @@ export function MapScreen() {
           } catch {
             return null;
           }
-        });
-        const results = await Promise.all(trackPromises);
+        };
+
+        // Em blocos, para não abrir dezenas de conexões de uma vez.
+        const results: ({ deviceId: string; coords: { latitude: number; longitude: number }[] } | null)[] = [];
+        for (let i = 0; i < alvos.length; i += TRACKS_CONCORRENCIA) {
+          if (cancelado) return;
+          const bloco = alvos.slice(i, i + TRACKS_CONCORRENCIA);
+          results.push(...(await Promise.all(bloco.map(carregarUm))));
+        }
+
+        if (cancelado) return;
         setTracks(results.filter((r): r is { deviceId: string; coords: { latitude: number; longitude: number }[] } => r !== null));
       } finally {
-        setIsLoadingTracks(false);
+        if (!cancelado) setIsLoadingTracks(false);
       }
     };
+
     loadAllTracks();
+    return () => { cancelado = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showTracks, locatedDevicesKey]);
+  }, [showTracks, locatedDevicesKey, rastroSegueSelecao]);
 
   const handleGeofenceCreated = useCallback(() => {
     setShowFences(true);
@@ -972,8 +1074,18 @@ export function MapScreen() {
   const wsBufferRef = useRef(new Map<string, import('../tracking/trackingWebSocket').WsPosition>());
   const wsFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const agendarFlushWs = useCallback((flush: () => void) => {
+    if (wsFlushTimerRef.current) return;
+    wsFlushTimerRef.current = setTimeout(flush, WS_FLUSH_MS);
+  }, []);
+
   const flushWsBuffer = useCallback(() => {
     wsFlushTimerRef.current = null;
+
+    const novosEventos = eventosPendentesRef.current;
+    eventosPendentesRef.current = 0;
+    if (novosEventos > 0) setUnreadCount((atual) => atual + novosEventos);
+
     const buffer = wsBufferRef.current;
     if (buffer.size === 0) return;
     wsBufferRef.current = new Map();
@@ -983,10 +1095,9 @@ export function MapScreen() {
   const handleWebSocketMessage = useCallback(
     (position: import('../tracking/trackingWebSocket').WsPosition, dispositivoId: string) => {
       wsBufferRef.current.set(dispositivoId, position);
-      if (wsFlushTimerRef.current) return;
-      wsFlushTimerRef.current = setTimeout(flushWsBuffer, WS_FLUSH_MS);
+      agendarFlushWs(flushWsBuffer);
     },
-    [flushWsBuffer],
+    [agendarFlushWs, flushWsBuffer],
   );
 
   useEffect(() => () => {
@@ -995,8 +1106,9 @@ export function MapScreen() {
 
   const handleWebSocketEvent = useCallback(() => {
     if (notificationsSheetVisible) return;
-    setUnreadCount((current) => current + 1);
-  }, [notificationsSheetVisible]);
+    eventosPendentesRef.current += 1;
+    agendarFlushWs(flushWsBuffer);
+  }, [notificationsSheetVisible, agendarFlushWs, flushWsBuffer]);
 
   useTrackingWebSocket(devices, traccarDeviceIndex, handleWebSocketMessage, handleWebSocketEvent);
 
@@ -1082,7 +1194,10 @@ export function MapScreen() {
             const color = getMarkerColor(device);
             const curso = device.posicao?.curso ?? 0;
             const label = device.placa ?? device.nome ?? '';
-            const markerContent = (
+            // Construído sob demanda: no Android a maioria dos marcadores usa o
+            // bitmap e não desenha filho nenhum — montar essa árvore para todos
+            // gerava milhares de elementos descartados a cada atualização.
+            const montarMarkerContent = () => (
               <View style={styles.markerContainer} collapsable={false}>
                 <View style={styles.markerWrap}>
                   <VehicleIcon
@@ -1114,7 +1229,10 @@ export function MapScreen() {
               return (
                 <IconMarker
                   key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}`}
-                  signature={`${color}|${Math.round(curso / 10)}|${label}|${showLabels ? 1 : 0}`}
+                  // Mesma granularidade de 15° usada no bitmap do Android: cada
+                  // mudança de assinatura liga `tracksViewChanges` por meio
+                  // segundo, e no iOS isso é o principal custo do mapa.
+                  signature={`${color}|${cursoDoCard(device)}|${label}|${showLabels ? 1 : 0}`}
                   coordinate={coord}
                   anchor={{ x: 0.5, y: 0.5 }}
                   zIndex={isSpiderMarker ? 1000 : 100}
@@ -1123,7 +1241,7 @@ export function MapScreen() {
                     focusDevice(device, true);
                   }}
                 >
-                  {markerContent}
+                  {montarMarkerContent()}
                 </IconMarker>
               );
             }
@@ -1148,7 +1266,7 @@ export function MapScreen() {
                   focusDevice(device, true);
                 }}
               >
-                {desenharFilho ? markerContent : null}
+                {desenharFilho ? montarMarkerContent() : null}
               </Marker>
             );
           };
@@ -1386,7 +1504,7 @@ export function MapScreen() {
                 // A virtualização depende de conhecer a altura do viewport —
                 // dentro da gaveta de altura animada, o flex garante isso.
                 style={styles.quickListWrap}
-                data={filteredDevices}
+                data={devicesParaLista}
                 renderItem={renderQuickCard}
                 keyExtractor={quickKeyExtractor}
                 getItemLayout={quickGetItemLayout}
@@ -1396,7 +1514,7 @@ export function MapScreen() {
                   styles.quickRow,
                   // Veículo único: centraliza a célula (que ocupa metade da
                   // largura) em vez de deixá-la encostada à esquerda.
-                  filteredDevices.length === 1 && styles.quickRowCenter,
+                  devicesParaLista.length === 1 && styles.quickRowCenter,
                 ]}
                 showsVerticalScrollIndicator={quickSheetMode === 'expanded'}
                 contentContainerStyle={styles.quickList}
@@ -1404,7 +1522,9 @@ export function MapScreen() {
                 maxToRenderPerBatch={6}
                 updateCellsBatchingPeriod={60}
                 windowSize={5}
-                removeClippedSubviews
+                // Só no Android: no iOS essa otimização tem histórico de deixar
+                // células em branco ao rolar rápido.
+                removeClippedSubviews={Platform.OS === 'android'}
               />
             </>
           ) : null}
@@ -1483,7 +1603,7 @@ export function MapScreen() {
 
       <SearchBottomSheet
         visible={searchSheetVisible}
-        devices={filteredDevices}
+        devices={devicesParaLista}
         onClose={() => setSearchSheetVisible(false)}
         onSelectDevice={(device) => {
           focusDevice(device, true);
@@ -1494,7 +1614,7 @@ export function MapScreen() {
       {canVerEventos ? (
         <NotificationsBottomSheet
           visible={notificationsSheetVisible}
-          devices={filteredDevices}
+          devices={devicesParaLista}
           onClose={() => setNotificationsSheetVisible(false)}
           onSelectEvent={(event) => {
             if (event.dispositivoId) {

@@ -32,6 +32,36 @@ export function getStatusColor(status: string, position?: TrackingPosition | nul
   return '#fab32c';
 }
 
+/**
+ * Curso arredondado para uso nos cards. O ângulo cru muda a cada posição
+ * recebida; nos ícones pequenos das listas uma diferença de poucos graus é
+ * invisível, e estabilizar o valor evita redesenhar o SVG à toa.
+ */
+export function cursoDoCard(device: TrackingDevice) {
+  const curso = device.posicao?.curso;
+  if (typeof curso !== 'number' || !Number.isFinite(curso)) return 0;
+  return ((Math.round(curso / 15) * 15) % 360 + 360) % 360;
+}
+
+/**
+ * Compara só o que o card mostra. Sem isso, qualquer posição recebida
+ * (velocidade, ignição, endereço…) redesenhava o SVG do veículo em todas as
+ * células visíveis da lista.
+ */
+export function mesmaAparenciaDeCard(a: TrackingDevice, b: TrackingDevice) {
+  return (
+    a.dispositivoId === b.dispositivoId &&
+    a.nome === b.nome &&
+    a.placa === b.placa &&
+    a.apelidoCliente === b.apelidoCliente &&
+    a.imagemUrlCliente === b.imagemUrlCliente &&
+    a.categoria === b.categoria &&
+    getMarkerColor(a) === getMarkerColor(b) &&
+    cursoDoCard(a) === cursoDoCard(b) &&
+    formatSpeed(a) === formatSpeed(b)
+  );
+}
+
 export function getMarkerColor(device: TrackingDevice) {
   if (device.status !== 'online') return '#fab32c';
   if (!device.posicao) return '#fab32c';
@@ -132,7 +162,7 @@ function VehiclePhoto({ device, size = 62 }: { device: TrackingDevice; size?: nu
       {imageUrl ? (
         <Image source={{ uri: imageUrl }} style={styles.photo} />
       ) : (
-        <VehicleIcon categoria={device.categoria} color={getMarkerColor(device)} course={device.posicao?.curso} size={size - 6} />
+        <VehicleIcon categoria={device.categoria} color={getMarkerColor(device)} course={cursoDoCard(device)} size={size - 6} />
       )}
       <View style={styles.cameraBadge}>
         <Icon source="camera" size={13} color={colors.primaryText} />
@@ -171,9 +201,16 @@ function QuickVehicleCardBase({
   );
 }
 
-// A lista de veículos é virtualizada; o memo impede que todas as células
+// A lista de veículos é virtualizada; o comparador impede que todas as células
 // visíveis sejam redesenhadas a cada posição recebida do WebSocket.
-export const QuickVehicleCard = memo(QuickVehicleCardBase);
+// `onPress` fica de fora de propósito: ele só usa o id do dispositivo, que não
+// muda — comparar a função (nova a cada render) anularia o memo.
+export const QuickVehicleCard = memo(
+  QuickVehicleCardBase,
+  (anterior, proximo) =>
+    anterior.selected === proximo.selected &&
+    mesmaAparenciaDeCard(anterior.device, proximo.device),
+);
 
 const _geocodeCache: Record<string, string> = {};
 

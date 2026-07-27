@@ -9,7 +9,10 @@ import { VehicleIcon } from './VehicleIcon';
 import { getMarkerColor } from './VehicleCards';
 
 export const MARKER_ICON_SIZE = 58;
-const COURSE_STEP = 10;
+// Passo de 15°: no Android trocar o bitmap remonta o marcador nativo, então
+// cada grau a menos de granularidade é uma remontagem a menos. A 15° a
+// diferença de rotação não é perceptível no ícone.
+const COURSE_STEP = 15;
 const MARKER_BITMAP_VERSION = 2.5;
 
 // Quantas capturas rodam ao mesmo tempo. `captureRef` é uma operação nativa

@@ -3,6 +3,7 @@ import {
   FlatList,
   Image,
   type ListRenderItemInfo,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,7 +15,7 @@ import { Icon, IconButton } from 'react-native-paper';
 import { BottomSheet } from './BottomSheet';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
-import { getMarkerColor } from '../tracking/VehicleCards';
+import { cursoDoCard, getMarkerColor, mesmaAparenciaDeCard } from '../tracking/VehicleCards';
 import { VehicleIcon } from '../tracking/VehicleIcon';
 import { resolveUploadUrl } from '../profile/profileService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
@@ -37,13 +38,13 @@ function SearchCardBase({
   onPress,
 }: {
   device: TrackingDevice;
-  onPress(device: TrackingDevice): void;
+  onPress(dispositivoId: string): void;
 }) {
   const statusColor = getMarkerColor(device);
   const imageUrl = resolveUploadUrl(device.imagemUrlCliente);
 
   return (
-    <Pressable style={styles.card} onPress={() => onPress(device)}>
+    <Pressable style={styles.card} onPress={() => onPress(device.dispositivoId)}>
       <View style={styles.cardPhotoCol}>
         <View style={[styles.cardPhoto, { backgroundColor: statusColor + '20' }]}>
           {imageUrl ? (
@@ -52,7 +53,7 @@ function SearchCardBase({
             <VehicleIcon
               categoria={device.categoria}
               color={statusColor}
-              course={device.posicao?.curso}
+              course={cursoDoCard(device)}
               size={54}
             />
           )}
@@ -73,7 +74,10 @@ function SearchCardBase({
   );
 }
 
-const SearchCard = memo(SearchCardBase);
+// Só redesenha quando muda algo que o card mostra — ver mesmaAparenciaDeCard.
+const SearchCard = memo(SearchCardBase, (anterior, proximo) =>
+  mesmaAparenciaDeCard(anterior.device, proximo.device),
+);
 
 export function SearchBottomSheet({
   visible,
@@ -110,10 +114,16 @@ export function SearchBottomSheet({
   onSelectRef.current = onSelectDevice;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const devicesRef = useRef(devices);
+  devicesRef.current = devices;
 
   // Identidade estável: evita invalidar o memo de todos os cards a cada render.
-  const handleSelect = useCallback((device: TrackingDevice) => {
-    onSelectRef.current(device);
+  // Resolve o dispositivo pelo id porque a célula pode não ter sido redesenhada
+  // desde a última posição recebida — o objeto capturado na closure é antigo.
+  const handleSelect = useCallback((dispositivoId: string) => {
+    const atual = devicesRef.current.find((d) => d.dispositivoId === dispositivoId);
+    if (!atual) return;
+    onSelectRef.current(atual);
     onCloseRef.current();
   }, []);
 
@@ -183,7 +193,9 @@ export function SearchBottomSheet({
         maxToRenderPerBatch={6}
         updateCellsBatchingPeriod={60}
         windowSize={5}
-        removeClippedSubviews
+        // Só no Android: no iOS essa otimização tem histórico de deixar células
+        // em branco ao rolar rápido.
+        removeClippedSubviews={Platform.OS === 'android'}
       />
     </BottomSheet>
   );
