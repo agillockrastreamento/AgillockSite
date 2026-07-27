@@ -31,17 +31,26 @@ export type NotificationPreferences = {
   [eventType: string]: NotificationChannelPrefs;
 };
 
+/** SEMANAL | QUINZENAL | MENSAL | SEMESTRAL | ANUAL */
+export type PeriodoKm = 'SEMANAL' | 'QUINZENAL' | 'MENSAL' | 'SEMESTRAL' | 'ANUAL';
+
+/**
+ * A referência de renovação depende do período: dia da semana no semanal, dia
+ * do mês nos demais — por isso as duas viajam juntas nos dois tipos de alerta.
+ */
+export type KmPeriodoConfig = {
+  kmMaximo30Dias?: number | null;
+  kmMinimo7Dias?: number | null;
+  diaRenovacaoMes: number | null;
+  diaSemanaRenovacao: number | null;
+  periodo?: PeriodoKm | null;
+};
+
 export type NotificationPreferencesResponse = {
   preferencias: NotificationPreferences;
   overspeedLimit?: number;
-  kmExcedida?: {
-    kmMaximo30Dias: number | null;
-    diaRenovacaoMes: number | null;
-  };
-  kmReduzida?: {
-    kmMinimo7Dias: number | null;
-    diaSemanaRenovacao: number | null;
-  };
+  kmExcedida?: KmPeriodoConfig;
+  kmReduzida?: KmPeriodoConfig;
   kmTrocaOleo?: number | null;
   semAtualizacaoHoras?: number | null;
 };
@@ -50,14 +59,8 @@ export type SaveNotificationPreferencesPayload = {
   dispositivoId: string;
   preferencias: NotificationPreferences;
   overspeedLimit?: number;
-  kmExcedida?: {
-    kmMaximo30Dias: number | null;
-    diaRenovacaoMes: number | null;
-  };
-  kmReduzida?: {
-    kmMinimo7Dias: number | null;
-    diaSemanaRenovacao: number;
-  };
+  kmExcedida?: KmPeriodoConfig;
+  kmReduzida?: KmPeriodoConfig;
   kmTrocaOleo?: number | null;
   semAtualizacaoHoras?: number | null;
 };
@@ -65,14 +68,8 @@ export type SaveNotificationPreferencesPayload = {
 export type KmConfigResponse = {
   kmTrocaOleo?: number | null;
   proximaTrocaKm?: number | null;
-  kmExcedida?: {
-    kmMaximo30Dias: number | null;
-    diaRenovacaoMes: number | null;
-  };
-  kmReduzida?: {
-    kmMinimo7Dias: number | null;
-    diaSemanaRenovacao: number | null;
-  };
+  kmExcedida?: KmPeriodoConfig;
+  kmReduzida?: KmPeriodoConfig;
 };
 
 export async function getNotificationEvents(params?: {

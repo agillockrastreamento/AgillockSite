@@ -19,10 +19,36 @@ function _inicioDiaSaoPaulo(offsetDias = 0): Date {
   return inicio;
 }
 
+// Os avisos de multa/licenciamento têm um único interruptor na tela: "Multas".
+export const TIPOS_MULTA = ['multaNova', 'multaVencimento7dias', 'multaVencimentoHoje', 'licenciamentoPendente'];
+
+export const PERIODOS_KM = ['SEMANAL', 'QUINZENAL', 'MENSAL', 'SEMESTRAL', 'ANUAL'] as const;
+export type PeriodoKm = (typeof PERIODOS_KM)[number];
+
+// Antes da periodicidade ser configurável, km excedida era sempre mensal e km
+// reduzida sempre semanal — quem já tinha configuração salva continua assim.
+export function periodoKmOuPadrao(valor: string | null | undefined, tipoEvento: string): PeriodoKm {
+  const normalizado = String(valor ?? '').toUpperCase();
+  if ((PERIODOS_KM as readonly string[]).includes(normalizado)) return normalizado as PeriodoKm;
+  return tipoEvento === 'kmReduzida' ? 'SEMANAL' : 'MENSAL';
+}
+
+export function rotuloPeriodoKm(periodo: PeriodoKm): string {
+  const rotulos: Record<PeriodoKm, string> = {
+    SEMANAL: 'semanal',
+    QUINZENAL: 'quinzenal',
+    MENSAL: 'mensal',
+    SEMESTRAL: 'semestral',
+    ANUAL: 'anual',
+  };
+  return rotulos[periodo];
+}
+
 // Normaliza subtipos de manutenção para a chave de preferência do admin
 function _tipoPreferenciaAdmin(tipo: string): string {
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
   if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'recorrenciaData';
+  if (TIPOS_MULTA.includes(tipo)) return 'multa';
   return tipo;
 }
 
@@ -492,6 +518,10 @@ class NotificationService {
                 clienteId: dados.clienteId ?? null,
                 notificarCliente: dados.notificarCliente,
                 geofenceId: dados.geofenceId ?? null,
+                // O broadcast usa este flag para suprimir o evento nas conexões
+                // do admin. Sem ele, o filtro deixava passar tudo e o veículo
+                // silenciado continuava aparecendo em tempo real no painel.
+                eventosAdminHabilitado: dispositivo.eventosAdminHabilitado !== false,
               };
 
               console.log(`[Notif] Evento "${tipo}" salvo no banco para ${cliente.nome}`);
@@ -585,9 +615,15 @@ class NotificationService {
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'kmExcedida' } },
     });
     if (!pref || (!pref.web && !pref.app && !pref.email)) return;
-    if (!pref.kmMaximo30Dias || !pref.diaRenovacaoMes) return;
+    if (!pref.kmMaximo30Dias) return;
 
-    const periodoInicio = _ultimaOcorrenciaDiaMes(pref.diaRenovacaoMes, new Date());
+    const periodo = periodoKmOuPadrao(pref.kmPeriodo, 'kmExcedida');
+    const periodoInicio = inicioPeriodoKm(
+      periodo,
+      { diaDoMes: pref.diaRenovacaoMes, diaDaSemana: pref.diaSemanaRenovacao },
+      new Date(),
+    );
+    if (!periodoInicio) return;
 
     const estado = await prisma.estadoKmNotificacao.upsert({
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'kmExcedida' } },
@@ -605,7 +641,7 @@ class NotificationService {
 
     const kmNoPeriodo = (odometroMetros - estado.kmBaseMetros) / 1000;
     if (kmNoPeriodo > pref.kmMaximo30Dias && !estado.notificacaoEnviada) {
-      const mensagem = `Quilometragem Excedida: O veículo ${dispositivo.nome}${dispositivo.placa ? ' (' + dispositivo.placa + ')' : ''} atingiu ${Math.round(kmNoPeriodo)} km no período (limite: ${pref.kmMaximo30Dias} km).`;
+      const mensagem = `Quilometragem Excedida: O veículo ${dispositivo.nome}${dispositivo.placa ? ' (' + dispositivo.placa + ')' : ''} atingiu ${Math.round(kmNoPeriodo)} km no período ${rotuloPeriodoKm(periodo)} (limite: ${pref.kmMaximo30Dias} km).`;
       await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'kmExcedida', mensagem);
       await prisma.estadoKmNotificacao.update({
         where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'kmExcedida' } },
@@ -623,9 +659,15 @@ class NotificationService {
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'kmReduzida' } },
     });
     if (!pref || (!pref.web && !pref.app && !pref.email)) return;
-    if (!pref.kmMinimo7Dias || pref.diaSemanaRenovacao == null) return;
+    if (!pref.kmMinimo7Dias) return;
 
-    const ultimaRenovacao = _ultimaOcorrenciaDiaSemana(pref.diaSemanaRenovacao, new Date());
+    const periodo = periodoKmOuPadrao(pref.kmPeriodo, 'kmReduzida');
+    const ultimaRenovacao = inicioPeriodoKm(
+      periodo,
+      { diaDoMes: pref.diaRenovacaoMes, diaDaSemana: pref.diaSemanaRenovacao },
+      new Date(),
+    );
+    if (!ultimaRenovacao) return;
 
     const estado = await prisma.estadoKmNotificacao.upsert({
       where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId: dispositivo.id, tipoEvento: 'kmReduzida' } },
@@ -636,7 +678,7 @@ class NotificationService {
     if (estado.dataBase < ultimaRenovacao) {
       const kmNoPeriodo = (odometroMetros - estado.kmBaseMetros) / 1000;
       if (kmNoPeriodo < pref.kmMinimo7Dias) {
-        const mensagem = `Quilometragem Reduzida: O veículo ${dispositivo.nome}${dispositivo.placa ? ' (' + dispositivo.placa + ')' : ''} percorreu apenas ${Math.round(kmNoPeriodo)} km nos últimos 7 dias (mínimo: ${pref.kmMinimo7Dias} km).`;
+        const mensagem = `Quilometragem Reduzida: O veículo ${dispositivo.nome}${dispositivo.placa ? ' (' + dispositivo.placa + ')' : ''} percorreu apenas ${Math.round(kmNoPeriodo)} km no período ${rotuloPeriodoKm(periodo)} (mínimo: ${pref.kmMinimo7Dias} km).`;
         await this._salvarEEnviar(clienteLoginId, dispositivo, pref, 'kmReduzida', mensagem);
       }
       await prisma.estadoKmNotificacao.update({
@@ -819,7 +861,7 @@ class NotificationService {
           dataReferencia: { lte: limite7d },
         },
         include: {
-          dispositivo: { select: { id: true, nome: true, placa: true, identificador: true, traccarId: true, clienteId: true, manutencaoAtiva: true } },
+          dispositivo: { select: { id: true, nome: true, placa: true, identificador: true, traccarId: true, clienteId: true, manutencaoAtiva: true, eventosAdminHabilitado: true } },
           clienteLogin: { select: { id: true, clienteId: true, ativo: true } },
         },
       });
@@ -837,7 +879,7 @@ class NotificationService {
       const recAtrasadas = await prisma.manutencaoRecorrenciaData.findMany({
         where: { ativa: true, dataReferencia: { lt: agora } },
         include: {
-          dispositivo: { select: { id: true, nome: true, placa: true, identificador: true, traccarId: true, clienteId: true, manutencaoAtiva: true } },
+          dispositivo: { select: { id: true, nome: true, placa: true, identificador: true, traccarId: true, clienteId: true, manutencaoAtiva: true, eventosAdminHabilitado: true } },
           clienteLogin: { select: { id: true, clienteId: true, ativo: true } },
         },
       });
@@ -1015,6 +1057,9 @@ class NotificationService {
         origemId: origemId ?? null,
         clienteLoginId,
         adminEvento: false,
+        // Idem processarEvento: sem este flag, os alertas de km/manutenção de um
+        // veículo silenciado continuavam chegando ao painel do admin.
+        eventosAdminHabilitado: dispositivo.eventosAdminHabilitado !== false,
       };
     }
     if (pref.email) {
@@ -1136,6 +1181,11 @@ class NotificationService {
       boletoVencendoHoje: 'Boleto vence hoje',
       boletoAtrasado: 'Boleto em atraso',
       pagamentoRecebido: 'Pagamento recebido',
+      multa:                 'Multas',
+      multaNova:             'Nova Multa',
+      multaVencimento7dias:  'Multa a Vencer (7 dias)',
+      multaVencimentoHoje:   'Multa Vence Hoje',
+      licenciamentoPendente: 'Licenciamento Pendente',
     };
     return labels[tipo] || tipo;
   }
@@ -1197,4 +1247,75 @@ function _ultimaOcorrenciaDiaSemana(diaSemana: number, agora: Date): Date {
   const diff = (d.getDay() - diaSemana + 7) % 7;
   d.setDate(d.getDate() - diff);
   return d;
+}
+
+/**
+ * Início do período de contagem de km vigente.
+ *
+ * A periodicidade é escolha do usuário (antes era fixa: mensal para km excedida
+ * e semanal para km reduzida). A referência é o dia da semana no período
+ * semanal e o dia do mês nos demais:
+ *
+ *  - SEMANAL   → toda semana no dia da semana escolhido
+ *  - QUINZENAL → duas vezes por mês: no dia escolhido e 15 dias depois
+ *  - MENSAL    → todo mês no dia escolhido
+ *  - SEMESTRAL → janeiro e julho, no dia escolhido
+ *  - ANUAL     → janeiro, no dia escolhido
+ *
+ * Devolve null quando falta a referência necessária (aí não há o que apurar).
+ */
+export function inicioPeriodoKm(
+  periodo: PeriodoKm,
+  ref: { diaDoMes?: number | null; diaDaSemana?: number | null },
+  agora: Date,
+): Date | null {
+  const hoje = new Date(agora);
+  hoje.setHours(0, 0, 0, 0);
+
+  if (periodo === 'SEMANAL') {
+    if (ref.diaDaSemana == null) return null;
+    return _ultimaOcorrenciaDiaSemana(ref.diaDaSemana, hoje);
+  }
+
+  const dia = ref.diaDoMes;
+  if (!dia) return null;
+
+  const candidatas: Date[] = [];
+  const adicionar = (ano: number, mes: number, diaAlvo: number) => {
+    // Mês curto: o dia 31 vira o último dia do mês.
+    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+    candidatas.push(new Date(ano, mes, Math.min(diaAlvo, diasNoMes)));
+  };
+
+  const ano = hoje.getFullYear();
+  const mes = hoje.getMonth();
+
+  if (periodo === 'QUINZENAL' || periodo === 'MENSAL') {
+    // Mês atual e o anterior bastam: uma das fronteiras já ficou para trás.
+    for (let volta = 0; volta <= 1; volta += 1) {
+      const base = new Date(ano, mes - volta, 1);
+      adicionar(base.getFullYear(), base.getMonth(), dia);
+      if (periodo === 'QUINZENAL') {
+        // 15 dias corridos depois da âncora do mês — pode cair no mês seguinte.
+        // Somar 15 ao número do dia truncaria a segunda quinzena no fim do mês
+        // (com âncora no dia 20, o segundo bloco teria só 11 dias).
+        const diasNoMes = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+        const meia = new Date(base.getFullYear(), base.getMonth(), Math.min(dia, diasNoMes));
+        meia.setDate(meia.getDate() + 15);
+        candidatas.push(meia);
+      }
+    }
+  } else if (periodo === 'SEMESTRAL') {
+    for (const a of [ano, ano - 1]) {
+      adicionar(a, 0, dia);
+      adicionar(a, 6, dia);
+    }
+  } else {
+    for (const a of [ano, ano - 1]) adicionar(a, 0, dia);
+  }
+
+  const passadas = candidatas
+    .filter((d) => d.getTime() <= hoje.getTime())
+    .sort((a, b) => b.getTime() - a.getTime());
+  return passadas[0] ?? null;
 }

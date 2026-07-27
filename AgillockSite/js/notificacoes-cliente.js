@@ -16,6 +16,12 @@
     { id: 'semAtualizacao',label: 'Veículo sem Atualização',     icon: 'fa-wifi',               iconClass: 'ic-alarm' },
     { id: 'kmExcedida',    label: 'Km Excedida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'kmReduzida',    label: 'Km Reduzida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
+    // Um interruptor para todos os avisos de multa/licenciamento.
+    { id: 'multa',         label: 'Multas',                      icon: 'fa-gavel',                iconClass: 'ic-alarm' },
+    { id: 'multaNova',              label: 'Nova Multa',            icon: 'fa-gavel', iconClass: 'ic-alarm', hidden: true },
+    { id: 'multaVencimento7dias',   label: 'Multa a Vencer (7 dias)', icon: 'fa-gavel', iconClass: 'ic-alarm', hidden: true },
+    { id: 'multaVencimentoHoje',    label: 'Multa Vence Hoje',      icon: 'fa-gavel', iconClass: 'ic-alarm', hidden: true },
+    { id: 'licenciamentoPendente',  label: 'Licenciamento Pendente', icon: 'fa-gavel', iconClass: 'ic-alarm', hidden: true },
     { id: 'manutencao',         label: 'Manutenções (Recorrências)', icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
     { id: 'manutencaoAlerta',   label: 'Alerta de Manutenção',       icon: 'fa-wrench',               iconClass: 'ic-manutencao-alerta', hidden: true },
     { id: 'manutencaoAtrasada', label: 'Manutenção Atrasada',        icon: 'fa-exclamation-triangle', iconClass: 'ic-manutencao-atrasada', hidden: true },
@@ -193,6 +199,20 @@
 
     document.getElementById('btn-configurar-todos').addEventListener('click', entrarModoTodos);
     document.getElementById('btn-salvar-geral').addEventListener('click', salvarConfiguracoes);
+    document.getElementById('select-periodo-excedida').addEventListener('change', aplicarPeriodoKm);
+    document.getElementById('select-periodo-reduzida').addEventListener('change', aplicarPeriodoKm);
+  }
+
+  // A referência de renovação muda com o período: no semanal o que importa é o
+  // dia da semana; nos demais, o dia do mês.
+  function aplicarPeriodoKm() {
+    const alternar = function (periodoId, grupoSemanaId, grupoMesId) {
+      const semanal = document.getElementById(periodoId).value === 'SEMANAL';
+      document.getElementById(grupoSemanaId).style.display = semanal ? '' : 'none';
+      document.getElementById(grupoMesId).style.display = semanal ? 'none' : '';
+    };
+    alternar('select-periodo-excedida', 'grupo-dia-semana-excedida', 'grupo-dia-mes-excedida');
+    alternar('select-periodo-reduzida', 'grupo-dia-semana-reduzida', 'grupo-dia-mes-reduzida');
   }
 
   async function carregarPreferencias(dispositivoId) {
@@ -206,12 +226,19 @@
       // Fill km excedida config
       document.getElementById('input-km-max').value = data?.kmExcedida?.kmMaximo30Dias || '';
       document.getElementById('input-dia-mes').value = data?.kmExcedida?.diaRenovacaoMes || '';
+      if (data?.kmExcedida?.diaSemanaRenovacao != null) {
+        document.getElementById('select-dia-semana-excedida').value = data.kmExcedida.diaSemanaRenovacao;
+      }
+      document.getElementById('select-periodo-excedida').value = data?.kmExcedida?.periodo || 'MENSAL';
 
       // Fill km reduzida config
       document.getElementById('input-km-min').value = data?.kmReduzida?.kmMinimo7Dias || '';
       if (data?.kmReduzida?.diaSemanaRenovacao != null) {
         document.getElementById('select-dia-semana').value = data.kmReduzida.diaSemanaRenovacao;
       }
+      document.getElementById('input-dia-mes-reduzida').value = data?.kmReduzida?.diaRenovacaoMes || '';
+      document.getElementById('select-periodo-reduzida').value = data?.kmReduzida?.periodo || 'SEMANAL';
+      aplicarPeriodoKm();
 
       document.getElementById('notif-container').style.display = 'block';
       document.getElementById('notif-vazio').style.display = 'none';
@@ -256,13 +283,22 @@
 
       const kmMax = valorComum(d => d?.kmExcedida?.kmMaximo30Dias ?? null);
       const diaMes = valorComum(d => d?.kmExcedida?.diaRenovacaoMes ?? null);
+      const diaSemanaExc = valorComum(d => d?.kmExcedida?.diaSemanaRenovacao ?? null);
+      const periodoExc = valorComum(d => d?.kmExcedida?.periodo ?? null);
       const kmMin = valorComum(d => d?.kmReduzida?.kmMinimo7Dias ?? null);
       const diaSemana = valorComum(d => d?.kmReduzida?.diaSemanaRenovacao ?? null);
+      const diaMesRed = valorComum(d => d?.kmReduzida?.diaRenovacaoMes ?? null);
+      const periodoRed = valorComum(d => d?.kmReduzida?.periodo ?? null);
 
       document.getElementById('input-km-max').value = kmMax || '';
       document.getElementById('input-dia-mes').value = diaMes || '';
+      if (diaSemanaExc != null) document.getElementById('select-dia-semana-excedida').value = diaSemanaExc;
+      document.getElementById('select-periodo-excedida').value = periodoExc || 'MENSAL';
       document.getElementById('input-km-min').value = kmMin || '';
       if (diaSemana != null) document.getElementById('select-dia-semana').value = diaSemana;
+      document.getElementById('input-dia-mes-reduzida').value = diaMesRed || '';
+      document.getElementById('select-periodo-reduzida').value = periodoRed || 'SEMANAL';
+      aplicarPeriodoKm();
 
       document.getElementById('notif-container').style.display = 'block';
       document.getElementById('notif-vazio').style.display = 'none';
@@ -326,10 +362,14 @@
       kmExcedida: {
         kmMaximo30Dias: parseInt(document.getElementById('input-km-max').value) || null,
         diaRenovacaoMes: parseInt(document.getElementById('input-dia-mes').value) || null,
+        diaSemanaRenovacao: parseInt(document.getElementById('select-dia-semana-excedida').value),
+        periodo: document.getElementById('select-periodo-excedida').value,
       },
       kmReduzida: {
         kmMinimo7Dias: parseInt(document.getElementById('input-km-min').value) || null,
         diaSemanaRenovacao: parseInt(document.getElementById('select-dia-semana').value),
+        diaRenovacaoMes: parseInt(document.getElementById('input-dia-mes-reduzida').value) || null,
+        periodo: document.getElementById('select-periodo-reduzida').value,
       },
     };
 

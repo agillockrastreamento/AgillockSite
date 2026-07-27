@@ -634,6 +634,11 @@ model PreferenciaNotificacao {
   diaRenovacaoMes     Int?
   kmMinimo7Dias       Int?
   diaSemanaRenovacao  Int?
+  // Periodicidade da contagem de km: SEMANAL | QUINZENAL | MENSAL | SEMESTRAL | ANUAL.
+  // Antes era fixo (kmExcedida mensal, kmReduzida semanal); nulo mantém esse padrão
+  // antigo para quem já tinha configuração salva.
+  // A referência vem de diaSemanaRenovacao (semanal) ou diaRenovacaoMes (demais).
+  kmPeriodo           String?
   kmTrocaOleo         Int?
   semAtualizacaoHoras Int?     @default(3) // Horas sem posição p/ disparar "semAtualizacao" (escolha do usuário)
   createdAt           DateTime @default(now())

@@ -2,10 +2,13 @@ import { Router } from 'express';
 import prisma from '../utils/prisma';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
+import { periodoKmOuPadrao } from '../services/notification.service';
 
 function tipoPreferenciaAdmin(tipoEvento: string) {
   if (tipoEvento === 'manutencaoAlerta' || tipoEvento === 'manutencaoAtrasada' || tipoEvento === 'manutencaoFeita') return 'manutencao';
   if (tipoEvento === 'recorrenciaDataAlerta' || tipoEvento === 'recorrenciaDataNaoFeita' || tipoEvento === 'recorrenciaDataFeita') return 'recorrenciaData';
+  // Os subtipos de multa compartilham um único interruptor "Multas".
+  if (tipoEvento === 'multaNova' || tipoEvento === 'multaVencimento7dias' || tipoEvento === 'multaVencimentoHoje' || tipoEvento === 'licenciamentoPendente') return 'multa';
   return tipoEvento;
 }
 
@@ -139,8 +142,8 @@ router.get('/clientes/:clienteLoginId/preferencias/:dispositivoId', async (req, 
     prefs.forEach(p => {
       result.preferencias[p.tipoEvento] = { web: p.web, app: p.app, email: p.email };
       if (p.tipoEvento === 'overspeed')   result.overspeedLimit = p.overspeedLimit;
-      if (p.tipoEvento === 'kmExcedida')  result.kmExcedida = { kmMaximo30Dias: p.kmMaximo30Dias, diaRenovacaoMes: p.diaRenovacaoMes };
-      if (p.tipoEvento === 'kmReduzida')  result.kmReduzida = { kmMinimo7Dias: p.kmMinimo7Dias, diaSemanaRenovacao: p.diaSemanaRenovacao };
+      if (p.tipoEvento === 'kmExcedida')  result.kmExcedida = { kmMaximo30Dias: p.kmMaximo30Dias, diaRenovacaoMes: p.diaRenovacaoMes, diaSemanaRenovacao: p.diaSemanaRenovacao, periodo: periodoKmOuPadrao(p.kmPeriodo, 'kmExcedida') };
+      if (p.tipoEvento === 'kmReduzida')  result.kmReduzida = { kmMinimo7Dias: p.kmMinimo7Dias, diaSemanaRenovacao: p.diaSemanaRenovacao, diaRenovacaoMes: p.diaRenovacaoMes, periodo: periodoKmOuPadrao(p.kmPeriodo, 'kmReduzida') };
       if (p.tipoEvento === 'trocaOleo')   result.kmTrocaOleo = p.kmTrocaOleo;
       if (p.tipoEvento === 'semAtualizacao') result.semAtualizacaoHoras = p.semAtualizacaoHoras;
     });
@@ -162,8 +165,10 @@ router.post('/clientes/:clienteLoginId/preferencias', async (req, res) => {
       Object.keys(preferencias).map(tipo => {
         const extra: any = {};
         if (tipo === 'overspeed')  extra.overspeedLimit = overspeedLimit ?? 100;
-        if (tipo === 'kmExcedida') { extra.kmMaximo30Dias = kmExcedida?.kmMaximo30Dias ?? null; extra.diaRenovacaoMes = kmExcedida?.diaRenovacaoMes ?? null; }
-        if (tipo === 'kmReduzida') { extra.kmMinimo7Dias = kmReduzida?.kmMinimo7Dias ?? null; extra.diaSemanaRenovacao = kmReduzida?.diaSemanaRenovacao ?? null; }
+        // Grava as duas referências (dia do mês e dia da semana) porque a usada
+        // depende do período escolhido.
+        if (tipo === 'kmExcedida') { extra.kmMaximo30Dias = kmExcedida?.kmMaximo30Dias ?? null; extra.diaRenovacaoMes = kmExcedida?.diaRenovacaoMes ?? null; extra.diaSemanaRenovacao = kmExcedida?.diaSemanaRenovacao ?? null; extra.kmPeriodo = periodoKmOuPadrao(kmExcedida?.periodo, 'kmExcedida'); }
+        if (tipo === 'kmReduzida') { extra.kmMinimo7Dias = kmReduzida?.kmMinimo7Dias ?? null; extra.diaSemanaRenovacao = kmReduzida?.diaSemanaRenovacao ?? null; extra.diaRenovacaoMes = kmReduzida?.diaRenovacaoMes ?? null; extra.kmPeriodo = periodoKmOuPadrao(kmReduzida?.periodo, 'kmReduzida'); }
         if (tipo === 'trocaOleo')  extra.kmTrocaOleo = kmTrocaOleo ?? null;
         if (tipo === 'semAtualizacao') extra.semAtualizacaoHoras = semAtualizacaoHoras ?? 3;
         return prisma.preferenciaNotificacao.upsert({
@@ -255,7 +260,19 @@ router.get('/eventos', async (req, res) => {
     const [adminPrefsRow, eventos] = await Promise.all([
       prisma.adminPreferencia.findUnique({ where: { userId } }),
       prisma.eventoNotificacao.findMany({
-        where: { createdAt: dateFilter, OR: [{ adminEvento: true }, { origemTipo: null }] },
+        where: {
+          createdAt: dateFilter,
+          AND: [
+            // Eventos criados para o admin + os eventos "de sistema" sem origem
+            // (é por aqui que entram os financeiros, que não têm dispositivo).
+            { OR: [{ adminEvento: true }, { origemTipo: null }] },
+            // Veículo com eventos-admin desligados não aparece no painel. Sem o
+            // filtro, tudo que o cliente recebia continuava listado aqui e o
+            // botão de silenciar parecia não funcionar. Os eventos sem
+            // dispositivo (financeiros) seguem aparecendo.
+            { OR: [{ dispositivoId: null }, { dispositivo: { eventosAdminHabilitado: true } }] },
+          ],
+        },
         orderBy: { createdAt: 'desc' },
         take: 500,
         include: {

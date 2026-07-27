@@ -7,6 +7,7 @@ import {
 } from '../middleware/cliente-auth.middleware';
 import EmailService from '../services/email.service';
 import ExpoPushService from '../services/expo-push.service';
+import { periodoKmOuPadrao } from '../services/notification.service';
 
 const router = Router();
 
@@ -99,10 +100,20 @@ router.get('/preferencias/:dispositivoId', clienteAuthMiddleware, async (req: an
         result.overspeedLimit = p.overspeedLimit;
       }
       if (p.tipoEvento === 'kmExcedida') {
-        result.kmExcedida = { kmMaximo30Dias: p.kmMaximo30Dias, diaRenovacaoMes: p.diaRenovacaoMes };
+        result.kmExcedida = {
+          kmMaximo30Dias: p.kmMaximo30Dias,
+          diaRenovacaoMes: p.diaRenovacaoMes,
+          diaSemanaRenovacao: p.diaSemanaRenovacao,
+          periodo: periodoKmOuPadrao(p.kmPeriodo, 'kmExcedida'),
+        };
       }
       if (p.tipoEvento === 'kmReduzida') {
-        result.kmReduzida = { kmMinimo7Dias: p.kmMinimo7Dias, diaSemanaRenovacao: p.diaSemanaRenovacao };
+        result.kmReduzida = {
+          kmMinimo7Dias: p.kmMinimo7Dias,
+          diaSemanaRenovacao: p.diaSemanaRenovacao,
+          diaRenovacaoMes: p.diaRenovacaoMes,
+          periodo: periodoKmOuPadrao(p.kmPeriodo, 'kmReduzida'),
+        };
       }
       if (p.tipoEvento === 'trocaOleo') {
         result.kmTrocaOleo = p.kmTrocaOleo;
@@ -153,13 +164,19 @@ router.post('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
       Object.keys(preferencias).map(tipo => {
         const extra: any = {};
         if (tipo === 'overspeed') extra.overspeedLimit = overspeedLimit ?? 100;
+        // A referência (dia do mês ou dia da semana) depende do período escolhido,
+        // então as duas são gravadas nos dois tipos.
         if (tipo === 'kmExcedida') {
           extra.kmMaximo30Dias = kmExcedida?.kmMaximo30Dias ?? null;
           extra.diaRenovacaoMes = kmExcedida?.diaRenovacaoMes ?? null;
+          extra.diaSemanaRenovacao = kmExcedida?.diaSemanaRenovacao ?? null;
+          extra.kmPeriodo = periodoKmOuPadrao(kmExcedida?.periodo, 'kmExcedida');
         }
         if (tipo === 'kmReduzida') {
           extra.kmMinimo7Dias = kmReduzida?.kmMinimo7Dias ?? null;
           extra.diaSemanaRenovacao = kmReduzida?.diaSemanaRenovacao ?? null;
+          extra.diaRenovacaoMes = kmReduzida?.diaRenovacaoMes ?? null;
+          extra.kmPeriodo = periodoKmOuPadrao(kmReduzida?.periodo, 'kmReduzida');
         }
         if (tipo === 'trocaOleo') {
           extra.kmTrocaOleo = kmTrocaOleo ?? null;

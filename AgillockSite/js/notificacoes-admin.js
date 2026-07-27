@@ -16,6 +16,12 @@
     { id: 'semAtualizacao', label: 'Veículo sem Atualização',     icon: 'fa-wifi',               iconClass: 'ic-alarm' },
     { id: 'kmExcedida',     label: 'Km Excedida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
     { id: 'kmReduzida',     label: 'Km Reduzida (Período)',       icon: 'fa-road',                 iconClass: 'ic-km' },
+    // Um interruptor para todos os avisos de multa/licenciamento.
+    { id: 'multa',          label: 'Multas',                      icon: 'fa-gavel',                iconClass: 'ic-alarm' },
+    { id: 'multaNova',             label: 'Nova Multa',             icon: 'fa-gavel', iconClass: 'ic-alarm', hidden: true },
+    { id: 'multaVencimento7dias',  label: 'Multa a Vencer (7 dias)', icon: 'fa-gavel', iconClass: 'ic-alarm', hidden: true },
+    { id: 'multaVencimentoHoje',   label: 'Multa Vence Hoje',       icon: 'fa-gavel', iconClass: 'ic-alarm', hidden: true },
+    { id: 'licenciamentoPendente', label: 'Licenciamento Pendente',  icon: 'fa-gavel', iconClass: 'ic-alarm', hidden: true },
     { id: 'manutencao',         label: 'Manutenções (Recorrências)', icon: 'fa-wrench',               iconClass: 'ic-manutencao' },
     { id: 'manutencaoAlerta',   label: 'Alerta de Manutenção',       icon: 'fa-wrench',               iconClass: 'ic-manutencao-alerta', hidden: true },
     { id: 'manutencaoAtrasada', label: 'Manutenção Atrasada',        icon: 'fa-exclamation-triangle', iconClass: 'ic-manutencao-atrasada', hidden: true },
@@ -242,10 +248,17 @@
 
       document.getElementById('c-input-km-max').value  = data?.kmExcedida?.kmMaximo30Dias || '';
       document.getElementById('c-input-dia-mes').value  = data?.kmExcedida?.diaRenovacaoMes || '';
+      if (data?.kmExcedida?.diaSemanaRenovacao != null) {
+        document.getElementById('c-select-dia-semana-excedida').value = data.kmExcedida.diaSemanaRenovacao;
+      }
+      document.getElementById('c-select-periodo-excedida').value = data?.kmExcedida?.periodo || 'MENSAL';
       document.getElementById('c-input-km-min').value   = data?.kmReduzida?.kmMinimo7Dias || '';
       if (data?.kmReduzida?.diaSemanaRenovacao != null) {
         document.getElementById('c-select-dia-semana').value = data.kmReduzida.diaSemanaRenovacao;
       }
+      document.getElementById('c-input-dia-mes-reduzida').value = data?.kmReduzida?.diaRenovacaoMes || '';
+      document.getElementById('c-select-periodo-reduzida').value = data?.kmReduzida?.periodo || 'SEMANAL';
+      aplicarPeriodoKmCliente();
       document.getElementById('cliente-notif-container').style.display = 'block';
       document.getElementById('cliente-notif-vazio').style.display    = 'none';
     } catch (err) {
@@ -295,10 +308,14 @@
       kmExcedida: {
         kmMaximo30Dias:  parseInt(document.getElementById('c-input-km-max').value) || null,
         diaRenovacaoMes: parseInt(document.getElementById('c-input-dia-mes').value) || null,
+        diaSemanaRenovacao: parseInt(document.getElementById('c-select-dia-semana-excedida').value),
+        periodo: document.getElementById('c-select-periodo-excedida').value,
       },
       kmReduzida: {
         kmMinimo7Dias:       parseInt(document.getElementById('c-input-km-min').value) || null,
         diaSemanaRenovacao:  parseInt(document.getElementById('c-select-dia-semana').value),
+        diaRenovacaoMes:     parseInt(document.getElementById('c-input-dia-mes-reduzida').value) || null,
+        periodo: document.getElementById('c-select-periodo-reduzida').value,
       },
     };
 
@@ -416,6 +433,20 @@
 
     document.getElementById('c-btn-salvar').addEventListener('click', salvarPreferenciasCliente);
     document.getElementById('a-btn-salvar').addEventListener('click', salvarAdminPrefs);
+    document.getElementById('c-select-periodo-excedida').addEventListener('change', aplicarPeriodoKmCliente);
+    document.getElementById('c-select-periodo-reduzida').addEventListener('change', aplicarPeriodoKmCliente);
+  }
+
+  // A referência de renovação muda com o período: no semanal vale o dia da
+  // semana; nos demais, o dia do mês.
+  function aplicarPeriodoKmCliente() {
+    const alternar = function (periodoId, grupoSemanaId, grupoMesId) {
+      const semanal = document.getElementById(periodoId).value === 'SEMANAL';
+      document.getElementById(grupoSemanaId).style.display = semanal ? '' : 'none';
+      document.getElementById(grupoMesId).style.display = semanal ? 'none' : '';
+    };
+    alternar('c-select-periodo-excedida', 'c-grupo-dia-semana-excedida', 'c-grupo-dia-mes-excedida');
+    alternar('c-select-periodo-reduzida', 'c-grupo-dia-semana-reduzida', 'c-grupo-dia-mes-reduzida');
   }
 
   init();

@@ -16,6 +16,7 @@ import {
   getNotificationPreferences,
   saveNotificationPreferences,
   type NotificationPreferencesResponse,
+  type PeriodoKm,
   type SaveNotificationPreferencesPayload,
 } from '../notifications/notificationService';
 import { colors } from '../theme/colors';
@@ -39,9 +40,19 @@ const TIPOS_NOTIF = [
   { id: 'semAtualizacao', label: 'Veículo sem Atualização', icon: 'wifi-off' },
   { id: 'kmExcedida', label: 'Km Excedida (Período)', icon: 'chart-line-variant' },
   { id: 'kmReduzida', label: 'Km Reduzida (Período)', icon: 'chart-line-variant' },
+  // Um interruptor para todos os avisos de multa/licenciamento.
+  { id: 'multa', label: 'Multas', icon: 'gavel' },
   { id: 'trocaOleo', label: 'Troca de Óleo', icon: 'oil' },
   { id: 'manutencao', label: 'Manutenções (Recorrências)', icon: 'wrench' },
   { id: 'recorrenciaData', label: 'Recorrência por Data', icon: 'calendar-check' },
+];
+
+const PERIODOS_KM: Array<{ label: string; value: PeriodoKm }> = [
+  { label: 'Semanal', value: 'SEMANAL' },
+  { label: 'Quinzenal', value: 'QUINZENAL' },
+  { label: 'Mensal', value: 'MENSAL' },
+  { label: 'Semestral', value: 'SEMESTRAL' },
+  { label: 'Anual', value: 'ANUAL' },
 ];
 
 const CANAIS = [
@@ -74,6 +85,13 @@ export function NotificationsScreen() {
   const [kmMinimo, setKmMinimo] = useState('');
   const [diaSemana, setDiaSemana] = useState(1);
   const [dayPickerVisible, setDayPickerVisible] = useState(false);
+  // Periodicidade da contagem de km (antes era fixa: excedida mensal, reduzida semanal)
+  const [periodoExcedida, setPeriodoExcedida] = useState<PeriodoKm>('MENSAL');
+  const [periodoReduzida, setPeriodoReduzida] = useState<PeriodoKm>('SEMANAL');
+  const [diaSemanaExcedida, setDiaSemanaExcedida] = useState(1);
+  const [diaMesReduzida, setDiaMesReduzida] = useState('');
+  const [periodoPickerVisivel, setPeriodoPickerVisivel] = useState<'excedida' | 'reduzida' | null>(null);
+  const [dayPickerExcedidaVisible, setDayPickerExcedidaVisible] = useState(false);
 
   const diasSemana = [
     { label: 'Domingo', value: 0 },
@@ -126,6 +144,10 @@ export function NotificationsScreen() {
       setDiaMes(prefsData.kmExcedida?.diaRenovacaoMes?.toString() || '');
       setKmMinimo(prefsData.kmReduzida?.kmMinimo7Dias?.toString() || '');
       setDiaSemana(prefsData.kmReduzida?.diaSemanaRenovacao ?? 1);
+      setPeriodoExcedida(prefsData.kmExcedida?.periodo || 'MENSAL');
+      setPeriodoReduzida(prefsData.kmReduzida?.periodo || 'SEMANAL');
+      setDiaSemanaExcedida(prefsData.kmExcedida?.diaSemanaRenovacao ?? 1);
+      setDiaMesReduzida(prefsData.kmReduzida?.diaRenovacaoMes?.toString() || '');
     } catch {
       toast.show({ message: 'Erro ao carregar preferências.', type: 'error' });
     } finally {
@@ -188,10 +210,14 @@ export function NotificationsScreen() {
         kmExcedida: {
           kmMaximo30Dias: kmMaximo ? parseInt(kmMaximo) : null,
           diaRenovacaoMes: diaMes ? parseInt(diaMes) : null,
+          diaSemanaRenovacao: diaSemanaExcedida,
+          periodo: periodoExcedida,
         },
         kmReduzida: {
           kmMinimo7Dias: kmMinimo ? parseInt(kmMinimo) : null,
           diaSemanaRenovacao: diaSemana,
+          diaRenovacaoMes: diaMesReduzida ? parseInt(diaMesReduzida) : null,
+          periodo: periodoReduzida,
         },
         kmTrocaOleo: null, // hidden on web, kept for compatibility
       };
@@ -363,11 +389,23 @@ export function NotificationsScreen() {
                     <Text style={styles.configTitle}>Alerta de Quilometragem por Período</Text>
 
                     <View style={styles.kmSubSection}>
-                      <Text style={styles.kmSubTitle}>Quilometragem Excedida (mensal)</Text>
-                      <Text style={styles.configHelp}>Notifica quando o veículo ultrapassar o km máximo no período mensal.</Text>
+                      <Text style={styles.kmSubTitle}>Quilometragem Excedida</Text>
+                      <Text style={styles.configHelp}>Notifica quando o veículo ultrapassar o km máximo dentro do período escolhido.</Text>
                       <View style={styles.kmInputs}>
                         <View style={styles.kmInputGroup}>
-                          <Text style={styles.kmLabel}>Km máximo em 30 dias</Text>
+                          <Text style={styles.kmLabel}>Período</Text>
+                          <Pressable
+                            style={styles.vehicleSelector}
+                            onPress={() => setPeriodoPickerVisivel('excedida')}
+                          >
+                            <Text style={styles.vehicleSelectorText}>
+                              {PERIODOS_KM.find(p => p.value === periodoExcedida)?.label || 'Mensal'}
+                            </Text>
+                            <Icon source="chevron-down" size={20} color={colors.textMuted} />
+                          </Pressable>
+                        </View>
+                        <View style={styles.kmInputGroup}>
+                          <Text style={styles.kmLabel}>Km máximo no período</Text>
                           <TextInput
                             mode="outlined"
                             value={kmMaximo}
@@ -377,26 +415,54 @@ export function NotificationsScreen() {
                             dense
                           />
                         </View>
-                        <View style={styles.kmInputGroup}>
-                          <Text style={styles.kmLabel}>Dia do mês que renova</Text>
-                          <TextInput
-                            mode="outlined"
-                            value={diaMes}
-                            onChangeText={setDiaMes}
-                            keyboardType="numeric"
-                            style={styles.kmInput}
-                            dense
-                          />
-                        </View>
+                        {/* A referência depende do período: dia da semana no semanal, dia do mês nos demais. */}
+                        {periodoExcedida === 'SEMANAL' ? (
+                          <View style={styles.kmInputGroup}>
+                            <Text style={styles.kmLabel}>Dia que renova</Text>
+                            <Pressable
+                              style={styles.vehicleSelector}
+                              onPress={() => setDayPickerExcedidaVisible(true)}
+                            >
+                              <Text style={styles.vehicleSelectorText}>
+                                {diasSemana.find(d => d.value === diaSemanaExcedida)?.label || 'Selecione...'}
+                              </Text>
+                              <Icon source="chevron-down" size={20} color={colors.textMuted} />
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <View style={styles.kmInputGroup}>
+                            <Text style={styles.kmLabel}>Dia do mês que renova</Text>
+                            <TextInput
+                              mode="outlined"
+                              value={diaMes}
+                              onChangeText={setDiaMes}
+                              keyboardType="numeric"
+                              style={styles.kmInput}
+                              dense
+                            />
+                          </View>
+                        )}
                       </View>
                     </View>
 
                     <View style={styles.kmSubSection}>
-                      <Text style={styles.kmSubTitle}>Quilometragem Reduzida (semanal)</Text>
-                      <Text style={styles.configHelp}>Notifica ao fim da semana se o veículo não atingir o km mínimo.</Text>
+                      <Text style={styles.kmSubTitle}>Quilometragem Reduzida</Text>
+                      <Text style={styles.configHelp}>Notifica ao fim de cada período se o veículo não atingir o km mínimo.</Text>
                       <View style={styles.kmInputs}>
                         <View style={styles.kmInputGroup}>
-                          <Text style={styles.kmLabel}>Km mínimo em 7 dias</Text>
+                          <Text style={styles.kmLabel}>Período</Text>
+                          <Pressable
+                            style={styles.vehicleSelector}
+                            onPress={() => setPeriodoPickerVisivel('reduzida')}
+                          >
+                            <Text style={styles.vehicleSelectorText}>
+                              {PERIODOS_KM.find(p => p.value === periodoReduzida)?.label || 'Semanal'}
+                            </Text>
+                            <Icon source="chevron-down" size={20} color={colors.textMuted} />
+                          </Pressable>
+                        </View>
+                        <View style={styles.kmInputGroup}>
+                          <Text style={styles.kmLabel}>Km mínimo no período</Text>
                           <TextInput
                             mode="outlined"
                             value={kmMinimo}
@@ -406,39 +472,32 @@ export function NotificationsScreen() {
                             dense
                           />
                         </View>
-                        <View style={styles.kmInputGroup}>
-                          <Text style={styles.kmLabel}>Dia que renova</Text>
-                          <Pressable
-                            style={styles.vehicleSelector}
-                            onPress={() => setDayPickerVisible(true)}
-                          >
-                            <Text style={styles.vehicleSelectorText}>
-                              {diasSemana.find(d => d.value === diaSemana)?.label || 'Selecione...'}
-                            </Text>
-                            <Icon source="chevron-down" size={20} color={colors.textMuted} />
-                          </Pressable>
-                          <BottomSheet
-                            visible={dayPickerVisible}
-                            heightPercent={0.5}
-                            onClose={() => setDayPickerVisible(false)}
-                            title="Dia da semana que renova o alerta"
-                          >
-                            <ScrollView style={styles.vehicleList}>
-                              {diasSemana.map(d => (
-                                <Pressable
-                                  key={d.value}
-                                  style={styles.vehicleItem}
-                                  onPress={() => {
-                                    setDiaSemana(d.value);
-                                    setDayPickerVisible(false);
-                                  }}
-                                >
-                                  <Text style={styles.vehicleItemText}>{d.label}</Text>
-                                </Pressable>
-                              ))}
-                            </ScrollView>
-                          </BottomSheet>
-                        </View>
+                        {periodoReduzida === 'SEMANAL' ? (
+                          <View style={styles.kmInputGroup}>
+                            <Text style={styles.kmLabel}>Dia que renova</Text>
+                            <Pressable
+                              style={styles.vehicleSelector}
+                              onPress={() => setDayPickerVisible(true)}
+                            >
+                              <Text style={styles.vehicleSelectorText}>
+                                {diasSemana.find(d => d.value === diaSemana)?.label || 'Selecione...'}
+                              </Text>
+                              <Icon source="chevron-down" size={20} color={colors.textMuted} />
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <View style={styles.kmInputGroup}>
+                            <Text style={styles.kmLabel}>Dia do mês que renova</Text>
+                            <TextInput
+                              mode="outlined"
+                              value={diaMesReduzida}
+                              onChangeText={setDiaMesReduzida}
+                              keyboardType="numeric"
+                              style={styles.kmInput}
+                              dense
+                            />
+                          </View>
+                        )}
                       </View>
                     </View>
                   </Card.Content>
@@ -459,6 +518,75 @@ export function NotificationsScreen() {
         )}
 
       </ScrollView>
+
+      {/* Seletores no nível da tela: dentro do card virariam modal sobre modal,
+          que o iOS não abre. */}
+      <BottomSheet
+        visible={dayPickerVisible}
+        heightPercent={0.5}
+        onClose={() => setDayPickerVisible(false)}
+        title="Dia da semana que renova o alerta"
+      >
+        <ScrollView style={styles.vehicleList}>
+          {diasSemana.map(d => (
+            <Pressable
+              key={d.value}
+              style={styles.vehicleItem}
+              onPress={() => {
+                setDiaSemana(d.value);
+                setDayPickerVisible(false);
+              }}
+            >
+              <Text style={styles.vehicleItemText}>{d.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={dayPickerExcedidaVisible}
+        heightPercent={0.5}
+        onClose={() => setDayPickerExcedidaVisible(false)}
+        title="Dia da semana que renova o alerta"
+      >
+        <ScrollView style={styles.vehicleList}>
+          {diasSemana.map(d => (
+            <Pressable
+              key={d.value}
+              style={styles.vehicleItem}
+              onPress={() => {
+                setDiaSemanaExcedida(d.value);
+                setDayPickerExcedidaVisible(false);
+              }}
+            >
+              <Text style={styles.vehicleItemText}>{d.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={periodoPickerVisivel !== null}
+        heightPercent={0.5}
+        onClose={() => setPeriodoPickerVisivel(null)}
+        title="Período de contagem"
+      >
+        <ScrollView style={styles.vehicleList}>
+          {PERIODOS_KM.map(p => (
+            <Pressable
+              key={p.value}
+              style={styles.vehicleItem}
+              onPress={() => {
+                if (periodoPickerVisivel === 'excedida') setPeriodoExcedida(p.value);
+                else setPeriodoReduzida(p.value);
+                setPeriodoPickerVisivel(null);
+              }}
+            >
+              <Text style={styles.vehicleItemText}>{p.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </BottomSheet>
 
       <SearchBottomSheet
         visible={vehicleSelectorVisible}

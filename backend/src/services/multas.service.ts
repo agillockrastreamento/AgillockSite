@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
 import { UPLOADS_DIR } from '../utils/upload-paths';
 import ExpoPushService from './expo-push.service';
+import EmailService from './email.service';
 import { broadcastTrackingEvents } from './traccar.ws';
 
 const MULTAS_DIR = path.join(UPLOADS_DIR, 'multas');
@@ -529,6 +530,16 @@ async function notificarClienteMulta(
   payload: { title: string; body: string; mensagem: string },
   origemTipo: 'multa' | 'licenciamento' = 'multa',
 ): Promise<void> {
+  // Canais escolhidos pelo cliente para o tipo "multa". Quem nunca abriu a tela
+  // de notificações não tem registro: mantém o comportamento anterior (web+app),
+  // senão desligaríamos o aviso de todo mundo de uma vez.
+  const pref = await prisma.preferenciaNotificacao.findUnique({
+    where: { clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento: 'multa' } },
+    select: { web: true, app: true, email: true },
+  });
+  const canais = pref ?? { web: true, app: true, email: false };
+  if (!canais.web && !canais.app && !canais.email) return;
+
   let algumNovo = false;
   for (const ait of aits) {
     try {
@@ -540,40 +551,61 @@ async function notificarClienteMulta(
   }
   if (!algumNovo) return;
 
-  const evento = await prisma.eventoNotificacao.create({
-    data: {
-      clienteLoginId,
-      dispositivoId,
-      tipoEvento: tipo,
-      origemTipo,
-      origemId: aits.join(','),
-      mensagem: payload.mensagem,
-    },
-  });
-  await ExpoPushService.enviarParaCliente(clienteLoginId, {
-    title: payload.title,
-    body: payload.body,
-    data: { tipo, ait: aits.join(',') },
-  });
-
-  // Portal do cliente aberto recebe na hora (o push cobre só o app).
   const disp = await prisma.dispositivo.findUnique({
     where: { id: dispositivoId },
-    select: { traccarId: true },
+    select: { traccarId: true, eventosAdminHabilitado: true },
   });
-  if (disp?.traccarId) {
-    broadcastTrackingEvents([
-      {
-        deviceId: disp.traccarId,
-        type: tipo,
-        tipoLabel: payload.title,
-        serverTime: evento.createdAt.toISOString(),
-        mensagem: payload.mensagem,
+
+  if (canais.web) {
+    const evento = await prisma.eventoNotificacao.create({
+      data: {
+        clienteLoginId,
+        dispositivoId,
+        tipoEvento: tipo,
         origemTipo,
         origemId: aits.join(','),
-        adminEvento: false,
+        mensagem: payload.mensagem,
       },
-    ]);
+    });
+
+    // Portal do cliente aberto recebe na hora (o push cobre só o app).
+    if (disp?.traccarId) {
+      broadcastTrackingEvents([
+        {
+          deviceId: disp.traccarId,
+          type: tipo,
+          tipoLabel: payload.title,
+          serverTime: evento.createdAt.toISOString(),
+          mensagem: payload.mensagem,
+          origemTipo,
+          origemId: aits.join(','),
+          adminEvento: false,
+          eventosAdminHabilitado: disp.eventosAdminHabilitado !== false,
+        },
+      ]);
+    }
+  }
+
+  if (canais.app) {
+    await ExpoPushService.enviarParaCliente(clienteLoginId, {
+      title: payload.title,
+      body: payload.body,
+      data: { tipo, ait: aits.join(',') },
+    });
+  }
+
+  if (canais.email) {
+    const login = await prisma.clienteLogin.findUnique({
+      where: { id: clienteLoginId },
+      select: { email: true },
+    });
+    if (login?.email) {
+      await EmailService.enviarEmail(
+        login.email,
+        payload.title,
+        `<p>${payload.mensagem}</p>`,
+      ).catch((err: any) => console.error('[Multas] Falha ao enviar e-mail:', err?.message || err));
+    }
   }
 }
 

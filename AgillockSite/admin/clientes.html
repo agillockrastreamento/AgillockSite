@@ -393,6 +393,17 @@
         // há algum veículo enviando eventos ao admin?" e alterna todos de uma vez.
         var disps = c.dispositivos || [];
         var evOn = disps.some(function (d) { return d.eventosAdminHabilitado !== false; });
+        // Sem veículos próprios o botão não tem o que alternar (um veículo apenas
+        // vinculado pertence a outro cliente). Antes ele caía no mesmo visual de
+        // "silenciado", o que dava a impressão de estar desligado sozinho.
+        var evIndisponivel = !disps.length;
+        var evIcone = evIndisponivel ? 'bell-o' : (evOn ? 'bell' : 'bell-slash');
+        var evClasse = evIndisponivel ? 'btn-default' : (evOn ? 'btn-success' : 'btn-warning');
+        var evTitulo = evIndisponivel
+          ? 'Este cliente não tem veículos próprios — nada a silenciar. Veículos apenas vinculados pertencem a outro cliente e são controlados na ficha do titular.'
+          : (evOn
+            ? 'Eventos no painel do admin ATIVOS — clique para silenciar os veículos deste cliente'
+            : 'Eventos deste cliente SILENCIADOS no painel do admin — clique para reativar');
         var acoes = '<button class="btn btn-xs btn-default btn-editar" data-id="' + c.id + '" title="Editar"><i class="fa fa-pencil"></i></button> ' +
           '<button class="btn btn-xs ' + (c.status === 'ATIVO' ? 'btn-warning' : 'btn-success') + ' btn-toggle" data-id="' + c.id + '" data-status="' + c.status + '" title="' + (c.status === 'ATIVO' ? 'Inativar' : 'Ativar') + '">' +
           '<i class="fa fa-power-off"></i></button> ' +
@@ -402,10 +413,10 @@
           '<i class="fa fa-gavel"></i></button> ' +
           '<button class="btn btn-xs ' + (gdOn ? 'btn-success' : 'btn-default') + ' btn-dispositivos" data-id="' + c.id + '" data-nome="' + c.nome + '" data-on="' + (gdOn ? '1' : '0') + '" data-limite="' + gdLimite + '" title="' + (gdOn ? 'Tela de dispositivos HABILITADA (limite: ' + gdLimite + ') — clique para desabilitar' : 'Tela de dispositivos desabilitada — clique para habilitar') + '">' +
           '<i class="fa fa-microchip"></i>' + (gdOn ? ' <strong>' + gdLimite + '</strong>' : '') + '</button> ' +
-          '<button class="btn btn-xs ' + (evOn ? 'btn-success' : 'btn-default') + ' btn-eventos-admin" data-id="' + c.id + '" data-nome="' + c.nome + '" data-on="' + (evOn ? '1' : '0') + '" data-qtd="' + disps.length + '"' +
-          ' title="' + (!disps.length ? 'Cliente sem veículos próprios' : evOn ? 'Eventos no painel do admin ATIVOS — clique para silenciar os veículos deste cliente' : 'Eventos deste cliente silenciados no painel do admin — clique para reativar') + '"' +
-          (disps.length ? '' : ' disabled') + '>' +
-          '<i class="fa fa-' + (evOn ? 'bell' : 'bell-slash') + '"></i></button> ' +
+          '<button class="btn btn-xs ' + evClasse + ' btn-eventos-admin" data-id="' + c.id + '" data-nome="' + c.nome + '" data-on="' + (evOn ? '1' : '0') + '" data-qtd="' + disps.length + '"' +
+          ' title="' + evTitulo + '"' +
+          (evIndisponivel ? ' disabled' : '') + '>' +
+          '<i class="fa fa-' + evIcone + '"></i></button> ' +
           '<button class="btn btn-xs btn-default btn-iapro" data-id="' + c.id + '" data-nome="' + c.nome + '" title="Compartilhar com a IAPRO" style="padding:1px 4px;">' +
           '<img src="../img/logo_iapro.jpeg" alt="IAPRO" style="height:16px;border-radius:3px;vertical-align:middle;" /></button>';
         if (isAdmin) {

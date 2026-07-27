@@ -345,6 +345,11 @@ const TIPOS_EVENTO_ADMIN = [
   { tipo: 'recorrenciaDataFeita',    label: 'Recorrência Data Realizada',  css: 'tipo-ignition'  },
   { tipo: 'consultaMultasConcluida', label: 'Consulta de Multas (Detran)',  css: 'tipo-geofence'  },
   { tipo: 'consultaMultasErro',      label: 'Falha na Consulta de Multas',  css: 'tipo-alarm'     },
+  // Avisos de multa/licenciamento do veículo (o interruptor é o tipo "multa").
+  { tipo: 'multaNova',               label: 'Nova Multa',                   css: 'tipo-alarm'     },
+  { tipo: 'multaVencimento7dias',    label: 'Multa a Vencer (7 dias)',      css: 'tipo-overspeed' },
+  { tipo: 'multaVencimentoHoje',     label: 'Multa Vence Hoje',             css: 'tipo-alarm'     },
+  { tipo: 'licenciamentoPendente',   label: 'Licenciamento Pendente',       css: 'tipo-overspeed' },
 ];
 const TIPOS_EVENTO_ADMIN_FILTRO = TIPOS_EVENTO_ADMIN
   .filter(t => t.tipo !== 'manutencao')
@@ -466,6 +471,8 @@ function _tipoPreferenciaAdmin(tipo) {
   if (tipo === 'commandQueued') return 'commandResult';
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
   if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'recorrenciaData';
+  // Os avisos de multa/licenciamento compartilham o interruptor "Multas".
+  if (tipo === 'multaNova' || tipo === 'multaVencimento7dias' || tipo === 'multaVencimentoHoje' || tipo === 'licenciamentoPendente') return 'multa';
   return tipo;
 }
 

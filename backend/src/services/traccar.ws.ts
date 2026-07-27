@@ -43,6 +43,8 @@ export function tipoEventoParaPrefAdmin(tipo: string): string {
   if (tipo === 'commandQueued') return 'commandResult';
   if (tipo === 'manutencaoAlerta' || tipo === 'manutencaoAtrasada' || tipo === 'manutencaoFeita') return 'manutencao';
   if (tipo === 'recorrenciaDataAlerta' || tipo === 'recorrenciaDataNaoFeita' || tipo === 'recorrenciaDataFeita') return 'recorrenciaData';
+  // Os avisos de multa/licenciamento compartilham o interruptor "Multas".
+  if (tipo === 'multaNova' || tipo === 'multaVencimento7dias' || tipo === 'multaVencimentoHoje' || tipo === 'licenciamentoPendente') return 'multa';
   return tipo;
 }
 
