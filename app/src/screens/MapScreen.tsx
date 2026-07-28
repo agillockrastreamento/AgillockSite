@@ -88,6 +88,10 @@ const MAIN_CARD_PEEK_HEIGHT = 76; // mostra apenas alça + header (nome/placa + 
 const MAP_PREFERENCES_KEY = 'agillock_map_preferences_v1';
 const CLUSTER_PX = 40;
 const SPIDER_RADIUS_PX = 55;
+// Teto de marcadores desenhados ao mesmo tempo no iOS — ver o comentário em
+// `clusterGroups`. O app caiu com 171 e com 275 marcadores; este teto mantém as
+// transações do mapa pequenas. Se ainda cair, baixe este número.
+const MAX_MARCADORES_IOS = 60;
 // Posições do WebSocket são acumuladas e aplicadas de uma vez. Com centenas de
 // veículos chegavam dezenas de mensagens por segundo, cada uma re-renderizando
 // a tela inteira (marcadores + lista + clusters).
@@ -427,14 +431,10 @@ export function MapScreen() {
   // tela era desperdício puro — quem está longe volta a aparecer no zoom out,
   // agrupado em cluster.
   //
-  // SÓ NO ANDROID. No iOS o react-native-maps roda pelo interop de views
-  // legadas do Fabric, que adia a montagem de todo filho inserido fora do fim
-  // da lista; se o marcador ainda não tem `contentView`, o mapa recebe nil e o
-  // app morre com NSInvalidArgumentException em insertReactSubview. Filtrar por
-  // viewport muda a composição da lista a cada gesto, o que multiplica essas
-  // inserções no meio — no iOS o conjunto fica estável e o mapa só reagrupa.
+  // Vale nas duas plataformas: no iOS é o que faz o teto de marcadores ser
+  // "por tela" — sem isto, veículos a centenas de quilômetros entram na conta
+  // do agrupamento e o teto nunca é alcançado.
   const devicesNaViewport = useMemo(() => {
-    if (isIOS) return locatedDevices;
     const { latitude, longitude, latitudeDelta, longitudeDelta } = currentRegion;
     if (!Number.isFinite(latitudeDelta) || !Number.isFinite(longitudeDelta)) {
       return locatedDevices;
@@ -475,66 +475,90 @@ export function MapScreen() {
 
     const latPorPx = pxToLatDeg || 1;
     const lngPorPx = pxToLngDeg || 1;
-    const celulaLat = latPorPx * CLUSTER_PX;
-    const celulaLng = lngPorPx * CLUSTER_PX;
 
-    type Entrada = { device: TrackingDevice; lat: number; lng: number; gx: number; gy: number };
-    const entradas: Entrada[] = [];
-    const celulas = new Map<string, Entrada[]>();
+    const agrupar = (raioPx: number): Grupo[] => {
+      const celulaLat = latPorPx * raioPx;
+      const celulaLng = lngPorPx * raioPx;
 
-    for (const device of devicesNaViewport) {
-      const coord = getDeviceCoordinate(device);
-      if (!coord) continue;
-      const gx = Math.floor(coord.longitude / celulaLng);
-      const gy = Math.floor(coord.latitude / celulaLat);
-      const entrada: Entrada = { device, lat: coord.latitude, lng: coord.longitude, gx, gy };
-      entradas.push(entrada);
-      const chave = `${gx}:${gy}`;
-      const lista = celulas.get(chave);
-      if (lista) lista.push(entrada);
-      else celulas.set(chave, [entrada]);
-    }
+      type Entrada = { device: TrackingDevice; lat: number; lng: number; gx: number; gy: number };
+      const entradas: Entrada[] = [];
+      const celulas = new Map<string, Entrada[]>();
 
-    const visited = new Set<string>();
-    const groups: Grupo[] = [];
-
-    for (const base of entradas) {
-      if (visited.has(base.device.dispositivoId)) continue;
-      visited.add(base.device.dispositivoId);
-      const group: TrackingDevice[] = [base.device];
-      let somaLat = base.lat;
-      let somaLng = base.lng;
-      let menorId = base.device.dispositivoId;
-
-      for (let dx = -1; dx <= 1; dx += 1) {
-        for (let dy = -1; dy <= 1; dy += 1) {
-          const vizinhos = celulas.get(`${base.gx + dx}:${base.gy + dy}`);
-          if (!vizinhos) continue;
-          for (const outro of vizinhos) {
-            if (visited.has(outro.device.dispositivoId)) continue;
-            const dxPx = (outro.lng - base.lng) / lngPorPx;
-            const dyPx = (outro.lat - base.lat) / latPorPx;
-            if (Math.hypot(dxPx, dyPx) > CLUSTER_PX) continue;
-            visited.add(outro.device.dispositivoId);
-            group.push(outro.device);
-            somaLat += outro.lat;
-            somaLng += outro.lng;
-            if (outro.device.dispositivoId < menorId) menorId = outro.device.dispositivoId;
-          }
-        }
+      for (const device of devicesNaViewport) {
+        const coord = getDeviceCoordinate(device);
+        if (!coord) continue;
+        const gx = Math.floor(coord.longitude / celulaLng);
+        const gy = Math.floor(coord.latitude / celulaLat);
+        const entrada: Entrada = { device, lat: coord.latitude, lng: coord.longitude, gx, gy };
+        entradas.push(entrada);
+        const chave = `${gx}:${gy}`;
+        const lista = celulas.get(chave);
+        if (lista) lista.push(entrada);
+        else celulas.set(chave, [entrada]);
       }
 
-      groups.push({
-        // Chave estável para o conjunto (usada pelo spider) sem concatenar
-        // centenas de ids a cada recálculo.
-        key: `${menorId}|${group.length}`,
-        devices: group,
-        lat: somaLat / group.length,
-        lng: somaLng / group.length,
-      });
+      const visited = new Set<string>();
+      const groups: Grupo[] = [];
+
+      for (const base of entradas) {
+        if (visited.has(base.device.dispositivoId)) continue;
+        visited.add(base.device.dispositivoId);
+        const group: TrackingDevice[] = [base.device];
+        let somaLat = base.lat;
+        let somaLng = base.lng;
+        let menorId = base.device.dispositivoId;
+
+        for (let dx = -1; dx <= 1; dx += 1) {
+          for (let dy = -1; dy <= 1; dy += 1) {
+            const vizinhos = celulas.get(`${base.gx + dx}:${base.gy + dy}`);
+            if (!vizinhos) continue;
+            for (const outro of vizinhos) {
+              if (visited.has(outro.device.dispositivoId)) continue;
+              const dxPx = (outro.lng - base.lng) / lngPorPx;
+              const dyPx = (outro.lat - base.lat) / latPorPx;
+              if (Math.hypot(dxPx, dyPx) > raioPx) continue;
+              visited.add(outro.device.dispositivoId);
+              group.push(outro.device);
+              somaLat += outro.lat;
+              somaLng += outro.lng;
+              if (outro.device.dispositivoId < menorId) menorId = outro.device.dispositivoId;
+            }
+          }
+        }
+
+        groups.push({
+          // Chave estável para o conjunto (usada pelo spider) sem concatenar
+          // centenas de ids a cada recálculo.
+          key: `${menorId}|${group.length}`,
+          devices: group,
+          lat: somaLat / group.length,
+          lng: somaLng / group.length,
+        });
+      }
+
+      return groups;
+    };
+
+    let grupos = agrupar(CLUSTER_PX);
+
+    // iOS: teto de marcadores na tela. O react-native-maps 1.20.1 fala com o
+    // mapa pelo interop de views legadas do Fabric, que perde a conta dos
+    // índices quando uma transação insere e remove muitos filhos de uma vez —
+    // é o que derruba o app ao aproximar numa área cheia de ícones
+    // (NSRangeException/NSInvalidArgumentException em insertReactSubview).
+    // Agrupando mais, cada transação fica pequena. Não é correção, é redução
+    // de exposição: a correção de verdade é a lib com componente Fabric nativo.
+    if (isIOS && grupos.length > MAX_MARCADORES_IOS) {
+      let raio = CLUSTER_PX;
+      // Dobrar o raio a cada passo converge mesmo com veículos espalhados: em
+      // 14 passos o raio cobre qualquer distância que caiba na tela.
+      for (let tentativa = 0; tentativa < 14 && grupos.length > MAX_MARCADORES_IOS; tentativa += 1) {
+        raio *= 2;
+        grupos = agrupar(raio);
+      }
     }
 
-    return groups;
+    return grupos;
   }, [devicesNaViewport, pxToLatDeg, pxToLngDeg]);
 
   const clusterCounts = useMemo(
