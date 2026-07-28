@@ -1,0 +1,52 @@
+diff --git a/node_modules/react-native-maps/ios/AirGoogleMaps/AIRGoogleMap.m b/node_modules/react-native-maps/ios/AirGoogleMaps/AIRGoogleMap.m
+index a1ffe69..ef803de 100644
+--- a/node_modules/react-native-maps/ios/AirGoogleMaps/AIRGoogleMap.m
++++ b/node_modules/react-native-maps/ios/AirGoogleMaps/AIRGoogleMap.m
+@@ -148,6 +148,21 @@ id regionAsJSON(MKCoordinateRegion region) {
+ #pragma clang diagnostic push
+ #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
+ - (void)insertReactSubview:(id<RCTComponent>)subview atIndex:(NSInteger)atIndex {
++  // PATCH (AgilLock): sob a New Architecture os filhos chegam pelo interop de
++  // views legadas (RCTLegacyViewManagerInteropComponentView), que:
++  //   - aplica as INSERÇÕES antes das REMOÇÕES em finalizeUpdates;
++  //   - remove pelo ÍNDICE (reactSubviews[index]) enquanto removeReactSubview
++  //     remove por IDENTIDADE (removeObject:).
++  // Com isso, qualquer transação que insira e remova junto (abrir vários
++  // clusters ao aproximar o mapa) faz o índice do React divergir de
++  // _reactSubviews, e o app morre com NSInvalidArgumentException ("object
++  // cannot be nil") ou NSRangeException ("index N beyond bounds").
++  // _reactSubviews é só bookkeeping — o que desenha são self.markers/polylines/
++  // circles, alimentados por identidade logo abaixo. Então ignorar um nil e
++  // limitar o índice ao tamanho do array evita o crash sem afetar o mapa.
++  if (subview == nil) {
++    return;
++  }
+   // Our desired API is to pass up markers/overlays as children to the mapview component.
+   // This is where we intercept them and do the appropriate underlying mapview action.
+   if ([subview isKindOfClass:[AIRGoogleMapMarker class]]) {
+@@ -188,7 +203,12 @@ id regionAsJSON(MKCoordinateRegion region) {
+       [self insertReactSubview:(UIView *)childSubviews[i] atIndex:atIndex];
+     }
+   }
+-  [_reactSubviews insertObject:(UIView *)subview atIndex:(NSUInteger) atIndex];
++  // PATCH (AgilLock): índice fora dos limites vira "no fim da lista".
++  NSUInteger safeIndex = atIndex < 0 ? 0 : (NSUInteger)atIndex;
++  if (safeIndex > _reactSubviews.count) {
++    safeIndex = _reactSubviews.count;
++  }
++  [_reactSubviews insertObject:(UIView *)subview atIndex:safeIndex];
+ }
+ #pragma clang diagnostic pop
+ 
+@@ -196,6 +216,11 @@ id regionAsJSON(MKCoordinateRegion region) {
+ #pragma clang diagnostic push
+ #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
+ - (void)removeReactSubview:(id<RCTComponent>)subview {
++  // PATCH (AgilLock): mesmo motivo do insertReactSubview — o interop pode
++  // entregar nil quando os índices divergem.
++  if (subview == nil) {
++    return;
++  }
+   // similarly, when the children are being removed we have to do the appropriate
+   // underlying mapview action here.
+   if ([subview isKindOfClass:[AIRGoogleMapMarker class]]) {
