@@ -582,73 +582,7 @@ export function MapScreen() {
   // No iOS o ícone é renderizado como filho do Marker (sem bitmap) — desliga a
   // captura para não rodar captureRef em massa (custo/crash sob Fabric).
   const { getBitmap } = useMarkerBitmaps(markerDevices, showLabels, !isIOS);
-
-  // ── Papéis dos marcadores no iOS ───────────────────────────────────────────
-  // No iOS a lista de filhos do <MapView> precisa ser SEMPRE a mesma: um
-  // marcador por veículo, na mesma ordem. O interop de views legadas do Fabric
-  // aplica as inserções antes das remoções e mantém um índice próprio; quando
-  // vários clusters se abrem de uma vez (aproximar o mapa numa área cheia de
-  // ícones) a contagem diverge e o app morre com "index N beyond bounds" ou
-  // "object cannot be nil" dentro de -[AIRGoogleMap insertReactSubview:].
-  //
-  // Então, em vez de trocar marcadores por marcadores de cluster, cada veículo
-  // muda de PAPEL: desenha o próprio ícone, desenha o balão do cluster (o de
-  // menor id representa o grupo) ou fica invisível. Nada entra nem sai da lista.
-  type PapelMarcador = {
-    tipo: 'veiculo' | 'cluster' | 'oculto';
-    latitude: number;
-    longitude: number;
-    quantidade?: number;
-    clusterKey?: string;
-    noSpider?: boolean;
-  };
-
-  const papeisIOS = useMemo(() => {
-    if (!isIOS) return null;
-    const papeis = new Map<string, PapelMarcador>();
-
-    for (const group of clusterGroups) {
-      const ehCluster = group.devices.length > 1;
-
-      if (!ehCluster) {
-        const device = group.devices[0];
-        const coord = getDeviceCoordinate(device);
-        if (coord) {
-          papeis.set(device.dispositivoId, { tipo: 'veiculo', latitude: coord.latitude, longitude: coord.longitude });
-        }
-        continue;
-      }
-
-      if (spiderClusterKey === group.key && spiderPositions) {
-        for (const sp of spiderPositions) {
-          papeis.set(sp.device.dispositivoId, {
-            tipo: 'veiculo', latitude: sp.latitude, longitude: sp.longitude, noSpider: true,
-          });
-        }
-        continue;
-      }
-
-      // Cluster fechado: o veículo de menor id vira o balão com a contagem e os
-      // demais ficam invisíveis no mesmo ponto.
-      let lider = group.devices[0];
-      for (const d of group.devices) if (d.dispositivoId < lider.dispositivoId) lider = d;
-      for (const d of group.devices) {
-        papeis.set(d.dispositivoId, d.dispositivoId === lider.dispositivoId
-          ? { tipo: 'cluster', latitude: group.lat, longitude: group.lng, quantidade: group.devices.length, clusterKey: group.key }
-          : { tipo: 'oculto', latitude: group.lat, longitude: group.lng });
-      }
-    }
-
-    return papeis;
-  }, [clusterGroups, spiderClusterKey, spiderPositions]);
-
-  // Ordem fixa: a lista de marcadores do iOS não pode se reordenar entre
-  // renders, senão o índice do interop volta a divergir.
-  const devicesMarcadoresIOS = useMemo(() => {
-    if (!isIOS) return [];
-    return [...locatedDevices].sort((a, b) => a.dispositivoId.localeCompare(b.dispositivoId));
-  }, [locatedDevices]);
-  // Com muitos marcadores na tela, o fallback "ícone como filho" (que exige
+  // Android: com muitos marcadores o fallback "ícone como filho" (que exige
   // tracksViewChanges) é caro demais — nesse caso esperamos o bitmap.
   const usarIconeComoFilho = markerDevices.length <= MARKER_CHILDREN_LIMIT;
 
@@ -1267,18 +1201,15 @@ export function MapScreen() {
             isSpiderMarker: boolean,
           ) => {
             const color = getMarkerColor(device);
-            // Arredondado em 15°, igual ao bitmap do Android e à assinatura do
-            // iOS. Desenhar o ângulo cru aqui deixava o ícone fora de sincronia
-            // com o que dispara o re-snapshot: no iOS o mapa só refotografa a
-            // view quando a assinatura muda, então um ângulo intermediário
-            // capturado no meio da janela aparecia como tremido.
-            const curso = cursoDoCard(device);
+            // No iOS o ângulo é o cru, como sempre foi. No Android o bitmap
+            // arredonda em 15° dentro do próprio cache (ver COURSE_STEP).
+            const curso = isIOS ? (device.posicao?.curso ?? 0) : cursoDoCard(device);
             const label = device.placa ?? device.nome ?? '';
             // Construído sob demanda: no Android a maioria dos marcadores usa o
             // bitmap e não desenha filho nenhum — montar essa árvore para todos
             // gerava milhares de elementos descartados a cada atualização.
             const montarMarkerContent = () => (
-              <View style={styles.markerContainer} collapsable={false}>
+              <View style={styles.markerContainer}>
                 <View style={styles.markerWrap}>
                   <VehicleIcon
                     categoria={device.categoria}
@@ -1299,6 +1230,30 @@ export function MapScreen() {
                 ) : null}
               </View>
             );
+
+            // iOS/Fabric: NUNCA remontar o Marker via key (derruba o app) nem
+            // confiar no prop `image` (não reaplica). Renderiza o ícone como
+            // filho e re-snapshota via tracksViewChanges quando o conteúdo muda.
+            // Este caminho é o original, de antes das otimizações de 2026-07-27:
+            // o relato do iPhone era sobre o modal de pesquisa, não sobre o
+            // mapa, e mexer aqui só rendeu crash no interop do Fabric.
+            if (isIOS) {
+              return (
+                <IconMarker
+                  key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}`}
+                  signature={`${color}|${Math.round(curso / 10)}|${label}|${showLabels ? 1 : 0}`}
+                  coordinate={coord}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                  zIndex={isSpiderMarker ? 1000 : 100}
+                  onPress={() => {
+                    if (isSpiderMarker) closeSpiderFromMarker();
+                    focusDevice(device, true);
+                  }}
+                >
+                  {montarMarkerContent()}
+                </IconMarker>
+              );
+            }
 
             // Android: o `image` não reaplica em update — o bitmap entra na key
             // para remontar quando o ícone muda (remontar é seguro no Android).
@@ -1325,83 +1280,7 @@ export function MapScreen() {
             );
           };
 
-          // ── iOS: lista de marcadores fixa ────────────────────────────────
-          // Um marcador por veículo, sempre, na mesma ordem. O que muda é só o
-          // papel de cada um (ícone do veículo, balão de cluster ou invisível).
-          // Ver o comentário de `papeisIOS`: trocar marcadores por marcadores de
-          // cluster fazia o interop do Fabric perder o índice e derrubar o app
-          // ao aproximar numa área cheia de ícones.
-          if (isIOS && papeisIOS) {
-            return devicesMarcadoresIOS.map((device) => {
-              const papel = papeisIOS.get(device.dispositivoId);
-              const coordDevice = getDeviceCoordinate(device);
-              const latitude = papel?.latitude ?? coordDevice?.latitude ?? 0;
-              const longitude = papel?.longitude ?? coordDevice?.longitude ?? 0;
-
-              // Card aberto: só o veículo focado aparece (como sempre foi) — mas
-              // pela opacidade, sem tirar ninguém da lista.
-              const focoAtivo = mainCardVisible && !!selectedDeviceId;
-              const ehFocado = selectedDeviceId === device.dispositivoId;
-              const tipo: PapelMarcador['tipo'] = !papel
-                ? 'oculto'
-                : focoAtivo
-                  ? (ehFocado ? 'veiculo' : 'oculto')
-                  : papel.tipo;
-
-              const color = getMarkerColor(device);
-              const curso = cursoDoCard(device);
-              const label = device.placa ?? device.nome ?? '';
-              const quantidade = papel?.quantidade ?? 0;
-
-              return (
-                <IconMarker
-                  key={`dev-${device.dispositivoId}`}
-                  // O papel entra na assinatura: virar cluster ou sumir também
-                  // precisa de um novo snapshot da view.
-                  signature={`${tipo}|${quantidade}|${color}|${curso}|${label}|${showLabels ? 1 : 0}`}
-                  coordinate={{ latitude, longitude }}
-                  anchor={{ x: 0.5, y: 0.5 }}
-                  opacity={tipo === 'oculto' ? 0 : 1}
-                  tappable={tipo !== 'oculto'}
-                  zIndex={tipo === 'cluster' ? 500 : papel?.noSpider ? 1000 : 100}
-                  onPress={() => {
-                    if (tipo === 'oculto') return;
-                    if (tipo === 'cluster') {
-                      if (papel?.clusterKey) openSpider(papel.clusterKey);
-                      return;
-                    }
-                    if (papel?.noSpider) closeSpiderFromMarker();
-                    focusDevice(device, true);
-                  }}
-                >
-                  {tipo === 'cluster' ? (
-                    <View style={styles.markerContainer} collapsable={false}>
-                      <ClusterIcon count={quantidade} />
-                    </View>
-                  ) : tipo === 'oculto' ? (
-                    // Invisível: nada de SVG, só um vazio para o marcador existir.
-                    <View style={styles.markerOculto} collapsable={false} />
-                  ) : (
-                    <View style={styles.markerContainer} collapsable={false}>
-                      <View style={styles.markerWrap}>
-                        <VehicleIcon categoria={device.categoria} color={color} course={curso} size={58} />
-                      </View>
-                      {showLabels ? (
-                        <View style={styles.markerLabelWrap}>
-                          <View style={styles.markerLabelPointer} />
-                          <View style={styles.markerLabel}>
-                            <Text style={styles.markerLabelText} numberOfLines={1}>{label}</Text>
-                          </View>
-                        </View>
-                      ) : null}
-                    </View>
-                  )}
-                </IconMarker>
-              );
-            });
-          }
-
-          // Android: com o card aberto desenha só o veículo focado.
+          // Card aberto: desenha só o veículo focado (comportamento original).
           if (mainCardVisible && selectedDevice) {
             const coord = getDeviceCoordinate(selectedDevice);
             return coord ? renderDeviceMarker(selectedDevice, coord, false) : null;
@@ -1438,6 +1317,22 @@ export function MapScreen() {
             return coord ? [renderDeviceMarker(device, coord, false)] : [];
           });
         })()}
+
+        {!mainCardVisible && spiderPositions
+          ? spiderPositions.map((sp) => (
+              <Polyline
+                key={`spider-line-${sp.device.dispositivoId}`}
+                coordinates={[
+                  { latitude: sp.centerLat, longitude: sp.centerLng },
+                  { latitude: sp.latitude, longitude: sp.longitude },
+                ]}
+                strokeColor="rgba(102,102,102,0.65)"
+                strokeWidth={1.5}
+                lineDashPattern={[4, 4]}
+                zIndex={400}
+              />
+            ))
+          : null}
 
         {showFences && filteredGeofences.map((geofence) => {
           const parsed = parseCircleArea(geofence.area);
@@ -1490,27 +1385,6 @@ export function MapScreen() {
             />
           );
         })}
-
-        {/* Ligações do spider por último de propósito: abrir/fechar o spider
-            passa a inserir e remover no FIM da lista de filhos do mapa, que é o
-            único caminho que o interop do Fabric aplica na hora (inserção no
-            meio fica pendente e derruba o app). A ordem aqui não muda o
-            desenho — quem manda é o zIndex. */}
-        {!mainCardVisible && spiderPositions
-          ? spiderPositions.map((sp) => (
-              <Polyline
-                key={`spider-line-${sp.device.dispositivoId}`}
-                coordinates={[
-                  { latitude: sp.centerLat, longitude: sp.centerLng },
-                  { latitude: sp.latitude, longitude: sp.longitude },
-                ]}
-                strokeColor="rgba(102,102,102,0.65)"
-                strokeWidth={1.5}
-                lineDashPattern={[4, 4]}
-                zIndex={400}
-              />
-            ))
-          : null}
       </MapView>
 
       <OffscreenCapturePool enabled={!isIOS} />
@@ -1861,11 +1735,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',
-  },
-  // Marcador que existe só para segurar o lugar na lista (iOS).
-  markerOculto: {
-    width: 1,
-    height: 1,
   },
   markerLabel: {
     maxWidth: 96,
