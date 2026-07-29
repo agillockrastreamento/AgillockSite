@@ -405,7 +405,7 @@ export function NotificationsScreen() {
                           </Pressable>
                         </View>
                         <View style={styles.kmInputGroup}>
-                          <Text style={styles.kmLabel}>Km máximo no período</Text>
+                          <Text style={styles.kmLabel}>Km máximo</Text>
                           <TextInput
                             mode="outlined"
                             value={kmMaximo}
@@ -462,7 +462,7 @@ export function NotificationsScreen() {
                           </Pressable>
                         </View>
                         <View style={styles.kmInputGroup}>
-                          <Text style={styles.kmLabel}>Km mínimo no período</Text>
+                          <Text style={styles.kmLabel}>Km mínimo</Text>
                           <TextInput
                             mode="outlined"
                             value={kmMinimo}
