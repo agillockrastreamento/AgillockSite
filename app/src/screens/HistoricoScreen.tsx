@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Icon } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -19,6 +19,7 @@ import type { RootStackParamList } from '../navigation/routes';
 import { IDLE_ALERT_LIMIT_MIN, useIdleAlertBitmap } from '../reporting/idleAlert';
 import type { OciosoSegmento } from '../reporting/reportTypes';
 import { IconMarker } from '../tracking/IconMarker';
+import { RoutePolyline } from '../tracking/RoutePolyline';
 
 type RouteProps = NativeStackScreenProps<RootStackParamList, 'Historico'>['route'];
 
@@ -164,7 +165,7 @@ export function HistoricoScreen() {
         {/* zIndex explícito: sem ele o iOS pode desenhar o rastro do período
             por cima do traçado da viagem, escondendo a cor de destaque. */}
         {positions.length > 1 && (
-          <Polyline
+          <RoutePolyline
             coordinates={positions}
             strokeWidth={3}
             strokeColor="rgba(41,128,185,0.4)"
@@ -172,7 +173,7 @@ export function HistoricoScreen() {
           />
         )}
         {tripPositions.length > 1 && (
-          <Polyline
+          <RoutePolyline
             coordinates={tripPositions}
             strokeWidth={4}
             strokeColor="rgba(230,126,34,0.9)"

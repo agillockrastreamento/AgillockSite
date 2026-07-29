@@ -17,7 +17,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
 import * as Sharing from 'expo-sharing';
-import MapView, { AnimatedRegion, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { AnimatedRegion, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 const MarkerAnimated = Animated.createAnimatedComponent(Marker);
 import Svg, { G, Line, Path, Text as SvgText } from 'react-native-svg';
@@ -52,6 +52,7 @@ import { getTrackingSnapshot } from '../tracking/trackingService';
 import type { TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
 import { IconMarker } from '../tracking/IconMarker';
+import { RoutePolyline } from '../tracking/RoutePolyline';
 import { SearchBottomSheet } from '../components/SearchBottomSheet';
 import { useAuth } from '../auth/AuthProvider';
 import { colors } from '../theme/colors';
@@ -494,7 +495,7 @@ function RouteTab({
           pitchEnabled={false}
           rotateEnabled={false}
         >
-          <Polyline coordinates={coords} strokeColor={colors.accent} strokeWidth={3} geodesic />
+          <RoutePolyline coordinates={coords} strokeColor={colors.accent} strokeWidth={3} geodesic />
           {!playerActive && (
             isIOS ? (
               <IconMarker

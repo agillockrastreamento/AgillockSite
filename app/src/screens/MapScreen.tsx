@@ -55,6 +55,7 @@ import {
 import type { TrackingAccessStatus, TrackingDevice } from '../tracking/trackingTypes';
 import { VehicleIcon } from '../tracking/VehicleIcon';
 import { IconMarker } from '../tracking/IconMarker';
+import { RoutePolyline } from '../tracking/RoutePolyline';
 import { useMarkerBitmaps, OffscreenCapturePool } from '../tracking/useMarkerBitmaps';
 import { useClusterBitmaps, ClusterCapturePool, ClusterIcon } from '../tracking/useClusterBitmaps';
 import {
@@ -1515,7 +1516,7 @@ export function MapScreen() {
             return null;
           }
           return (
-            <Polyline
+            <RoutePolyline
               key={track.deviceId}
               coordinates={track.coords}
               strokeWidth={3}
