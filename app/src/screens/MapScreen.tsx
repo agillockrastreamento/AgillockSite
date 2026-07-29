@@ -33,6 +33,7 @@ import { Icon, IconButton } from 'react-native-paper';
 
 import { useAuth } from '../auth/AuthProvider';
 import { SearchBottomSheet } from '../components/SearchBottomSheet';
+import { MapDevicesSheet } from '../components/MapDevicesSheet';
 import { NotificationsBottomSheet } from '../components/NotificationsBottomSheet';
 import { useConfirmDialog } from '../components/ConfirmDialogProvider';
 import { colors } from '../theme/colors';
@@ -86,12 +87,14 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const MAIN_CARD_HEIGHT = Math.round(SCREEN_HEIGHT * 0.60);
 const MAIN_CARD_PEEK_HEIGHT = 76; // mostra apenas alça + header (nome/placa + X)
 const MAP_PREFERENCES_KEY = 'agillock_map_preferences_v1';
+const MAP_SELECAO_KEY = 'agillock_map_selecao_v1';
+// Teto de veículos desenhados no mapa. Acima disso o mapa engasga no Android e
+// chega a derrubar o app no iOS ao aproximar o zoom (cada marcador é uma view
+// nativa que o mapa refotografa). Quem tem mais que isso escolhe quais quer ver
+// pelo botão do topo; a busca continua enxergando a frota inteira.
+const LIMITE_MAPA = 40;
 const CLUSTER_PX = 40;
 const SPIDER_RADIUS_PX = 55;
-// Teto de marcadores desenhados ao mesmo tempo no iOS — ver o comentário em
-// `clusterGroups`. O app caiu com 171 e com 275 marcadores; este teto mantém as
-// transações do mapa pequenas. Se ainda cair, baixe este número.
-const MAX_MARCADORES_IOS = 60;
 // Posições do WebSocket são acumuladas e aplicadas de uma vez. Com centenas de
 // veículos chegavam dezenas de mensagens por segundo, cada uma re-renderizando
 // a tela inteira (marcadores + lista + clusters).
@@ -144,6 +147,43 @@ function getQuickSheetHeights(deviceCount: number) {
     peek,
     expanded,
   };
+}
+
+type SelecaoPorMapa = { 1: string[] | null; 2: string[] | null };
+
+const SELECAO_VAZIA: SelecaoPorMapa = { 1: null, 2: null };
+
+/**
+ * Corta a lista do mapa no teto de `LIMITE_MAPA`.
+ *
+ * - Até o limite, nada muda: aparecem todos.
+ * - Acima dele vale a escolha do usuário (`selecao`); sem escolha, os primeiros
+ *   da lista, para o mapa nunca abrir vazio.
+ * - O veículo focado entra sempre, mesmo fora da escolha: é o que permite achar
+ *   pela busca alguém que não está entre os selecionados e vê-lo no mapa.
+ */
+function aplicarLimiteMapa(
+  devices: TrackingDevice[],
+  selecao: string[] | null,
+  focadoId: string | null,
+): TrackingDevice[] {
+  let base: TrackingDevice[];
+  if (devices.length <= LIMITE_MAPA) {
+    base = devices;
+  } else if (selecao && selecao.length) {
+    const ids = new Set(selecao);
+    const escolhidos = devices.filter((d) => ids.has(d.dispositivoId)).slice(0, LIMITE_MAPA);
+    // Escolha antiga apontando só para veículos que sumiram: volta ao automático.
+    base = escolhidos.length ? escolhidos : devices.slice(0, LIMITE_MAPA);
+  } else {
+    base = devices.slice(0, LIMITE_MAPA);
+  }
+
+  if (focadoId && !base.some((d) => d.dispositivoId === focadoId)) {
+    const focado = devices.find((d) => d.dispositivoId === focadoId);
+    if (focado) return [...base, focado];
+  }
+  return base;
 }
 
 function getDeviceCoordinate(device: TrackingDevice): LatLng | null {
@@ -250,6 +290,14 @@ export function MapScreen() {
   mainCardPeekedRef.current = mainCardPeeked;
   const selectedDeviceRef = useRef<TrackingDevice | null>(null);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
+  const [devicesSheetVisible, setDevicesSheetVisible] = useState(false);
+  // Quais veículos o usuário escolheu ver no mapa, por mapa (1 e 2).
+  // `null` = automático (os primeiros do limite).
+  const [selecaoMapa, setSelecaoMapa] = useState<SelecaoPorMapa>(SELECAO_VAZIA);
+  const selecaoMapaRef = useRef(selecaoMapa);
+  selecaoMapaRef.current = selecaoMapa;
+  const [selecaoMapaCarregada, setSelecaoMapaCarregada] = useState(false);
+  const avisoLimiteMostradoRef = useRef(false);
   const [notificationsSheetVisible, setNotificationsSheetVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   // Eventos recebidos aguardando o próximo lote do WebSocket (ver flushWsBuffer).
@@ -308,6 +356,37 @@ export function MapScreen() {
     ).catch(() => {});
   }, [showLabels, showFences, showTracks]);
 
+  // A escolha de quais veículos ficam no mapa é trabalhosa de refazer — sobrevive
+  // ao fechamento do app.
+  useEffect(() => {
+    let cancelled = false;
+    const carregarSelecao = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(MAP_SELECAO_KEY);
+        if (!raw || cancelled) return;
+        const salvo = JSON.parse(raw) as Partial<SelecaoPorMapa>;
+        const normalizar = (v: unknown) =>
+          Array.isArray(v) && v.every((id) => typeof id === 'string')
+            ? (v as string[]).slice(0, LIMITE_MAPA)
+            : null;
+        setSelecaoMapa({ 1: normalizar(salvo?.[1]), 2: normalizar(salvo?.[2]) });
+      } catch {
+        await AsyncStorage.removeItem(MAP_SELECAO_KEY);
+      } finally {
+        if (!cancelled) setSelecaoMapaCarregada(true);
+      }
+    };
+    carregarSelecao();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selecaoMapaCarregada) return;
+    AsyncStorage.setItem(MAP_SELECAO_KEY, JSON.stringify(selecaoMapa)).catch(() => {});
+  }, [selecaoMapa, selecaoMapaCarregada]);
+
   // O app sempre abre no Mapa 1 — não restauramos nem persistimos o último mapa
   // visto (decisão de produto). O flag apenas libera os efeitos que dependem de
   // troca de mapa pelo usuário; mantido assíncrono (microtask) para não disparar
@@ -331,7 +410,10 @@ export function MapScreen() {
         if (mainCardVisible) closeMainCard();
       }
     }
-    fitAllDevices(devices.filter((d) => getMapaDoDevice(d) === mapaAtivo));
+    // Enquadra só o que vai aparecer: com o teto ativo, incluir os cortados
+    // daria um zoom bem mais aberto do que os veículos desenhados pedem.
+    const doMapa = devices.filter((d) => getMapaDoDevice(d) === mapaAtivo);
+    fitAllDevices(aplicarLimiteMapa(doMapa, selecaoMapaRef.current[mapaAtivo], null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapaAtivo]);
 
@@ -391,26 +473,58 @@ export function MapScreen() {
     [devices, mapaAtivo],
   );
 
-  // Versão da lista para os cards (gaveta e modais). O mapa continua usando
-  // `filteredDevices`, que acompanha cada posição recebida.
+  const selecaoAtual = selecaoMapa[mapaAtivo];
+  const acimaDoLimite = filteredDevices.length > LIMITE_MAPA;
+
+  // O que de fato é desenhado no mapa (marcadores, clusters) e listado na
+  // gaveta. Tudo que vem depois daqui trabalha em cima desta lista.
+  const devicesVisiveis = useMemo(
+    () => aplicarLimiteMapa(filteredDevices, selecaoAtual, selectedDeviceId),
+    [filteredDevices, selecaoAtual, selectedDeviceId],
+  );
+
+  // Versão da lista para os cards (gaveta). O mapa continua usando
+  // `devicesVisiveis`, que acompanha cada posição recebida.
   // Trocar de mapa ou ganhar/perder um veículo aparece na hora; só as
   // atualizações de posição é que são espaçadas.
   const devicesParaLista = useValorEspacado(
+    devicesVisiveis,
+    LISTA_INTERVALO_MS,
+    `${mapaAtivo}:${devicesVisiveis.length}:${selectedDeviceId ?? ''}`,
+  );
+
+  // Busca e notificações enxergam a frota inteira do mapa ativo: o teto existe
+  // para o mapa não travar, não para esconder veículo do usuário. Escolher um
+  // que está fora dos selecionados o traz para o mapa (ver `aplicarLimiteMapa`).
+  const todosParaLista = useValorEspacado(
     filteredDevices,
     LISTA_INTERVALO_MS,
-    `${mapaAtivo}:${filteredDevices.length}`,
+    `todos:${mapaAtivo}:${filteredDevices.length}`,
   );
+
+  // Avisa uma vez por sessão que o mapa está cortando a frota — só para quem
+  // ainda não escolheu seus veículos (quem já escolheu sabe do corte).
+  useEffect(() => {
+    if (!acimaDoLimite || !selecaoMapaCarregada || avisoLimiteMostradoRef.current) return;
+    if (selecaoAtual && selecaoAtual.length) return;
+    avisoLimiteMostradoRef.current = true;
+    toast.show({
+      message: `Mostrando ${LIMITE_MAPA} de ${filteredDevices.length} veículos. Toque no ícone de veículos no topo para escolher quais.`,
+      type: 'info',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acimaDoLimite, selecaoMapaCarregada]);
 
   const filteredGeofences = useMemo(
     () => geofences.filter((g) => cercaNoMapaAtivo(g, mapaAtivo)),
     [geofences, mapaAtivo],
   );
 
-  const quickSheetHeights = useMemo(() => getQuickSheetHeights(filteredDevices.length), [filteredDevices.length]);
+  const quickSheetHeights = useMemo(() => getQuickSheetHeights(devicesVisiveis.length), [devicesVisiveis.length]);
   const quickSheetHeight = useRef(new Animated.Value(Math.round(SCREEN_HEIGHT * 0.3))).current;
 
   useEffect(() => {
-    if (filteredDevices.length > 0) {
+    if (devicesVisiveis.length > 0) {
       Animated.spring(quickSheetHeight, {
         toValue: quickSheetHeights[quickSheetMode],
         useNativeDriver: false,
@@ -418,11 +532,11 @@ export function MapScreen() {
         tension: 82,
       }).start();
     }
-  }, [filteredDevices.length, quickSheetHeights, quickSheetHeight, quickSheetMode]);
+  }, [devicesVisiveis.length, quickSheetHeights, quickSheetHeight, quickSheetMode]);
 
   const locatedDevices = useMemo(
-    () => filteredDevices.filter((device) => !!getDeviceCoordinate(device)),
-    [filteredDevices],
+    () => devicesVisiveis.filter((device) => !!getDeviceCoordinate(device)),
+    [devicesVisiveis],
   );
 
   // Só vira marcador quem está na área visível (com folga de 75% para o ícone
@@ -430,10 +544,6 @@ export function MapScreen() {
   // fim dele). Cada marcador é uma view nativa: criar centenas delas fora da
   // tela era desperdício puro — quem está longe volta a aparecer no zoom out,
   // agrupado em cluster.
-  //
-  // Vale nas duas plataformas: no iOS é o que faz o teto de marcadores ser
-  // "por tela" — sem isto, veículos a centenas de quilômetros entram na conta
-  // do agrupamento e o teto nunca é alcançado.
   const devicesNaViewport = useMemo(() => {
     const { latitude, longitude, latitudeDelta, longitudeDelta } = currentRegion;
     if (!Number.isFinite(latitudeDelta) || !Number.isFinite(longitudeDelta)) {
@@ -475,90 +585,66 @@ export function MapScreen() {
 
     const latPorPx = pxToLatDeg || 1;
     const lngPorPx = pxToLngDeg || 1;
+    const celulaLat = latPorPx * CLUSTER_PX;
+    const celulaLng = lngPorPx * CLUSTER_PX;
 
-    const agrupar = (raioPx: number): Grupo[] => {
-      const celulaLat = latPorPx * raioPx;
-      const celulaLng = lngPorPx * raioPx;
+    type Entrada = { device: TrackingDevice; lat: number; lng: number; gx: number; gy: number };
+    const entradas: Entrada[] = [];
+    const celulas = new Map<string, Entrada[]>();
 
-      type Entrada = { device: TrackingDevice; lat: number; lng: number; gx: number; gy: number };
-      const entradas: Entrada[] = [];
-      const celulas = new Map<string, Entrada[]>();
-
-      for (const device of devicesNaViewport) {
-        const coord = getDeviceCoordinate(device);
-        if (!coord) continue;
-        const gx = Math.floor(coord.longitude / celulaLng);
-        const gy = Math.floor(coord.latitude / celulaLat);
-        const entrada: Entrada = { device, lat: coord.latitude, lng: coord.longitude, gx, gy };
-        entradas.push(entrada);
-        const chave = `${gx}:${gy}`;
-        const lista = celulas.get(chave);
-        if (lista) lista.push(entrada);
-        else celulas.set(chave, [entrada]);
-      }
-
-      const visited = new Set<string>();
-      const groups: Grupo[] = [];
-
-      for (const base of entradas) {
-        if (visited.has(base.device.dispositivoId)) continue;
-        visited.add(base.device.dispositivoId);
-        const group: TrackingDevice[] = [base.device];
-        let somaLat = base.lat;
-        let somaLng = base.lng;
-        let menorId = base.device.dispositivoId;
-
-        for (let dx = -1; dx <= 1; dx += 1) {
-          for (let dy = -1; dy <= 1; dy += 1) {
-            const vizinhos = celulas.get(`${base.gx + dx}:${base.gy + dy}`);
-            if (!vizinhos) continue;
-            for (const outro of vizinhos) {
-              if (visited.has(outro.device.dispositivoId)) continue;
-              const dxPx = (outro.lng - base.lng) / lngPorPx;
-              const dyPx = (outro.lat - base.lat) / latPorPx;
-              if (Math.hypot(dxPx, dyPx) > raioPx) continue;
-              visited.add(outro.device.dispositivoId);
-              group.push(outro.device);
-              somaLat += outro.lat;
-              somaLng += outro.lng;
-              if (outro.device.dispositivoId < menorId) menorId = outro.device.dispositivoId;
-            }
-          }
-        }
-
-        groups.push({
-          // Chave estável para o conjunto (usada pelo spider) sem concatenar
-          // centenas de ids a cada recálculo.
-          key: `${menorId}|${group.length}`,
-          devices: group,
-          lat: somaLat / group.length,
-          lng: somaLng / group.length,
-        });
-      }
-
-      return groups;
-    };
-
-    let grupos = agrupar(CLUSTER_PX);
-
-    // iOS: teto de marcadores na tela. O react-native-maps 1.20.1 fala com o
-    // mapa pelo interop de views legadas do Fabric, que perde a conta dos
-    // índices quando uma transação insere e remove muitos filhos de uma vez —
-    // é o que derruba o app ao aproximar numa área cheia de ícones
-    // (NSRangeException/NSInvalidArgumentException em insertReactSubview).
-    // Agrupando mais, cada transação fica pequena. Não é correção, é redução
-    // de exposição: a correção de verdade é a lib com componente Fabric nativo.
-    if (isIOS && grupos.length > MAX_MARCADORES_IOS) {
-      let raio = CLUSTER_PX;
-      // Dobrar o raio a cada passo converge mesmo com veículos espalhados: em
-      // 14 passos o raio cobre qualquer distância que caiba na tela.
-      for (let tentativa = 0; tentativa < 14 && grupos.length > MAX_MARCADORES_IOS; tentativa += 1) {
-        raio *= 2;
-        grupos = agrupar(raio);
-      }
+    for (const device of devicesNaViewport) {
+      const coord = getDeviceCoordinate(device);
+      if (!coord) continue;
+      const gx = Math.floor(coord.longitude / celulaLng);
+      const gy = Math.floor(coord.latitude / celulaLat);
+      const entrada: Entrada = { device, lat: coord.latitude, lng: coord.longitude, gx, gy };
+      entradas.push(entrada);
+      const chave = `${gx}:${gy}`;
+      const lista = celulas.get(chave);
+      if (lista) lista.push(entrada);
+      else celulas.set(chave, [entrada]);
     }
 
-    return grupos;
+    const visited = new Set<string>();
+    const groups: Grupo[] = [];
+
+    for (const base of entradas) {
+      if (visited.has(base.device.dispositivoId)) continue;
+      visited.add(base.device.dispositivoId);
+      const group: TrackingDevice[] = [base.device];
+      let somaLat = base.lat;
+      let somaLng = base.lng;
+      let menorId = base.device.dispositivoId;
+
+      for (let dx = -1; dx <= 1; dx += 1) {
+        for (let dy = -1; dy <= 1; dy += 1) {
+          const vizinhos = celulas.get(`${base.gx + dx}:${base.gy + dy}`);
+          if (!vizinhos) continue;
+          for (const outro of vizinhos) {
+            if (visited.has(outro.device.dispositivoId)) continue;
+            const dxPx = (outro.lng - base.lng) / lngPorPx;
+            const dyPx = (outro.lat - base.lat) / latPorPx;
+            if (Math.hypot(dxPx, dyPx) > CLUSTER_PX) continue;
+            visited.add(outro.device.dispositivoId);
+            group.push(outro.device);
+            somaLat += outro.lat;
+            somaLng += outro.lng;
+            if (outro.device.dispositivoId < menorId) menorId = outro.device.dispositivoId;
+          }
+        }
+      }
+
+      groups.push({
+        // Chave estável para o conjunto (usada pelo spider) sem concatenar
+        // centenas de ids a cada recálculo.
+        key: `${menorId}|${group.length}`,
+        devices: group,
+        lat: somaLat / group.length,
+        lng: somaLng / group.length,
+      });
+    }
+
+    return groups;
   }, [devicesNaViewport, pxToLatDeg, pxToLngDeg]);
 
   const clusterCounts = useMemo(
@@ -593,8 +679,7 @@ export function MapScreen() {
   // recebia TODOS os dispositivos e capturava um bitmap para cada um, mesmo os
   // que estavam escondidos dentro de um cluster.
   const markerDevices = useMemo(() => {
-    // Espelha a regra do render: só o Android colapsa para o veículo focado.
-    if (!isIOS && mainCardVisible && selectedDevice) return [selectedDevice];
+    if (mainCardVisible && selectedDevice) return [selectedDevice];
     const lista: TrackingDevice[] = [];
     for (const group of clusterGroups) {
       if (group.devices.length === 1) lista.push(group.devices[0]);
@@ -606,7 +691,7 @@ export function MapScreen() {
   // No iOS o ícone é renderizado como filho do Marker (sem bitmap) — desliga a
   // captura para não rodar captureRef em massa (custo/crash sob Fabric).
   const { getBitmap } = useMarkerBitmaps(markerDevices, showLabels, !isIOS);
-  // Android: com muitos marcadores o fallback "ícone como filho" (que exige
+  // Com muitos marcadores na tela, o fallback "ícone como filho" (que exige
   // tracksViewChanges) é caro demais — nesse caso esperamos o bitmap.
   const usarIconeComoFilho = markerDevices.length <= MARKER_CHILDREN_LIMIT;
 
@@ -901,6 +986,20 @@ export function MapScreen() {
   const devicesRef = useRef(devices);
   devicesRef.current = devices;
 
+  const aplicarSelecaoDoMapa = useCallback(
+    (ids: string[]) => {
+      // Sem nada marcado voltamos ao automático — o mapa nunca fica vazio.
+      const proxima = ids.length ? ids.slice(0, LIMITE_MAPA) : null;
+      setSelecaoMapa((atual) => ({ ...atual, [mapaAtivo]: proxima }));
+      // Reenquadra no novo conjunto, exceto quando o usuário está acompanhando
+      // um veículo (aí o mapa deve continuar nele).
+      if (mainCardVisible) return;
+      const doMapa = devicesRef.current.filter((d) => getMapaDoDevice(d) === mapaAtivo);
+      fitAllDevices(aplicarLimiteMapa(doMapa, proxima, null));
+    },
+    [mapaAtivo, mainCardVisible, fitAllDevices],
+  );
+
   // A célula pode não ter sido redesenhada desde a última posição recebida, e a
   // lista é atualizada de forma espaçada — por isso buscamos o dispositivo
   // atual pelo id em vez de usar o objeto capturado na closure.
@@ -947,7 +1046,8 @@ export function MapScreen() {
         return;
       }
       setDevices(snapshot);
-      fitAllDevices(snapshot.filter((d) => getMapaDoDevice(d) === mapaAtivo));
+      const doMapa = snapshot.filter((d) => getMapaDoDevice(d) === mapaAtivo);
+      fitAllDevices(aplicarLimiteMapa(doMapa, selecaoMapaRef.current[mapaAtivo], null));
     } catch (error) {
       toast.show({
         message: error instanceof Error ? error.message : 'Não foi possível carregar o rastreamento.',
@@ -985,6 +1085,16 @@ export function MapScreen() {
         : 'Mapa',
       headerRight: () => (
         <View style={styles.headerButtons}>
+          {/* Só aparece para quem tem mais veículos do que o mapa aguenta. */}
+          {acimaDoLimite ? (
+            <IconButton
+              icon="car-multiple"
+              iconColor={colors.surface}
+              size={22}
+              accessibilityLabel="Escolher veículos no mapa"
+              onPress={() => setDevicesSheetVisible(true)}
+            />
+          ) : null}
           <IconButton icon="magnify" iconColor={colors.surface} size={22} onPress={() => setSearchSheetVisible(true)} />
           {canVerEventos ? (
             <>
@@ -999,7 +1109,7 @@ export function MapScreen() {
         </View>
       ),
     });
-  }, [navigation, unreadCount, canVerEventos, mapaAtivo, seletorVisivel]);
+  }, [navigation, unreadCount, canVerEventos, mapaAtivo, seletorVisivel, acimaDoLimite]);
 
   useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
 
@@ -1225,15 +1335,18 @@ export function MapScreen() {
             isSpiderMarker: boolean,
           ) => {
             const color = getMarkerColor(device);
-            // No iOS o ângulo é o cru, como sempre foi. No Android o bitmap
-            // arredonda em 15° dentro do próprio cache (ver COURSE_STEP).
-            const curso = isIOS ? (device.posicao?.curso ?? 0) : cursoDoCard(device);
+            // Arredondado em 15°, igual ao bitmap do Android e à assinatura do
+            // iOS. Desenhar o ângulo cru aqui deixava o ícone fora de sincronia
+            // com o que dispara o re-snapshot: no iOS o mapa só refotografa a
+            // view quando a assinatura muda, então um ângulo intermediário
+            // capturado no meio da janela aparecia como tremido.
+            const curso = cursoDoCard(device);
             const label = device.placa ?? device.nome ?? '';
             // Construído sob demanda: no Android a maioria dos marcadores usa o
             // bitmap e não desenha filho nenhum — montar essa árvore para todos
             // gerava milhares de elementos descartados a cada atualização.
             const montarMarkerContent = () => (
-              <View style={styles.markerContainer}>
+              <View style={styles.markerContainer} collapsable={false}>
                 <View style={styles.markerWrap}>
                   <VehicleIcon
                     categoria={device.categoria}
@@ -1257,15 +1370,17 @@ export function MapScreen() {
 
             // iOS/Fabric: NUNCA remontar o Marker via key (derruba o app) nem
             // confiar no prop `image` (não reaplica). Renderiza o ícone como
-            // filho e re-snapshota via tracksViewChanges quando o conteúdo muda.
-            // Este caminho é o original, de antes das otimizações de 2026-07-27:
-            // o relato do iPhone era sobre o modal de pesquisa, não sobre o
-            // mapa, e mexer aqui só rendeu crash no interop do Fabric.
+            // filho e re-snapshota via tracksViewChanges quando o conteúdo muda
+            // (cor/curso/label/etiqueta) — assim rotação, cor e etiqueta
+            // atualizam na hora.
             if (isIOS) {
               return (
                 <IconMarker
                   key={`dev-${device.dispositivoId}${isSpiderMarker ? '-spider' : ''}`}
-                  signature={`${color}|${Math.round(curso / 10)}|${label}|${showLabels ? 1 : 0}`}
+                  // Cada mudança de assinatura liga `tracksViewChanges` por meio
+                  // segundo, e no iOS isso é o principal custo do mapa — daí o
+                  // curso entrar já arredondado em 15°.
+                  signature={`${color}|${curso}|${label}|${showLabels ? 1 : 0}`}
                   coordinate={coord}
                   anchor={{ x: 0.5, y: 0.5 }}
                   zIndex={isSpiderMarker ? 1000 : 100}
@@ -1304,7 +1419,6 @@ export function MapScreen() {
             );
           };
 
-          // Card aberto: desenha só o veículo focado (comportamento original).
           if (mainCardVisible && selectedDevice) {
             const coord = getDeviceCoordinate(selectedDevice);
             return coord ? renderDeviceMarker(selectedDevice, coord, false) : null;
@@ -1503,7 +1617,7 @@ export function MapScreen() {
         </View>
       ) : null}
 
-      {!accessStatus?.bloqueado && filteredDevices.length ? (
+      {!accessStatus?.bloqueado && devicesVisiveis.length ? (
         <Animated.View style={[styles.quickSheet, { height: quickSheetHeight }]}>
           <View style={styles.quickHandleArea} {...quickSheetPanResponder.panHandlers}>
             <Pressable
@@ -1520,6 +1634,14 @@ export function MapScreen() {
               <View style={styles.quickHeader}>
                 <View>
                   <Text style={styles.quickTitle}>{seletorVisivel ? `Veículos · Mapa ${mapaAtivo}` : 'Veículos'}</Text>
+                  {/* Deixa explícito que o mapa não está mostrando a frota toda. */}
+                  {acimaDoLimite ? (
+                    <Pressable accessibilityRole="button" onPress={() => setDevicesSheetVisible(true)}>
+                      <Text style={styles.quickSubtitle}>
+                        {devicesVisiveis.length} de {filteredDevices.length} · toque para escolher
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
                 <Pressable
                   accessibilityRole="button"
@@ -1635,9 +1757,11 @@ export function MapScreen() {
         </Animated.View>
       )}
 
+      {/* A busca lista a frota inteira do mapa ativo, inclusive quem ficou fora
+          do teto: ao escolher um desses, ele entra no mapa focado. */}
       <SearchBottomSheet
         visible={searchSheetVisible}
-        devices={devicesParaLista}
+        devices={todosParaLista}
         onClose={() => setSearchSheetVisible(false)}
         onSelectDevice={(device) => {
           focusDevice(device, true);
@@ -1645,10 +1769,21 @@ export function MapScreen() {
         }}
       />
 
+      {acimaDoLimite ? (
+        <MapDevicesSheet
+          visible={devicesSheetVisible}
+          devices={todosParaLista}
+          selectedIds={selecaoAtual}
+          limite={LIMITE_MAPA}
+          onClose={() => setDevicesSheetVisible(false)}
+          onApply={aplicarSelecaoDoMapa}
+        />
+      ) : null}
+
       {canVerEventos ? (
         <NotificationsBottomSheet
           visible={notificationsSheetVisible}
-          devices={devicesParaLista}
+          devices={todosParaLista}
           onClose={() => setNotificationsSheetVisible(false)}
           onSelectEvent={(event) => {
             if (event.dispositivoId) {
@@ -1914,6 +2049,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     fontWeight: '900',
+  },
+  quickSubtitle: {
+    marginTop: 1,
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '800',
   },
   quickMeta: {
     marginTop: 2,
