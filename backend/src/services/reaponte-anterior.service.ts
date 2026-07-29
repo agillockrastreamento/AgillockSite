@@ -166,6 +166,13 @@ async function listarUsuariosCache(cfg: AnteriorConfig): Promise<UsuarioAnterior
   return data;
 }
 
+/** Invalida os caches locais da API antiga (usar depois de excluir algo lá). */
+export function invalidarCacheAnterior(): void {
+  devicesCache = null;
+  usuariosCache = null;
+  odometrosCache = null;
+}
+
 /** Dispositivos de uma conta específica do painel antigo (isola o cliente certo). */
 async function devicesDoUsuario(cfg: AnteriorConfig, userId: number): Promise<DeviceAnterior[]> {
   const res = await fetch(`${cfg.base}/devices?userId=${encodeURIComponent(String(userId))}`, {
@@ -416,6 +423,154 @@ export async function reapontarDispositivos(
 
   const ok = itens.filter((i) => i.ok).length;
   return { comando, total: itens.length, ok, erro: itens.length - ok, itens };
+}
+
+// ─── Limpeza: apagar dados do sistema anterior ──────────────────────────────
+// Usado pela aba "Apagar do Sistema Anterior". Tudo aqui é IRREVERSÍVEL no
+// painel antigo — a validação de "só apaga o que já foi apontado para cá" fica
+// na rota (precisa do banco), não neste serviço.
+
+export interface UsuarioAnteriorResumo {
+  id: number;
+  name: string;
+  email: string | null;
+}
+
+export interface MotoristaAnterior {
+  id: number;
+  name: string | null;
+  uniqueId: string | null;
+}
+
+export interface GeocercaAnterior {
+  id: number;
+  name: string | null;
+}
+
+export interface DispositivoAnteriorDetalhe {
+  id: number;
+  name: string | null;
+  uniqueId: string | null;
+  status: string | null;
+  lastUpdate: string | null;
+  contact: string | null;
+  category: string | null;
+}
+
+export interface DetalheClienteAnterior {
+  usuario: UsuarioAnteriorResumo;
+  dispositivos: DispositivoAnteriorDetalhe[];
+  motoristas: MotoristaAnterior[];
+  geocercas: GeocercaAnterior[];
+}
+
+/** Contas do sistema anterior (id + nome + e-mail) para o select com busca. */
+export async function listarUsuariosAnteriores(): Promise<UsuarioAnteriorResumo[]> {
+  const cfg = anteriorConfig();
+  if (!cfg) throw new Error('Integração com o sistema anterior não configurada (ANTERIOR_API_URL/USER/PASS).');
+  const usuarios = await listarUsuariosCache(cfg);
+  return usuarios
+    .map((u) => ({ id: u.id, name: (u.name || '').trim(), email: u.email ?? null }))
+    .filter((u) => u.name)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+async function getJson<T>(cfg: AnteriorConfig, path: string, fallback: T): Promise<T> {
+  const res = await fetch(`${cfg.base}${path}`, {
+    headers: { Accept: 'application/json', Authorization: authHeader(cfg) },
+  });
+  if (!res.ok) return fallback;
+  return (await res.json()) as T;
+}
+
+/**
+ * Tudo o que a conta do sistema anterior tem: dispositivos, motoristas e
+ * geocercas. Os motoristas vêm da conta e também dos dispositivos dela (no
+ * painel antigo o vínculo às vezes é motorista↔dispositivo, não motorista↔conta).
+ */
+export async function detalharClienteAnterior(userId: number): Promise<DetalheClienteAnterior> {
+  const cfg = anteriorConfig();
+  if (!cfg) throw new Error('Integração com o sistema anterior não configurada (ANTERIOR_API_URL/USER/PASS).');
+
+  const usuarios = await listarUsuariosCache(cfg);
+  const usuario = usuarios.find((u) => u.id === userId);
+  if (!usuario) throw new Error(`Conta ${userId} não encontrada no sistema anterior.`);
+
+  const devices = await devicesDoUsuario(cfg, userId);
+
+  const motoristas = new Map<number, MotoristaAnterior>();
+  const daConta = await getJson<MotoristaAnterior[]>(cfg, `/drivers?userId=${userId}`, []);
+  for (const d of daConta) motoristas.set(d.id, { id: d.id, name: d.name ?? null, uniqueId: d.uniqueId ?? null });
+  // Vínculos por dispositivo (limitado para não explodir em contas com 50+ carros).
+  for (const dev of devices.slice(0, 60)) {
+    const doDevice = await getJson<MotoristaAnterior[]>(cfg, `/drivers?deviceId=${dev.id}`, []);
+    for (const d of doDevice) {
+      if (!motoristas.has(d.id)) motoristas.set(d.id, { id: d.id, name: d.name ?? null, uniqueId: d.uniqueId ?? null });
+    }
+  }
+
+  const geo = await getJson<GeocercaAnterior[]>(cfg, `/geofences?userId=${userId}`, []);
+
+  return {
+    usuario: { id: usuario.id, name: (usuario.name || '').trim(), email: usuario.email ?? null },
+    dispositivos: devices.map((d) => ({
+      id: d.id,
+      name: d.name ?? null,
+      uniqueId: d.uniqueId ?? null,
+      status: d.status ?? null,
+      lastUpdate: d.lastUpdate ?? null,
+      contact: d.contact ?? null,
+      category: d.category ?? null,
+    })),
+    motoristas: [...motoristas.values()].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR')),
+    geocercas: geo.map((g) => ({ id: g.id, name: g.name ?? null })),
+  };
+}
+
+export interface ExclusaoItem {
+  tipo: 'dispositivo' | 'motorista' | 'geocerca' | 'cliente';
+  id: number;
+  nome: string | null;
+  uniqueId: string | null;
+  ok: boolean;
+  http: number | null;
+  resp: string;
+}
+
+/** DELETE genérico na API antiga. 204/200 = apagado; 404 = já não existia (conta como ok). */
+async function excluirNoAnterior(
+  tipo: ExclusaoItem['tipo'],
+  path: string,
+  id: number,
+  nome: string | null,
+  uniqueId: string | null,
+): Promise<ExclusaoItem> {
+  const cfg = anteriorConfig();
+  if (!cfg) throw new Error('Integração com o sistema anterior não configurada (ANTERIOR_API_URL/USER/PASS).');
+  try {
+    const res = await fetch(`${cfg.base}${path}`, {
+      method: 'DELETE',
+      headers: { Accept: 'application/json', Authorization: authHeader(cfg) },
+    });
+    const ok = res.status === 204 || res.status === 200 || res.status === 404;
+    const resp = ok ? (res.status === 404 ? 'Já não existia no sistema anterior.' : '') : (await res.text().catch(() => '')).slice(0, 200);
+    return { tipo, id, nome, uniqueId, ok, http: res.status, resp };
+  } catch (e) {
+    return { tipo, id, nome, uniqueId, ok: false, http: null, resp: (e instanceof Error ? e.message : String(e)).slice(0, 200) };
+  }
+}
+
+export function excluirDispositivoAnterior(id: number, nome: string | null, uniqueId: string | null) {
+  return excluirNoAnterior('dispositivo', `/devices/${id}`, id, nome, uniqueId);
+}
+export function excluirMotoristaAnterior(id: number, nome: string | null, uniqueId: string | null) {
+  return excluirNoAnterior('motorista', `/drivers/${id}`, id, nome, uniqueId);
+}
+export function excluirGeocercaAnterior(id: number, nome: string | null) {
+  return excluirNoAnterior('geocerca', `/geofences/${id}`, id, nome, null);
+}
+export function excluirUsuarioAnterior(id: number, nome: string | null) {
+  return excluirNoAnterior('cliente', `/users/${id}`, id, nome, null);
 }
 
 // ─── Planilha do resultado (.xlsx) ──────────────────────────────────────────

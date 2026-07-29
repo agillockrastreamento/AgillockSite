@@ -7,6 +7,7 @@
   <link rel="icon" href="../favicon.ico" type="image/x-icon" />
   <title>Trazer do Sistema Anterior — AgilLock Admin</title>
   <link rel="stylesheet" href="../css/bootstrap.min.css" />
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/admin.css" />
@@ -53,6 +54,33 @@
     .msg-box { width:100%; min-height:200px; font-family:monospace; font-size:12px; }
     .novos-box { margin-top:10px; padding:8px 10px; background:#e6f0ff; border:1px solid #b6d4fe; border-radius:6px; }
     html.dark-theme .novos-box { background:#16233a; border-color:#2a4a6a; }
+
+    /* select2 (busca de cliente) */
+    .select2-container { max-width:100%; }
+    html.dark-theme .select2-container--default .select2-selection--single { background-color:#252535; border-color:#3a3a5c; }
+    html.dark-theme .select2-container--default .select2-selection--single .select2-selection__rendered { color:#c9d1d9; }
+    html.dark-theme .select2-dropdown { background-color:#1e2530; border-color:#3a3a5c; color:#adb5bd; }
+    html.dark-theme .select2-results__option--highlighted[aria-selected] { background-color:#2980b9; color:#fff; }
+    html.dark-theme .select2-search__field { background-color:#252535; color:#c9d1d9; border-color:#3a3a5c; }
+
+    /* Aba "Apagar do Sistema Anterior" */
+    .step-tag.s3 { background:#b71c1c; }
+    .perigo-box { background:#fdecea; border:1px solid #f5c2c0; border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:13px; }
+    html.dark-theme .perigo-box { background:#2a1618; border-color:#5a2a2a; color:#f0c9c9; }
+    .modo-opt { display:block; border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; margin-bottom:8px; cursor:pointer; font-weight:normal; }
+    .modo-opt:hover { border-color:#9ec5fe; }
+    .modo-opt.sel { border-color:#0a58ca; background:#f2f7ff; }
+    html.dark-theme .modo-opt { border-color:#2a3340; }
+    html.dark-theme .modo-opt.sel { border-color:#6ea8fe; background:#16233a; }
+    .modo-opt .modo-tit { font-weight:700; font-size:13px; }
+    .modo-opt .modo-sub { font-size:12px; color:#777; margin-top:2px; }
+    html.dark-theme .modo-opt .modo-sub { color:#9aa4b2; }
+    .lista-check { max-height:260px; overflow:auto; border:1px solid #e5e7eb; border-radius:8px; }
+    html.dark-theme .lista-check { border-color:#2a3340; }
+    .lista-check label { display:flex; align-items:center; gap:8px; padding:6px 10px; margin:0; font-weight:normal; font-size:13px; border-bottom:1px solid #f0f2f5; }
+    html.dark-theme .lista-check label { border-bottom-color:#1c232d; }
+    .lista-check label:last-child { border-bottom:0; }
+    .row-bloqueado { opacity:.65; }
   </style>
 </head>
 <body>
@@ -126,6 +154,7 @@
     <div class="mt-tabs">
       <a href="#" data-tab="reapontar" class="active">Reapontar</a>
       <a href="#" data-tab="historico">Histórico</a>
+      <a href="#" data-tab="limpeza">Apagar dados do sistema anterior</a>
     </div>
 
     <!-- ===================== ABA REAPONTAR ===================== -->
@@ -235,6 +264,146 @@
         </table>
       </div>
     </div>
+
+    <!-- ============ ABA APAGAR DADOS DO SISTEMA ANTERIOR ============ -->
+    <div id="tab-limpeza" style="display:none;">
+
+      <div class="perigo-box">
+        <b><i class="fa fa-exclamation-triangle"></i> Área de exclusão definitiva.</b>
+        O que for apagado aqui sai do painel antigo (monitorando) e <b>não tem como voltar</b>.
+        Só é possível excluir dispositivos que <b>já foram apontados</b> para a AgilLock — ou seja,
+        que já estão cadastrados aqui <b>e</b> já enviaram posição para o nosso servidor.
+      </div>
+
+      <!-- ETAPA 1 — escolher o cliente -->
+      <div class="step-card">
+        <p class="step-title"><span class="step-tag">ETAPA 1</span> Escolher o cliente no sistema anterior</p>
+        <p class="step-sub">Pesquise pelo nome da conta cadastrada no painel antigo. Nada é apagado nesta etapa.</p>
+        <div class="row">
+          <div class="col-sm-8" style="margin-bottom:8px;">
+            <select id="sel-limpeza-cliente" style="width:100%"></select>
+          </div>
+          <div class="col-sm-4" style="margin-bottom:8px;">
+            <button class="btn btn-primary-al btn-block" id="btn-limpeza-analisar"><i class="fa fa-search"></i> Analisar</button>
+          </div>
+        </div>
+        <span class="adv-toggle" id="limpeza-adv-toggle"><i class="fa fa-sliders"></i> Opções avançadas</span>
+        <div id="limpeza-adv-box" style="display:none;margin-top:10px;">
+          <div class="row">
+            <div class="col-sm-4">
+              <label style="font-size:12px;">Janela de sinal (horas)</label>
+              <input type="number" id="in-limpeza-horas" class="form-control" value="48" min="1" max="2160" />
+              <span class="step-sub">Um rastreador conta como "enviando sinal" se mandou posição dentro dessa janela.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTADO -->
+      <div id="limpeza-resultado" style="display:none;">
+
+        <!-- Panorama -->
+        <div class="step-card">
+          <p class="step-title" style="margin-bottom:10px;"><i class="fa fa-bar-chart"></i> Panorama do cliente</p>
+          <div id="limpeza-cli-card"></div>
+          <div class="step-sub" style="margin:12px 0 4px;"><b>Onde estão os dispositivos</b></div>
+          <div class="counters" id="limpeza-counters-cadastro"></div>
+          <div class="step-sub" style="margin:12px 0 4px;"><b>Quem está enviando sinal para onde</b> (últimas <span id="limpeza-janela">48</span>h)</div>
+          <div class="counters" id="limpeza-counters-sinal"></div>
+        </div>
+
+        <!-- Dispositivos -->
+        <div class="step-card">
+          <p class="step-title" style="margin-bottom:10px;"><i class="fa fa-microchip"></i> Dispositivos no sistema anterior</p>
+          <div class="table-responsive">
+            <table class="admin-table table">
+              <thead><tr>
+                <th style="width:34px;text-align:center;"><input type="checkbox" id="chk-limpeza-todos"></th>
+                <th>IMEI</th><th>Veículo</th>
+                <th style="text-align:center;">Sinal no site antigo</th>
+                <th style="text-align:center;">Sinal na AgilLock</th>
+                <th style="text-align:center;">Situação</th>
+              </tr></thead>
+              <tbody id="tbody-limpeza-disp"></tbody>
+            </table>
+          </div>
+          <div class="step-sub" style="margin-top:6px;">
+            <span id="limpeza-sel-count">0</span> selecionado(s) de <span id="limpeza-lib-count">0</span> liberado(s).
+            <a href="#" id="limpeza-sel-todos">Selecionar todos os liberados</a> · <a href="#" id="limpeza-sel-nenhum">limpar</a>
+          </div>
+          <div id="limpeza-so-aqui" style="margin-top:10px;"></div>
+        </div>
+
+        <!-- Motoristas -->
+        <div class="step-card" id="limpeza-card-motoristas" style="display:none;">
+          <p class="step-title" style="margin-bottom:10px;"><i class="fa fa-id-card-o"></i> Motoristas no sistema anterior (<span id="limpeza-mot-total">0</span>)</p>
+          <p class="step-sub">Marque quais serão apagados quando o modo escolhido incluir motoristas. Um motorista pode estar compartilhado com outra conta do painel antigo.</p>
+          <div class="lista-check" id="lista-motoristas"></div>
+          <div class="step-sub" style="margin-top:6px;">
+            <a href="#" id="mot-sel-todos">marcar todos</a> · <a href="#" id="mot-sel-nenhum">limpar</a>
+          </div>
+        </div>
+
+        <!-- ETAPA 2 — o que apagar -->
+        <div class="step-card">
+          <p class="step-title"><span class="step-tag s3">ETAPA 2</span> O que apagar no sistema anterior</p>
+          <p class="step-sub">Escolha uma opção. Todas respeitam a trava: dispositivo não apontado para a AgilLock não é excluído.</p>
+          <div id="limpeza-modos">
+            <label class="modo-opt" data-modo="dispositivos">
+              <input type="radio" name="modo-limpeza" value="dispositivos" checked>
+              <span class="modo-tit">Excluir apenas os dispositivos marcados (mantém o cliente)</span>
+              <div class="modo-sub">Apaga os rastreadores selecionados acima. A conta do cliente continua no painel antigo.</div>
+            </label>
+            <label class="modo-opt" data-modo="cliente_dispositivos">
+              <input type="radio" name="modo-limpeza" value="cliente_dispositivos">
+              <span class="modo-tit">Excluir o cliente com todos os seus dispositivos</span>
+              <div class="modo-sub">Só executa se <b>todos</b> os dispositivos da conta já estiverem apontados para a AgilLock.</div>
+            </label>
+            <label class="modo-opt" data-modo="cliente_dispositivos_motoristas">
+              <input type="radio" name="modo-limpeza" value="cliente_dispositivos_motoristas">
+              <span class="modo-tit">Excluir o cliente com seus dispositivos e motoristas</span>
+              <div class="modo-sub">Igual à opção acima, apagando também os motoristas marcados.</div>
+            </label>
+            <label class="modo-opt" data-modo="motoristas">
+              <input type="radio" name="modo-limpeza" value="motoristas">
+              <span class="modo-tit">Excluir somente os motoristas do cliente</span>
+              <div class="modo-sub">Mantém a conta e os dispositivos no painel antigo.</div>
+            </label>
+            <label class="modo-opt" data-modo="tudo">
+              <input type="radio" name="modo-limpeza" value="tudo">
+              <span class="modo-tit">Excluir tudo relacionado ao cliente</span>
+              <div class="modo-sub">Dispositivos + motoristas + geocercas + a própria conta do cliente.</div>
+            </label>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-danger" id="btn-limpeza-executar"><i class="fa fa-trash"></i> Apagar no sistema anterior</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Log (fora do bloco de resultado: continua visível se a conta for apagada) -->
+      <div class="step-card" id="limpeza-log-card" style="display:none;">
+        <p class="step-title" style="margin-bottom:10px;"><i class="fa fa-terminal"></i> Resultado da exclusão</p>
+        <div class="log-panel" id="limpeza-log-panel"></div>
+        <div id="limpeza-log-resumo" style="margin-top:10px;font-weight:700;"></div>
+      </div>
+
+      <!-- Histórico das exclusões -->
+      <div class="step-card">
+        <p class="step-title" style="margin-bottom:10px;"><i class="fa fa-history"></i> Histórico de exclusões</p>
+        <div class="table-responsive">
+          <table class="admin-table table">
+            <thead><tr>
+              <th>Data</th><th>Cliente</th><th>Por</th><th>Modo</th>
+              <th style="text-align:center;">Disp.</th><th style="text-align:center;">Motoristas</th>
+              <th style="text-align:center;">Geocercas</th><th style="text-align:center;">Conta</th><th style="text-align:center;">Erro</th>
+            </tr></thead>
+            <tbody id="tbody-limpeza-historico"><tr><td colspan="9" style="text-align:center;color:#888;">Carregando…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Modal confirmação -->
@@ -293,7 +462,29 @@
     </div>
   </div>
 
+  <!-- Modal confirmação da exclusão no sistema anterior -->
+  <div class="modal fade" id="modal-limpeza" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header"><button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title" style="color:#b71c1c;"><i class="fa fa-trash"></i> Apagar dados no sistema anterior</h4></div>
+        <div class="modal-body">
+          <div id="limpeza-confirmar-body">…</div>
+          <div style="margin-top:12px;">
+            <label style="font-size:12px;">Para confirmar, digite <span class="code-inline">EXCLUIR</span></label>
+            <input type="text" id="in-limpeza-confirmacao" class="form-control" placeholder="EXCLUIR" autocomplete="off" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" id="btn-limpeza-confirmar"><i class="fa fa-trash"></i> Apagar definitivamente</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/jquery.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script src="../js/bootstrap.min.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/auth-guard.js"></script>
@@ -349,7 +540,9 @@
         var tab = this.dataset.tab;
         document.getElementById('tab-reapontar').style.display = tab==='reapontar'?'':'none';
         document.getElementById('tab-historico').style.display = tab==='historico'?'':'none';
+        document.getElementById('tab-limpeza').style.display = tab==='limpeza'?'':'none';
         if (tab==='historico') loadHistorico();
+        if (tab==='limpeza') initLimpeza();
       });
     });
 
@@ -720,6 +913,317 @@
           b.addEventListener('click', function(){ baixarPlanilhaHistorico(this.dataset.id, this.dataset.nome, this); });
         });
       }).catch(function(err){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#b71c1c;">'+esc(err.message)+'</td></tr>'; });
+    }
+
+    // ═══════════════ ABA: APAGAR DADOS DO SISTEMA ANTERIOR ═══════════════
+    // Tudo aqui é exclusão definitiva no painel antigo. A trava de "só apaga o
+    // que já foi apontado para a AgilLock" é aplicada no backend também — o que
+    // a tela faz (desabilitar checkbox, avisar) é conveniência, não segurança.
+    var limpezaIniciada = false;
+    var limpezaDados = null; // resposta de /limpeza/detalhe
+
+    var MODOS_LABEL = {
+      dispositivos: 'Excluir apenas os dispositivos marcados',
+      cliente_dispositivos: 'Excluir o cliente com todos os seus dispositivos',
+      cliente_dispositivos_motoristas: 'Excluir o cliente com dispositivos e motoristas',
+      motoristas: 'Excluir somente os motoristas',
+      tudo: 'Excluir tudo relacionado ao cliente'
+    };
+
+    function initLimpeza(){
+      if (limpezaIniciada) return;
+      limpezaIniciada = true;
+
+      var sel = $('#sel-limpeza-cliente');
+      sel.select2({ placeholder: 'Pesquise o cliente…', allowClear: true, width: '100%', language: { noResults: function(){ return 'Nenhum cliente encontrado'; }, searching: function(){ return 'Buscando…'; } } });
+      sel.prop('disabled', true);
+      AL.apiGet('/api/integracao/anterior/limpeza/clientes').then(function(lista){
+        var opts = '<option></option>' + (lista || []).map(function(c){
+          return '<option value="'+esc(c.id)+'">'+esc(c.name) + (c.email ? ' — '+esc(c.email) : '') + '</option>';
+        }).join('');
+        sel.html(opts).prop('disabled', false);
+      }).catch(function(err){
+        sel.html('<option></option>').prop('disabled', false);
+        AL.showAlert('Não foi possível carregar os clientes do sistema anterior: ' + err.message);
+      });
+
+      document.getElementById('limpeza-adv-toggle').addEventListener('click', function(){
+        var b = document.getElementById('limpeza-adv-box');
+        b.style.display = b.style.display==='none' ? '' : 'none';
+      });
+      document.getElementById('btn-limpeza-analisar').addEventListener('click', analisarLimpeza);
+      sel.on('select2:select', analisarLimpeza);
+
+      document.getElementById('chk-limpeza-todos').addEventListener('change', function(){
+        var v = this.checked;
+        document.querySelectorAll('.chk-limpeza-disp:not(:disabled)').forEach(function(c){ c.checked=v; });
+        atualizarSelecaoLimpeza();
+      });
+      document.getElementById('limpeza-sel-todos').addEventListener('click', function(e){ e.preventDefault(); document.querySelectorAll('.chk-limpeza-disp:not(:disabled)').forEach(function(c){c.checked=true;}); atualizarSelecaoLimpeza(); });
+      document.getElementById('limpeza-sel-nenhum').addEventListener('click', function(e){ e.preventDefault(); document.querySelectorAll('.chk-limpeza-disp').forEach(function(c){c.checked=false;}); atualizarSelecaoLimpeza(); });
+      document.getElementById('mot-sel-todos').addEventListener('click', function(e){ e.preventDefault(); document.querySelectorAll('.chk-limpeza-mot').forEach(function(c){c.checked=true;}); });
+      document.getElementById('mot-sel-nenhum').addEventListener('click', function(e){ e.preventDefault(); document.querySelectorAll('.chk-limpeza-mot').forEach(function(c){c.checked=false;}); });
+
+      document.querySelectorAll('input[name="modo-limpeza"]').forEach(function(r){
+        r.addEventListener('change', marcarModoSelecionado);
+      });
+      marcarModoSelecionado();
+
+      document.getElementById('btn-limpeza-executar').addEventListener('click', abrirConfirmacaoLimpeza);
+      document.getElementById('btn-limpeza-confirmar').addEventListener('click', executarLimpeza);
+
+      loadLimpezaHistorico();
+    }
+
+    function marcarModoSelecionado(){
+      var v = (document.querySelector('input[name="modo-limpeza"]:checked') || {}).value;
+      document.querySelectorAll('#limpeza-modos .modo-opt').forEach(function(l){
+        l.classList.toggle('sel', l.dataset.modo === v);
+      });
+    }
+
+    function analisarLimpeza(){
+      var userId = document.getElementById('sel-limpeza-cliente').value;
+      if (!userId){ AL.showAlert('Escolha um cliente do sistema anterior.'); return; }
+      var horas = document.getElementById('in-limpeza-horas').value || 48;
+      var btn = document.getElementById('btn-limpeza-analisar');
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Analisando…';
+      AL.apiGet('/api/integracao/anterior/limpeza/detalhe?userId='+encodeURIComponent(userId)+'&horas='+encodeURIComponent(horas))
+        .then(function(d){
+          limpezaDados = d;
+          renderLimpeza(d);
+          document.getElementById('limpeza-resultado').style.display='';
+          document.getElementById('limpeza-log-card').style.display='none';
+        })
+        .catch(function(err){ AL.showAlert(err.message); })
+        .then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    }
+
+    function renderLimpeza(d){
+      var c = d.contadores;
+      document.getElementById('limpeza-janela').textContent = d.janelaHoras;
+
+      // Cartão do cliente
+      var local = d.clienteLocal
+        ? '<span class="mini-badge b-ok">Cadastrado aqui</span> <span class="cli-meta">'+esc(d.clienteLocal.nome)+'</span>'
+        : '<span class="mini-badge b-warn">Sem cadastro na AgilLock</span>';
+      document.getElementById('limpeza-cli-card').innerHTML =
+        '<div class="cli-card"><div>'+
+          '<div class="cli-nome">'+esc(d.usuario.name)+'</div>'+
+          '<div class="cli-meta">'+(d.usuario.email ? '<i class="fa fa-envelope-o"></i> '+esc(d.usuario.email)+' &nbsp; ' : '')+'conta #'+esc(d.usuario.id)+'</div>'+
+          '<div style="margin-top:4px;">'+local+
+            ' <span class="mini-badge b-neutral">'+esc(c.motoristas)+' motorista(s)</span>'+
+            ' <span class="mini-badge b-neutral">'+esc(c.geocercas)+' geocerca(s)</span></div>'+
+        '</div></div>';
+
+      // Contadores: onde estão os dispositivos
+      document.getElementById('limpeza-counters-cadastro').innerHTML =
+        counter(c.anteriorTotal, 'No site antigo') +
+        counter(c.jaNoNovo, 'Já no site novo') +
+        counter(c.faltamNoNovo, 'Faltam trazer') +
+        counter(c.soAqui, 'Só no site novo');
+
+      // Contadores: sinal
+      document.getElementById('limpeza-counters-sinal').innerHTML =
+        counter(c.sinalNovo, 'Enviando p/ a AgilLock') +
+        counter(c.sinalAntigo, 'Enviando p/ o site antigo') +
+        counter(c.semSinalNenhum, 'Sem sinal nos dois') +
+        counter(c.liberadosParaExcluir, 'Liberados p/ excluir') +
+        counter(c.bloqueados, 'Bloqueados');
+
+      // Tabela de dispositivos
+      var tb = document.getElementById('tbody-limpeza-disp');
+      if (!d.dispositivos.length){
+        tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">Este cliente não tem dispositivos no sistema anterior.</td></tr>';
+      } else {
+        tb.innerHTML = d.dispositivos.map(function(x){
+          var sinalAnt = x.sinalAntigo
+            ? '<span class="mini-badge b-warn" title="'+esc(fmtQuando(x.ultimaAtualizacaoAntiga))+'">Ainda envia</span>'
+            : '<span class="mini-badge b-neutral" title="'+esc(fmtQuando(x.ultimaAtualizacaoAntiga))+'">Parou</span>';
+          var sinalNovo = x.sinalNovo
+            ? '<span class="mini-badge b-ok" title="'+esc(fmtQuando(x.ultimaAtualizacaoNova))+'">Recebendo</span>'
+            : (x.existeAqui
+              ? '<span class="mini-badge b-warn" title="'+esc(fmtQuando(x.ultimaAtualizacaoNova))+'">Cadastrado, sem sinal</span>'
+              : '<span class="mini-badge b-neutral">Não cadastrado</span>');
+          var sit = x.apontado
+            ? '<span class="mini-badge b-ok"><i class="fa fa-check"></i> Liberado</span>'
+            : '<span class="mini-badge b-err" title="'+esc(x.motivo)+'"><i class="fa fa-lock"></i> Bloqueado</span>';
+          return '<tr'+(x.apontado?'':' class="row-bloqueado"')+'>'+
+            '<td style="text-align:center;"><input type="checkbox" class="chk-limpeza-disp" data-id="'+esc(x.id)+'"'+(x.apontado?'':' disabled title="'+esc(x.motivo)+'"')+'></td>'+
+            '<td><code>'+esc(x.uniqueId)+'</code></td>'+
+            '<td>'+esc(x.nome)+'</td>'+
+            '<td style="text-align:center;">'+sinalAnt+'</td>'+
+            '<td style="text-align:center;">'+sinalNovo+'</td>'+
+            '<td style="text-align:center;">'+sit+'</td>'+
+          '</tr>';
+        }).join('');
+      }
+      document.getElementById('chk-limpeza-todos').checked = false;
+      document.querySelectorAll('.chk-limpeza-disp').forEach(function(x){ x.addEventListener('change', atualizarSelecaoLimpeza); });
+      atualizarSelecaoLimpeza();
+
+      // Dispositivos que só existem aqui
+      document.getElementById('limpeza-so-aqui').innerHTML = (d.dispositivosSoAqui || []).length
+        ? '<div class="novos-box"><b><i class="fa fa-info-circle"></i> '+d.dispositivosSoAqui.length+' dispositivo(s) deste cliente existem só na AgilLock</b> (não estão mais no sistema anterior): '+
+          d.dispositivosSoAqui.map(function(x){ return esc(x.nome || x.identificador); }).join(', ')+'</div>'
+        : '';
+
+      // Motoristas
+      var cardMot = document.getElementById('limpeza-card-motoristas');
+      if ((d.motoristas || []).length){
+        cardMot.style.display='';
+        document.getElementById('limpeza-mot-total').textContent = d.motoristas.length;
+        document.getElementById('lista-motoristas').innerHTML = d.motoristas.map(function(m){
+          return '<label><input type="checkbox" class="chk-limpeza-mot" data-id="'+esc(m.id)+'" checked> '+
+            '<span>'+esc(m.name || '(sem nome)')+'</span>'+
+            (m.uniqueId ? '<code style="font-size:11px;color:#888;">'+esc(m.uniqueId)+'</code>' : '')+'</label>';
+        }).join('');
+      } else {
+        cardMot.style.display='none';
+        document.getElementById('lista-motoristas').innerHTML='';
+      }
+    }
+
+    function fmtQuando(iso){
+      if (!iso) return 'Nunca recebeu posição.';
+      return 'Último sinal: ' + AL.fmtDate(iso);
+    }
+
+    function atualizarSelecaoLimpeza(){
+      var n = document.querySelectorAll('.chk-limpeza-disp:checked').length;
+      var lib = document.querySelectorAll('.chk-limpeza-disp:not(:disabled)').length;
+      document.getElementById('limpeza-sel-count').textContent = n;
+      document.getElementById('limpeza-lib-count').textContent = lib;
+    }
+
+    function idsSelecionados(sel){
+      return Array.prototype.map.call(document.querySelectorAll(sel), function(c){ return Number(c.dataset.id); });
+    }
+
+    function abrirConfirmacaoLimpeza(){
+      if (!limpezaDados){ AL.showAlert('Analise um cliente antes.'); return; }
+      if (currentUser.role !== 'ADMIN'){ AL.showAlert('Somente ADMIN pode apagar dados do sistema anterior.'); return; }
+      var modo = document.querySelector('input[name="modo-limpeza"]:checked').value;
+      var d = limpezaDados;
+      var disp = modo === 'dispositivos'
+        ? idsSelecionados('.chk-limpeza-disp:checked')
+        : (modo === 'motoristas' ? [] : d.dispositivos.map(function(x){ return x.id; }));
+      var mot = (modo === 'motoristas' || modo === 'cliente_dispositivos_motoristas' || modo === 'tudo')
+        ? idsSelecionados('.chk-limpeza-mot:checked') : [];
+
+      if (modo === 'dispositivos' && !disp.length){ AL.showAlert('Marque ao menos um dispositivo liberado.'); return; }
+      if (modo === 'motoristas' && !mot.length){ AL.showAlert('Marque ao menos um motorista.'); return; }
+
+      // Aviso local da trava (o backend reavalia e barra de qualquer jeito).
+      var bloqueados = modo === 'dispositivos'
+        ? []
+        : d.dispositivos.filter(function(x){ return !x.apontado; });
+      var html = '<p>Cliente: <b>'+esc(d.usuario.name)+'</b> (conta #'+esc(d.usuario.id)+' do sistema anterior)</p>'+
+        '<p>Operação: <b>'+esc(MODOS_LABEL[modo])+'</b></p>';
+      if (bloqueados.length && modo !== 'motoristas'){
+        html += '<div class="perigo-box"><b><i class="fa fa-lock"></i> Esta operação será recusada:</b> '+bloqueados.length+
+          ' dispositivo(s) ainda não foram apontados para a AgilLock. Reaponte-os primeiro ou use a opção de excluir só os dispositivos marcados.</div>';
+      } else {
+        html += '<ul style="margin-left:18px;">';
+        if (disp.length) html += '<li><b>'+disp.length+'</b> dispositivo(s)</li>';
+        if (mot.length) html += '<li><b>'+mot.length+'</b> motorista(s)</li>';
+        if (modo === 'tudo' && (d.geocercas||[]).length) html += '<li><b>'+d.geocercas.length+'</b> geocerca(s)</li>';
+        if (modo === 'cliente_dispositivos' || modo === 'cliente_dispositivos_motoristas' || modo === 'tudo') html += '<li>a <b>conta do cliente</b> no sistema anterior</li>';
+        html += '</ul><p style="color:#b71c1c;"><i class="fa fa-exclamation-triangle"></i> Ação irreversível.</p>';
+      }
+      document.getElementById('limpeza-confirmar-body').innerHTML = html;
+      document.getElementById('in-limpeza-confirmacao').value = '';
+      $('#modal-limpeza').modal('show');
+    }
+
+    function executarLimpeza(){
+      var confirmacao = document.getElementById('in-limpeza-confirmacao').value.trim().toUpperCase();
+      if (confirmacao !== 'EXCLUIR'){ AL.showAlert('Digite EXCLUIR para confirmar.'); return; }
+      var modo = document.querySelector('input[name="modo-limpeza"]:checked').value;
+      var payload = {
+        userId: Number(limpezaDados.usuario.id),
+        modo: modo,
+        horas: Number(document.getElementById('in-limpeza-horas').value || 48),
+        confirmacao: 'EXCLUIR'
+      };
+      if (modo === 'dispositivos') payload.deviceIds = idsSelecionados('.chk-limpeza-disp:checked');
+      if (modo === 'motoristas' || modo === 'cliente_dispositivos_motoristas' || modo === 'tudo') payload.driverIds = idsSelecionados('.chk-limpeza-mot:checked');
+
+      var btn = document.getElementById('btn-limpeza-confirmar');
+      var old = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Apagando…';
+      document.getElementById('limpeza-log-card').style.display='';
+      document.getElementById('limpeza-log-panel').textContent = 'Apagando no sistema anterior…';
+      document.getElementById('limpeza-log-resumo').textContent = '';
+
+      // fetch cru: o corpo do 409 traz a lista de bloqueados, que o AL.apiPost descarta.
+      fetch(API + '/api/integracao/anterior/limpeza/executar', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+localStorage.getItem('al_token') },
+        body: JSON.stringify(payload)
+      }).then(function(res){
+        return res.json().then(function(body){ return { ok: res.ok, body: body }; });
+      }).then(function(r){
+        if (!r.ok){
+          var msg = '<span class="log-err">'+esc(r.body.error || 'Falha ao apagar.')+'</span>';
+          if (r.body.bloqueados && r.body.bloqueados.length){
+            msg += '\n' + r.body.bloqueados.map(function(b){
+              return '<span class="log-err">  · '+esc(b.uniqueId||'')+'  '+esc(b.nome||'')+'  — '+esc(b.motivo||'')+'</span>';
+            }).join('\n');
+          }
+          document.getElementById('limpeza-log-panel').innerHTML = msg;
+          return;
+        }
+        $('#modal-limpeza').modal('hide');
+        renderLimpezaLog(r.body);
+        AL.showAlert('Exclusão concluída no sistema anterior.', r.body.erro ? 'error' : 'success');
+        loadLimpezaHistorico();
+        if (r.body.usuarioExcluido){
+          // a conta não existe mais lá — some com o painel e tira do select
+          limpezaDados = null;
+          document.getElementById('limpeza-resultado').style.display='none';
+          $('#sel-limpeza-cliente option[value="'+payload.userId+'"]').remove();
+          $('#sel-limpeza-cliente').val(null).trigger('change');
+        } else {
+          analisarLimpeza(); // recarrega a foto do cliente
+        }
+      }).catch(function(err){
+        document.getElementById('limpeza-log-panel').innerHTML = '<span class="log-err">'+esc(err.message)+'</span>';
+      }).then(function(){ btn.disabled=false; btn.innerHTML=old; });
+    }
+
+    function renderLimpezaLog(r){
+      var tipoLabel = { dispositivo:'DISPOSITIVO', motorista:'MOTORISTA', geocerca:'GEOCERCA', cliente:'CONTA' };
+      document.getElementById('limpeza-log-panel').innerHTML = (r.itens || []).map(function(i, idx){
+        var cls = i.ok ? 'log-ok' : 'log-err';
+        var tag = i.ok ? 'OK' : ('ERRO '+(i.http||''));
+        return '<span class="'+cls+'">['+(idx+1)+'/'+r.total+'] '+esc(tag)+'  '+esc(tipoLabel[i.tipo]||i.tipo)+'  '+
+          esc(i.uniqueId||'')+'  '+esc(i.nome||'')+(i.resp?('  '+esc(i.resp)):'')+'</span>';
+      }).join('\n') || 'Nada foi excluído.';
+      var cls = r.erro===0 ? 'b-ok' : 'b-err';
+      document.getElementById('limpeza-log-resumo').innerHTML = '<span class="mini-badge '+cls+'">RESUMO: '+
+        r.dispositivos+' dispositivo(s), '+r.motoristas+' motorista(s), '+r.geocercas+' geocerca(s)'+
+        (r.usuarioExcluido?', conta excluída':'')+' — '+r.erro+' erro(s)</span>';
+    }
+
+    function loadLimpezaHistorico(){
+      var tb = document.getElementById('tbody-limpeza-historico');
+      tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888;">Carregando…</td></tr>';
+      AL.apiGet('/api/integracao/anterior/limpeza/historico').then(function(rows){
+        if (!rows.length){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#888;">Nenhuma exclusão registrada.</td></tr>'; return; }
+        tb.innerHTML = rows.map(function(h){
+          return '<tr>'+
+            '<td>'+AL.fmtDate(h.createdAt)+'</td>'+
+            '<td>'+esc(h.clienteNome)+'</td>'+
+            '<td>'+esc(h.criadoPor && h.criadoPor.nome || '—')+'</td>'+
+            '<td style="font-size:12px;">'+esc(MODOS_LABEL[h.modo] || h.modo)+'</td>'+
+            '<td style="text-align:center;">'+h.dispositivos+'</td>'+
+            '<td style="text-align:center;">'+h.motoristas+'</td>'+
+            '<td style="text-align:center;">'+h.geocercas+'</td>'+
+            '<td style="text-align:center;">'+(h.usuarioExcluido?'<span class="mini-badge b-ok">excluída</span>':'<span class="mini-badge b-neutral">mantida</span>')+'</td>'+
+            '<td style="text-align:center;">'+(h.erro ? '<span class="mini-badge b-err">'+h.erro+'</span>' : '0')+'</td>'+
+          '</tr>';
+        }).join('');
+      }).catch(function(err){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#b71c1c;">'+esc(err.message)+'</td></tr>'; });
     }
 
     function baixarPlanilhaHistorico(id, nome, btn){

@@ -11,9 +11,17 @@ import {
   normalizarNome,
   mapaOdometros,
   ReaponteItem,
+  listarUsuariosAnteriores,
+  detalharClienteAnterior,
+  excluirDispositivoAnterior,
+  excluirMotoristaAnterior,
+  excluirGeocercaAnterior,
+  excluirUsuarioAnterior,
+  invalidarCacheAnterior,
+  ExclusaoItem,
 } from '../services/reaponte-anterior.service';
 import { buildTraccarDeviceSyncData, syncTraccarAccumulators } from '../utils/dispositivo-sync';
-import { traccarCreateDevice } from '../services/traccar.service';
+import { traccarCreateDevice, traccarGetDevices } from '../services/traccar.service';
 import { planejarAjuste } from '../utils/normalizar-dispositivo';
 
 /**
@@ -372,6 +380,343 @@ router.get('/historico', async (req: AuthRequest, res: Response) => {
     select: {
       id: true, clienteNome: true, clienteId: true, comando: true,
       total: true, ok: true, erro: true, createdAt: true,
+      criadoPor: { select: { nome: true } },
+    },
+  });
+  res.json(registros);
+});
+
+// ─── Limpeza: apagar dados do sistema anterior ──────────────────────────────
+// Depois que os rastreadores de um cliente já estão reportando para a AgilLock,
+// o cadastro dele continua ocupando espaço no painel antigo. Esta parte da tela
+// apaga esses dados LÁ — de forma irreversível — com uma trava dura: só sai o
+// dispositivo que já foi apontado para cá (existe aqui E já mandou posição).
+
+const MODOS_LIMPEZA = [
+  'dispositivos',
+  'cliente_dispositivos',
+  'cliente_dispositivos_motoristas',
+  'motoristas',
+  'tudo',
+] as const;
+type ModoLimpeza = (typeof MODOS_LIMPEZA)[number];
+
+/** Modos que apagam dispositivos (e por isso passam pela trava do "apontado"). */
+const MODOS_COM_DISPOSITIVOS: ModoLimpeza[] = ['dispositivos', 'cliente_dispositivos', 'cliente_dispositivos_motoristas', 'tudo'];
+/** Modos que apagam a própria conta do cliente no sistema anterior. */
+const MODOS_COM_CLIENTE: ModoLimpeza[] = ['cliente_dispositivos', 'cliente_dispositivos_motoristas', 'tudo'];
+/** Modos que apagam motoristas. */
+const MODOS_COM_MOTORISTAS: ModoLimpeza[] = ['motoristas', 'cliente_dispositivos_motoristas', 'tudo'];
+
+const JANELA_HORAS_PADRAO = 48;
+
+interface DispositivoLimpeza {
+  id: number;
+  nome: string | null;
+  uniqueId: string | null;
+  statusAntigo: string | null;
+  ultimaAtualizacaoAntiga: string | null;
+  existeAqui: boolean;
+  dispositivoLocalId: string | null;
+  ultimaAtualizacaoNova: string | null;
+  sinalNovo: boolean;   // já está mandando posição para a AgilLock
+  sinalAntigo: boolean; // ainda está mandando posição para o sistema antigo
+  apontado: boolean;    // liberado para excluir lá
+  motivo: string | null; // por que NÃO pode ser excluído
+}
+
+/**
+ * Monta a foto do cliente no sistema anterior cruzada com o cadastro daqui.
+ * `janelaHoras` define o que conta como "está enviando sinal" nos dois lados.
+ */
+async function montarLimpeza(userId: number, janelaHoras: number) {
+  const detalhe = await detalharClienteAnterior(userId);
+  const corte = Date.now() - janelaHoras * 3600_000;
+  const recente = (iso: string | null | undefined) => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return Number.isFinite(t) && t >= corte;
+  };
+
+  // Cadastro daqui (casa pelo nome da conta antiga).
+  const clienteLocal = await casarClienteLocal(detalhe.usuario.name);
+
+  // Dispositivos daqui com os IMEIs do sistema anterior.
+  const imeis = detalhe.dispositivos.map((d) => d.uniqueId).filter((v): v is string => !!v);
+  const locais = imeis.length
+    ? await prisma.dispositivo.findMany({
+        where: { identificador: { in: imeis } },
+        select: { id: true, identificador: true, traccarId: true, telemetriaUltimaPosicaoEm: true },
+      })
+    : [];
+  const porImei = new Map(locais.map((d) => [d.identificador, d]));
+
+  // Último contato no NOSSO Traccar (fonte mais confiável que a telemetria salva).
+  const nossoTraccar = new Map<string, string>();
+  try {
+    for (const d of await traccarGetDevices()) {
+      if (d.uniqueId && d.lastUpdate) nossoTraccar.set(d.uniqueId, d.lastUpdate);
+    }
+  } catch {
+    // sem Traccar, cai para telemetriaUltimaPosicaoEm
+  }
+
+  const dispositivos: DispositivoLimpeza[] = detalhe.dispositivos.map((d) => {
+    const local = d.uniqueId ? porImei.get(d.uniqueId) : undefined;
+    const ultimaNova =
+      (d.uniqueId ? nossoTraccar.get(d.uniqueId) : undefined) ??
+      (local?.telemetriaUltimaPosicaoEm ? local.telemetriaUltimaPosicaoEm.toISOString() : null);
+    const existeAqui = !!local;
+    const sinalNovo = existeAqui && recente(ultimaNova);
+    const apontado = existeAqui && sinalNovo;
+    return {
+      id: d.id,
+      nome: d.name,
+      uniqueId: d.uniqueId,
+      statusAntigo: d.status,
+      ultimaAtualizacaoAntiga: d.lastUpdate,
+      existeAqui,
+      dispositivoLocalId: local?.id ?? null,
+      ultimaAtualizacaoNova: ultimaNova ?? null,
+      sinalNovo,
+      sinalAntigo: recente(d.lastUpdate),
+      apontado,
+      motivo: apontado
+        ? null
+        : !existeAqui
+          ? 'Ainda não foi trazido para a AgilLock (IMEI não cadastrado aqui).'
+          : `Cadastrado aqui, mas sem posição na AgilLock nas últimas ${janelaHoras}h — não foi apontado.`,
+    };
+  });
+
+  // Dispositivos que o cliente já tem aqui e não existem mais no sistema antigo.
+  const dispositivosSoAqui = clienteLocal
+    ? await prisma.dispositivo.findMany({
+        where: { clienteId: clienteLocal.id, identificador: { notIn: imeis.length ? imeis : ['—'] } },
+        select: { id: true, nome: true, identificador: true, placa: true },
+        orderBy: { nome: 'asc' },
+      })
+    : [];
+
+  const jaNoNovo = dispositivos.filter((d) => d.existeAqui).length;
+  const contadores = {
+    anteriorTotal: dispositivos.length,
+    jaNoNovo,
+    faltamNoNovo: dispositivos.length - jaNoNovo,
+    sinalNovo: dispositivos.filter((d) => d.sinalNovo).length,
+    sinalAntigo: dispositivos.filter((d) => d.sinalAntigo).length,
+    semSinalNenhum: dispositivos.filter((d) => !d.sinalNovo && !d.sinalAntigo).length,
+    liberadosParaExcluir: dispositivos.filter((d) => d.apontado).length,
+    bloqueados: dispositivos.filter((d) => !d.apontado).length,
+    soAqui: dispositivosSoAqui.length,
+    motoristas: detalhe.motoristas.length,
+    geocercas: detalhe.geocercas.length,
+  };
+
+  return {
+    usuario: detalhe.usuario,
+    janelaHoras,
+    clienteLocal: clienteLocal
+      ? { id: clienteLocal.id, nome: clienteLocal.nome, telefone: clienteLocal.telefone, status: clienteLocal.status }
+      : null,
+    contadores,
+    dispositivos,
+    dispositivosSoAqui,
+    motoristas: detalhe.motoristas,
+    geocercas: detalhe.geocercas,
+  };
+}
+
+// Contas do sistema anterior (alimenta o select com busca da aba de limpeza).
+// GET /api/integracao/anterior/limpeza/clientes
+router.get('/limpeza/clientes', async (_req: AuthRequest, res: Response) => {
+  try {
+    res.json(await listarUsuariosAnteriores());
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Erro ao listar contas do sistema anterior.';
+    res.status(/não configurada/i.test(msg) ? 503 : 502).json({ error: msg });
+  }
+});
+
+// Foto do cliente nos dois sistemas (contadores + listas).
+// GET /api/integracao/anterior/limpeza/detalhe?userId=123&horas=48
+router.get('/limpeza/detalhe', async (req: AuthRequest, res: Response) => {
+  const userId = Number(req.query.userId);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    res.status(400).json({ error: 'Informe o userId da conta no sistema anterior.' });
+    return;
+  }
+  const horas = req.query.horas !== undefined ? Number(req.query.horas) : JANELA_HORAS_PADRAO;
+  if (!Number.isFinite(horas) || horas <= 0 || horas > 24 * 90) {
+    res.status(400).json({ error: 'Parâmetro horas inválido (1 a 2160).' });
+    return;
+  }
+  try {
+    res.json(await montarLimpeza(userId, horas));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Erro ao consultar o sistema anterior.';
+    const status = /não configurada/i.test(msg) ? 503 : /não encontrada/i.test(msg) ? 404 : 502;
+    res.status(status).json({ error: msg });
+  }
+});
+
+// Executa a exclusão no sistema anterior (IRREVERSÍVEL — só ADMIN).
+// POST /api/integracao/anterior/limpeza/executar
+// body: { userId, modo, deviceIds?, driverIds?, horas?, confirmacao: 'EXCLUIR' }
+router.post('/limpeza/executar', async (req: AuthRequest, res: Response) => {
+  if (req.user!.role !== 'ADMIN') {
+    res.status(403).json({ error: 'Somente ADMIN pode apagar dados do sistema anterior.' });
+    return;
+  }
+  if (String(req.body?.confirmacao || '').trim().toUpperCase() !== 'EXCLUIR') {
+    res.status(400).json({ error: 'Confirmação inválida — digite EXCLUIR para confirmar.' });
+    return;
+  }
+  const userId = Number(req.body?.userId);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    res.status(400).json({ error: 'Informe o userId da conta no sistema anterior.' });
+    return;
+  }
+  const modo = String(req.body?.modo || '') as ModoLimpeza;
+  if (!MODOS_LIMPEZA.includes(modo)) {
+    res.status(400).json({ error: 'Modo de exclusão inválido.' });
+    return;
+  }
+  const horas = req.body?.horas !== undefined ? Number(req.body.horas) : JANELA_HORAS_PADRAO;
+  if (!Number.isFinite(horas) || horas <= 0 || horas > 24 * 90) {
+    res.status(400).json({ error: 'Parâmetro horas inválido (1 a 2160).' });
+    return;
+  }
+
+  try {
+    // Refaz a foto no servidor — a trava nunca depende do que veio do navegador.
+    const foto = await montarLimpeza(userId, horas);
+
+    // 1) Quais dispositivos entram nesta operação.
+    let dispositivosAlvo: DispositivoLimpeza[] = [];
+    if (MODOS_COM_DISPOSITIVOS.includes(modo)) {
+      if (modo === 'dispositivos') {
+        const escolhidos = new Set(
+          (Array.isArray(req.body?.deviceIds) ? req.body.deviceIds : []).map((x: unknown) => Number(x)),
+        );
+        if (!escolhidos.size) {
+          res.status(400).json({ error: 'Selecione ao menos um dispositivo para excluir.' });
+          return;
+        }
+        dispositivosAlvo = foto.dispositivos.filter((d) => escolhidos.has(d.id));
+        const desconhecidos = [...escolhidos].filter((id) => !foto.dispositivos.some((d) => d.id === id));
+        if (desconhecidos.length) {
+          res.status(400).json({ error: `Dispositivo(s) fora desta conta: ${desconhecidos.join(', ')}.` });
+          return;
+        }
+      } else {
+        dispositivosAlvo = foto.dispositivos;
+      }
+
+      // TRAVA: nada que não tenha sido apontado para a AgilLock é apagado lá.
+      const bloqueados = dispositivosAlvo.filter((d) => !d.apontado);
+      if (bloqueados.length) {
+        res.status(409).json({
+          error:
+            `${bloqueados.length} dispositivo(s) ainda não foram apontados para a AgilLock. ` +
+            'Reaponte-os (ou tire-os da seleção) antes de excluir.',
+          bloqueados: bloqueados.map((d) => ({ id: d.id, nome: d.nome, uniqueId: d.uniqueId, motivo: d.motivo })),
+        });
+        return;
+      }
+    }
+
+    // 2) Quais motoristas entram.
+    let motoristasAlvo = MODOS_COM_MOTORISTAS.includes(modo) ? foto.motoristas : [];
+    if (motoristasAlvo.length && Array.isArray(req.body?.driverIds)) {
+      const escolhidos = new Set(req.body.driverIds.map((x: unknown) => Number(x)));
+      motoristasAlvo = motoristasAlvo.filter((m) => escolhidos.has(m.id));
+    }
+
+    // 3) Executa na ordem segura: dispositivos → motoristas → geocercas → conta.
+    const itens: ExclusaoItem[] = [];
+    for (const d of dispositivosAlvo) {
+      itens.push(await excluirDispositivoAnterior(d.id, d.nome, d.uniqueId));
+    }
+    for (const m of motoristasAlvo) {
+      itens.push(await excluirMotoristaAnterior(m.id, m.name, m.uniqueId));
+    }
+    if (modo === 'tudo') {
+      for (const g of foto.geocercas) {
+        itens.push(await excluirGeocercaAnterior(g.id, g.name));
+      }
+    }
+
+    // A conta só cai se tudo o que dependia dela saiu — senão sobra órfão lá.
+    let usuarioExcluido = false;
+    const falhasAntes = itens.filter((i) => !i.ok).length;
+    if (MODOS_COM_CLIENTE.includes(modo)) {
+      if (falhasAntes) {
+        itens.push({
+          tipo: 'cliente',
+          id: foto.usuario.id,
+          nome: foto.usuario.name,
+          uniqueId: null,
+          ok: false,
+          http: null,
+          resp: 'Conta mantida: houve falha ao excluir itens dela.',
+        });
+      } else {
+        const r = await excluirUsuarioAnterior(foto.usuario.id, foto.usuario.name);
+        itens.push(r);
+        usuarioExcluido = r.ok;
+      }
+    }
+
+    invalidarCacheAnterior();
+
+    const resumo = {
+      modo,
+      usuario: foto.usuario,
+      dispositivos: itens.filter((i) => i.tipo === 'dispositivo' && i.ok).length,
+      motoristas: itens.filter((i) => i.tipo === 'motorista' && i.ok).length,
+      geocercas: itens.filter((i) => i.tipo === 'geocerca' && i.ok).length,
+      usuarioExcluido,
+      erro: itens.filter((i) => !i.ok).length,
+      total: itens.length,
+      itens,
+    };
+
+    await prisma.limpezaAnteriorHistorico.create({
+      data: {
+        usuarioAnteriorId: foto.usuario.id,
+        clienteNome: foto.usuario.name,
+        clienteId: foto.clienteLocal?.id ?? null,
+        modo,
+        dispositivos: resumo.dispositivos,
+        motoristas: resumo.motoristas,
+        geocercas: resumo.geocercas,
+        usuarioExcluido,
+        erro: resumo.erro,
+        itens: itens as unknown as object[],
+        criadoPorId: req.user!.userId,
+      },
+    });
+
+    res.json(resumo);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Erro ao apagar dados do sistema anterior.';
+    const status = /não configurada/i.test(msg) ? 503 : /não encontrada/i.test(msg) ? 404 : 502;
+    res.status(status).json({ error: msg });
+  }
+});
+
+// Histórico das exclusões feitas no sistema anterior (auditoria).
+// GET /api/integracao/anterior/limpeza/historico?limite=50
+router.get('/limpeza/historico', async (req: AuthRequest, res: Response) => {
+  const limite = Math.min(Number(req.query.limite) || 50, 200);
+  const registros = await prisma.limpezaAnteriorHistorico.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limite,
+    select: {
+      id: true, clienteNome: true, usuarioAnteriorId: true, modo: true,
+      dispositivos: true, motoristas: true, geocercas: true,
+      usuarioExcluido: true, erro: true, createdAt: true,
       criadoPor: { select: { nome: true } },
     },
   });

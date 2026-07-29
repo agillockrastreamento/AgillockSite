@@ -81,6 +81,7 @@ model User {
   adminPreferencia      AdminPreferencia?
   dispositivosResgate   UsuarioResgateDispositivo[]
   reapontamentos        ReaponteHistorico[]         @relation("ReaponteCriador")
+  limpezasAnterior      LimpezaAnteriorHistorico[]  @relation("LimpezaAnteriorCriador")
 }
 
 // Auditoria de cada envio de comando para o sistema anterior (monitorando.me),
@@ -100,6 +101,32 @@ model ReaponteHistorico {
 
   criadoPorId String
   criadoPor   User     @relation("ReaponteCriador", fields: [criadoPorId], references: [id])
+  cliente     Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  @@index([clienteNome])
+  @@index([clienteId])
+  @@index([createdAt])
+}
+
+// Auditoria da aba "Apagar dados do sistema anterior". A exclusão acontece no
+// painel antigo (monitorando) e é IRREVERSÍVEL — este registro é a única prova
+// do que foi apagado, por quem e quando.
+model LimpezaAnteriorHistorico {
+  id                String  @id @default(uuid())
+  usuarioAnteriorId Int? // id da conta no sistema anterior
+  clienteNome       String // nome da conta como está no sistema anterior
+  clienteId         String? // Cliente daqui, quando o nome casa com um cadastro
+  modo              String // dispositivos | cliente_dispositivos | cliente_dispositivos_motoristas | motoristas | tudo
+  dispositivos      Int      @default(0)
+  motoristas        Int      @default(0)
+  geocercas         Int      @default(0)
+  usuarioExcluido   Boolean  @default(false)
+  erro              Int      @default(0)
+  itens             Json // [{ tipo, id, nome, uniqueId, ok, http, resp }]
+  createdAt         DateTime @default(now())
+
+  criadoPorId String
+  criadoPor   User     @relation("LimpezaAnteriorCriador", fields: [criadoPorId], references: [id])
   cliente     Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
 
   @@index([clienteNome])
@@ -179,6 +206,7 @@ model Cliente {
   motoristas             Motorista[]
   veiculosMultaSituacao  VeiculoMultaSituacao[]
   reapontamentos         ReaponteHistorico[]
+  limpezasAnterior       LimpezaAnteriorHistorico[]
 }
 
 // Veículo de um contrato da IAPRO sincronizado via API. Enquanto não houver um
