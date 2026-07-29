@@ -120,6 +120,10 @@ model LimpezaAnteriorHistorico {
   dispositivos      Int      @default(0)
   motoristas        Int      @default(0)
   geocercas         Int      @default(0)
+  // Quantos dispositivos foram apagados mesmo SEM apontamento confirmado para a
+  // AgilLock. A tela avisa e pede uma 2ª confirmação; este campo é o registro de
+  // que o admin decidiu seguir assim mesmo.
+  naoApontados      Int      @default(0)
   usuarioExcluido   Boolean  @default(false)
   erro              Int      @default(0)
   itens             Json // [{ tipo, id, nome, uniqueId, ok, http, resp }]

@@ -535,6 +535,11 @@ export interface ExclusaoItem {
   ok: boolean;
   http: number | null;
   resp: string;
+  // Só para dispositivos: se estava apontado para a AgilLock no momento da
+  // exclusão. Guardado no histórico — é a prova de que o admin optou por
+  // apagar um rastreador que ainda não estava reportando aqui.
+  apontado?: boolean;
+  motivo?: string | null;
 }
 
 /** DELETE genérico na API antiga. 204/200 = apagado; 404 = já não existia (conta como ok). */

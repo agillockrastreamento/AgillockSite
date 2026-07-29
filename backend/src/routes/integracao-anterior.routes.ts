@@ -421,8 +421,8 @@ interface DispositivoLimpeza {
   ultimaAtualizacaoNova: string | null;
   sinalNovo: boolean;   // já está mandando posição para a AgilLock
   sinalAntigo: boolean; // ainda está mandando posição para o sistema antigo
-  apontado: boolean;    // liberado para excluir lá
-  motivo: string | null; // por que NÃO pode ser excluído
+  apontado: boolean;    // migração confirmada (cadastrado aqui + já reportou)
+  motivo: string | null; // por que a migração NÃO está confirmada
 }
 
 /**
@@ -484,8 +484,8 @@ async function montarLimpeza(userId: number, janelaHoras: number) {
       motivo: apontado
         ? null
         : !existeAqui
-          ? 'Ainda não foi trazido para a AgilLock (IMEI não cadastrado aqui).'
-          : `Cadastrado aqui, mas sem posição na AgilLock nas últimas ${janelaHoras}h — não foi apontado.`,
+          ? 'Ainda não foi trazido para a AgilLock (IMEI não cadastrado aqui). Se apagar, o rastreador some do sistema antigo sem estar reportando aqui.'
+          : `Cadastrado aqui, mas sem posição na AgilLock nas últimas ${janelaHoras}h — não dá para confirmar que o apontamento pegou.`,
     };
   });
 
@@ -506,8 +506,8 @@ async function montarLimpeza(userId: number, janelaHoras: number) {
     sinalNovo: dispositivos.filter((d) => d.sinalNovo).length,
     sinalAntigo: dispositivos.filter((d) => d.sinalAntigo).length,
     semSinalNenhum: dispositivos.filter((d) => !d.sinalNovo && !d.sinalAntigo).length,
-    liberadosParaExcluir: dispositivos.filter((d) => d.apontado).length,
-    bloqueados: dispositivos.filter((d) => !d.apontado).length,
+    apontados: dispositivos.filter((d) => d.apontado).length,
+    naoApontados: dispositivos.filter((d) => !d.apontado).length,
     soAqui: dispositivosSoAqui.length,
     motoristas: detalhe.motoristas.length,
     geocercas: detalhe.geocercas.length,
@@ -588,8 +588,14 @@ router.post('/limpeza/executar', async (req: AuthRequest, res: Response) => {
     return;
   }
 
+  // Confirmação extra para os dispositivos que ainda não foram apontados para a
+  // AgilLock. Não é uma barreira: se o admin decidir apagar assim mesmo, ele
+  // apaga — a decisão dele fica registrada no histórico.
+  const cienteNaoApontados = req.body?.cienteNaoApontados === true;
+
   try {
-    // Refaz a foto no servidor — a trava nunca depende do que veio do navegador.
+    // Refaz a foto no servidor — o cálculo do "apontado" nunca depende do que
+    // veio do navegador (o histórico precisa registrar o estado real).
     const foto = await montarLimpeza(userId, horas);
 
     // 1) Quais dispositivos entram nesta operação.
@@ -613,14 +619,16 @@ router.post('/limpeza/executar', async (req: AuthRequest, res: Response) => {
         dispositivosAlvo = foto.dispositivos;
       }
 
-      // TRAVA: nada que não tenha sido apontado para a AgilLock é apagado lá.
-      const bloqueados = dispositivosAlvo.filter((d) => !d.apontado);
-      if (bloqueados.length) {
+      // Sem apontamento confirmado o rastreador some do sistema antigo sem estar
+      // reportando no novo. Não bloqueia — exige o "estou ciente" da 2ª etapa.
+      const semApontamento = dispositivosAlvo.filter((d) => !d.apontado);
+      if (semApontamento.length && !cienteNaoApontados) {
         res.status(409).json({
           error:
-            `${bloqueados.length} dispositivo(s) ainda não foram apontados para a AgilLock. ` +
-            'Reaponte-os (ou tire-os da seleção) antes de excluir.',
-          bloqueados: bloqueados.map((d) => ({ id: d.id, nome: d.nome, uniqueId: d.uniqueId, motivo: d.motivo })),
+            `${semApontamento.length} dispositivo(s) ainda não foram apontados para a AgilLock. ` +
+            'Confirme que quer excluí-los assim mesmo.',
+          precisaConfirmar: true,
+          naoApontados: semApontamento.map((d) => ({ id: d.id, nome: d.nome, uniqueId: d.uniqueId, motivo: d.motivo })),
         });
         return;
       }
@@ -636,7 +644,8 @@ router.post('/limpeza/executar', async (req: AuthRequest, res: Response) => {
     // 3) Executa na ordem segura: dispositivos → motoristas → geocercas → conta.
     const itens: ExclusaoItem[] = [];
     for (const d of dispositivosAlvo) {
-      itens.push(await excluirDispositivoAnterior(d.id, d.nome, d.uniqueId));
+      const r = await excluirDispositivoAnterior(d.id, d.nome, d.uniqueId);
+      itens.push({ ...r, apontado: d.apontado, motivo: d.motivo });
     }
     for (const m of motoristasAlvo) {
       itens.push(await excluirMotoristaAnterior(m.id, m.name, m.uniqueId));
@@ -676,6 +685,8 @@ router.post('/limpeza/executar', async (req: AuthRequest, res: Response) => {
       dispositivos: itens.filter((i) => i.tipo === 'dispositivo' && i.ok).length,
       motoristas: itens.filter((i) => i.tipo === 'motorista' && i.ok).length,
       geocercas: itens.filter((i) => i.tipo === 'geocerca' && i.ok).length,
+      // Quantos foram apagados mesmo sem estarem apontados para a AgilLock.
+      naoApontados: itens.filter((i) => i.tipo === 'dispositivo' && i.ok && i.apontado === false).length,
       usuarioExcluido,
       erro: itens.filter((i) => !i.ok).length,
       total: itens.length,
@@ -691,6 +702,7 @@ router.post('/limpeza/executar', async (req: AuthRequest, res: Response) => {
         dispositivos: resumo.dispositivos,
         motoristas: resumo.motoristas,
         geocercas: resumo.geocercas,
+        naoApontados: resumo.naoApontados,
         usuarioExcluido,
         erro: resumo.erro,
         itens: itens as unknown as object[],
@@ -715,7 +727,7 @@ router.get('/limpeza/historico', async (req: AuthRequest, res: Response) => {
     take: limite,
     select: {
       id: true, clienteNome: true, usuarioAnteriorId: true, modo: true,
-      dispositivos: true, motoristas: true, geocercas: true,
+      dispositivos: true, motoristas: true, geocercas: true, naoApontados: true,
       usuarioExcluido: true, erro: true, createdAt: true,
       criadoPor: { select: { nome: true } },
     },
