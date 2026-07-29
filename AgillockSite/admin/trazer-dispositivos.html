@@ -665,6 +665,15 @@
       document.getElementById('clientes-locais').innerHTML = locais.map(function(c){
         var jaRe = c.ultimoReaponte ? '<span class="mini-badge b-info" title="'+esc(c.ultimoReaponte.ok)+' OK / '+esc(c.ultimoReaponte.erro)+' erro">Reapontado em '+AL.fmtDate(c.ultimoReaponte.createdAt)+'</span>' : '<span class="mini-badge b-warn">Nunca reapontado</span>';
         var existe = c.clienteId ? '<span class="mini-badge b-ok">Cadastrado aqui · '+esc(c.dispositivosLocais)+' disp.</span>' : '<span class="mini-badge b-neutral">Sem cadastro aqui</span>';
+        // Nome casou com o cadastro daqui escrito de outro jeito — mostra qual é.
+        if (c.clienteId && c.clienteNomeLocal && c.clienteNomeLocal !== c.nome){
+          existe += ' <span class="mini-badge b-info" title="Nome diferente no cadastro daqui">= '+esc(c.clienteNomeLocal)+'</span>';
+        }
+        // Ambíguo: o backend não cadastra nem vincula nada até o admin resolver.
+        if (c.matchTipo === 'ambiguo'){
+          existe = '<span class="mini-badge b-warn" title="'+esc((c.candidatos||[]).map(function(x){return x.nome;}).join(' | '))+'">'+
+            '<i class="fa fa-exclamation-triangle"></i> '+esc((c.candidatos||[]).length)+' clientes com nome parecido</span>';
+        }
         var waBtn = (c.clienteId && c.telefone)
           ? '<button class="btn btn-xs btn-wa btn-wa-open" data-nome="'+esc(c.nome)+'"><i class="fa fa-whatsapp"></i> Enviar acesso</button>'
           : '<button class="btn btn-xs btn-default" disabled title="Sem cadastro/telefone aqui"><i class="fa fa-whatsapp"></i> Enviar acesso</button>';
@@ -735,18 +744,21 @@
       return c || null;
     }
 
-    // Clientes desta seleção que ainda não existem aqui (serão criados).
-    function clientesParaCriar(alvos){
+    // Separa os clientes da seleção entre "serão criados" e "ambíguos" (nome
+    // parecido com mais de um cadastro daqui — o backend não mexe nesses).
+    function clientesDaSelecao(alvos){
       var locais = (consulta && consulta.clientesLocais) || [];
-      var mapa = {};
-      locais.forEach(function(c){ mapa[c.nome] = c.clienteId; });
-      var vistos = {}, res = [];
+      var porNome = {};
+      locais.forEach(function(c){ porNome[c.nome] = c; });
+      var vistos = {}, criar = [], ambiguos = [];
       alvos.forEach(function(a){
         if (vistos[a.cliente]) return;
         vistos[a.cliente] = true;
-        if (!mapa[a.cliente]) res.push(a.cliente); // sem clienteId (ou não listado) = criar
+        var c = porNome[a.cliente];
+        if (c && c.matchTipo === 'ambiguo') ambiguos.push(c);
+        else if (!c || !c.clienteId) criar.push(a.cliente); // sem clienteId (ou não listado) = criar
       });
-      return res;
+      return { criar: criar, ambiguos: ambiguos };
     }
 
     document.getElementById('btn-reapontar').addEventListener('click', function(){
@@ -757,7 +769,8 @@
       if (custom && !cmd){ AL.showAlert('Digite o comando personalizado.'); return; }
 
       var novos = alvos.filter(function(a){ return !a.existeAqui; });
-      var criarCli = clientesParaCriar(alvos);
+      var cli = clientesDaSelecao(alvos);
+      var criarCli = cli.criar;
       var html = '<p>Vai enviar o comando <span class="code-inline">'+esc(cmd || CMD_PADRAO)+'</span> para <b>'+alvos.length+' dispositivo(s)</b>.</p>';
       if (novos.length || criarCli.length){
         html += '<div class="novos-box"><b><i class="fa fa-plus-circle"></i> Antes do envio, será cadastrado no sistema atual:</b>'+
@@ -765,6 +778,18 @@
           (criarCli.length ? '<li><b>'+criarCli.length+'</b> cliente(s): '+esc(criarCli.join(', '))+'</li>' : '')+
           (novos.length ? '<li><b>'+novos.length+'</b> dispositivo(s) novo(s)</li>' : '')+
           '</ul></div>';
+      }
+      // Sem isso o admin só descobre que nada foi cadastrado depois do envio.
+      if (cli.ambiguos.length){
+        html += '<div class="novos-box" style="border-color:#c9a227;"><b><i class="fa fa-exclamation-triangle"></i> '+
+          cli.ambiguos.length+' cliente(s) com nome parecido com mais de um cadastro daqui:</b>'+
+          '<ul style="margin:6px 0 0 18px;">'+
+          cli.ambiguos.map(function(c){
+            return '<li>'+esc(c.nome)+' → '+esc((c.candidatos||[]).map(function(x){return x.nome;}).join(' | '))+'</li>';
+          }).join('')+
+          '</ul><div class="step-sub" style="margin-top:6px;">Os dispositivos deles <b>não</b> serão cadastrados nem vinculados '+
+          '(evita duplicar cliente ou vincular no errado). O comando é enviado normalmente. '+
+          'Para trazê-los, acerte o nome no cadastro de clientes e repita.</div></div>';
       }
       html += (custom ? '<p style="color:#a35b00;"><i class="fa fa-exclamation-triangle"></i> Comando personalizado — confira antes de enviar.</p>' : '<p class="step-sub">Os online recebem na hora; os offline ficam enfileirados e recebem ao reconectar.</p>');
       document.getElementById('confirmar-body').innerHTML = html;
@@ -799,7 +824,7 @@
     function enviarReaponte(){
       var alvos = alvosSelecionados();
       var cmd = comandoEscolhido();
-      var precisaCadastrar = alvos.some(function(a){ return !a.existeAqui; }) || clientesParaCriar(alvos).length > 0;
+      var precisaCadastrar = alvos.some(function(a){ return !a.existeAqui; }) || clientesDaSelecao(alvos).criar.length > 0;
       var btn = document.getElementById('btn-reapontar');
       var old = btn.innerHTML; btn.disabled=true;
 
@@ -815,8 +840,9 @@
           if (r.dispositivosCriados) parts.push(r.dispositivosCriados+' dispositivo(s) cadastrado(s)');
           if (r.dispositivosVinculados) parts.push(r.dispositivosVinculados+' vinculado(s)');
           if (r.odometrosPreenchidos) parts.push(r.odometrosPreenchidos+' com km preenchido');
+          if (r.clientesAmbiguos) parts.push(r.clientesAmbiguos+' cliente(s) ambíguo(s) ignorado(s)');
           if (r.erros) parts.push(r.erros+' erro(s)');
-          if (parts.length) AL.showAlert('Cadastro: '+parts.join(', ')+'.', r.erros ? 'error' : 'success');
+          if (parts.length) AL.showAlert('Cadastro: '+parts.join(', ')+'.', (r.erros || r.clientesAmbiguos) ? 'error' : 'success');
           // marca localmente como já existente p/ refletir e evitar recadastro se reenviar
           alvos.forEach(function(a){ a.existeAqui = true; });
         });

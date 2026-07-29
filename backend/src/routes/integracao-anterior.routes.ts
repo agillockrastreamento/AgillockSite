@@ -40,22 +40,106 @@ function parseLista(v: unknown): string[] {
   return [];
 }
 
-// Casa o nome do cliente do sistema antigo com um Cliente cadastrado aqui.
-// Retorna o melhor match (exato antes de parcial), ou null.
-async function casarClienteLocal(nomeAntigo: string) {
-  const alvo = normalizarNome(nomeAntigo);
-  if (!alvo) return null;
-  const clientes = await prisma.cliente.findMany({
-    select: { id: true, nome: true, telefone: true, status: true },
-  });
-  let exato: (typeof clientes)[number] | null = null;
-  let parcial: (typeof clientes)[number] | null = null;
+// ─── Casamento do nome do cliente antigo com o cadastro daqui ───────────────
+// O mesmo cliente costuma estar escrito de forma diferente nos dois sistemas:
+// nome do meio só de um lado ("DAVID DODOU" x "DAVID HILANO DODOU"), sufixo de
+// origem ("… Ravena", "… IAPRO") ou lixo de digitação ("CYNARA PINHEIRO ANGELO /").
+// Por isso a comparação é por PALAVRAS, não por substring — comparar substring
+// casa nomes que nada têm a ver e, quando não casa, a importação cria um cliente
+// duplicado sem CPF nem login.
+
+/** Preposições: não identificam ninguém, então saem da comparação. */
+const TOKENS_IGNORADOS = new Set(['da', 'de', 'do', 'das', 'dos', 'di', 'du', 'del', 'la', 'e']);
+
+/**
+ * Rótulo de origem (de onde a base veio) e forma jurídica. Aparece em um lado e
+ * não no outro — "MARIA … SILVA Ravena" aqui, "MARIA … SILVA" lá —, então não
+ * pode pesar na comparação.
+ */
+const TOKENS_RUIDO = new Set([
+  'iapro', 'ravena', 'atual', 'master', 'xm', 'locasmartpro', 'locasmatpro', 'agillock',
+  'ltda', 'me', 'epp', 'eireli', 'mei', 'sa',
+]);
+
+/** Palavras significativas do nome (sem acento, pontuação, números soltos). */
+function tokensNome(nome: string): string[] {
+  return normalizarNome(nome)
+    .replace(/[^a-z0-9\s]/g, ' ') // barra, parênteses, ponto viram separador
+    .replace(/\b\d+\b/g, ' ')     // telefone/código colado no nome
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !TOKENS_IGNORADOS.has(t) && !TOKENS_RUIDO.has(t));
+}
+
+function todasContidas(palavras: string[], conjunto: Set<string>): boolean {
+  return palavras.every((p) => conjunto.has(p));
+}
+
+function buscarClientesParaMatch() {
+  return prisma.cliente.findMany({ select: { id: true, nome: true, telefone: true, status: true } });
+}
+
+type ClienteLocalBasico = Awaited<ReturnType<typeof buscarClientesParaMatch>>[number];
+
+interface MatchClienteLocal {
+  cliente: ClienteLocalBasico | null;
+  /** 'ambiguo' = mais de um cadastro plausível; ninguém decide sozinho nesse caso. */
+  tipo: 'exato' | 'tokens' | 'contido' | 'ambiguo' | 'nenhum';
+  candidatos: ClienteLocalBasico[];
+}
+
+/**
+ * Procura o Cliente daqui que corresponde ao nome vindo do sistema antigo.
+ * Ordem de confiança: nome idêntico → mesmas palavras → um nome contido no
+ * outro. Fora do idêntico, só decide quando há UM único candidato; com dois ou
+ * mais devolve 'ambiguo' para o chamador tratar (nunca chuta).
+ */
+async function resolverClienteLocal(nomeAntigo: string): Promise<MatchClienteLocal> {
+  const semMatch: MatchClienteLocal = { cliente: null, tipo: 'nenhum', candidatos: [] };
+  const alvoNorm = normalizarNome(nomeAntigo);
+  const alvoTokens = tokensNome(nomeAntigo);
+  if (!alvoNorm || !alvoTokens.length) return semMatch;
+  const alvoSet = new Set(alvoTokens);
+
+  const clientes = await buscarClientesParaMatch();
+
+  const exatos: ClienteLocalBasico[] = [];
+  const mesmasPalavras: ClienteLocalBasico[] = []; // só muda pontuação/ordem
+  const contidos: ClienteLocalBasico[] = [];       // um tem palavras a mais que o outro
+
   for (const c of clientes) {
-    const n = normalizarNome(c.nome);
-    if (n === alvo) { exato = c; break; }
-    if (!parcial && (n.includes(alvo) || alvo.includes(n))) parcial = c;
+    if (normalizarNome(c.nome) === alvoNorm) { exatos.push(c); continue; }
+
+    const cTokens = tokensNome(c.nome);
+    if (!cTokens.length) continue;
+    const cSet = new Set(cTokens);
+
+    if (cSet.size === alvoSet.size && todasContidas(cTokens, alvoSet)) { mesmasPalavras.push(c); continue; }
+
+    // Exige 2+ palavras e o mesmo primeiro nome E o mesmo último sobrenome. Só
+    // o primeiro nome não basta: "JOSE DA SILVA SANTOS" cabe inteiro dentro de
+    // "JOSE EDSON SILVA DOS SANTOS MARQUES" e são pessoas diferentes. Com o
+    // último sobrenome, o que passa é "DAVID DODOU" ⊂ "DAVID HILANO DODOU" —
+    // nome do meio a mais, mesma pessoa.
+    const menor = cTokens.length <= alvoTokens.length ? cTokens : alvoTokens;
+    const maior = cTokens.length <= alvoTokens.length ? alvoSet : cSet;
+    const mesmoPrimeiro = cTokens[0] === alvoTokens[0];
+    const mesmoUltimo = cTokens[cTokens.length - 1] === alvoTokens[alvoTokens.length - 1];
+    if (menor.length >= 2 && mesmoPrimeiro && mesmoUltimo && todasContidas(menor, maior)) contidos.push(c);
   }
-  return exato || parcial;
+
+  // Homônimo exato é raro e o cadastro antigo já vinha assim — mantém o 1º.
+  if (exatos.length) return { cliente: exatos[0], tipo: 'exato', candidatos: exatos };
+
+  for (const [tipo, lista] of [['tokens', mesmasPalavras], ['contido', contidos]] as const) {
+    if (lista.length === 1) return { cliente: lista[0], tipo, candidatos: lista };
+    if (lista.length > 1) return { cliente: null, tipo: 'ambiguo', candidatos: lista };
+  }
+  return semMatch;
+}
+
+/** Atalho para quem só quer o cliente (ou null) — leitura/enriquecimento de tela. */
+async function casarClienteLocal(nomeAntigo: string): Promise<ClienteLocalBasico | null> {
+  return (await resolverClienteLocal(nomeAntigo)).cliente;
 }
 
 // Status da integração (a tela usa para avisar se falta configurar credencial).
@@ -112,7 +196,8 @@ router.get('/consultar', async (req: AuthRequest, res: Response) => {
     const nomesUnicos = [...new Set(resultado.alvos.map((a) => a.cliente))];
     const locais = await Promise.all(
       nomesUnicos.map(async (nome) => {
-        const local = await casarClienteLocal(nome);
+        const match = await resolverClienteLocal(nome);
+        const local = match.cliente;
         const ultimo = await prisma.reaponteHistorico.findFirst({
           where: { clienteNome: { equals: nome, mode: 'insensitive' } },
           orderBy: { createdAt: 'desc' },
@@ -131,6 +216,10 @@ router.get('/consultar', async (req: AuthRequest, res: Response) => {
         return {
           nome,
           clienteId: local?.id ?? null,
+          clienteNomeLocal: local?.nome ?? null, // pode diferir do nome de lá
+          matchTipo: match.tipo,
+          // Só faz sentido listar quando ninguém pôde ser escolhido.
+          candidatos: match.tipo === 'ambiguo' ? match.candidatos.map((c) => ({ id: c.id, nome: c.nome })) : [],
           telefone: local?.telefone ?? null,
           statusCliente: local?.status ?? null,
           loginEmail,
@@ -229,6 +318,8 @@ router.post('/importar', async (req: AuthRequest, res: Response) => {
   const resumo = {
     clientesCriados: 0,
     clientesExistentes: 0,
+    // Nome que bateu com mais de um cadastro daqui: nada é criado nem vinculado.
+    clientesAmbiguos: 0,
     dispositivosCriados: 0,
     dispositivosVinculados: 0,
     dispositivosExistentes: 0,
@@ -247,7 +338,27 @@ router.post('/importar', async (req: AuthRequest, res: Response) => {
   try {
     for (const [nome, itens] of porCliente) {
       // 1) Cliente: casa pelo nome; cria se não existir aqui (e for permitido).
-      let local = await casarClienteLocal(nome);
+      const match = await resolverClienteLocal(nome);
+
+      // Com dois ou mais cadastros plausíveis, criar um novo geraria duplicata e
+      // vincular no chute levaria os veículos para o cliente errado. Para aqui e
+      // devolve os candidatos para o admin resolver o cadastro antes.
+      if (match.tipo === 'ambiguo') {
+        resumo.clientesAmbiguos++;
+        const candidatos = match.candidatos.map((c) => c.nome).join(' | ');
+        for (const a of itens) {
+          resumo.itens.push({
+            imei: a.uniqueId ?? null,
+            nome: a.name ?? null,
+            cliente: nome,
+            status: 'ignorado',
+            detalhe: `Nome parecido com ${match.candidatos.length} clientes daqui (${candidatos}). Ajuste o cadastro e importe de novo.`,
+          });
+        }
+        continue;
+      }
+
+      let local = match.cliente;
       if (!local) {
         if (!criarClientes) {
           for (const a of itens) {
