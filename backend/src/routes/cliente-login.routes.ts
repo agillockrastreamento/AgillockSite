@@ -8,6 +8,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { requireRoles } from '../middleware/roles.middleware';
 import { param } from '../utils/params';
 import prisma from '../utils/prisma';
+import { cifrarSenha, decifrarSenha } from '../utils/senha-cifrada';
 import { CLIENTE_LOGO_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
 
 const router = Router();
@@ -49,6 +50,31 @@ router.get('/:id/login', async (req: AuthRequest, res: Response): Promise<void> 
   });
 
   res.json(login || null);
+});
+
+// ── GET /api/clientes/:id/login/senha ─────────────────────────────────────────
+// Revela a senha atual do login do cliente (inclusive quando ele mesmo a trocou).
+// Exclusivo do ADMIN — o COLABORADOR pode redefinir a senha, mas não vê a atual.
+router.get('/:id/login/senha', async (req: AuthRequest, res: Response): Promise<void> => {
+  if (req.user!.role !== 'ADMIN') {
+    res.status(403).json({ error: 'Apenas administradores podem visualizar a senha do cliente.' });
+    return;
+  }
+
+  const id = param(req, 'id');
+
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
+    select: { senhaCifrada: true },
+  });
+  if (!login) {
+    res.status(404).json({ error: 'Login não encontrado para este cliente.' });
+    return;
+  }
+
+  // Null quando a senha foi definida antes deste recurso (só existe o hash) — nesse
+  // caso não há como recuperá-la, o admin precisa definir uma nova.
+  res.json({ senha: decifrarSenha(login.senhaCifrada) });
 });
 
 // ── POST /api/clientes/:id/login ──────────────────────────────────────────────
@@ -93,7 +119,7 @@ router.post('/:id/login', async (req: AuthRequest, res: Response): Promise<void>
 
   const senhaHash = await bcrypt.hash(senha, 10);
   const login = await prisma.clienteLogin.create({
-    data: { clienteId: id, email, senhaHash, tipo: 'responsavel' },
+    data: { clienteId: id, email, senhaHash, senhaCifrada: cifrarSenha(senha), tipo: 'responsavel' },
     select: { id: true, email: true, ativo: true, logoUrl: true, createdAt: true },
   });
 
@@ -135,7 +161,10 @@ router.put('/:id/login', async (req: AuthRequest, res: Response): Promise<void> 
 
   const data: Record<string, unknown> = {};
   if (email) data.email = email;
-  if (senha) data.senhaHash = await bcrypt.hash(senha, 10);
+  if (senha) {
+    data.senhaHash = await bcrypt.hash(senha, 10);
+    data.senhaCifrada = cifrarSenha(senha);
+  }
 
   const updated = await prisma.clienteLogin.update({
     where: { id: login.id },

@@ -8,6 +8,7 @@ import {
 import { param } from '../utils/params';
 import prisma from '../utils/prisma';
 import { normalizarPermissoes } from '../utils/cliente-permissoes';
+import { cifrarSenha } from '../utils/senha-cifrada';
 
 const router = Router();
 
@@ -208,6 +209,7 @@ router.post('/usuarios', requireResponsavel, async (req: ClienteRequest, res: Re
       clienteId,
       email: body.email!,
       senhaHash,
+      senhaCifrada: cifrarSenha(body.senha!),
       tipo: 'vinculado',
       nome: body.nome?.trim() ?? null,
       perfil: body.perfil ?? null,
@@ -281,7 +283,10 @@ router.put('/usuarios/:id', requireResponsavel, async (req: ClienteRequest, res:
 
   const data: Record<string, unknown> = {};
   if (body.email) data.email = body.email;
-  if (body.senha) data.senhaHash = await bcrypt.hash(body.senha, 10);
+  if (body.senha) {
+    data.senhaHash = await bcrypt.hash(body.senha, 10);
+    data.senhaCifrada = cifrarSenha(body.senha);
+  }
   if (body.nome !== undefined) data.nome = body.nome?.trim() || null;
   if (body.perfil !== undefined) data.perfil = body.perfil ?? null;
   if (cpfCnpj !== undefined) data.cpfCnpj = cpfCnpj;

@@ -586,6 +586,10 @@ model ClienteLogin {
   // CPF/CNPJ opcional (somente dígitos) — permite que o sub-usuário entre com ele no login
   cpfCnpj          String?
   senhaHash        String
+  // Mesma senha do `senhaHash`, porém cifrada de forma reversível (AES-256-GCM,
+  // ver utils/senha-cifrada.ts) para que o ADMIN possa consultar a senha atual.
+  // Null nos logins cuja senha foi definida antes deste recurso.
+  senhaCifrada     String?
   ativo            Boolean  @default(true)
   prefs            Json     @default("{}")
   avatarUrl        String?

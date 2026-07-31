@@ -1157,6 +1157,56 @@
         });
     }
 
+    // Senha atual do cliente (só ADMIN). Buscada sob demanda, nunca junto do GET do
+    // login — assim ela só trafega quando o admin realmente pede para ver.
+    function montarVerSenha() {
+      var campo = document.getElementById('login-senha-atual');
+      var btnVer = document.getElementById('btn-ver-senha');
+      var btnCopiar = document.getElementById('btn-copiar-senha');
+      var alerta = document.getElementById('senha-alert');
+      var senha = null;
+      var visivel = false;
+
+      function pintar() {
+        campo.textContent = visivel && senha ? senha : '••••••••';
+        btnVer.innerHTML = visivel ? '<i class="fa fa-eye-slash"></i> Ocultar' : '<i class="fa fa-eye"></i> Mostrar';
+        btnCopiar.style.display = visivel && senha ? '' : 'none';
+      }
+
+      btnVer.addEventListener('click', function () {
+        alerta.innerHTML = '';
+        if (visivel) { visivel = false; pintar(); return; }
+        if (senha !== null) { visivel = true; pintar(); return; }
+
+        btnVer.disabled = true;
+        btnVer.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+        AL.apiGet('/api/clientes/' + clienteId + '/login/senha')
+          .then(function (data) {
+            btnVer.disabled = false;
+            if (!data || !data.senha) {
+              pintar();
+              alerta.innerHTML = '<div class="alert alert-warning" style="margin:10px 0 0;padding:8px 12px;font-size:13px;">' +
+                'Esta senha foi definida antes deste recurso e não pode ser recuperada. Defina uma nova em <strong>Editar</strong> para poder consultá-la daqui em diante.</div>';
+              return;
+            }
+            senha = data.senha;
+            visivel = true;
+            pintar();
+          })
+          .catch(function (err) {
+            btnVer.disabled = false;
+            pintar();
+            alerta.innerHTML = '<div class="alert alert-danger" style="margin:10px 0 0;padding:8px 12px;font-size:13px;">' + err.message + '</div>';
+          });
+      });
+
+      btnCopiar.addEventListener('click', function () {
+        if (!senha) return;
+        if (navigator.clipboard) navigator.clipboard.writeText(senha);
+        AL.showAlert('Senha copiada!', 'success');
+      });
+    }
+
     function renderLogin() {
       var div = document.getElementById('tab-login');
 
@@ -1217,6 +1267,17 @@
               AL.badgeStatus(loginData.ativo ? 'ATIVO' : 'INATIVO') +
             '</div>' +
           '</div>' +
+          (isAdmin ?
+            '<div style="border-top:1px solid #e6e6e6;margin-top:14px;padding-top:12px;">' +
+              '<div style="font-size:11px;text-transform:uppercase;color:#999;letter-spacing:.5px;margin-bottom:6px;">Senha atual</div>' +
+              '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+                '<code id="login-senha-atual" style="font-size:14px;font-weight:600;background:#fff;border:1px solid #e2e8f0;border-radius:4px;padding:5px 12px;color:#333;">••••••••</code>' +
+                '<button class="btn btn-xs btn-default" id="btn-ver-senha"><i class="fa fa-eye"></i> Mostrar</button>' +
+                '<button class="btn btn-xs btn-default" id="btn-copiar-senha" style="display:none;"><i class="fa fa-copy"></i> Copiar</button>' +
+              '</div>' +
+              '<div id="senha-alert"></div>' +
+            '</div>'
+          : '') +
         '</div>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
           '<button class="btn btn-sm btn-default" id="btn-login-editar"><i class="fa fa-pencil"></i> Editar</button>' +
@@ -1247,6 +1308,8 @@
           '<div id="logo-alert" style="margin-top:10px;"></div>' +
         '</div>' +
         '</div>';
+
+      if (isAdmin) montarVerSenha();
 
       document.getElementById('btn-login-editar').addEventListener('click', function () {
         var wrap = document.getElementById('form-editar-wrap');
