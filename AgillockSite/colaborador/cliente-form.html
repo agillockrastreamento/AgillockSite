@@ -295,10 +295,18 @@
       ══════════════════════════════════════════ -->
       <div class="secao-titulo">Outras Informações</div>
       <div class="row">
-        <div class="col-sm-6">
+        <div class="col-sm-4">
+          <div class="form-group">
+            <label>Vendedor</label>
+            <select class="form-control" id="fc-vendedor">
+              <option value="">Sem vendedor</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-sm-4">
           <div class="form-group"><label>Origem do Cliente</label><input type="text" class="form-control" id="fc-origem" placeholder="Ex.: indicação, Instagram, site…" maxlength="120" /></div>
         </div>
-        <div class="col-sm-6">
+        <div class="col-sm-4">
           <div class="form-group"><label>Notas</label><textarea class="form-control" id="fc-notas" rows="1"></textarea></div>
         </div>
       </div>
@@ -451,6 +459,21 @@
       renderSocios(parseInt(this.value) || 0, null);
     });
 
+    // ── Vendedores ────────────────────────────────────────────
+    // O select é preenchido de forma assíncrona; guardamos o vendedor do cliente
+    // numa variável para que a ordem de chegada das duas requisições não importe.
+    var vendedorSelecionado = '';
+    AL.apiGet('/api/vendedores').then(function (list) {
+      var sel = document.getElementById('fc-vendedor');
+      (list || []).forEach(function (v) {
+        var o = document.createElement('option');
+        o.value = v.id;
+        o.textContent = v.nome;
+        sel.appendChild(o);
+      });
+      sel.value = vendedorSelecionado;
+    }).catch(function () {});
+
     // ── Carregar cliente para edição ──────────────────────────
     if (clienteId) {
       document.getElementById('page-titulo').textContent = 'Editar Cliente';
@@ -499,6 +522,8 @@
 
         document.getElementById('fc-notas').value  = c.notas || '';
         document.getElementById('fc-origem').value = c.origemCliente || '';
+        vendedorSelecionado = c.vendedorId || '';
+        document.getElementById('fc-vendedor').value = vendedorSelecionado;
       }).catch(function (err) { AL.showAlert(err.message, 'error'); });
     } else {
       AL.maskCpfCnpj(document.getElementById('fc-cpf'));
@@ -535,9 +560,10 @@
 
     // ── Salvar ────────────────────────────────────────────────
     function salvar() {
-      var id     = document.getElementById('fc-id').value;
-      var origem = document.getElementById('fc-origem').value.trim() || null;
-      var notas  = document.getElementById('fc-notas').value.trim();
+      var id       = document.getElementById('fc-id').value;
+      var origem   = document.getElementById('fc-origem').value.trim() || null;
+      var notas    = document.getElementById('fc-notas').value.trim();
+      var vendedor = document.getElementById('fc-vendedor').value || null;
       var payload;
 
       if (tipoPessoa === 'PF') {
@@ -568,7 +594,7 @@
           cep: cep, logradouro: logradouro, numero: numero,
           complemento:    document.getElementById('fc-complemento').value.trim(),
           bairro: bairro, cidade: cidade, estado: estado,
-          origemCliente: origem, notas: notas,
+          origemCliente: origem, notas: notas, vendedorId: vendedor,
           nirc: null, emailCobranca: null, socios: null,
         };
       } else {
@@ -616,7 +642,7 @@
           complemento:   document.getElementById('fc-pj-complemento').value.trim(),
           bairro: bairroPJ, cidade: cidadePJ, estado: estadoPJ,
           socios: sociosArr.length > 0 ? sociosArr : null,
-          origemCliente: origem, notas: notas,
+          origemCliente: origem, notas: notas, vendedorId: vendedor,
           email: null, dataNascimento: null, rg: null, profissao: null, estadoCivil: null,
         };
       }

@@ -202,7 +202,9 @@ router.put('/:id', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest
       emailCobranca: emailCobranca || null,
       origemCliente: origemCliente || null,
       socios: socios ?? null,
-      vendedorId: vendedorId || null,
+      // Só altera o vendedor quando o campo vem no corpo. Payloads que omitem
+      // vendedorId (formulários antigos, integrações) não devem desvincular o cliente.
+      ...(vendedorId !== undefined ? { vendedorId: vendedorId || null } : {}),
       cep: cep || null,
       logradouro: logradouro || null,
       numero: numero || null,
