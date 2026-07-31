@@ -37,6 +37,14 @@ async function resolverDispositivoPorPlaca(placaRaw: string) {
       nome: true,
       identificador: true,
       placa: true,
+      // Dados cadastrais do veículo — a Raposo os usa para preencher o cadastro
+      // dela quando a placa já existe aqui (evita redigitar chassi e renavam).
+      marca: true,
+      modeloVeiculo: true,
+      cor: true,
+      ano: true,
+      renavam: true,
+      chassi: true,
       ...DISPOSITIVO_MEDIDORES_SELECT,
     },
   });
@@ -72,6 +80,19 @@ router.get('/veiculo/:placa/detalhe', async (req: Request, res: Response) => {
     res.json({
       placa: dispositivo.placa,
       dispositivoId: dispositivo.id,
+      /**
+       * Cadastro do veículo (acrescentado em 31/07/2026, a pedido da Raposo).
+       * Campos **adicionais** — nada foi removido da resposta, então
+       * integrações existentes continuam funcionando sem alteração.
+       */
+      veiculo: {
+        marca: dispositivo.marca ?? null,
+        modelo: dispositivo.modeloVeiculo ?? null,
+        cor: dispositivo.cor ?? null,
+        ano: dispositivo.ano ?? null,
+        renavam: dispositivo.renavam ?? null,
+        chassi: dispositivo.chassi ?? null,
+      },
       online: traccarDevice?.status === 'online',
       km: odometroM != null ? Math.round(odometroM / 1000) : null,
       odometroMetros: odometroM,
