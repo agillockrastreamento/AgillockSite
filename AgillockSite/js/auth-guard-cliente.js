@@ -300,6 +300,150 @@
     }).catch(function () {});
   }
 
+  // ─── Alterar a própria senha ──────────────────────────────────────────────
+  // Mora aqui (e não na tela de Usuários) porque o sub-usuário vinculado não
+  // enxerga aquela tela — o botão do rodapé da sidebar é o caminho dele.
+
+  var SENHA_MIN = 6;
+
+  function _ensureEstiloSenha() {
+    if (document.getElementById('al-estilo-senha')) return;
+    var st = document.createElement('style');
+    st.id = 'al-estilo-senha';
+    st.textContent = [
+      '#al-senha-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;}',
+      '#al-senha-modal{background:#fff;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.3);width:100%;max-width:400px;overflow:hidden;}',
+      'html.dark-theme #al-senha-modal{background:#1e2530;color:#e0e6f0;}',
+      '#al-senha-modal .als-head{padding:14px 18px;border-bottom:1px solid #eee;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:12px;}',
+      'html.dark-theme #al-senha-modal .als-head{border-color:#2d3748;}',
+      '#al-senha-modal .als-x{background:none;border:none;font-size:20px;line-height:1;color:#999;cursor:pointer;padding:0;}',
+      '#al-senha-modal .als-body{padding:18px;display:flex;flex-direction:column;gap:14px;}',
+      '#al-senha-modal .als-campo{display:flex;flex-direction:column;gap:5px;}',
+      '#al-senha-modal label{font-size:12px;color:#888;font-weight:400;margin:0;}',
+      '#al-senha-modal .als-input-wrap{position:relative;}',
+      '#al-senha-modal input{width:100%;height:38px;padding:0 38px 0 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:#fff;color:#1e2530;}',
+      'html.dark-theme #al-senha-modal input{background:#141820;border-color:#2d3748;color:#e0e6f0;}',
+      '#al-senha-modal input:focus{outline:none;border-color:#fab32c;}',
+      '#al-senha-modal .als-eye{position:absolute;right:0;top:0;height:38px;width:36px;background:none;border:none;color:#999;cursor:pointer;}',
+      '#al-senha-modal .als-hint{font-size:12px;color:#888;}',
+      '#al-senha-modal .als-erro{font-size:13px;color:#e74c3c;display:none;}',
+      '#al-senha-modal .als-foot{padding:14px 18px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;}',
+      'html.dark-theme #al-senha-modal .als-foot{border-color:#2d3748;}',
+    ].join('');
+    document.head.appendChild(st);
+  }
+
+  function _campoSenha(id, rotulo) {
+    return '<div class="als-campo">' +
+      '<label for="' + id + '">' + rotulo + '</label>' +
+      '<div class="als-input-wrap">' +
+        '<input type="password" id="' + id + '" autocomplete="off" />' +
+        '<button type="button" class="als-eye" data-alvo="' + id + '" tabindex="-1" aria-label="Mostrar ou ocultar a senha"><i class="fa fa-eye"></i></button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function abrirModalSenha() {
+    if (document.getElementById('al-senha-overlay')) return;
+    _ensureEstiloSenha();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'al-senha-overlay';
+    overlay.innerHTML =
+      '<div id="al-senha-modal" role="dialog" aria-modal="true" aria-labelledby="al-senha-titulo">' +
+        '<div class="als-head"><span id="al-senha-titulo">Alterar senha</span>' +
+          '<button type="button" class="als-x" id="al-senha-x" aria-label="Fechar">&times;</button></div>' +
+        '<div class="als-body">' +
+          _campoSenha('al-senha-atual', 'Senha atual') +
+          _campoSenha('al-senha-nova', 'Nova senha') +
+          _campoSenha('al-senha-conf', 'Confirmar nova senha') +
+          '<div class="als-hint">Mínimo de ' + SENHA_MIN + ' caracteres.</div>' +
+          '<div class="als-erro" id="al-senha-erro"></div>' +
+        '</div>' +
+        '<div class="als-foot">' +
+          '<button type="button" class="btn btn-default" id="al-senha-cancelar">Cancelar</button>' +
+          '<button type="button" class="btn btn-primary-al" id="al-senha-salvar">Salvar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    var erro = overlay.querySelector('#al-senha-erro');
+    var salvar = overlay.querySelector('#al-senha-salvar');
+
+    function fechar() {
+      document.removeEventListener('keydown', onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    function onKey(e) { if (e.key === 'Escape') fechar(); }
+    document.addEventListener('keydown', onKey);
+
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) fechar(); });
+    overlay.querySelector('#al-senha-x').addEventListener('click', fechar);
+    overlay.querySelector('#al-senha-cancelar').addEventListener('click', fechar);
+
+    overlay.querySelectorAll('.als-eye').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var input = document.getElementById(btn.getAttribute('data-alvo'));
+        var mostrando = input.type === 'text';
+        input.type = mostrando ? 'password' : 'text';
+        btn.querySelector('i').className = mostrando ? 'fa fa-eye' : 'fa fa-eye-slash';
+      });
+    });
+
+    function mostrarErro(msg) {
+      erro.textContent = msg;
+      erro.style.display = 'block';
+    }
+
+    function enviar() {
+      var atual = document.getElementById('al-senha-atual').value;
+      var nova  = document.getElementById('al-senha-nova').value;
+      var conf  = document.getElementById('al-senha-conf').value;
+
+      erro.style.display = 'none';
+      if (!atual) return mostrarErro('Informe a senha atual.');
+      if (nova.length < SENHA_MIN) return mostrarErro('A nova senha deve ter pelo menos ' + SENHA_MIN + ' caracteres.');
+      if (nova !== conf) return mostrarErro('A confirmação não confere com a nova senha.');
+      if (nova === atual) return mostrarErro('A nova senha deve ser diferente da atual.');
+
+      salvar.disabled = true;
+      salvar.textContent = 'Salvando...';
+      apiPatch('/api/cliente/perfil/senha', { senhaAtual: atual, novaSenha: nova })
+        .then(function () {
+          fechar();
+          showAlert('Senha alterada.', 'success');
+        })
+        .catch(function (err) {
+          salvar.disabled = false;
+          salvar.textContent = 'Salvar';
+          mostrarErro(err.message || 'Não foi possível alterar a senha.');
+        });
+    }
+
+    salvar.addEventListener('click', enviar);
+    overlay.querySelectorAll('input').forEach(function (input) {
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') enviar(); });
+    });
+
+    document.getElementById('al-senha-atual').focus();
+  }
+
+  // Botão no rodapé da sidebar, acima do tema. Injetado por JS para valer em todas
+  // as páginas do portal sem repetir markup em cada HTML.
+  function _injetarBotaoSenhaSidebar() {
+    var footer = document.querySelector('#sidebar .sidebar-footer');
+    if (!footer || document.getElementById('btn-senha-sidebar')) return;
+    var btn = document.createElement('button');
+    btn.id = 'btn-senha-sidebar';
+    btn.className = 'btn-senha-sidebar';
+    btn.title = 'Alterar senha';
+    btn.innerHTML = '<i class="fa fa-key fa-fw"></i> <span>Alterar senha</span>';
+    btn.addEventListener('click', abrirModalSenha);
+    var tema = footer.querySelector('#btn-tema, .btn-tema-sidebar');
+    if (tema) footer.insertBefore(btn, tema);
+    else footer.appendChild(btn);
+  }
+
   // ─── Toast ────────────────────────────────────────────────────────────────
 
   function showAlert(msg, type) {
@@ -453,6 +597,7 @@
 
     // Injeta logo automaticamente em páginas autenticadas
     if (isAuthenticated()) {
+      _injetarBotaoSenhaSidebar();
       initClienteLogo();
       // Aplica permissões da sidebar usando cache imediato e re-aplica após refresh
       aplicarPermissoesSidebar();
@@ -476,6 +621,7 @@
     apiDelete: apiDelete,
     uploadFoto: uploadFoto,
     showAlert: showAlert,
+    abrirModalSenha: abrirModalSenha,
     initThemeToggle: initThemeToggle,
     fmtDate: fmtDate,
     fmtMoney: fmtMoney,

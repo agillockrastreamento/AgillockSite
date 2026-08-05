@@ -1,25 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { ActivityIndicator, Avatar, Button } from 'react-native-paper';
+import { ActivityIndicator, Avatar, Button, Icon } from 'react-native-paper';
 
 import { BottomSheet } from '../components/BottomSheet';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/layout';
 import { useToast } from '../toast/ToastProvider';
 import {
+  alterarSenhaCliente,
   getClientePerfil,
   resolveUploadUrl,
   uploadClienteAvatar,
 } from './profileService';
 import type { ClientePerfil, ClientePerfilVeiculo } from './profileTypes';
+
+/** Mesmo mínimo cobrado pelo backend e pelo portal web. */
+const SENHA_MIN = 6;
 
 type Props = {
   visible: boolean;
@@ -73,6 +78,47 @@ function VeiculoList({
   );
 }
 
+function CampoSenha({
+  rotulo,
+  valor,
+  onChange,
+  autoFocus,
+}: {
+  rotulo: string;
+  valor: string;
+  onChange(v: string): void;
+  autoFocus?: boolean;
+}) {
+  const [mostrar, setMostrar] = useState(false);
+
+  return (
+    <View style={styles.campo}>
+      <Text style={styles.fieldLabel}>{rotulo}</Text>
+      <View style={styles.passwordWrap}>
+        <TextInput
+          value={valor}
+          onChangeText={onChange}
+          style={[styles.input, styles.inputWithIcon]}
+          secureTextEntry={!mostrar}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoFocus={autoFocus}
+          placeholder="••••••"
+          placeholderTextColor={colors.textMuted}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Mostrar ou ocultar a senha"
+          style={styles.eyeBtn}
+          onPress={() => setMostrar((v) => !v)}
+        >
+          <Icon source={mostrar ? 'eye-off' : 'eye'} size={20} color={colors.textMuted} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export function ProfileModal({
   visible,
   initialProfile,
@@ -85,6 +131,33 @@ export function ProfileModal({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Alterar senha troca o conteúdo DESTE sheet em vez de abrir um segundo.
+  // O BottomSheet é um Modal nativo e, no iOS, apresentar um modal sobre outro
+  // (ou fechar um e abrir o próximo no mesmo tick) congela o sistema de modais.
+  const [view, setView] = useState<'perfil' | 'senha'>('perfil');
+  const [senhaAtual, setSenhaAtual] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmacao, setConfirmacao] = useState('');
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
+  const [isSalvandoSenha, setIsSalvandoSenha] = useState(false);
+
+  const limparSenha = useCallback(() => {
+    setSenhaAtual('');
+    setNovaSenha('');
+    setConfirmacao('');
+    setErroSenha(null);
+    setIsSalvandoSenha(false);
+  }, []);
+
+  // Reabrir o perfil sempre começa na visão de dados, mesmo que o sheet tenha sido
+  // fechado com o formulário de senha aberto.
+  useEffect(() => {
+    if (!visible) {
+      setView('perfil');
+      limparSenha();
+    }
+  }, [limparSenha, visible]);
 
   useEffect(() => {
     if (initialProfile) setProfile(initialProfile);
@@ -151,7 +224,97 @@ export function ProfileModal({
     }
   }
 
+  async function handleSalvarSenha() {
+    setErroSenha(null);
+
+    if (!senhaAtual) {
+      setErroSenha('Informe a senha atual.');
+      return;
+    }
+    if (novaSenha.length < SENHA_MIN) {
+      setErroSenha(`A nova senha deve ter pelo menos ${SENHA_MIN} caracteres.`);
+      return;
+    }
+    if (novaSenha !== confirmacao) {
+      setErroSenha('A confirmação não confere com a nova senha.');
+      return;
+    }
+    if (novaSenha === senhaAtual) {
+      setErroSenha('A nova senha deve ser diferente da atual.');
+      return;
+    }
+
+    try {
+      setIsSalvandoSenha(true);
+      await alterarSenhaCliente(senhaAtual, novaSenha);
+      limparSenha();
+      setView('perfil');
+      toast.show({ message: 'Senha alterada.', type: 'success' });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Não foi possível alterar a senha.';
+      setErroSenha(message);
+      setIsSalvandoSenha(false);
+    }
+  }
+
   const avatarUri = resolveUploadUrl(profile?.avatarUrl);
+
+  if (view === 'senha') {
+    return (
+      <BottomSheet
+        visible={visible}
+        title="Alterar senha"
+        heightPercent={0.7}
+        onClose={onClose}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Pressable
+            accessibilityRole="button"
+            style={styles.voltarRow}
+            onPress={() => {
+              limparSenha();
+              setView('perfil');
+            }}
+          >
+            <Icon source="chevron-left" size={20} color={colors.primary} />
+            <Text style={styles.voltarText}>Perfil</Text>
+          </Pressable>
+
+          <View style={styles.section}>
+            <CampoSenha
+              rotulo="Senha atual"
+              valor={senhaAtual}
+              onChange={setSenhaAtual}
+              autoFocus
+            />
+            <CampoSenha rotulo="Nova senha" valor={novaSenha} onChange={setNovaSenha} />
+            <CampoSenha
+              rotulo="Confirmar nova senha"
+              valor={confirmacao}
+              onChange={setConfirmacao}
+            />
+            <Text style={styles.emptyText}>Mínimo de {SENHA_MIN} caracteres.</Text>
+            {erroSenha ? <Text style={styles.erroText}>{erroSenha}</Text> : null}
+          </View>
+
+          <Button
+            mode="contained"
+            icon="key-variant"
+            loading={isSalvandoSenha}
+            disabled={isSalvandoSenha}
+            onPress={handleSalvarSenha}
+          >
+            Salvar nova senha
+          </Button>
+        </ScrollView>
+      </BottomSheet>
+    );
+  }
 
   return (
     <BottomSheet visible={visible} title="Perfil" heightPercent={0.7} onClose={onClose}>
@@ -213,6 +376,16 @@ export function ProfileModal({
               {formatCpfCnpj(profile?.cpfCnpj)}
             </Text>
           </View>
+
+          <Pressable
+            accessibilityRole="button"
+            style={styles.acaoRow}
+            onPress={() => setView('senha')}
+          >
+            <Icon source="key-variant" size={18} color={colors.text} />
+            <Text style={styles.acaoText}>Alterar senha</Text>
+            <Icon source="chevron-right" size={20} color={colors.textMuted} />
+          </Pressable>
 
           <VeiculoList
             title="Veículos sob responsabilidade"
@@ -311,5 +484,69 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textMuted,
     fontSize: 14,
+  },
+
+  // ── Alterar senha ──────────────────────────────────────────────────────────
+  acaoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceMuted,
+  },
+  acaoText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  voltarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingRight: spacing.sm,
+  },
+  voltarText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  campo: {
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  input: {
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 14,
+    color: colors.text,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  inputWithIcon: {
+    paddingRight: 44,
+  },
+  passwordWrap: {
+    position: 'relative',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: spacing.sm,
+    top: 0,
+    bottom: 0,
+    width: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  erroText: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

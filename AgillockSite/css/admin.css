@@ -1259,6 +1259,26 @@ html.al-rastr-ativa.rastr-bar-fechada .modal-dialog { margin-top: 0; }
 }
 .btn-tema-sidebar:hover { color: #fab32c; }
 
+/* Alterar senha — injetado no rodapé pelo auth-guard-cliente.js. É o único caminho
+   do sub-usuário, que não enxerga a tela de Usuários. */
+.btn-senha-sidebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #adb5bd;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    margin-bottom: 14px;
+    font-family: inherit;
+    transition: color 0.2s;
+    width: 100%;
+    text-align: left;
+}
+.btn-senha-sidebar:hover { color: #fab32c; }
+
 .btn-tema-login {
     background: transparent;
     border: 1px solid #ddd;
@@ -1447,6 +1467,7 @@ html.dark-theme .btn-tema-login:hover { border-color: #fab32c; color: #fab32c; }
 }
 .admin-sidebar.collapsed .sidebar-user { display: none; }
 .admin-sidebar.collapsed .btn-tema-sidebar,
+.admin-sidebar.collapsed .btn-senha-sidebar,
 .admin-sidebar.collapsed .btn-logout {
     justify-content: center;
     padding: 10px 0;
@@ -1454,6 +1475,7 @@ html.dark-theme .btn-tema-login:hover { border-color: #fab32c; color: #fab32c; }
     font-size: 0 !important;
 }
 .admin-sidebar.collapsed .btn-tema-sidebar .fa,
+.admin-sidebar.collapsed .btn-senha-sidebar .fa,
 .admin-sidebar.collapsed .btn-logout .fa { font-size: 17px !important; }
 
 /* Content e topbar */
@@ -1494,6 +1516,7 @@ html.dark-theme .btn-tema-login:hover { border-color: #fab32c; color: #fab32c; }
 /* Tema escuro — collapsed */
 html.dark-theme .admin-sidebar.collapsed ~ .admin-content { background: #141820; }
 .admin-sidebar.collapsed .btn-tema-sidebar,
+.admin-sidebar.collapsed .btn-senha-sidebar,
 .admin-sidebar.collapsed .btn-logout {
     justify-content: center;
     padding: 10px 0;
@@ -1501,6 +1524,7 @@ html.dark-theme .admin-sidebar.collapsed ~ .admin-content { background: #141820;
     font-size: 0 !important;
 }
 .admin-sidebar.collapsed .btn-tema-sidebar .fa,
+.admin-sidebar.collapsed .btn-senha-sidebar .fa,
 .admin-sidebar.collapsed .btn-logout .fa {
     font-size: 17px !important;
 }

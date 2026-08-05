@@ -1,14 +1,19 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
+import bcrypt from 'bcryptjs';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import prisma from '../utils/prisma';
 import { ClienteRequest, clienteAuthMiddleware } from '../middleware/cliente-auth.middleware';
 import { CLIENTE_AVATAR_UPLOADS_DIR, CLIENTE_LOGO_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
+import { cifrarSenha } from '../utils/senha-cifrada';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
+
+// Mesmo mínimo cobrado no cadastro de sub-usuários (cliente-usuarios.routes.ts).
+const SENHA_MIN_CARACTERES = 6;
 
 const uploadDir = CLIENTE_AVATAR_UPLOADS_DIR;
 if (!fs.existsSync(uploadDir)) {
@@ -245,6 +250,62 @@ router.delete('/logo', async (req: ClienteRequest, res: Response): Promise<void>
     res.status(204).send();
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Erro ao remover logo' });
+  }
+});
+
+// PATCH /api/cliente/perfil/senha
+// Troca a senha do PRÓPRIO login. Sem `requireResponsavel` de propósito: o
+// sub-usuário vinculado não enxerga a tela de Usuários e não teria outro caminho
+// para trocar a própria senha.
+router.patch('/senha', async (req: ClienteRequest, res: Response): Promise<void> => {
+  try {
+    const clienteLoginId = req.cliente!.sub;
+    const senhaAtual = typeof req.body?.senhaAtual === 'string' ? req.body.senhaAtual : '';
+    const novaSenha = typeof req.body?.novaSenha === 'string' ? req.body.novaSenha : '';
+
+    if (!senhaAtual || !novaSenha) {
+      res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });
+      return;
+    }
+    if (novaSenha.length < SENHA_MIN_CARACTERES) {
+      res.status(400).json({ error: `A nova senha deve ter pelo menos ${SENHA_MIN_CARACTERES} caracteres.` });
+      return;
+    }
+    if (novaSenha === senhaAtual) {
+      res.status(400).json({ error: 'A nova senha deve ser diferente da atual.' });
+      return;
+    }
+
+    const clienteLogin = await prisma.clienteLogin.findUnique({
+      where: { id: clienteLoginId },
+      select: { senhaHash: true },
+    });
+    if (!clienteLogin) {
+      res.status(404).json({ error: 'Login não encontrado' });
+      return;
+    }
+
+    const confere = await bcrypt.compare(senhaAtual, clienteLogin.senhaHash);
+    if (!confere) {
+      res.status(400).json({ error: 'A senha atual não confere.' });
+      return;
+    }
+
+    await prisma.clienteLogin.update({
+      where: { id: clienteLoginId },
+      data: {
+        senhaHash: await bcrypt.hash(novaSenha, 10),
+        // Espelho reversível que o admin consulta na ficha do cliente — sem isso ele
+        // continuaria vendo a senha antiga.
+        senhaCifrada: cifrarSenha(novaSenha),
+      },
+    });
+
+    // O token continua válido: trocar a senha não desloga a sessão em uso.
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('[Perfil Cliente] Erro ao alterar senha:', error);
+    res.status(500).json({ error: 'Erro ao alterar a senha' });
   }
 });
 

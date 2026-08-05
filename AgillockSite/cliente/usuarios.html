@@ -13,8 +13,7 @@
   <style>
     body { overflow: hidden !important; height: 100vh; }
     .admin-content { height: 100vh; display: flex; flex-direction: column; padding-bottom: 0 !important; }
-    .action-bar { flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 16px; }
-    #scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 24px 24px; scrollbar-gutter: stable; }
+    #scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 18px 24px 24px; scrollbar-gutter: stable; }
     #scroll-area::-webkit-scrollbar { width: 7px; }
     #scroll-area::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     html.dark-theme #scroll-area::-webkit-scrollbar-thumb { background: #3a4555; }
@@ -40,6 +39,21 @@
     .empty-state { padding: 60px 20px; text-align: center; color: #888; }
     .empty-state i { font-size: 48px; opacity: 0.4; }
     .empty-state p { margin-top: 14px; font-size: 14px; }
+
+    /* Bloco "Sua conta" — o titular, acima da lista de vinculados */
+    .bloco-titulo { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #888; margin: 4px 0 8px; }
+    #conta-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.05); padding: 14px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+    html.dark-theme #conta-card { background: #1e2530; }
+    .conta-avatar { width: 38px; height: 38px; border-radius: 50%; background: #fab32c; color: #1e2530; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+    .conta-info { flex: 1; min-width: 0; }
+    .conta-nome { font-weight: 700; font-size: 14px; color: #1e2530; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    html.dark-theme .conta-nome { color: #e0e6f0; }
+    .conta-email { font-size: 12px; color: #888; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badge-titular { background: #3498db; color: #fff; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+    @media (max-width: 520px) {
+      #conta-card { flex-wrap: wrap; }
+      #conta-card .btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -81,13 +95,27 @@
 
     <div id="al-alert-container"></div>
 
-    <div class="action-bar">
-      <a href="usuario-form.html" class="btn btn-primary-al btn-sm">
-        <i class="fa fa-plus"></i> Novo Usuário
-      </a>
-    </div>
-
     <div id="scroll-area">
+      <div class="bloco-titulo">Sua conta</div>
+      <div id="conta-card">
+        <div class="conta-avatar" id="conta-avatar">—</div>
+        <div class="conta-info">
+          <div class="conta-nome" id="conta-nome">—</div>
+          <div class="conta-email" id="conta-email">—</div>
+        </div>
+        <span class="badge-titular">TITULAR</span>
+        <button type="button" class="btn btn-default btn-sm" id="btn-alterar-senha">
+          <i class="fa fa-key"></i> Alterar senha
+        </button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div class="bloco-titulo" style="margin:0;flex:1;" id="titulo-vinculados">Usuários vinculados</div>
+        <a href="usuario-form.html" class="btn btn-primary-al btn-sm">
+          <i class="fa fa-plus"></i> Novo Usuário
+        </a>
+      </div>
+
       <div id="loading-state" class="text-center" style="padding:40px;color:#999;">
         <i class="fa fa-spinner fa-spin fa-2x"></i>
         <p style="margin-top:12px;">Carregando...</p>
@@ -122,7 +150,34 @@
       document.getElementById('btn-logout').addEventListener('click', AL_CLIENTE.logout);
       AL_CLIENTE.initThemeToggle('btn-tema');
 
+      // O modal é o mesmo do atalho no rodapé da sidebar (auth-guard-cliente.js).
+      document.getElementById('btn-alterar-senha').addEventListener('click', AL_CLIENTE.abrirModalSenha);
+
+      carregarConta();
       carregar();
+
+      function carregarConta() {
+        AL_CLIENTE.apiGet('/api/cliente/perfil')
+          .then(function (perfil) {
+            var nome = perfil.nome || user.nome || '—';
+            document.getElementById('conta-nome').textContent = nome;
+            document.getElementById('conta-email').textContent = perfil.email || '—';
+            document.getElementById('conta-avatar').textContent = iniciais(nome);
+          })
+          .catch(function () {
+            // Sem o perfil o card ainda serve: o botão de senha continua funcionando.
+            document.getElementById('conta-nome').textContent = user.nome || '—';
+            document.getElementById('conta-email').textContent = '—';
+            document.getElementById('conta-avatar').textContent = iniciais(user.nome || '');
+          });
+      }
+
+      function iniciais(nome) {
+        var partes = String(nome).trim().split(/\s+/).filter(Boolean);
+        if (!partes.length) return '—';
+        if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+        return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+      }
 
       function carregar() {
         document.getElementById('loading-state').style.display = 'block';
@@ -132,7 +187,10 @@
         AL_CLIENTE.apiGet('/api/cliente/usuarios')
           .then(function (usuarios) {
             document.getElementById('loading-state').style.display = 'none';
-            if (!usuarios || !usuarios.length) {
+            var total = (usuarios || []).length;
+            document.getElementById('titulo-vinculados').textContent =
+              total ? 'Usuários vinculados · ' + total : 'Usuários vinculados';
+            if (!total) {
               document.getElementById('empty-state').style.display = 'block';
               return;
             }

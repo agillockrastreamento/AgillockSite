@@ -54,3 +54,11 @@ export function uploadClienteLogo(asset: {
 export function deleteClienteLogo() {
   return apiRequest<null>('/cliente/perfil/logo', { method: 'DELETE' });
 }
+
+/** Troca a senha do próprio login — vale para o titular e para o sub-usuário. */
+export function alterarSenhaCliente(senhaAtual: string, novaSenha: string) {
+  return apiRequest<{ ok: true }>('/cliente/perfil/senha', {
+    method: 'PATCH',
+    body: JSON.stringify({ senhaAtual, novaSenha }),
+  });
+}
