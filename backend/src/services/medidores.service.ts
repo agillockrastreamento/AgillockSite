@@ -166,6 +166,32 @@ export async function reancorarRecorrenciasSeOdometroMenor(
   });
 }
 
+type LeituraCartaoMotorista = Pick<DispositivoMedidores, 'ultimoCartaoMotorista' | 'ultimoCartaoMotoristaEm'>;
+
+// Cartão RFID: o leitor só envia o serial no login/logout da jornada, então a maioria
+// das posições não traz nada — nesse caso mantém o cartão já registrado (retorna null).
+// No logout (fim de jornada) o cartão é zerado, pois não há mais motorista ao volante.
+//
+// A âncora de tempo é `ultimoCartaoMotoristaEm`, NÃO `telemetriaUltimaPosicaoEm`: o
+// pacote que carrega o serial costuma reaproveitar o fix anterior (mesmo deviceTime, às
+// vezes anterior ao da última posição já processada). Ancorar na telemetria descartaria
+// a troca de motorista e deixaria o card preso no motorista antigo, enquanto o relatório
+// — que varre o histórico do Traccar — já mostraria o novo.
+function lerCartaoMotorista(
+  dispositivo: DispositivoMedidores,
+  posicao: TraccarPosition,
+  instanteAtual: Date,
+): LeituraCartaoMotorista | null {
+  const leitura = cartaoDaPosicao(posicao.attributes);
+  if (!leitura) return null;
+  const registradoEm = dispositivo.ultimoCartaoMotoristaEm;
+  if (registradoEm && instanteAtual.getTime() < registradoEm.getTime()) return null;
+  return {
+    ultimoCartaoMotorista: leitura.inicio ? leitura.cartao : null,
+    ultimoCartaoMotoristaEm: instanteAtual,
+  };
+}
+
 function aplicarPosicaoAoEstado(
   dispositivo: DispositivoMedidores,
   posicao: TraccarPosition,
@@ -173,9 +199,13 @@ function aplicarPosicaoAoEstado(
   const instanteAtual = parsePositionTime(posicao);
   if (!instanteAtual) return dispositivo;
 
+  const cartao = lerCartaoMotorista(dispositivo, posicao, instanteAtual);
+
   const ultimoInstante = dispositivo.telemetriaUltimaPosicaoEm;
   if (ultimoInstante && instanteAtual.getTime() <= ultimoInstante.getTime()) {
-    return dispositivo;
+    // Posição repetida ou atrasada: não mexe em odômetro/horímetro/telemetria, mas a
+    // leitura de cartão precisa passar (ver comentário em `lerCartaoMotorista`).
+    return cartao ? { ...dispositivo, ...cartao } : dispositivo;
   }
 
   let horimetroSistemaSegundos = dispositivo.horimetroSistemaSegundos ?? 0;
@@ -205,23 +235,11 @@ function aplicarPosicaoAoEstado(
     }
   }
 
-  // Cartão RFID: o leitor só envia no login/logout da jornada, então a maioria das
-  // posições não traz nada — nesse caso mantém o cartão já registrado. No logout
-  // (fim de jornada) o cartão é zerado, pois não há mais motorista ao volante.
-  const leitura = cartaoDaPosicao(posicao.attributes);
-  let ultimoCartaoMotorista = dispositivo.ultimoCartaoMotorista ?? null;
-  let ultimoCartaoMotoristaEm = dispositivo.ultimoCartaoMotoristaEm ?? null;
-  if (leitura) {
-    ultimoCartaoMotorista = leitura.inicio ? leitura.cartao : null;
-    ultimoCartaoMotoristaEm = instanteAtual;
-  }
-
   return {
     ...dispositivo,
+    ...cartao,
     odometroSistemaMetros,
     horimetroSistemaSegundos,
-    ultimoCartaoMotorista,
-    ultimoCartaoMotoristaEm,
     telemetriaUltimaPosicaoEm: instanteAtual,
     telemetriaUltimaLatitude: posicao.valid ? posicao.latitude : dispositivo.telemetriaUltimaLatitude,
     telemetriaUltimaLongitude: posicao.valid ? posicao.longitude : dispositivo.telemetriaUltimaLongitude,
@@ -232,22 +250,31 @@ function aplicarPosicaoAoEstado(
   };
 }
 
+// Aceita mais de uma posição por dispositivo (o WS do Traccar entrega vários pacotes do
+// mesmo veículo num único lote). Guardar só a última perderia o pacote que carrega o
+// serial do cartão RFID quando ele não é o mais recente do lote.
 export async function sincronizarDispositivosComPosicoes<T extends DispositivoMedidores>(
   dispositivos: T[],
-  posicaoPorIdentificador: Map<string, TraccarPosition>,
+  posicaoPorIdentificador: Map<string, TraccarPosition | TraccarPosition[]>,
 ): Promise<Map<string, T>> {
   const atualizados = new Map<string, T>();
   const updates: Array<ReturnType<typeof prisma.dispositivo.update>> = [];
 
   for (const dispositivo of dispositivos) {
-    const posicao = posicaoPorIdentificador.get(dispositivo.identificador);
-    if (!posicao) {
+    const recebidas = posicaoPorIdentificador.get(dispositivo.identificador);
+    const posicoes = Array.isArray(recebidas) ? recebidas : recebidas ? [recebidas] : [];
+    if (!posicoes.length) {
       atualizados.set(dispositivo.identificador, dispositivo);
       continue;
     }
 
-    const proximoEstado = aplicarPosicaoAoEstado(dispositivo, posicao) as T;
-    atualizados.set(dispositivo.identificador, proximoEstado);
+    // Aplica em ordem cronológica para que o estado final reflita o pacote mais recente.
+    const emOrdem = [...posicoes].sort(
+      (a, b) => (parsePositionTime(a)?.getTime() ?? 0) - (parsePositionTime(b)?.getTime() ?? 0),
+    );
+    let proximoEstado = dispositivo as DispositivoMedidores;
+    for (const posicao of emOrdem) proximoEstado = aplicarPosicaoAoEstado(proximoEstado, posicao);
+    atualizados.set(dispositivo.identificador, proximoEstado as T);
 
     const mudou =
       proximoEstado.odometroSistemaMetros !== dispositivo.odometroSistemaMetros
@@ -257,7 +284,8 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
       || proximoEstado.telemetriaUltimaLongitude !== dispositivo.telemetriaUltimaLongitude
       || proximoEstado.telemetriaUltimaIgnicao !== dispositivo.telemetriaUltimaIgnicao
       || proximoEstado.telemetriaUltimoBloqueio !== dispositivo.telemetriaUltimoBloqueio
-      || proximoEstado.ultimoCartaoMotorista !== dispositivo.ultimoCartaoMotorista;
+      || proximoEstado.ultimoCartaoMotorista !== dispositivo.ultimoCartaoMotorista
+      || proximoEstado.ultimoCartaoMotoristaEm?.getTime() !== dispositivo.ultimoCartaoMotoristaEm?.getTime();
 
     if (!mudou) continue;
 

@@ -353,6 +353,12 @@ async function connectToTraccar() {
 
 // ── Transformar mensagem do Traccar para o formato do frontend ────────────────
 
+function tempoPosicaoWs(posicao: { deviceTime?: string; fixTime?: string; serverTime?: string }): number {
+  const bruto = posicao.deviceTime || posicao.fixTime || posicao.serverTime;
+  const t = bruto ? new Date(bruto).getTime() : NaN;
+  return Number.isNaN(t) ? 0 : t;
+}
+
 async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | null> {
   const result: Record<string, unknown> = {};
   const syntheticEvents: Array<{
@@ -398,7 +404,7 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
   }
 
   if (msg.positions?.length) {
-    const posicaoPorIdentificador = new Map<string, {
+    type PosicaoWs = {
       deviceId: number;
       latitude: number;
       longitude: number;
@@ -411,18 +417,32 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
       valid: boolean;
       address: string | null;
       attributes: Record<string, unknown>;
-    }>();
+    };
+    // Guarda TODAS as posições do lote por dispositivo: um mesmo veículo pode mandar
+    // vários pacotes de uma vez, e ficar só com o último perderia o que carrega o
+    // serial do cartão RFID (o card do motorista ficaria preso no motorista anterior).
+    const posicoesPorIdentificador = new Map<string, PosicaoWs[]>();
     msg.positions.forEach(position => {
       const identificador = traccarIdToUniqueId.get(position.deviceId);
-      if (identificador) posicaoPorIdentificador.set(identificador, position);
+      if (!identificador) return;
+      const lista = posicoesPorIdentificador.get(identificador);
+      if (lista) lista.push(position);
+      else posicoesPorIdentificador.set(identificador, [position]);
     });
+    // A verificação de alertas compara com o pacote mais recente de cada dispositivo.
+    const posicaoPorIdentificador = new Map<string, PosicaoWs>(
+      Array.from(posicoesPorIdentificador, ([identificador, lista]) => [
+        identificador,
+        lista.reduce((maisRecente, atual) => (tempoPosicaoWs(atual) >= tempoPosicaoWs(maisRecente) ? atual : maisRecente)),
+      ]),
+    );
 
     // Mapeia o estado ANTERIOR dos dispositivos para comparação de alertas (ignição)
     const estadoAnteriorMap = new Map(dispositivos.map(d => [d.identificador, { ...d }]));
 
     const atualizados = await sincronizarDispositivosComPosicoes(
       dispositivos,
-      posicaoPorIdentificador as unknown as Map<string, any>,
+      posicoesPorIdentificador as unknown as Map<string, any>,
     );
 
     atualizados.forEach((dispositivo, identificador) => {
@@ -486,7 +506,25 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
   if (msg.positions?.length) {
     // Motorista do cartão RFID: enviado junto com a posição para que o card do
     // veículo no mapa acompanhe a troca de motorista sem recarregar a página.
+    // Resolvido UMA vez por dispositivo, a partir do estado já consolidado com todo o
+    // lote e do pacote mais recente: se o lote trouxer o logout do motorista anterior e
+    // o login do novo, cada posição isolada daria uma resposta diferente e o card
+    // acabaria exibindo a do último item do array, não a do último instante.
     const resolverMotorista = await carregarResolvedorMotoristas().catch(() => null);
+    const posicaoMaisRecentePorDevice = new Map<number, typeof msg.positions[number]>();
+    for (const p of msg.positions) {
+      const atual = posicaoMaisRecentePorDevice.get(p.deviceId);
+      if (!atual || tempoPosicaoWs(p) >= tempoPosicaoWs(atual)) posicaoMaisRecentePorDevice.set(p.deviceId, p);
+    }
+    const motoristaPorDevice = new Map<number, ReturnType<typeof motoristaAtualDoDispositivo> | null>();
+    if (resolverMotorista) {
+      for (const [deviceId, p] of posicaoMaisRecentePorDevice) {
+        const identificador = traccarIdToUniqueId.get(deviceId);
+        const dispositivo = identificador ? localPorIdentificador.get(identificador) : null;
+        if (!dispositivo) continue;
+        motoristaPorDevice.set(deviceId, motoristaAtualDoDispositivo(resolverMotorista, dispositivo as any, p as any));
+      }
+    }
 
     result.positions = msg.positions.map(p => ({
       deviceId: p.deviceId,
@@ -510,9 +548,9 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         }
         return {
           ...decorarPosicaoComMedidores(dispositivo, p as any),
-          motorista: resolverMotorista
-            ? motoristaAtualDoDispositivo(resolverMotorista, dispositivo as any, p as any)
-            : null,
+          // Sem resolvedor (falha ao ler o cadastro de motoristas) a chave é omitida,
+          // para o card manter o motorista que já exibia em vez de apagá-lo.
+          ...(resolverMotorista ? { motorista: motoristaPorDevice.get(p.deviceId) ?? null } : {}),
         };
       })(),
     }));
