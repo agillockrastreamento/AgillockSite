@@ -117,7 +117,7 @@ Regras que valem para todas:
 
 Antes, o Raposo **perguntava**: um job de 20 em 20 minutos, uma chamada por placa. Com 150 veículos são **450 chamadas por hora** para descobrir que quase nada mudou, e ainda assim o KM da tela dele ficava até 20 minutos atrasado. Agora a Ágil Lock **avisa**.
 
-**Endpoint no Raposo:** `POST https://raposomotors.com.br/api/webhooks/agillock`, header `x-agillock-secret`.
+**Endpoint no Raposo:** `POST https://raposomotors.com.br/api/v1/webhooks/agillock`, header `x-agillock-secret`.
 
 **Corpo** (um evento por requisição):
 
@@ -147,7 +147,7 @@ Como funciona, e por que assim:
 
 ```env
 RAPOSO_WEBHOOK_ATIVO=false                  # nasce DESLIGADO; sem isto nada é gravado nem enviado
-RAPOSO_WEBHOOK_URL=https://raposomotors.com.br/api/webhooks/agillock
+RAPOSO_WEBHOOK_URL=https://raposomotors.com.br/api/v1/webhooks/agillock
 RAPOSO_WEBHOOK_SECRET=<mesmo AGILLOCK_WEBHOOK_SECRET do Raposo>
 RAPOSO_WEBHOOK_CLIENTE_IDS=<uuid do cliente Raposo>   # separados por vírgula
 ```
