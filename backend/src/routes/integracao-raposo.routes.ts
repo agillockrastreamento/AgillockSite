@@ -196,8 +196,21 @@ router.get('/veiculo/:placa/manutencoes', async (req: Request, res: Response) =>
         where: { dispositivoId: dispositivo.id, ativa: true },
         orderBy: { dataReferencia: 'asc' },
       }),
+      /**
+       * 🐛 **O que nasceu na Raposo não volta para a Raposo** (07/08/2026,
+       * previsto por quem usa antes de acontecer em campo).
+       *
+       * Marcar um plano como feito lá cria a manutenção **lá** e empurra o
+       * `/feito` para cá, que deixa um `ManutencaoRegistro` de origem `RAPOSO`.
+       * Esse registro voltava nesta lista, a Raposo não o reconhecia (nunca
+       * tinha importado esse id) e criava uma **segunda** manutenção — a mesma
+       * revisão, duas vezes na tela, uma delas sem valor e sem responsável.
+       *
+       * É a mesma regra do anti-eco do webhook: origem `RAPOSO` fica fora.
+       * Ela continua no histórico daqui, que é o lugar dela.
+       */
       prisma.manutencaoRegistro.findMany({
-        where: { dispositivoId: dispositivo.id },
+        where: { dispositivoId: dispositivo.id, origem: { not: 'RAPOSO' } },
         orderBy: { dataRealizacao: 'desc' },
         take: 100,
       }),
@@ -229,6 +242,10 @@ router.get('/veiculo/:placa/manutencoes', async (req: Request, res: Response) =>
         kmRealizacao: r.kmRealizacao,
         custo: r.custo,
         oficina: r.oficina,
+        // A origem viaja para o Raposo poder se defender sozinho: se uma versão
+        // antiga desta API (sem o filtro acima) estiver no ar, ele ainda
+        // reconhece o que é dele e não reimporta.
+        origem: r.origem,
       })),
     });
   } catch (err) {
