@@ -14,6 +14,7 @@ import {
   decorarPosicaoComMedidores,
 } from './medidores.service';
 import { carregarResolvedorMotoristas, motoristaAtualDoDispositivo } from './motoristas.service';
+import { registrarKmDoDispositivo } from './webhook-raposo.service';
 import NotificationService from './notification.service';
 import { reverseGeocode } from '../utils/reverse-geocode';
 import { verifyClienteToken, verifyToken } from '../utils/jwt';
@@ -454,6 +455,11 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
         }
       }
       localPorIdentificador.set(identificador, dispositivo);
+
+      // O KM do Raposo Motors nasce aqui, no instante em que a moto anda — só
+      // acumula em memória; quem descarrega em lote (1×/min) é o serviço. Sem o
+      // webhook ligado esta chamada retorna na primeira linha.
+      registrarKmDoDispositivo(dispositivo.id, (dispositivo as any).odometroSistemaMetros);
 
       // Verificação proativa de alertas usando o estado ANTERIOR para comparação
       const pos = posicaoPorIdentificador.get(identificador);

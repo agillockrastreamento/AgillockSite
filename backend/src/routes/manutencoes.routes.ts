@@ -12,6 +12,11 @@ import { broadcastTrackingEvents } from '../services/traccar.ws';
 import { traccarGetDeviceByImei, traccarGetPositions } from '../services/traccar.service';
 import { calcularKmAtualPorDispositivo } from '../services/medidores.service';
 import ExpoPushService from '../services/expo-push.service';
+import {
+  emitirRecorrenciaKm,
+  emitirRecorrenciaData,
+  emitirRegistroCriado,
+} from '../services/webhook-raposo.service';
 
 const router = Router();
 router.use(clienteAuthMiddleware);
@@ -67,6 +72,22 @@ function _filtroManutencoesVisiveis(dispositivos: DispositivoAcessivel[], filtro
     dispositivoId: filtroDispositivo ?? { in: idsPermitidos },
     OR: [
       { origem: 'ADMIN' },
+      /**
+       * 🐛 **A recorrência criada pelo Raposo Motors era invisível** (07/08/2026,
+       * relatado por quem usa: *"criei a recorrência na Raposo e não apareceu
+       * aqui"*).
+       *
+       * A superfície de integração (`integracao-raposo.routes.ts`) grava
+       * `origem: 'RAPOSO'` e **sem `clienteLoginId`** — é uma chamada
+       * server-to-server, não tem login de cliente por trás. Uma linha assim não
+       * casava com nenhum dos dois braços deste OR: sumia no `WHERE`, antes de
+       * chegar à tela. A recorrência **existia no banco** e não aparecia em lugar
+       * nenhum, nem aqui nem no painel admin.
+       *
+       * O acesso já está garantido pelo `dispositivoId`: só entram dispositivos
+       * que este login pode ver. Origem não é controle de acesso — é procedência.
+       */
+      { origem: 'RAPOSO' },
       { clienteLogin: { clienteId: { in: clienteIdsResponsaveis } } },
     ],
   };
@@ -188,6 +209,10 @@ router.post('/registros', requirePermission('manutencao.criar'), async (req: any
       include: { dispositivo: { select: { nome: true, placa: true } } },
     });
 
+    // Se o veículo é da frota do Raposo, o registro chega lá em segundos — sem
+    // isto ele só apareceria na reconciliação do dia seguinte.
+    emitirRegistroCriado(registro);
+
     res.json(registro);
   } catch (err) {
     console.error(err);
@@ -253,6 +278,10 @@ router.get('/recorrencias', requirePermission('manutencao.ver'), async (req: any
     // Exclui recorrências CLIENTE cujo criador não é mais o responsável atual do dispositivo
     const filtradas = recorrencias.filter(r => {
       if (r.origem === 'ADMIN') return true;
+      // A do Raposo não tem `clienteLogin` (integração server-to-server) — sem
+      // esta linha ela passava pelo `WHERE` e morria aqui. Ver a nota em
+      // `_filtroManutencoesVisiveis`.
+      if (r.origem === 'RAPOSO') return true;
       return r.clienteLogin?.clienteId === r.dispositivo.clienteId;
     });
 
@@ -320,6 +349,8 @@ router.post('/recorrencias', requirePermission('manutencao.criarRecorrencia'), a
     // Garante que as notificações de manutenção estão ativas para este dispositivo
     await _ativarNotificacaoManutencao(clienteLoginId, dispositivoId);
 
+    emitirRecorrenciaKm('criada', recorrencia);
+
     res.json(recorrencia);
   } catch (err) {
     console.error(err);
@@ -373,7 +404,7 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
       data: { kmBase: kmAtual, alerta50Enviado: false, alerta25Enviado: false, alerta0Enviado: false, ultimaAlertaPostDueKm: -1 },
     });
 
-    await prisma.manutencaoRegistro.create({
+    const registroFeito = await prisma.manutencaoRegistro.create({
       data: {
         dispositivoId: recorrencia.dispositivoId,
         clienteLoginId,
@@ -387,6 +418,11 @@ router.post('/recorrencias/:id/feito', async (req: any, res) => {
         origem: 'CLIENTE',
       },
     });
+
+    // O Raposo fecha a ocorrência dele com isto — o contador reiniciou aqui, e
+    // lá a revisão precisa parar de alertar. O registro vai junto: é ele que
+    // vira a manutenção importada do outro lado, sem duplicar com o job diário.
+    emitirRecorrenciaKm('feita', { ...recorrencia, kmBase: kmAtual }, registroFeito);
 
     // Notificação verde: manutenção realizada
     const prefFeita = await prisma.preferenciaNotificacao.findUnique({
@@ -524,6 +560,7 @@ router.put('/recorrencias/:id', requirePermission('manutencao.editarRecorrencia'
       },
       include: { dispositivo: { select: { nome: true, placa: true, odometroSistemaMetros: true } } },
     });
+    emitirRecorrenciaKm('editada', updated);
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -543,6 +580,9 @@ router.delete('/recorrencias/:id', requirePermission('manutencao.editarRecorrenc
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada ou não pode ser excluída.' });
 
     await prisma.manutencaoRecorrencia.update({ where: { id }, data: { ativa: false } });
+    // Sem este aviso, o plano espelhado no Raposo continuaria alertando sozinho
+    // uma revisão que aqui deixou de existir.
+    emitirRecorrenciaKm('desativada', recorrencia);
     res.json({ message: 'Recorrência removida com sucesso.' });
   } catch (err) {
     console.error(err);
@@ -578,6 +618,10 @@ router.get('/recorrencias-data', requirePermission('manutencao.ver'), async (req
 
     const filtradas = recorrencias.filter(r => {
       if (r.origem === 'ADMIN') return true;
+      // A do Raposo não tem `clienteLogin` (integração server-to-server) — sem
+      // esta linha ela passava pelo `WHERE` e morria aqui. Ver a nota em
+      // `_filtroManutencoesVisiveis`.
+      if (r.origem === 'RAPOSO') return true;
       return r.clienteLogin?.clienteId === r.dispositivo.clienteId;
     });
 
@@ -629,6 +673,8 @@ router.post('/recorrencias-data', requirePermission('manutencao.criarRecorrencia
 
     await _ativarNotificacaoRecorrenciaData(clienteLoginId, dispositivoId);
 
+    emitirRecorrenciaData('criada', recorrencia);
+
     res.json(recorrencia);
   } catch (err: any) {
     console.error(err);
@@ -675,6 +721,7 @@ router.put('/recorrencias-data/:id', requirePermission('manutencao.editarRecorre
       },
       include: { dispositivo: { select: { nome: true, placa: true } } },
     });
+    emitirRecorrenciaData('editada', updated);
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -746,7 +793,7 @@ router.post('/recorrencias-data/:id/feito', async (req: any, res) => {
       });
     }
 
-    await prisma.manutencaoRegistro.create({
+    const registroFeito = await prisma.manutencaoRegistro.create({
       data: {
         dispositivoId: recorrencia.dispositivoId,
         clienteLoginId,
@@ -759,6 +806,14 @@ router.post('/recorrencias-data/:id/feito', async (req: any, res) => {
         origem: 'CLIENTE',
       },
     });
+
+    // A data já andou (ou a avulsa se encerrou): o Raposo precisa saber agora,
+    // não amanhã.
+    emitirRecorrenciaData(
+      'feita',
+      { ...recorrencia, dataReferencia: novaData ?? recorrencia.dataReferencia },
+      registroFeito,
+    );
 
     const nome = recorrencia.dispositivo.nome;
     const pl = recorrencia.dispositivo.placa ? ` (${recorrencia.dispositivo.placa})` : '';
@@ -827,6 +882,7 @@ router.delete('/recorrencias-data/:id', requirePermission('manutencao.editarReco
     if (!recorrencia) return res.status(404).json({ message: 'Recorrência não encontrada ou não pode ser excluída.' });
 
     await prisma.manutencaoRecorrenciaData.update({ where: { id }, data: { ativa: false } });
+    emitirRecorrenciaData('desativada', recorrencia);
     res.json({ message: 'Recorrência por data removida com sucesso.' });
   } catch (err) {
     console.error(err);
@@ -913,6 +969,13 @@ function _calcularProximaData(rec: { tipoRecorrencia: string; dataReferencia: Da
   }
 }
 
-export { _calcularProximaData, _parseDataSp };
+/**
+ * Os helpers de recorrência por data são compartilhados com o painel admin
+ * (`manutencoes-admin.routes.ts`) e com a superfície da Raposo
+ * (`integracao-raposo.routes.ts`). A regra de "qual é a próxima data" e de "estes
+ * campos são obrigatórios para este tipo" mora aqui, num lugar só — as três
+ * superfícies escrevem na mesma tabela e não podem discordar sobre isso.
+ */
+export { _calcularProximaData, _parseDataSp, _validarCamposRecorrenciaData, _ativarNotificacaoRecorrenciaData };
 
 export default router;

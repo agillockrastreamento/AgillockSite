@@ -1019,6 +1019,32 @@ model WorkerStatus {
   updatedAt       DateTime  @updatedAt
 }
 
+// Outbox dos eventos empurrados ao Raposo Motors (webhook, docs/integracao).
+//
+// Por que uma tabela e não um `fetch` no meio do fluxo: um deploy do Raposo
+// derruba a API dele por alguns segundos, e um evento perdido nesse intervalo
+// não seria notado até a revisão passar batido. Aqui o evento é gravado
+// primeiro e entregue depois, com retentativa e backoff — a entrega deixa de
+// depender de os dois sistemas estarem no ar ao mesmo tempo.
+//
+// `entregueEm` nulo e `tentativas < máximo` é o que o worker procura. O id da
+// linha viaja no corpo e é a chave de idempotência do outro lado: reentrega não
+// vira manutenção duplicada.
+model WebhookRaposoEvento {
+  id                 String    @id @default(uuid())
+  tipo               String // km.lote | recorrencia.* | recorrenciaData.* | registro.criado
+  payload            Json
+  tentativas         Int       @default(0)
+  proximaTentativaEm DateTime  @default(now())
+  entregueEm         DateTime?
+  desistiuEm         DateTime?
+  ultimoErro         String?   @db.Text
+  criadoEm           DateTime  @default(now())
+
+  @@index([entregueEm, desistiuEm, proximaTentativaEm])
+  @@index([criadoEm])
+}
+
 // Cache persistente de reverse geocoding. Evita repetir a chamada ao provedor
 // para a mesma coordenada (veículo parado gera centenas de eventos no mesmo
 // ponto). `provedor` permite invalidar só um provedor ao migrar, sem zerar tudo.

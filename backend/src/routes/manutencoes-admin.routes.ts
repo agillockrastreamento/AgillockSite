@@ -7,6 +7,11 @@ import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
 import { broadcastTrackingEvents } from '../services/traccar.ws';
 import { calcularKmAtualDispositivo, calcularKmAtualPorDispositivo } from '../services/medidores.service';
 import ExpoPushService from '../services/expo-push.service';
+import {
+  emitirRecorrenciaKm,
+  emitirRecorrenciaData,
+  emitirRegistroCriado,
+} from '../services/webhook-raposo.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -185,6 +190,10 @@ router.get('/clientes/:clienteLoginId/registros', async (req, res) => {
         dispositivoId: ctx.filtroDispositivo ?? { in: ctx.idsPermitidos },
         OR: [
           { origem: 'ADMIN' },
+          // 🐛 A recorrência/registro criado pelo Raposo Motors não tem
+          // `clienteLoginId` (integração server-to-server) e sumia deste OR —
+          // ver a nota em `manutencoes.routes.ts:_filtroManutencoesVisiveis`.
+          { origem: 'RAPOSO' },
           { clienteLoginId: { in: ctx.responsavelLoginIds } },
           { clienteLogin: { clienteId: { in: ctx.responsavelClienteIds } } },
         ],
@@ -243,6 +252,9 @@ router.post('/clientes/:clienteLoginId/registros', async (req: any, res) => {
       include: { dispositivo: { select: { nome: true, placa: true } } },
     });
 
+    // Veículo da frota do Raposo: o registro chega lá em segundos (webhook).
+    emitirRegistroCriado(registro);
+
     res.json(registro);
   } catch (err) {
     console.error(err);
@@ -279,6 +291,10 @@ router.get('/clientes/:clienteLoginId/recorrencias', async (req, res) => {
         ativa: true,
         OR: [
           { origem: 'ADMIN' },
+          // 🐛 A recorrência/registro criado pelo Raposo Motors não tem
+          // `clienteLoginId` (integração server-to-server) e sumia deste OR —
+          // ver a nota em `manutencoes.routes.ts:_filtroManutencoesVisiveis`.
+          { origem: 'RAPOSO' },
           { clienteLoginId: { in: ctx.responsavelLoginIds } },
           { clienteLogin: { clienteId: { in: ctx.responsavelClienteIds } } },
         ],
@@ -351,6 +367,8 @@ router.post('/clientes/:clienteLoginId/recorrencias', async (req: any, res) => {
 
     await _ativarNotificacaoManutencao(clienteLoginIdCanonical, dispositivoId);
 
+    emitirRecorrenciaKm('criada', recorrencia);
+
     res.json(recorrencia);
   } catch (err) {
     console.error(err);
@@ -410,6 +428,7 @@ router.put('/clientes/:clienteLoginId/recorrencias/:id', async (req, res) => {
       },
       include: { dispositivo: { select: { nome: true, placa: true, odometroSistemaMetros: true } } },
     });
+    emitirRecorrenciaKm('editada', updated);
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -445,7 +464,7 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
       data: { kmBase: kmAtual, alerta50Enviado: false, alerta25Enviado: false, alerta0Enviado: false, ultimaAlertaPostDueKm: -1 },
     });
 
-    await prisma.manutencaoRegistro.create({
+    const registroFeito = await prisma.manutencaoRegistro.create({
       data: {
         dispositivoId: recorrencia.dispositivoId,
         clienteLoginId: clienteLoginIdCanonical,
@@ -460,6 +479,8 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
         origem: 'ADMIN',
       },
     });
+
+    emitirRecorrenciaKm('feita', { ...recorrencia, kmBase: kmAtual }, registroFeito);
 
     // Notificação verde: manutenção realizada
     const prefFeita = await prisma.preferenciaNotificacao.findUnique({
@@ -536,7 +557,8 @@ router.post('/clientes/:clienteLoginId/recorrencias/:id/feito', async (req: any,
 router.delete('/clientes/:clienteLoginId/recorrencias/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.manutencaoRecorrencia.update({ where: { id }, data: { ativa: false } });
+    const removida = await prisma.manutencaoRecorrencia.update({ where: { id }, data: { ativa: false } });
+    emitirRecorrenciaKm('desativada', removida);
     res.json({ message: 'Recorrência removida com sucesso.' });
   } catch (err) {
     console.error(err);
@@ -613,7 +635,7 @@ router.post('/bulk/recorrencias', async (req: any, res) => {
             dispositivo?.identificador,
           );
 
-          await prisma.manutencaoRecorrencia.create({
+          const criada = await prisma.manutencaoRecorrencia.create({
             data: {
               dispositivoId: devId,
               clienteLoginId: clienteLoginIdCanonical,
@@ -625,6 +647,7 @@ router.post('/bulk/recorrencias', async (req: any, res) => {
               origem: 'ADMIN',
             },
           });
+          emitirRecorrenciaKm('criada', criada);
 
           await _ativarNotificacaoManutencao(clienteLoginIdCanonical, devId);
           criados.push(`${clienteLoginIdCanonical}/${devId}`);
@@ -660,6 +683,10 @@ router.get('/clientes/:clienteLoginId/recorrencias-data', async (req, res) => {
         ativa: true,
         OR: [
           { origem: 'ADMIN' },
+          // 🐛 A recorrência/registro criado pelo Raposo Motors não tem
+          // `clienteLoginId` (integração server-to-server) e sumia deste OR —
+          // ver a nota em `manutencoes.routes.ts:_filtroManutencoesVisiveis`.
+          { origem: 'RAPOSO' },
           { clienteLoginId: { in: ctx.responsavelLoginIds } },
           { clienteLogin: { clienteId: { in: ctx.responsavelClienteIds } } },
         ],
@@ -717,6 +744,7 @@ router.post('/clientes/:clienteLoginId/recorrencias-data', async (req: any, res)
     });
 
     await _ativarNotificacaoRecorrenciaData(clienteLoginIdCanonical, dispositivoId);
+    emitirRecorrenciaData('criada', recorrencia);
     res.json(recorrencia);
   } catch (err) {
     console.error(err);
@@ -749,6 +777,7 @@ router.put('/recorrencias-data/:id', async (req: any, res) => {
       },
       include: { dispositivo: { select: { nome: true, placa: true } } },
     });
+    emitirRecorrenciaData('editada', updated);
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -789,7 +818,7 @@ router.post('/clientes/:clienteLoginId/recorrencias-data/:id/feito', async (req:
     const pl = recorrencia.dispositivo.placa ? ` (${recorrencia.dispositivo.placa})` : '';
     const mensagem = `Recorrência "${recorrencia.titulo}" no veículo ${nome}${pl} marcada como realizada pelo administrador!`;
 
-    await prisma.manutencaoRegistro.create({
+    const registroFeito = await prisma.manutencaoRegistro.create({
       data: {
         dispositivoId: recorrencia.dispositivoId,
         clienteLoginId: clienteLoginIdCanonical,
@@ -844,6 +873,12 @@ router.post('/clientes/:clienteLoginId/recorrencias-data/:id/feito', async (req:
       endereco: null,
     }]);
 
+    emitirRecorrenciaData(
+      'feita',
+      { ...recorrencia, dataReferencia: novaData ?? recorrencia.dataReferencia },
+      registroFeito,
+    );
+
     res.json({ message: 'Recorrência por data confirmada pelo admin.', proximaData: novaData });
   } catch (err) {
     console.error(err);
@@ -855,7 +890,8 @@ router.post('/clientes/:clienteLoginId/recorrencias-data/:id/feito', async (req:
 router.delete('/recorrencias-data/:id', async (_req, res) => {
   try {
     const { id } = _req.params;
-    await prisma.manutencaoRecorrenciaData.update({ where: { id }, data: { ativa: false } });
+    const removida = await prisma.manutencaoRecorrenciaData.update({ where: { id }, data: { ativa: false } });
+    emitirRecorrenciaData('desativada', removida);
     res.json({ message: 'Recorrência por data removida com sucesso.' });
   } catch (err) {
     console.error(err);

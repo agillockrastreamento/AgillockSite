@@ -6,6 +6,7 @@ import FinanceiroNotificationService from './services/financeiro-notification.se
 import ContratoClicksignSyncService from './services/contrato-clicksign-sync.service';
 import NotificationService from './services/notification.service';
 import { iniciarConsultaLote, fecharLotesExpirados } from './services/multas.service';
+import { iniciarWebhookRaposo } from './services/webhook-raposo.service';
 
 const PORT = process.env.PORT || 3000;
 
@@ -14,6 +15,9 @@ const httpServer = http.createServer(app);
 initTraccarWebSocket(httpServer);
 FinanceiroNotificationService.iniciarAgendador();
 ContratoClicksignSyncService.iniciarAgendador();
+// Webhook do Raposo Motors: sem RAPOSO_WEBHOOK_ATIVO=true isto só imprime uma
+// linha no log e volta — a Ágil Lock segue exatamente como antes.
+iniciarWebhookRaposo();
 
 function proximaExecucaoRecorrenciasData(): Date {
   const agora = new Date();

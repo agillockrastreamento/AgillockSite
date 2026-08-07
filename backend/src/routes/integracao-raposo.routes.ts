@@ -11,6 +11,12 @@ import {
   sincronizarDispositivosComPosicoes,
   decorarPosicaoComMedidores,
 } from '../services/medidores.service';
+import {
+  _calcularProximaData,
+  _parseDataSp,
+  _validarCamposRecorrenciaData,
+  _ativarNotificacaoRecorrenciaData,
+} from './manutencoes.routes';
 
 /**
  * Superfície de integração dedicada ao Raposo Motors (server-to-server, API key).
@@ -231,6 +237,28 @@ router.get('/veiculo/:placa/manutencoes', async (req: Request, res: Response) =>
   }
 });
 
+/**
+ * ⭐ **A recorrência ganha dono** (07/08/2026). Ela nascia com `clienteLoginId`
+ * nulo — é uma chamada server-to-server, não há login por trás — e isso a fazia
+ * sumir dos filtros das telas (ver o 🐛 em
+ * `manutencoes.routes.ts:_filtroManutencoesVisiveis`, já corrigido).
+ *
+ * O filtro deixou de depender disto, mas o dono continua importando por outro
+ * motivo: as preferências de notificação são ligadas **por clienteLogin**, e sem
+ * dono a recorrência criada pela Raposo nunca notificaria ninguém aqui. Pega-se
+ * o primeiro login do cliente do dispositivo — o mesmo que o portal usaria.
+ */
+async function donoDoDispositivo(dispositivoId: string): Promise<{ id: string } | null> {
+  return prisma.dispositivo
+    .findUnique({ where: { id: dispositivoId }, select: { clienteId: true } })
+    .then(d =>
+      d?.clienteId
+        ? prisma.clienteLogin.findFirst({ where: { clienteId: d.clienteId }, select: { id: true } })
+        : null,
+    )
+    .catch(() => null);
+}
+
 /** km atual do veículo (odômetro em km), best-effort. */
 async function kmAtualDoVeiculo(dispositivo: Dispositivo): Promise<number | null> {
   const { posicao } = await posicaoAtual(dispositivo).catch(() => ({ posicao: null }));
@@ -256,9 +284,12 @@ router.post('/veiculo/:placa/manutencoes/recorrencia', async (req: Request, res:
       return;
     }
     const kmBase = (await kmAtualDoVeiculo(dispositivo)) ?? 0;
+    const dono = await donoDoDispositivo(dispositivo.id);
+
     const rec = await prisma.manutencaoRecorrencia.create({
       data: {
         dispositivoId: dispositivo.id,
+        ...(dono ? { clienteLoginId: dono.id } : {}),
         titulo: String(titulo),
         descricao: descricao ? String(descricao) : null,
         intervaloKm: parseInt(String(intervaloKm), 10),
@@ -319,6 +350,346 @@ router.post('/veiculo/:placa/manutencoes/recorrencia/:id/feito', async (req: Req
   } catch (err) {
     console.error('[integracao-raposo] recorrência feito:', err);
     res.status(500).json({ error: 'Erro ao marcar a recorrência como feita.' });
+  }
+});
+
+/**
+ * Resolve o dispositivo pela placa e já responde 404 quando ela não existe aqui.
+ * Devolve `null` quando a resposta foi enviada — quem chama só precisa sair.
+ */
+async function dispositivoOu404(req: Request, res: Response): Promise<Dispositivo | null> {
+  const dispositivo = await resolverDispositivoPorPlaca(String(req.params.placa));
+  if (!dispositivo) {
+    res.status(404).json({ error: 'Veículo não encontrado para a placa informada.' });
+    return null;
+  }
+  return dispositivo;
+}
+
+/**
+ * ⭐ **A mão dupla completa** (07/08/2026, docs/05 §5.4.1 do Raposo).
+ *
+ * Até aqui a superfície da Raposo sabia três coisas de manutenção: ler tudo,
+ * criar recorrência por KM e marcá-la feita. Sem editar, sem excluir e sem nada
+ * por data — então o espelho **passava a mentir na primeira edição**, e um plano
+ * do tipo AMBOS (KM + data) só existia pela metade deste lado.
+ *
+ * As seis rotas abaixo fecham o quadro. Cada uma faz o que a rota equivalente do
+ * portal do cliente (`manutencoes.routes.ts`) faz, reusando os mesmos helpers de
+ * data — mudam só a autenticação (API key server-to-server, sem login de
+ * cliente) e a `origem`, que fica `RAPOSO`.
+ *
+ * 🔴 **Excluir é desativar** (`ativa: false`), nunca apagar. Os registros de
+ * manutenção apontam para a recorrência: apagá-la levaria o histórico junto — e
+ * o histórico é do cliente, não da integração.
+ */
+
+// ── Recorrência por KM: editar e desativar ────────────────────────────────────
+
+/**
+ * PUT /api/integracao/raposo/veiculo/:placa/manutencoes/recorrencia/:id
+ * body: { titulo?, descricao?, intervaloKm?, kmBase?, kmProximo? }
+ *
+ * `kmProximo` existe porque os dois lados contam de formas diferentes: a Ágil
+ * Lock guarda **base + intervalo**, o Raposo guarda o **alvo absoluto**. Quem
+ * edita o alvo lá manda `kmProximo` e a conversão acontece aqui, onde as duas
+ * peças estão à mão — em vez de o Raposo ter de adivinhar a `kmBase` daqui.
+ */
+router.put('/veiculo/:placa/manutencoes/recorrencia/:id', async (req: Request, res: Response) => {
+  try {
+    const dispositivo = await dispositivoOu404(req, res);
+    if (!dispositivo) return;
+
+    const rec = await prisma.manutencaoRecorrencia.findFirst({
+      where: { id: String(req.params.id), dispositivoId: dispositivo.id },
+    });
+    if (!rec) {
+      res.status(404).json({ error: 'Recorrência não encontrada.' });
+      return;
+    }
+
+    const { titulo, descricao, intervaloKm, kmBase, kmProximo } = req.body || {};
+    const novoIntervalo = intervaloKm != null ? parseInt(String(intervaloKm), 10) : rec.intervaloKm;
+    let novaBase = kmBase != null ? Number(kmBase) : rec.kmBase;
+    if (kmProximo != null) novaBase = Number(kmProximo) - novoIntervalo;
+
+    /**
+     * 🔴 **Alvo que muda zera os avisos já enviados.** Sem isto, uma revisão
+     * empurrada de 10.000 para 15.000 km continuaria com "faltam 50 km" marcado
+     * como avisado — e o aviso de verdade, cinco mil quilômetros depois, nunca
+     * sairia. O portal não faz esse reset ao editar; aqui faz, porque é a
+     * edição que vem de fora e ninguém está olhando a tela para perceber.
+     */
+    const alvoMudou = novoIntervalo !== rec.intervaloKm || Math.round(novaBase) !== Math.round(rec.kmBase);
+
+    const atualizada = await prisma.manutencaoRecorrencia.update({
+      where: { id: rec.id },
+      data: {
+        titulo: titulo ? String(titulo) : rec.titulo,
+        descricao: descricao !== undefined ? (descricao ? String(descricao) : null) : rec.descricao,
+        intervaloKm: novoIntervalo,
+        kmBase: novaBase,
+        ativa: true,
+        ...(alvoMudou
+          ? {
+              alerta50Enviado: false,
+              alerta25Enviado: false,
+              alerta0Enviado: false,
+              ultimaAlertaPostDueKm: -1,
+            }
+          : {}),
+      },
+    });
+
+    res.json({
+      id: atualizada.id,
+      titulo: atualizada.titulo,
+      intervaloKm: atualizada.intervaloKm,
+      kmBase: atualizada.kmBase,
+    });
+  } catch (err) {
+    console.error('[integracao-raposo] editar recorrência:', err);
+    res.status(500).json({ error: 'Erro ao editar a recorrência.' });
+  }
+});
+
+/**
+ * DELETE /api/integracao/raposo/veiculo/:placa/manutencoes/recorrencia/:id
+ * Desativa (`ativa: false`). Idempotente: desativar de novo devolve 200.
+ */
+router.delete('/veiculo/:placa/manutencoes/recorrencia/:id', async (req: Request, res: Response) => {
+  try {
+    const dispositivo = await dispositivoOu404(req, res);
+    if (!dispositivo) return;
+
+    const rec = await prisma.manutencaoRecorrencia.findFirst({
+      where: { id: String(req.params.id), dispositivoId: dispositivo.id },
+      select: { id: true },
+    });
+    if (!rec) {
+      res.status(404).json({ error: 'Recorrência não encontrada.' });
+      return;
+    }
+    await prisma.manutencaoRecorrencia.update({ where: { id: rec.id }, data: { ativa: false } });
+    res.json({ ok: true, id: rec.id });
+  } catch (err) {
+    console.error('[integracao-raposo] desativar recorrência:', err);
+    res.status(500).json({ error: 'Erro ao desativar a recorrência.' });
+  }
+});
+
+// ── Recorrência por DATA: criar, editar, marcar feita e desativar ─────────────
+
+/**
+ * POST /api/integracao/raposo/veiculo/:placa/manutencoes/recorrencia-data
+ * body: { titulo, descricao?, tipoRecorrencia?, dataReferencia, intervaloDias?,
+ *         diasSemana?, diaDoMes?, mesDoAno? }
+ *
+ * `tipoRecorrencia` aceita AVULSA | INTERVALO | SEMANAL | MENSAL | ANUAL e cai
+ * em AVULSA quando não vier — o plano por data do Raposo é "a cada N dias"
+ * (INTERVALO) ou uma data única (AVULSA), e os outros três existem para o dia em
+ * que a tela de lá crescer.
+ */
+router.post('/veiculo/:placa/manutencoes/recorrencia-data', async (req: Request, res: Response) => {
+  try {
+    const { titulo, descricao, tipoRecorrencia, dataReferencia, intervaloDias, diasSemana, diaDoMes, mesDoAno } =
+      req.body || {};
+    if (!titulo || !dataReferencia) {
+      res.status(400).json({ error: 'titulo e dataReferencia são obrigatórios.' });
+      return;
+    }
+    const dispositivo = await dispositivoOu404(req, res);
+    if (!dispositivo) return;
+
+    const tipo = tipoRecorrencia ? String(tipoRecorrencia) : 'AVULSA';
+    try {
+      _validarCamposRecorrenciaData(tipo, intervaloDias, diasSemana, diaDoMes, mesDoAno);
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message || 'Campos inválidos para o tipo de recorrência.' });
+      return;
+    }
+
+    const dono = await donoDoDispositivo(dispositivo.id);
+    const rec = await prisma.manutencaoRecorrenciaData.create({
+      data: {
+        dispositivoId: dispositivo.id,
+        ...(dono ? { clienteLoginId: dono.id } : {}),
+        titulo: String(titulo),
+        descricao: descricao ? String(descricao) : null,
+        tipoRecorrencia: tipo,
+        dataReferencia: _parseDataSp(dataReferencia),
+        intervaloDias: intervaloDias ? parseInt(String(intervaloDias), 10) : null,
+        diasSemana: diasSemana || null,
+        diaDoMes: diaDoMes ? parseInt(String(diaDoMes), 10) : null,
+        mesDoAno: mesDoAno ? parseInt(String(mesDoAno), 10) : null,
+        origem: 'RAPOSO',
+      },
+    });
+    // Mesma cortesia do portal: a recorrência nasce com a notificação ligada
+    // para o dono. Sem dono não há preferência a ligar, e a recorrência vale
+    // como registro — o alerta de verdade, nesse caso, é o do Raposo.
+    if (dono) await _ativarNotificacaoRecorrenciaData(dono.id, dispositivo.id);
+
+    res.status(201).json({ id: rec.id, dataReferencia: rec.dataReferencia });
+  } catch (err) {
+    console.error('[integracao-raposo] criar recorrência por data:', err);
+    res.status(500).json({ error: 'Erro ao criar a recorrência por data.' });
+  }
+});
+
+/** PUT /api/integracao/raposo/veiculo/:placa/manutencoes/recorrencia-data/:id */
+router.put('/veiculo/:placa/manutencoes/recorrencia-data/:id', async (req: Request, res: Response) => {
+  try {
+    const dispositivo = await dispositivoOu404(req, res);
+    if (!dispositivo) return;
+
+    const rec = await prisma.manutencaoRecorrenciaData.findFirst({
+      where: { id: String(req.params.id), dispositivoId: dispositivo.id },
+    });
+    if (!rec) {
+      res.status(404).json({ error: 'Recorrência não encontrada.' });
+      return;
+    }
+
+    const { titulo, descricao, tipoRecorrencia, dataReferencia, intervaloDias, diasSemana, diaDoMes, mesDoAno } =
+      req.body || {};
+    const novoTipo = tipoRecorrencia ? String(tipoRecorrencia) : rec.tipoRecorrencia;
+    if (tipoRecorrencia || intervaloDias !== undefined || diasSemana !== undefined || diaDoMes !== undefined) {
+      try {
+        _validarCamposRecorrenciaData(
+          novoTipo,
+          intervaloDias !== undefined ? intervaloDias : rec.intervaloDias,
+          diasSemana !== undefined ? diasSemana : rec.diasSemana,
+          diaDoMes !== undefined ? diaDoMes : rec.diaDoMes,
+          mesDoAno !== undefined ? mesDoAno : rec.mesDoAno,
+        );
+      } catch (e: any) {
+        res.status(400).json({ error: e?.message || 'Campos inválidos para o tipo de recorrência.' });
+        return;
+      }
+    }
+
+    const atualizada = await prisma.manutencaoRecorrenciaData.update({
+      where: { id: rec.id },
+      data: {
+        titulo: titulo ? String(titulo) : rec.titulo,
+        descricao: descricao !== undefined ? (descricao ? String(descricao) : null) : rec.descricao,
+        tipoRecorrencia: novoTipo,
+        dataReferencia: dataReferencia ? _parseDataSp(dataReferencia) : rec.dataReferencia,
+        intervaloDias:
+          intervaloDias !== undefined ? (intervaloDias ? parseInt(String(intervaloDias), 10) : null) : rec.intervaloDias,
+        diasSemana: diasSemana !== undefined ? diasSemana || null : (rec.diasSemana as any),
+        diaDoMes: diaDoMes !== undefined ? (diaDoMes ? parseInt(String(diaDoMes), 10) : null) : rec.diaDoMes,
+        mesDoAno: mesDoAno !== undefined ? (mesDoAno ? parseInt(String(mesDoAno), 10) : null) : rec.mesDoAno,
+        ativa: true,
+        // Data nova zera os avisos — o mesmo motivo do reset por KM acima. É o
+        // que o portal já faz nesta rota.
+        ...(dataReferencia
+          ? {
+              alerta7dEnviado: false,
+              alerta4dEnviado: false,
+              alerta2dEnviado: false,
+              alerta1dEnviado: false,
+              alertaDiaEnviado: false,
+              ultimoAlertaPosDue: null,
+            }
+          : {}),
+      },
+    });
+
+    res.json({
+      id: atualizada.id,
+      titulo: atualizada.titulo,
+      tipoRecorrencia: atualizada.tipoRecorrencia,
+      dataReferencia: atualizada.dataReferencia,
+      intervaloDias: atualizada.intervaloDias,
+    });
+  } catch (err) {
+    console.error('[integracao-raposo] editar recorrência por data:', err);
+    res.status(500).json({ error: 'Erro ao editar a recorrência por data.' });
+  }
+});
+
+/**
+ * POST /api/integracao/raposo/veiculo/:placa/manutencoes/recorrencia-data/:id/feito
+ * Avança para a próxima data (ou desativa, se AVULSA) e deixa o registro.
+ *
+ * Como na irmã por KM: aqui fica só o **reset**, e o efeito financeiro
+ * (responsável, rateio, lançamento) é 100 % do Raposo. E, também como ela, não
+ * dispara notificação ao cliente da Ágil Lock — quem marcou feito foi a oficina
+ * do Raposo, que já avisa quem precisa saber pelos canais dela.
+ */
+router.post('/veiculo/:placa/manutencoes/recorrencia-data/:id/feito', async (req: Request, res: Response) => {
+  try {
+    const dispositivo = await dispositivoOu404(req, res);
+    if (!dispositivo) return;
+
+    const rec = await prisma.manutencaoRecorrenciaData.findFirst({
+      where: { id: String(req.params.id), dispositivoId: dispositivo.id },
+    });
+    if (!rec) {
+      res.status(404).json({ error: 'Recorrência não encontrada.' });
+      return;
+    }
+
+    const agora = new Date();
+    const proximaData = rec.tipoRecorrencia !== 'AVULSA' ? _calcularProximaData(rec as any, agora) : null;
+
+    await prisma.manutencaoRecorrenciaData.update({
+      where: { id: rec.id },
+      data: proximaData
+        ? {
+            dataReferencia: proximaData,
+            ciclosCompletos: rec.ciclosCompletos + 1,
+            alerta7dEnviado: false,
+            alerta4dEnviado: false,
+            alerta2dEnviado: false,
+            alerta1dEnviado: false,
+            alertaDiaEnviado: false,
+            ultimoAlertaPosDue: null,
+          }
+        : { ativa: false, ciclosCompletos: rec.ciclosCompletos + 1 },
+    });
+
+    const kmAtual = await kmAtualDoVeiculo(dispositivo);
+    await prisma.manutencaoRegistro.create({
+      data: {
+        dispositivoId: dispositivo.id,
+        titulo: `${rec.titulo} — confirmado (Raposo)`,
+        tipo: 'recorrenciaData',
+        descricao: `Recorrência por data "${rec.titulo}" marcada como feita pelo Raposo Motors.`,
+        dataRealizacao: agora,
+        ...(kmAtual != null ? { kmRealizacao: kmAtual } : {}),
+        origem: 'RAPOSO',
+      },
+    });
+
+    res.json({ ok: true, proximaData, ativa: proximaData != null });
+  } catch (err) {
+    console.error('[integracao-raposo] recorrência por data feito:', err);
+    res.status(500).json({ error: 'Erro ao marcar a recorrência por data como feita.' });
+  }
+});
+
+/** DELETE /api/integracao/raposo/veiculo/:placa/manutencoes/recorrencia-data/:id */
+router.delete('/veiculo/:placa/manutencoes/recorrencia-data/:id', async (req: Request, res: Response) => {
+  try {
+    const dispositivo = await dispositivoOu404(req, res);
+    if (!dispositivo) return;
+
+    const rec = await prisma.manutencaoRecorrenciaData.findFirst({
+      where: { id: String(req.params.id), dispositivoId: dispositivo.id },
+      select: { id: true },
+    });
+    if (!rec) {
+      res.status(404).json({ error: 'Recorrência não encontrada.' });
+      return;
+    }
+    await prisma.manutencaoRecorrenciaData.update({ where: { id: rec.id }, data: { ativa: false } });
+    res.json({ ok: true, id: rec.id });
+  } catch (err) {
+    console.error('[integracao-raposo] desativar recorrência por data:', err);
+    res.status(500).json({ error: 'Erro ao desativar a recorrência por data.' });
   }
 });
 
