@@ -305,8 +305,25 @@ export async function sincronizarDispositivosComPosicoes<T extends DispositivoMe
     }));
   }
 
-  if (updates.length) {
-    await prisma.$transaction(updates);
+  // ATENÇÃO: NÃO envolver estes updates num único `prisma.$transaction(updates)`.
+  // Cada gravação é a telemetria independente de um dispositivo (odômetro/horímetro/
+  // última posição/cartão) e não precisa de atomicidade entre dispositivos. Uma
+  // transação única com dezenas/centenas de updates estourava o timeout padrão de
+  // 5s e, pior, colidia em lock nas mesmas linhas de `Dispositivo` quando o relay do
+  // WS e o polling HTTP sincronizavam ao mesmo tempo — travando o pool de conexões
+  // ("Unable to start a transaction in the given time") e derrubando até o login.
+  // Rodamos em lotes pequenos e concorrentes, sem transação envolvente: cada lock de
+  // linha dura poucos ms e uma falha isolada não arrasta as demais gravações.
+  // `allSettled`: uma gravação que falha isoladamente (ex.: dispositivo recém-
+  // excluído → P2025) não deve abortar as telemetrias dos demais dispositivos.
+  const TAMANHO_LOTE = 10;
+  for (let i = 0; i < updates.length; i += TAMANHO_LOTE) {
+    const resultados = await Promise.allSettled(updates.slice(i, i + TAMANHO_LOTE));
+    for (const r of resultados) {
+      if (r.status === 'rejected') {
+        console.error('[Medidores] Falha ao gravar telemetria de dispositivo:', r.reason?.message ?? r.reason);
+      }
+    }
   }
 
   return atualizados;
