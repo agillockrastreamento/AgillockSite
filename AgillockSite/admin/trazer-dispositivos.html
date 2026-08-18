@@ -1288,19 +1288,61 @@
       }).then(function(){ btn.disabled=false; btn.innerHTML=old; });
     }
 
+    // Traduz a falha crua de um item (http + resp do sistema anterior) num motivo
+    // legível e diz se vale a pena retentar. 'rede' = transitório (retente);
+    // 'permissao' e 'recusado' = definitivos (o sistema anterior respondeu não).
+    function classificarFalhaLimpeza(i){
+      var resp = String(i.resp || '');
+      var http = i.http;
+      if (/não configurada/i.test(resp)) {
+        return { classe:'config', curto:'NÃO CONFIGURADO', detalhe:'integração com o sistema anterior ausente (ANTERIOR_API_URL/USER/PASS)', retryavel:false };
+      }
+      // Erro de rede: o fetch de saída nem chegou a receber resposta HTTP.
+      if (http == null || /fetch failed|network|timeout|socket|aborted|ECONN|EAI_AGAIN/i.test(resp)) {
+        return { classe:'rede', curto:'ERRO DE REDE', detalhe:'falha de conexão com o sistema anterior — recarregue e tente de novo', retryavel:true };
+      }
+      // Permissão: a conta AgilLock (gerente, não admin) não é dona do item lá.
+      if (http === 401 || http === 403 || /access denied|denied|permiss|não autoriz|nao autoriz|forbidden/i.test(resp)) {
+        return { classe:'permissao', curto:'SEM PERMISSÃO', detalhe:'a conta AgilLock não é dona deste item no sistema anterior — exclua pela conta dona/admin lá', retryavel:false };
+      }
+      return { classe:'recusado', curto:'RECUSADO (HTTP '+(http||'?')+')', detalhe:resp.slice(0,140), retryavel:false };
+    }
+
     function renderLimpezaLog(r){
       var tipoLabel = { dispositivo:'DISPOSITIVO', motorista:'MOTORISTA', geocerca:'GEOCERCA', cliente:'CONTA' };
       document.getElementById('limpeza-log-panel').innerHTML = (r.itens || []).map(function(i, idx){
-        var cls = i.ok ? (i.apontado === false ? 'log-queue' : 'log-ok') : 'log-err';
-        var tag = i.ok ? (i.apontado === false ? 'OK (sem apontamento)' : 'OK') : ('ERRO '+(i.http||''));
-        return '<span class="'+cls+'">['+(idx+1)+'/'+r.total+'] '+esc(tag)+'  '+esc(tipoLabel[i.tipo]||i.tipo)+'  '+
-          esc(i.uniqueId||'')+'  '+esc(i.nome||'')+(i.resp?('  '+esc(i.resp)):'')+'</span>';
+        var pre = '['+(idx+1)+'/'+r.total+'] ';
+        var meta = '  '+esc(tipoLabel[i.tipo]||i.tipo)+'  '+esc(i.uniqueId||'')+'  '+esc(i.nome||'');
+        if (i.ok){
+          var okCls = i.apontado === false ? 'log-queue' : 'log-ok';
+          var okTag = i.apontado === false ? 'OK (sem apontamento)' : 'OK';
+          return '<span class="'+okCls+'">'+pre+esc(okTag)+meta+'</span>';
+        }
+        var f = classificarFalhaLimpeza(i);
+        var cls = f.retryavel ? 'log-queue' : 'log-err';
+        var marcador = f.retryavel ? '↻ ' : '✕ ';
+        var titleAttr = i.resp ? ' title="'+esc(i.resp)+'"' : '';
+        return '<span class="'+cls+'"'+titleAttr+'>'+pre+esc(marcador+f.curto)+meta+
+          (f.detalhe?('  — '+esc(f.detalhe)):'')+'</span>';
       }).join('\n') || 'Nada foi excluído.';
+
+      // Quebra os erros por motivo para o resumo (rede = retentável; resto = definitivo).
+      var falhas = (r.itens || []).filter(function(i){ return !i.ok; });
+      var nRede=0, nPerm=0, nOutro=0;
+      falhas.forEach(function(i){
+        var f = classificarFalhaLimpeza(i);
+        if (f.retryavel) nRede++; else if (f.classe==='permissao') nPerm++; else nOutro++;
+      });
+
       var cls = r.erro===0 ? 'b-ok' : 'b-err';
-      document.getElementById('limpeza-log-resumo').innerHTML = '<span class="mini-badge '+cls+'">RESUMO: '+
+      var html = '<span class="mini-badge '+cls+'">RESUMO: '+
         r.dispositivos+' dispositivo(s), '+r.motoristas+' motorista(s), '+r.geocercas+' geocerca(s)'+
         (r.usuarioExcluido?', conta excluída':'')+' — '+r.erro+' erro(s)</span>' +
         (r.naoApontados ? ' <span class="mini-badge b-warn">'+r.naoApontados+' sem apontamento confirmado</span>' : '');
+      if (nRede)  html += ' <span class="mini-badge b-warn" title="Transitório — recarregue o cliente e tente apagar de novo os que faltaram">'+nRede+' erro(s) de rede — retente</span>';
+      if (nPerm)  html += ' <span class="mini-badge b-err" title="A conta AgilLock não é dona destes itens no sistema anterior; exclua pela conta dona/admin de lá">'+nPerm+' sem permissão no sistema antigo</span>';
+      if (nOutro) html += ' <span class="mini-badge b-err">'+nOutro+' recusado(s) pelo sistema anterior</span>';
+      document.getElementById('limpeza-log-resumo').innerHTML = html;
     }
 
     function loadLimpezaHistorico(){
