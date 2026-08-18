@@ -552,17 +552,28 @@ async function excluirNoAnterior(
 ): Promise<ExclusaoItem> {
   const cfg = anteriorConfig();
   if (!cfg) throw new Error('Integração com o sistema anterior não configurada (ANTERIOR_API_URL/USER/PASS).');
-  try {
-    const res = await fetch(`${cfg.base}${path}`, {
-      method: 'DELETE',
-      headers: { Accept: 'application/json', Authorization: authHeader(cfg) },
-    });
-    const ok = res.status === 204 || res.status === 200 || res.status === 404;
-    const resp = ok ? (res.status === 404 ? 'Já não existia no sistema anterior.' : '') : (await res.text().catch(() => '')).slice(0, 200);
-    return { tipo, id, nome, uniqueId, ok, http: res.status, resp };
-  } catch (e) {
-    return { tipo, id, nome, uniqueId, ok: false, http: null, resp: (e instanceof Error ? e.message : String(e)).slice(0, 200) };
+  // Retenta APENAS em erro de rede (fetch que lança — ex.: "fetch failed" por
+  // socket resetado/timeout, como aconteceu em massa quando o backend estava
+  // sobrecarregado). Uma resposta HTTP definitiva (500 "access denied", 400 etc.)
+  // NÃO é retentada — é a palavra final do servidor. O DELETE é idempotente: se a
+  // 1ª tentativa apagou mas a resposta se perdeu, a 2ª volta 404, que já é OK.
+  const MAX_TENTATIVAS = 3;
+  let ultimoErro = 'fetch failed';
+  for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+    try {
+      const res = await fetch(`${cfg.base}${path}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', Authorization: authHeader(cfg) },
+      });
+      const ok = res.status === 204 || res.status === 200 || res.status === 404;
+      const resp = ok ? (res.status === 404 ? 'Já não existia no sistema anterior.' : '') : (await res.text().catch(() => '')).slice(0, 200);
+      return { tipo, id, nome, uniqueId, ok, http: res.status, resp };
+    } catch (e) {
+      ultimoErro = (e instanceof Error ? e.message : String(e)).slice(0, 200);
+      if (tentativa < MAX_TENTATIVAS) await new Promise((r) => setTimeout(r, 300 * tentativa));
+    }
   }
+  return { tipo, id, nome, uniqueId, ok: false, http: null, resp: ultimoErro };
 }
 
 export function excluirDispositivoAnterior(id: number, nome: string | null, uniqueId: string | null) {
