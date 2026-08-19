@@ -52,6 +52,7 @@ services:
       - "5087:5087"   # Protocolo Maxtrack — exposto publicamente para os dispositivos GPS
       - "5207:5207"   # Protocolo Positron — exposto publicamente para os dispositivos GPS
       - "5216:5216"   # Protocolo Mobilogix — exposto publicamente para os dispositivos GPS
+      - "5056:5056"   # Protocolo EasyTrack — BWS E3/E3+
       # Porta 8082 NÃO exposta — backend acessa via rede interna Docker
     environment:
       - CONFIG_USE_ENVIRONMENT_VARIABLES=true
@@ -67,6 +68,7 @@ services:
       - MAXTRACK_PORT=5087
       - POSITRON_PORT=5207
       - MOBILOGIX_PORT=5216
+      - EASYTRACK_PORT=5056
       - OSMAND_PORT=5055
       - TIME_ZONE=America/Sao_Paulo
       - FILTER_ENABLE=true
