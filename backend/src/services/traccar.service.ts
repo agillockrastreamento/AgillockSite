@@ -12,6 +12,32 @@ const defaultHeaders = {
   'Accept': 'application/json',
 };
 
+// ── Cache curto + coalescência para relatórios pesados ───────────────────────
+// As telas de relatório disparam 5 chamadas simultâneas (histórico, viagens,
+// paradas, eventos, resumo) que compartilham o MESMO route report (~25 MB, ~19s
+// num período de 30 dias) e, logo depois, a exportação repete route+trips+stops.
+// Sem coalescência, o Traccar recalcula os mesmos relatórios 5-6× ao mesmo tempo,
+// contende na CPU e estoura o tempo do proxy. Aqui uma chamada em voo é
+// reaproveitada por todas as demais com a mesma (deviceIds, from, to), e o
+// resultado fica em cache por um curto período para a exportação reusar.
+const REPORT_CACHE_TTL_MS = 90_000;
+const reportCache = new Map<string, { at: number; promise: Promise<unknown> }>();
+
+function reportCacheKey(tipo: string, deviceIds: number[], from: Date, to: Date, extra = ''): string {
+  return `${tipo}|${[...deviceIds].sort((a, b) => a - b).join(',')}|${from.toISOString()}|${to.toISOString()}|${extra}`;
+}
+
+function cachedReport<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const agora = Date.now();
+  for (const [k, v] of reportCache) if (agora - v.at >= REPORT_CACHE_TTL_MS) reportCache.delete(k);
+  const hit = reportCache.get(key);
+  if (hit && agora - hit.at < REPORT_CACHE_TTL_MS) return hit.promise as Promise<T>;
+  // Se a busca falhar, remove do cache para não fixar o erro pelo TTL inteiro.
+  const promise = fetcher().catch(err => { reportCache.delete(key); throw err; });
+  reportCache.set(key, { at: agora, promise });
+  return promise;
+}
+
 // ── Dispositivos ─────────────────────────────────────────────────────────────
 
 export async function traccarGetDevices(): Promise<TraccarDevice[]> {
@@ -123,14 +149,16 @@ export async function traccarGetPositionHistory(
   from: Date,
   to: Date,
 ): Promise<TraccarPosition[]> {
-  const params = new URLSearchParams({
-    from: from.toISOString(),
-    to: to.toISOString(),
+  return cachedReport(reportCacheKey('route', deviceIds, from, to), async () => {
+    const params = new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+    deviceIds.forEach(id => params.append('deviceId', String(id)));
+    const res = await fetch(`${TRACCAR_URL}/api/reports/route?${params}`, { headers: defaultHeaders });
+    if (!res.ok) throw new Error(`Traccar ${res.status}`);
+    return res.json() as Promise<TraccarPosition[]>;
   });
-  deviceIds.forEach(id => params.append('deviceId', String(id)));
-  const res = await fetch(`${TRACCAR_URL}/api/reports/route?${params}`, { headers: defaultHeaders });
-  if (!res.ok) throw new Error(`Traccar ${res.status}`);
-  return res.json() as Promise<TraccarPosition[]>;
 }
 
 // ── Relatórios ────────────────────────────────────────────────────────────────
@@ -140,14 +168,16 @@ export async function traccarGetTrips(
   from: Date,
   to: Date,
 ): Promise<TraccarTrip[]> {
-  const params = new URLSearchParams({
-    from: from.toISOString(),
-    to: to.toISOString(),
+  return cachedReport(reportCacheKey('trips', deviceIds, from, to), async () => {
+    const params = new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+    deviceIds.forEach(id => params.append('deviceId', String(id)));
+    const res = await fetch(`${TRACCAR_URL}/api/reports/trips?${params}`, { headers: defaultHeaders });
+    if (!res.ok) throw new Error(`Traccar ${res.status}`);
+    return res.json() as Promise<TraccarTrip[]>;
   });
-  deviceIds.forEach(id => params.append('deviceId', String(id)));
-  const res = await fetch(`${TRACCAR_URL}/api/reports/trips?${params}`, { headers: defaultHeaders });
-  if (!res.ok) throw new Error(`Traccar ${res.status}`);
-  return res.json() as Promise<TraccarTrip[]>;
 }
 
 export async function traccarGetEvents(
@@ -160,11 +190,13 @@ export async function traccarGetEvents(
     from: from.toISOString(),
     to: to.toISOString(),
   });
-  deviceIds.forEach(id => params.append('deviceId', String(id)));
-  if (types?.length) types.forEach(t => params.append('type', t));
-  const res = await fetch(`${TRACCAR_URL}/api/reports/events?${params}`, { headers: defaultHeaders });
-  if (!res.ok) throw new Error(`Traccar ${res.status}`);
-  return res.json() as Promise<TraccarEvent[]>;
+  return cachedReport(reportCacheKey('events', deviceIds, from, to, (types || []).join(',')), async () => {
+    deviceIds.forEach(id => params.append('deviceId', String(id)));
+    if (types?.length) types.forEach(t => params.append('type', t));
+    const res = await fetch(`${TRACCAR_URL}/api/reports/events?${params}`, { headers: defaultHeaders });
+    if (!res.ok) throw new Error(`Traccar ${res.status}`);
+    return res.json() as Promise<TraccarEvent[]>;
+  });
 }
 
 export async function traccarGetSummary(
@@ -172,14 +204,16 @@ export async function traccarGetSummary(
   from: Date,
   to: Date,
 ): Promise<TraccarSummary[]> {
-  const params = new URLSearchParams({
-    from: from.toISOString(),
-    to: to.toISOString(),
+  return cachedReport(reportCacheKey('summary', deviceIds, from, to), async () => {
+    const params = new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+    deviceIds.forEach(id => params.append('deviceId', String(id)));
+    const res = await fetch(`${TRACCAR_URL}/api/reports/summary?${params}`, { headers: defaultHeaders });
+    if (!res.ok) throw new Error(`Traccar ${res.status}`);
+    return res.json() as Promise<TraccarSummary[]>;
   });
-  deviceIds.forEach(id => params.append('deviceId', String(id)));
-  const res = await fetch(`${TRACCAR_URL}/api/reports/summary?${params}`, { headers: defaultHeaders });
-  if (!res.ok) throw new Error(`Traccar ${res.status}`);
-  return res.json() as Promise<TraccarSummary[]>;
 }
 
 export async function traccarSendCommand(
@@ -206,14 +240,16 @@ export async function traccarGetStops(
   from: Date,
   to: Date,
 ): Promise<TraccarStop[]> {
-  const params = new URLSearchParams({
-    from: from.toISOString(),
-    to: to.toISOString(),
+  return cachedReport(reportCacheKey('stops', deviceIds, from, to), async () => {
+    const params = new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+    deviceIds.forEach(id => params.append('deviceId', String(id)));
+    const res = await fetch(`${TRACCAR_URL}/api/reports/stops?${params}`, { headers: defaultHeaders });
+    if (!res.ok) throw new Error(`Traccar ${res.status}`);
+    return res.json() as Promise<TraccarStop[]>;
   });
-  deviceIds.forEach(id => params.append('deviceId', String(id)));
-  const res = await fetch(`${TRACCAR_URL}/api/reports/stops?${params}`, { headers: defaultHeaders });
-  if (!res.ok) throw new Error(`Traccar ${res.status}`);
-  return res.json() as Promise<TraccarStop[]>;
 }
 
 export async function traccarExportReport(
