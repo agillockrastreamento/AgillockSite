@@ -76,7 +76,10 @@ services:
       - FILTER_ZERO=true
       - FILTER_DUPLICATE=true
       - FILTER_FUTURE=600
-      - DATABASE_POSITIONS_HISTORY_DAYS=365
+      # Teto de retenção do histórico de posições (limita o crescimento de tc_positions,
+      # que já passava de 60M linhas / 31GB). Só apaga dados mais velhos que este limite;
+      # com ~5 meses de base atual, nada é removido de imediato. Vale ao recriar o traccar.
+      - DATABASE_POSITIONS_HISTORY_DAYS=180
     volumes:
       - traccar_logs:/opt/traccar/logs
     networks:

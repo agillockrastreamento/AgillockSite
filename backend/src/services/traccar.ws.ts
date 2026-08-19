@@ -397,11 +397,12 @@ async function transformTraccarMessage(msg: TraccarWsMessage): Promise<object | 
   const localPorIdentificador = new Map(dispositivos.map(dispositivo => [dispositivo.identificador, dispositivo]));
 
   // Mantém o cache traccarId → dispositivoId para o filtro do broadcast.
-  for (const dispositivo of dispositivos) {
-    const identificador = dispositivo.identificador;
-    for (const [traccarId, uniqueId] of traccarIdToUniqueId) {
-      if (uniqueId === identificador) traccarIdToDispositivoId.set(traccarId, dispositivo.id);
-    }
+  // Uma passada só sobre traccarIdToUniqueId (antes era O(dispositivos × traccarMap),
+  // que a ~2256 dispositivos pesava no caminho quente de cada lote de posições).
+  const idPorIdentificador = new Map(dispositivos.map(d => [d.identificador, d.id]));
+  for (const [traccarId, uniqueId] of traccarIdToUniqueId) {
+    const dispositivoId = idPorIdentificador.get(uniqueId);
+    if (dispositivoId) traccarIdToDispositivoId.set(traccarId, dispositivoId);
   }
 
   if (msg.positions?.length) {

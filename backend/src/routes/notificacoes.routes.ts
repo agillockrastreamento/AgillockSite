@@ -7,7 +7,7 @@ import {
 } from '../middleware/cliente-auth.middleware';
 import EmailService from '../services/email.service';
 import ExpoPushService from '../services/expo-push.service';
-import { periodoKmOuPadrao } from '../services/notification.service';
+import NotificationService, { periodoKmOuPadrao } from '../services/notification.service';
 import { salvarPreferenciasEmMassa } from '../utils/preferencias-notificacao';
 
 const router = Router();
@@ -212,6 +212,9 @@ router.post('/preferencias', clienteAuthMiddleware, async (req: any, res) => {
       preferencias,
       extras: { overspeedLimit, kmTrocaOleo, semAtualizacaoHoras, kmExcedida, kmReduzida },
     });
+
+    // Invalida o cache do caminho quente para que a mudança valha imediatamente.
+    NotificationService.invalidarCachePreferencias(clienteLoginId);
 
     res.json({ message: 'Preferências salvas com sucesso!', dispositivosAtualizados: alvos.length });
   } catch (error) {

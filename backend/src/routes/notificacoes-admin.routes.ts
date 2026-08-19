@@ -2,7 +2,7 @@ import { Router } from 'express';
 import prisma from '../utils/prisma';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requireMonitoramentoAccess } from '../middleware/roles.middleware';
-import { periodoKmOuPadrao } from '../services/notification.service';
+import NotificationService, { periodoKmOuPadrao } from '../services/notification.service';
 import { salvarPreferenciasEmMassa } from '../utils/preferencias-notificacao';
 
 function tipoPreferenciaAdmin(tipoEvento: string) {
@@ -170,6 +170,8 @@ router.post('/clientes/:clienteLoginId/preferencias', async (req, res) => {
       preferencias,
       extras: { overspeedLimit, kmTrocaOleo, semAtualizacaoHoras, kmExcedida, kmReduzida },
     });
+
+    NotificationService.invalidarCachePreferencias(clienteLoginId);
 
     res.json({ message: 'Preferências salvas com sucesso!' });
   } catch (err) {

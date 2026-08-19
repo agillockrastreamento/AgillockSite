@@ -5,12 +5,18 @@ import ExpoPushService from './expo-push.service';
 
 type DispositivoBasico = { id: string; nome: string; placa: string | null; identificador: string; traccarId?: number | null; clienteId?: string | null; eventosAdminHabilitado?: boolean };
 
+// Linha de preferência cacheada no caminho quente (superconjunto de colunas usadas).
+type PreferenciaCacheada = { web: boolean; app: boolean; email: boolean; overspeedLimit: number | null; semAtualizacaoHoras: number | null };
+
 const MOTOR_OCIOSO_LIMITE_MS = 5 * 60 * 1000;          // 5 min parado com motor ligado
 const MOVIMENTO_COOLDOWN_MS = 5 * 60 * 1000;           // intervalo mínimo entre alertas de movimento
 const MOVIMENTO_VELOCIDADE_MINIMA_KMH = 5;             // fallback quando o atributo motion não vem
 const PARADO_VELOCIDADE_MAXIMA_KMH = 3;                // mesma régua do calcularOciosidade (relatórios)
 const SEM_ATUALIZACAO_HORAS_PADRAO = 3;                // padrão quando o usuário não escolheu
 const SEM_ATUALIZACAO_HORAS_MIN = 1;                   // piso do limite (em horas) para limitar a varredura
+const PREF_CACHE_TTL_MS = 45 * 1000;                   // TTL do cache de preferências no caminho quente (posições)
+// Log verboso do caminho quente só sai com NOTIF_DEBUG=1 (evita I/O + string por cliente/evento).
+const NOTIF_DEBUG = process.env.NOTIF_DEBUG === '1';
 
 function _inicioDiaSaoPaulo(offsetDias = 0): Date {
   const dataSp = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
@@ -63,6 +69,47 @@ class NotificationService {
   private _lastMovementAt = new Map<string, number>();     // Cooldown de alerta de movimento por dispositivo
   private _idleState = new Map<string, { desde: number; notificado: boolean }>(); // Motor ocioso por dispositivo
   private _semAtualizacaoNotificadoEm = new Map<string, number>(); // Dedup em memória de "sem atualização"
+  // Cache TTL das preferências (chave clienteLoginId:dispositivoId:tipoEvento). Guarda até o
+  // "sem preferência" (null) para não voltar ao banco a cada posição do mesmo veículo/cliente.
+  private _prefCache = new Map<string, { data: PreferenciaCacheada | null; at: number }>();
+
+  // Busca a preferência do trio (cliente, dispositivo, tipo) com cache curto. No caminho quente
+  // (uma posição de cada um dos ~centenas de veículos por segundo) isso troca N findUnique
+  // sequenciais por acertos de memória. Sempre seleciona o superconjunto de colunas usadas.
+  private async _buscarPreferencia(
+    clienteLoginId: string,
+    dispositivoId: string,
+    tipoEvento: string,
+  ): Promise<PreferenciaCacheada | null> {
+    const chave = `${clienteLoginId}:${dispositivoId}:${tipoEvento}`;
+    const agora = Date.now();
+    const cache = this._prefCache.get(chave);
+    if (cache && agora - cache.at < PREF_CACHE_TTL_MS) return cache.data;
+
+    const pref = await prisma.preferenciaNotificacao.findUnique({
+      where: {
+        clienteLoginId_dispositivoId_tipoEvento: { clienteLoginId, dispositivoId, tipoEvento },
+      },
+      select: { web: true, app: true, email: true, overspeedLimit: true, semAtualizacaoHoras: true },
+    });
+    this._prefCache.set(chave, { data: pref, at: agora });
+    return pref;
+  }
+
+  // Invalida o cache quando o usuário altera preferências (chamado pelas rotas de escrita).
+  // Sem argumentos limpa tudo; com argumentos limpa só as chaves afetadas.
+  public invalidarCachePreferencias(clienteLoginId?: string, dispositivoId?: string): void {
+    if (!clienteLoginId && !dispositivoId) {
+      this._prefCache.clear();
+      return;
+    }
+    for (const chave of this._prefCache.keys()) {
+      const [cli, disp] = chave.split(':');
+      if ((clienteLoginId && cli === clienteLoginId) || (dispositivoId && disp === dispositivoId)) {
+        this._prefCache.delete(chave);
+      }
+    }
+  }
 
   private async resolverEnderecoEvento(dados: any): Promise<string | null> {
     if (dados.endereco) return dados.endereco;
@@ -177,16 +224,7 @@ class NotificationService {
 
         // 2. Verificar Velocidade (Limite do Cliente)
         if (dados.velocidade !== null) {
-          const prefVel = await prisma.preferenciaNotificacao.findUnique({
-            where: {
-              clienteLoginId_dispositivoId_tipoEvento: {
-                clienteLoginId: clienteLogin.id,
-                dispositivoId: dispositivo.id,
-                tipoEvento: 'overspeed',
-              },
-            },
-            select: { web: true, app: true, email: true, overspeedLimit: true },
-          });
+          const prefVel = await this._buscarPreferencia(clienteLogin.id, dispositivo.id, 'overspeed');
 
           if (prefVel && (prefVel.web || prefVel.app || prefVel.email)) {
             const limite = prefVel.overspeedLimit ?? 100;
@@ -357,7 +395,7 @@ class NotificationService {
         ? Array.from(clientesMap.values()).filter(c => c.login?.id === targetClienteLoginId)
         : Array.from(clientesMap.values());
 
-      if (clientesParaProcessar.length > 0) {
+      if (NOTIF_DEBUG && clientesParaProcessar.length > 0) {
         console.log(`[Notif] Evento "${tipo}" (original: ${tipoOriginal}) para ${identificador} — ${clientesParaProcessar.length} cliente(s)`);
       }
 
@@ -423,19 +461,10 @@ class NotificationService {
             }
           }
 
-          const pref = await prisma.preferenciaNotificacao.findUnique({
-            where: {
-              clienteLoginId_dispositivoId_tipoEvento: {
-                clienteLoginId: clienteLogin.id,
-                dispositivoId: dispositivo.id,
-                tipoEvento: tipo,
-              },
-            },
-            select: { web: true, app: true, email: true, overspeedLimit: true, semAtualizacaoHoras: true },
-          });
+          const pref = await this._buscarPreferencia(clienteLogin.id, dispositivo.id, tipo);
 
           if (!pref || (!pref.web && !pref.app && !pref.email)) {
-            console.log(`[Notif] Sem preferência ativa para "${tipo}" — cliente ${clienteLogin.id} (${cliente.nome})`);
+            if (NOTIF_DEBUG) console.log(`[Notif] Sem preferência ativa para "${tipo}" — cliente ${clienteLogin.id} (${cliente.nome})`);
             continue;
           }
 
@@ -444,7 +473,7 @@ class NotificationService {
             const velocidadeAtual = dados.velocidade ?? 0;
 
             if (dados.velocidade !== null && velocidadeAtual <= limiteCliente) {
-              console.log(`[Notif] Overspeed ignorado: ${velocidadeAtual} km/h <= limite ${limiteCliente} (cliente: ${cliente.nome})`);
+              if (NOTIF_DEBUG) console.log(`[Notif] Overspeed ignorado: ${velocidadeAtual} km/h <= limite ${limiteCliente} (cliente: ${cliente.nome})`);
               continue;
             }
           }
