@@ -5,11 +5,13 @@ import {
   traccarGetDeviceByImei,
   traccarGetPositions,
   traccarSendCommand,
+  traccarUpdateDeviceAccumulators,
 } from '../services/traccar.service';
 import {
   DISPOSITIVO_MEDIDORES_SELECT,
   sincronizarDispositivosComPosicoes,
   decorarPosicaoComMedidores,
+  reancorarRecorrenciasSeOdometroMenor,
 } from '../services/medidores.service';
 import {
   _calcularProximaData,
@@ -707,6 +709,54 @@ router.delete('/veiculo/:placa/manutencoes/recorrencia-data/:id', async (req: Re
   } catch (err) {
     console.error('[integracao-raposo] desativar recorrência por data:', err);
     res.status(500).json({ error: 'Erro ao desativar a recorrência por data.' });
+  }
+});
+
+/**
+ * ⭐ **Calibrar o odômetro pela placa** (24/08/2026, a pedido da Raposo). A KM que a Raposo lê
+ * vem do rastreador; quando o operador tem o número REAL do painel (rastreador novo, contador
+ * zerado, drift), ele corrige na tela de Manutenções do Raposo e isso precisa refletir aqui.
+ *
+ * Mesma mecânica do "definir odômetro" do portal do cliente: grava `odometroSistemaMetros` (o
+ * override que a leitura usa), re-ancora as recorrências se o número CAIU (para não mostrar "km
+ * percorrido" negativo) e sincroniza o accumulator do Traccar (para o próprio rastreador contar
+ * a partir dali). Server-to-server por API key, resolvido por placa.
+ */
+router.put('/veiculo/:placa/odometro', async (req: Request, res: Response) => {
+  try {
+    const km = Number((req.body || {}).km);
+    if (!Number.isFinite(km) || km < 0) {
+      res.status(400).json({ error: 'km inválido — informe um número maior ou igual a 0.' });
+      return;
+    }
+    const dispositivo = await dispositivoOu404(req, res);
+    if (!dispositivo) return;
+
+    const atualizado = await prisma.dispositivo.update({
+      where: { id: dispositivo.id },
+      data: { odometroSistemaMetros: Math.round(km * 1000) },
+      select: { id: true, odometroSistemaMetros: true, horimetroSistemaSegundos: true },
+    });
+
+    await reancorarRecorrenciasSeOdometroMenor(dispositivo.id, atualizado.odometroSistemaMetros);
+
+    const traccarDevice = await traccarGetDeviceByImei(dispositivo.identificador).catch(() => null);
+    if (traccarDevice && atualizado.odometroSistemaMetros != null) {
+      traccarUpdateDeviceAccumulators(
+        traccarDevice.id,
+        atualizado.odometroSistemaMetros,
+        atualizado.horimetroSistemaSegundos * 1000,
+      ).catch((err) => console.error('[integracao-raposo] Traccar accumulators:', err.message));
+    }
+
+    res.json({
+      ok: true,
+      placa: dispositivo.placa,
+      km: atualizado.odometroSistemaMetros != null ? Math.round(atualizado.odometroSistemaMetros / 1000) : null,
+    });
+  } catch (err) {
+    console.error('[integracao-raposo] odometro:', err);
+    res.status(500).json({ error: 'Erro ao atualizar o odômetro.' });
   }
 });
 
