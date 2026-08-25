@@ -173,7 +173,7 @@ router.get('/rastreamento/status-acesso', async (req: ClienteRequest, res: Respo
   const clienteId = req.cliente!.clienteId;
 
   const hoje = new Date();
-  const limite = new Date(hoje.getTime() - 10 * 24 * 60 * 60 * 1000);
+  const limite = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   // Busca boletos atrasados do cliente (via carnês do cliente ou dispositivos vinculados)
   const boletosAtrasados = await prisma.boleto.findMany({
@@ -200,7 +200,7 @@ router.get('/rastreamento/status-acesso', async (req: ClienteRequest, res: Respo
 // ── Helper de verificação de bloqueio ─────────────────────────────────────────
 
 async function verificarBloqueio(clienteId: string): Promise<boolean> {
-  const limite = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+  const limite = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const count = await prisma.boleto.count({
     where: { status: 'ATRASADO', vencimento: { lt: limite }, carne: { clienteId } },
   });
