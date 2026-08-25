@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { requireRoles } from '../middleware/roles.middleware';
 import prisma from '../utils/prisma';
@@ -14,30 +15,49 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
   const status = query(req.query.status) as 'ATIVO' | 'INATIVO' | undefined;
   const vendedorId = query(req.query.vendedorId);
 
-  const clientes = await prisma.cliente.findMany({
-    where: {
-      ...(status ? { status } : {}),
-      ...(vendedorId ? { vendedorId } : {}),
-      ...(busca ? {
-        OR: [
-          { nome: { contains: busca, mode: 'insensitive' } },
-          { cpfCnpj: { contains: busca, mode: 'insensitive' } },
-          { telefone: { contains: busca, mode: 'insensitive' } },
-          { email: { contains: busca, mode: 'insensitive' } },
-          { placas: { some: { placa: { contains: busca, mode: 'insensitive' } } } },
-        ],
-      } : {}),
-    },
-    include: {
-      vendedor: { select: { id: true, nome: true } },
-      criadoPor: { select: { id: true, nome: true } },
-      placas: { where: { ativo: true }, select: { id: true, placa: true, descricao: true } },
-      dispositivos: { select: { id: true, nome: true, identificador: true, placa: true, categoria: true, ativo: true, eventosAdminHabilitado: true } },
-      _count: { select: { dispositivosVinculados: true } },
-    },
-    orderBy: { nome: 'asc' },
-  });
+  const where: Prisma.ClienteWhereInput = {
+    ...(status ? { status } : {}),
+    ...(vendedorId ? { vendedorId } : {}),
+    ...(busca ? {
+      OR: [
+        { nome: { contains: busca, mode: 'insensitive' } },
+        { cpfCnpj: { contains: busca, mode: 'insensitive' } },
+        { telefone: { contains: busca, mode: 'insensitive' } },
+        { email: { contains: busca, mode: 'insensitive' } },
+        { placas: { some: { placa: { contains: busca, mode: 'insensitive' } } } },
+      ],
+    } : {}),
+  };
 
+  const include = {
+    vendedor: { select: { id: true, nome: true } },
+    criadoPor: { select: { id: true, nome: true } },
+    placas: { where: { ativo: true }, select: { id: true, placa: true, descricao: true } },
+    dispositivos: { select: { id: true, nome: true, identificador: true, placa: true, categoria: true, ativo: true, eventosAdminHabilitado: true } },
+    _count: { select: { dispositivosVinculados: true } },
+  };
+
+  // Paginação OPT-IN: com `page`/`limit` devolve `{ data, total, page, limit, totalPages }`;
+  // sem eles, array puro (retrocompatível com combos/autocompletes que carregam tudo).
+  const paginado = req.query.page !== undefined || req.query.limit !== undefined;
+  if (paginado) {
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const [itens, total] = await Promise.all([
+      prisma.cliente.findMany({ where, include, orderBy: { nome: 'asc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.cliente.count({ where }),
+    ]);
+    res.json({
+      data: itens,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+    return;
+  }
+
+  const clientes = await prisma.cliente.findMany({ where, include, orderBy: { nome: 'asc' } });
   res.json(clientes);
 });
 

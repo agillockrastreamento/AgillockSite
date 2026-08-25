@@ -100,6 +100,7 @@
         </tbody>
       </table>
     </div>
+    <div id="dispositivos-paginacao" class="text-center" style="margin-top:12px;flex:0 0 auto;"></div>
   </div>
 
   <script src="../js/jquery.js"></script>
@@ -149,17 +150,9 @@
       }
 
       function renderTabela() {
-        var busca = filtroBusca.toLowerCase();
-        var lista = todosDispositivos.filter(function (d) {
-          if (filtroStatus !== '' && String(d.ativo) !== filtroStatus) return false;
-          if (busca && !(
-            d.nome.toLowerCase().indexOf(busca) !== -1 ||
-            d.identificador.toLowerCase().indexOf(busca) !== -1 ||
-            (d.placa || '').toLowerCase().indexOf(busca) !== -1
-          )) return false;
-          if (filtroCliente && !(d.cliente && d.cliente.nome.toLowerCase().indexOf(filtroCliente.toLowerCase()) !== -1)) return false;
-          return true;
-        });
+        // Filtro/paginação agora são server-side (ver carregarDispositivos): a lista
+        // recebida já vem filtrada e limitada à página atual.
+        var lista = todosDispositivos;
 
         var tbody = document.getElementById('tabela-body');
         if (!lista.length) {
@@ -225,11 +218,30 @@
         });
       }
 
-      function carregarDispositivos() {
-        AL.apiGet('/api/dispositivos')
-          .then(function (lista) {
-            todosDispositivos = lista || [];
+      var LIMITE_DISP = 50;
+      var dispPagina = 1, dispTotalPaginas = 1, dispTotalRegistros = 0;
+      function carregarDispositivos(pagina) {
+        if (typeof pagina === 'number' && pagina >= 1) dispPagina = pagina;
+        var params = [];
+        if (filtroBusca) params.push('busca=' + encodeURIComponent(filtroBusca));
+        if (filtroStatus !== '') params.push('ativo=' + encodeURIComponent(filtroStatus));
+        if (filtroCliente) params.push('clienteBusca=' + encodeURIComponent(filtroCliente));
+        params.push('page=' + dispPagina);
+        params.push('limit=' + LIMITE_DISP);
+        var tbody = document.getElementById('tabela-body');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:40px;"><i class="fa fa-spinner fa-spin fa-2x"></i></td></tr>';
+        AL.apiGet('/api/dispositivos?' + params.join('&'))
+          .then(function (resp) {
+            if (Array.isArray(resp)) {
+              todosDispositivos = resp; dispTotalRegistros = resp.length; dispTotalPaginas = 1; dispPagina = 1;
+            } else {
+              todosDispositivos = resp.data || [];
+              dispTotalRegistros = resp.total || 0;
+              dispTotalPaginas = resp.totalPages || 1;
+              dispPagina = resp.page || dispPagina;
+            }
             renderTabela();
+            renderPaginacaoDisp();
           })
           .catch(function (err) {
             document.getElementById('tabela-body').innerHTML =
@@ -237,19 +249,35 @@
           });
       }
 
+      function renderPaginacaoDisp() {
+        var box = document.getElementById('dispositivos-paginacao');
+        if (!box) return;
+        if (!dispTotalRegistros) { box.innerHTML = ''; return; }
+        var ini = (dispPagina - 1) * LIMITE_DISP + 1;
+        var fim = Math.min(dispPagina * LIMITE_DISP, dispTotalRegistros);
+        box.innerHTML =
+          '<button class="btn btn-sm btn-default" id="dpg-prev"' + (dispPagina <= 1 ? ' disabled' : '') + '><i class="fa fa-chevron-left"></i> Anterior</button> ' +
+          '<span style="margin:0 10px;">' + ini + '–' + fim + ' de ' + dispTotalRegistros + ' (página ' + dispPagina + ' de ' + dispTotalPaginas + ')</span> ' +
+          '<button class="btn btn-sm btn-default" id="dpg-next"' + (dispPagina >= dispTotalPaginas ? ' disabled' : '') + '>Próxima <i class="fa fa-chevron-right"></i></button>';
+        var prev = document.getElementById('dpg-prev');
+        var next = document.getElementById('dpg-next');
+        if (prev) prev.addEventListener('click', function () { if (dispPagina > 1) carregarDispositivos(dispPagina - 1); });
+        if (next) next.addEventListener('click', function () { if (dispPagina < dispTotalPaginas) carregarDispositivos(dispPagina + 1); });
+      }
+
       document.getElementById('filtro-busca').addEventListener('input', function () {
         filtroBusca = this.value;
         clearTimeout(filtroTimer);
-        filtroTimer = setTimeout(renderTabela, 200);
+        filtroTimer = setTimeout(function () { carregarDispositivos(1); }, 300);
       });
       document.getElementById('filtro-status').addEventListener('change', function () {
         filtroStatus = this.value;
-        renderTabela();
+        carregarDispositivos(1);
       });
       document.getElementById('filtro-cliente').addEventListener('input', function () {
         filtroCliente = this.value;
         clearTimeout(filtroTimer);
-        filtroTimer = setTimeout(renderTabela, 200);
+        filtroTimer = setTimeout(function () { carregarDispositivos(1); }, 300);
       });
 
       carregarDispositivos();

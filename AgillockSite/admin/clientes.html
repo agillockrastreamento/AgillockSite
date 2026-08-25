@@ -170,6 +170,7 @@
         </tbody>
       </table>
     </div>
+    <div id="clientes-paginacao" class="text-center" style="margin-top:12px;"></div>
   </div><!-- /admin-content -->
 
   <!-- ═══════════════ MODAL PLACA ═══════════════ -->
@@ -350,9 +351,14 @@
       document.getElementById('filtro-vendedor-wrap').style.display = 'none';
     }
 
-    // ── Listagem de clientes ──────────────────────────────────
+    // ── Listagem de clientes (paginada no servidor) ───────────
     var clientes = [];
-    function loadClientes() {
+    var LIMITE_CLIENTES = 50;
+    var paginaAtual = 1;
+    var totalPaginas = 1;
+    var totalRegistros = 0;
+    function loadClientes(pagina) {
+      if (typeof pagina === 'number' && pagina >= 1) paginaAtual = pagina;
       var params = [];
       var busca   = document.getElementById('filtro-busca').value.trim();
       var status  = document.getElementById('filtro-status').value;
@@ -360,19 +366,46 @@
       if (busca)    params.push('busca='   + encodeURIComponent(busca));
       if (status)   params.push('status='  + encodeURIComponent(status));
       if (vendedor) params.push('vendedorId=' + encodeURIComponent(vendedor));
+      params.push('page=' + paginaAtual);
+      params.push('limit=' + LIMITE_CLIENTES);
 
-      var qs = params.length ? '?' + params.join('&') : '';
+      var qs = '?' + params.join('&');
       var tbody = document.getElementById('clientes-tbody');
       tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted"><i class="fa fa-spinner fa-spin"></i> Carregando…</td></tr>';
 
       AL.apiGet('/api/clientes' + qs)
-        .then(function (data) {
-          clientes = data || [];
+        .then(function (resp) {
+          // Envelope paginado { data, total, page, totalPages }; tolera array puro.
+          if (Array.isArray(resp)) {
+            clientes = resp; totalRegistros = resp.length; totalPaginas = 1; paginaAtual = 1;
+          } else {
+            clientes = resp.data || [];
+            totalRegistros = resp.total || 0;
+            totalPaginas = resp.totalPages || 1;
+            paginaAtual = resp.page || paginaAtual;
+          }
           renderTabela();
+          renderPaginacao();
         })
         .catch(function (err) {
           tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">' + err.message + '</td></tr>';
         });
+    }
+
+    function renderPaginacao() {
+      var box = document.getElementById('clientes-paginacao');
+      if (!box) return;
+      if (!totalRegistros) { box.innerHTML = ''; return; }
+      var ini = (paginaAtual - 1) * LIMITE_CLIENTES + 1;
+      var fim = Math.min(paginaAtual * LIMITE_CLIENTES, totalRegistros);
+      box.innerHTML =
+        '<button class="btn btn-sm btn-default" id="pg-prev"' + (paginaAtual <= 1 ? ' disabled' : '') + '><i class="fa fa-chevron-left"></i> Anterior</button> ' +
+        '<span style="margin:0 10px;">' + ini + '–' + fim + ' de ' + totalRegistros + ' (página ' + paginaAtual + ' de ' + totalPaginas + ')</span> ' +
+        '<button class="btn btn-sm btn-default" id="pg-next"' + (paginaAtual >= totalPaginas ? ' disabled' : '') + '>Próxima <i class="fa fa-chevron-right"></i></button>';
+      var prev = document.getElementById('pg-prev');
+      var next = document.getElementById('pg-next');
+      if (prev) prev.addEventListener('click', function () { if (paginaAtual > 1) loadClientes(paginaAtual - 1); });
+      if (next) next.addEventListener('click', function () { if (paginaAtual < totalPaginas) loadClientes(paginaAtual + 1); });
     }
 
     function renderTabela() {
@@ -569,10 +602,10 @@
     var _debounceTimer = null;
     document.getElementById('filtro-busca').addEventListener('input', function () {
       clearTimeout(_debounceTimer);
-      _debounceTimer = setTimeout(loadClientes, 400);
+      _debounceTimer = setTimeout(function () { loadClientes(1); }, 400);
     });
-    document.getElementById('filtro-status').addEventListener('change', loadClientes);
-    document.getElementById('filtro-vendedor').addEventListener('change', loadClientes);
+    document.getElementById('filtro-status').addEventListener('change', function () { loadClientes(1); });
+    document.getElementById('filtro-vendedor').addEventListener('change', function () { loadClientes(1); });
 
     // ── Novo / Editar Cliente → página dedicada ───────────────
     document.getElementById('btn-novo-cliente').addEventListener('click', function () {

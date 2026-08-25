@@ -1,4 +1,5 @@
 import { Router, Response, Request } from 'express';
+import { Prisma } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { requireRoles } from '../middleware/roles.middleware';
 import prisma from '../utils/prisma';
@@ -86,38 +87,60 @@ async function syncTagPrincipal(dispositivoId: string, enderecoMac: string | nul
 }
 
 // ─── GET /api/dispositivos ─────────────────────────────────────────────────
+// Paginação OPT-IN: se `page` ou `limit` vierem na query, devolve o envelope
+// `{ data, total, page, limit, totalPages }`. Sem eles, devolve o array puro
+// (retrocompatível com dropdowns/autocompletes que carregam a lista inteira).
 router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, res: Response): Promise<void> => {
   const busca = query(req.query.busca);
   const clienteId = query(req.query.clienteId);
+  const clienteBusca = query(req.query.clienteBusca);
   const ativo = query(req.query.ativo);
 
-  const dispositivos = await prisma.dispositivo.findMany({
-    where: {
-      ...(clienteId ? { clienteId } : {}),
-      ...(ativo !== undefined ? { ativo: ativo === 'true' } : {}),
-      ...(busca ? {
-        OR: [
-          { nome: { contains: busca, mode: 'insensitive' } },
-          { identificador: { contains: busca, mode: 'insensitive' } },
-          { placa: { contains: busca, mode: 'insensitive' } },
-        ],
-      } : {}),
-    },
-    include: {
-      cliente: { select: { id: true, nome: true } },
-      vendedor: { select: { id: true, nome: true } },
-      _count: { select: { clientesVinculados: true, motoristasVinculados: true } },
-      clientesVinculados: {
-        take: 1,
-        include: { cliente: { select: { id: true, nome: true } } },
-      },
-      motoristasVinculados: {
-        include: { motorista: { select: { id: true, nome: true } } },
-      },
-    },
-    orderBy: { nome: 'asc' },
-  });
+  const where: Prisma.DispositivoWhereInput = {
+    ...(clienteId ? { clienteId } : {}),
+    ...(clienteBusca ? { cliente: { is: { nome: { contains: clienteBusca, mode: 'insensitive' } } } } : {}),
+    ...(ativo !== undefined ? { ativo: ativo === 'true' } : {}),
+    ...(busca ? {
+      OR: [
+        { nome: { contains: busca, mode: 'insensitive' } },
+        { identificador: { contains: busca, mode: 'insensitive' } },
+        { placa: { contains: busca, mode: 'insensitive' } },
+      ],
+    } : {}),
+  };
 
+  const include = {
+    cliente: { select: { id: true, nome: true } },
+    vendedor: { select: { id: true, nome: true } },
+    _count: { select: { clientesVinculados: true, motoristasVinculados: true } },
+    clientesVinculados: {
+      take: 1,
+      include: { cliente: { select: { id: true, nome: true } } },
+    },
+    motoristasVinculados: {
+      include: { motorista: { select: { id: true, nome: true } } },
+    },
+  };
+
+  const paginado = req.query.page !== undefined || req.query.limit !== undefined;
+  if (paginado) {
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const [itens, total] = await Promise.all([
+      prisma.dispositivo.findMany({ where, include, orderBy: { nome: 'asc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.dispositivo.count({ where }),
+    ]);
+    res.json({
+      data: itens.map(mapDispositivoResponse),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+    return;
+  }
+
+  const dispositivos = await prisma.dispositivo.findMany({ where, include, orderBy: { nome: 'asc' } });
   res.json(dispositivos.map(mapDispositivoResponse));
 });
 
