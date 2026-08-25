@@ -126,8 +126,17 @@ router.get('/', requireRoles('ADMIN', 'COLABORADOR'), async (req: AuthRequest, r
   if (paginado) {
     const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    // Payload enxuto para a tabela: só os campos que as telas de listagem usam
+    // (evita mandar o dispositivo inteiro — chassi, renavam, telemetria, senha…).
+    // A ramificação em array abaixo segue com o objeto completo (dropdowns/autocompletes).
+    const selectPaginado: Prisma.DispositivoSelect = {
+      id: true, nome: true, identificador: true, placa: true, categoria: true, ativo: true,
+      cliente: { select: { id: true, nome: true } },
+      _count: { select: { clientesVinculados: true, motoristasVinculados: true } },
+      clientesVinculados: { take: 1, select: { cliente: { select: { id: true, nome: true } } } },
+    };
     const [itens, total] = await Promise.all([
-      prisma.dispositivo.findMany({ where, include, orderBy: { nome: 'asc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.dispositivo.findMany({ where, select: selectPaginado, orderBy: { nome: 'asc' }, skip: (page - 1) * limit, take: limit }),
       prisma.dispositivo.count({ where }),
     ]);
     res.json({
