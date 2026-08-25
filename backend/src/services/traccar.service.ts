@@ -38,6 +38,61 @@ function cachedReport<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   return promise;
 }
 
+// O motor de relatório do Traccar retorna VAZIO/errado em intervalos de vários dias sobre
+// esta base (viagens/paradas/eventos/resumo). Consulta de 1 dia funciona certo. Então
+// quebramos o período em janelas diárias (UTC) e agregamos. O cache passa a ser por dia
+// (melhor reuso). Ver docs/memória: relatório multi-dia pós-migração.
+function splitByDay(from: Date, to: Date): Array<[Date, Date]> {
+  const janelas: Array<[Date, Date]> = [];
+  let ini = new Date(from);
+  while (ini < to) {
+    const fimDia = new Date(Date.UTC(ini.getUTCFullYear(), ini.getUTCMonth(), ini.getUTCDate(), 23, 59, 59, 999));
+    const fim = fimDia < to ? fimDia : to;
+    janelas.push([new Date(ini), fim]);
+    ini = new Date(fimDia.getTime() + 1);
+  }
+  return janelas;
+}
+
+// Executa `fn` sobre os itens com concorrência limitada (não martelar o Traccar com 60
+// chamadas de uma vez num relatório de 2 meses).
+async function mapLimit<A, B>(items: A[], limit: number, fn: (a: A, i: number) => Promise<B>): Promise<B[]> {
+  const results: B[] = new Array(items.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      results[idx] = await fn(items[idx], idx);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) || 1 }, worker));
+  return results;
+}
+
+// Busca um relatório que retorna ARRAY (trips/stops/events) por dia e concatena.
+async function fetchArrayByDay<T>(
+  endpoint: string,
+  tipo: string,
+  deviceIds: number[],
+  from: Date,
+  to: Date,
+  addParams?: (p: URLSearchParams) => void,
+  extraKey = '',
+): Promise<T[]> {
+  const dias = splitByDay(from, to);
+  const partes = await mapLimit(dias, 6, ([d0, d1]) =>
+    cachedReport(reportCacheKey(tipo, deviceIds, d0, d1, extraKey), async () => {
+      const params = new URLSearchParams({ from: d0.toISOString(), to: d1.toISOString() });
+      deviceIds.forEach(id => params.append('deviceId', String(id)));
+      addParams?.(params);
+      const res = await fetch(`${TRACCAR_URL}/api/reports/${endpoint}?${params}`, { headers: defaultHeaders });
+      if (!res.ok) throw new Error(`Traccar ${res.status}`);
+      return res.json() as Promise<T[]>;
+    }),
+  );
+  return partes.flat();
+}
+
 // ── Dispositivos ─────────────────────────────────────────────────────────────
 
 export async function traccarGetDevices(): Promise<TraccarDevice[]> {
@@ -168,16 +223,7 @@ export async function traccarGetTrips(
   from: Date,
   to: Date,
 ): Promise<TraccarTrip[]> {
-  return cachedReport(reportCacheKey('trips', deviceIds, from, to), async () => {
-    const params = new URLSearchParams({
-      from: from.toISOString(),
-      to: to.toISOString(),
-    });
-    deviceIds.forEach(id => params.append('deviceId', String(id)));
-    const res = await fetch(`${TRACCAR_URL}/api/reports/trips?${params}`, { headers: defaultHeaders });
-    if (!res.ok) throw new Error(`Traccar ${res.status}`);
-    return res.json() as Promise<TraccarTrip[]>;
-  });
+  return fetchArrayByDay<TraccarTrip>('trips', 'trips', deviceIds, from, to);
 }
 
 export async function traccarGetEvents(
@@ -186,17 +232,11 @@ export async function traccarGetEvents(
   to: Date,
   types?: string[],
 ): Promise<TraccarEvent[]> {
-  const params = new URLSearchParams({
-    from: from.toISOString(),
-    to: to.toISOString(),
-  });
-  return cachedReport(reportCacheKey('events', deviceIds, from, to, (types || []).join(',')), async () => {
-    deviceIds.forEach(id => params.append('deviceId', String(id)));
-    if (types?.length) types.forEach(t => params.append('type', t));
-    const res = await fetch(`${TRACCAR_URL}/api/reports/events?${params}`, { headers: defaultHeaders });
-    if (!res.ok) throw new Error(`Traccar ${res.status}`);
-    return res.json() as Promise<TraccarEvent[]>;
-  });
+  return fetchArrayByDay<TraccarEvent>(
+    'events', 'events', deviceIds, from, to,
+    (p) => { if (types?.length) types.forEach(t => p.append('type', t)); },
+    (types || []).join(','),
+  );
 }
 
 export async function traccarGetSummary(
@@ -204,16 +244,37 @@ export async function traccarGetSummary(
   from: Date,
   to: Date,
 ): Promise<TraccarSummary[]> {
-  return cachedReport(reportCacheKey('summary', deviceIds, from, to), async () => {
-    const params = new URLSearchParams({
-      from: from.toISOString(),
-      to: to.toISOString(),
-    });
-    deviceIds.forEach(id => params.append('deviceId', String(id)));
-    const res = await fetch(`${TRACCAR_URL}/api/reports/summary?${params}`, { headers: defaultHeaders });
-    if (!res.ok) throw new Error(`Traccar ${res.status}`);
-    return res.json() as Promise<TraccarSummary[]>;
-  });
+  // Summary por dia + agregação por dispositivo (soma distância/horas/combustível,
+  // máximo da velocidade máxima, média ponderada pela distância).
+  const dias = splitByDay(from, to);
+  const porDia = await mapLimit(dias, 6, ([d0, d1]) =>
+    cachedReport(reportCacheKey('summary', deviceIds, d0, d1), async () => {
+      const params = new URLSearchParams({ from: d0.toISOString(), to: d1.toISOString() });
+      deviceIds.forEach(id => params.append('deviceId', String(id)));
+      const res = await fetch(`${TRACCAR_URL}/api/reports/summary?${params}`, { headers: defaultHeaders });
+      if (!res.ok) throw new Error(`Traccar ${res.status}`);
+      return res.json() as Promise<TraccarSummary[]>;
+    }),
+  );
+  const acc = new Map<number, TraccarSummary & { _somaVelDist: number }>();
+  for (const dia of porDia) {
+    for (const s of dia) {
+      const cur = acc.get(s.deviceId);
+      if (!cur) {
+        acc.set(s.deviceId, { ...s, _somaVelDist: s.averageSpeed * s.distance });
+      } else {
+        cur.distance += s.distance;
+        cur.engineHours += s.engineHours;
+        cur.spentFuel += s.spentFuel;
+        cur.maxSpeed = Math.max(cur.maxSpeed, s.maxSpeed);
+        cur._somaVelDist += s.averageSpeed * s.distance;
+      }
+    }
+  }
+  return [...acc.values()].map(({ _somaVelDist, ...s }) => ({
+    ...s,
+    averageSpeed: s.distance > 0 ? _somaVelDist / s.distance : 0,
+  }));
 }
 
 export async function traccarSendCommand(
@@ -240,16 +301,7 @@ export async function traccarGetStops(
   from: Date,
   to: Date,
 ): Promise<TraccarStop[]> {
-  return cachedReport(reportCacheKey('stops', deviceIds, from, to), async () => {
-    const params = new URLSearchParams({
-      from: from.toISOString(),
-      to: to.toISOString(),
-    });
-    deviceIds.forEach(id => params.append('deviceId', String(id)));
-    const res = await fetch(`${TRACCAR_URL}/api/reports/stops?${params}`, { headers: defaultHeaders });
-    if (!res.ok) throw new Error(`Traccar ${res.status}`);
-    return res.json() as Promise<TraccarStop[]>;
-  });
+  return fetchArrayByDay<TraccarStop>('stops', 'stops', deviceIds, from, to);
 }
 
 export async function traccarExportReport(
