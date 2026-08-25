@@ -22,7 +22,6 @@ const _spider = { markers: [], linhas: [], chave: null };
 
 // ── Camadas de overlay ────────────────────────────────────────────────────────
 const _overlay = {
-  alarmes: true,    // mostrar badge de alarme sobre dispositivos
   labels: true,     // mostrar placa/nome sobre dispositivos
   cercas: false,    // mostrar cercas geovirtual
   rastro: false,    // mostrar rastro da última hora
@@ -30,9 +29,6 @@ const _overlay = {
 
 // Rastros: dispositivoId → { linha: L.Polyline, setas: L.Marker[] }
 const _rastros = {};
-
-// Marcadores de alarme: dispositivoId → L.Marker (badge flutuante)
-const _alarmeBadges = {};
 
 // Cercas: geofenceId → { camada: L.Layer, dados: {...} }
 const _cercasLayer = {};
@@ -1215,7 +1211,7 @@ function _salvarPreferenciasOverlay() {
   try {
     localStorage.setItem('al-overlay-pref', JSON.stringify({
       labels: _overlay.labels, cercas: _overlay.cercas,
-      rastro: _overlay.rastro, alarmes: _overlay.alarmes,
+      rastro: _overlay.rastro,
     }));
   } catch(e) {}
 }
@@ -1226,11 +1222,9 @@ function _aplicarPreferenciasOverlay() {
     if (pref.labels  !== undefined) { _overlay.labels  = pref.labels;  _mostrarPopup = _overlay.labels; }
     if (pref.cercas  !== undefined)   _overlay.cercas  = pref.cercas;
     if (pref.rastro  !== undefined)   _overlay.rastro  = pref.rastro;
-    if (pref.alarmes !== undefined)   _overlay.alarmes = pref.alarmes;
     document.getElementById('ml-labels') ?.classList.toggle('ativo', _overlay.labels);
     document.getElementById('ml-cercas') ?.classList.toggle('ativo', _overlay.cercas);
     document.getElementById('ml-rastro') ?.classList.toggle('ativo', _overlay.rastro);
-    document.getElementById('ml-alarmes')?.classList.toggle('ativo', _overlay.alarmes);
   } catch(e) {}
 }
 
@@ -1286,13 +1280,6 @@ function _adicionarBotoesCamadas() {
   });
   window.addEventListener('resize', function () {
     if (tray.classList.contains('aberta')) posicionarTrayCamadas();
-  });
-
-  document.getElementById('ml-alarmes').addEventListener('click', function () {
-    _overlay.alarmes = !_overlay.alarmes;
-    this.classList.toggle('ativo', _overlay.alarmes);
-    _atualizarAlarmeBadges();
-    _salvarPreferenciasOverlay();
   });
 
   document.getElementById('ml-dispositivos').addEventListener('click', function () {
@@ -1873,49 +1860,6 @@ function _cancelarDesenhoCirculo() {
   if (btn) btn.classList.remove('ativo');
 }
 
-// ── Badges de alarme sobre marcadores ────────────────────────────────────────
-
-function _atualizarAlarmeBadges() {
-  Object.keys(veiculosMap).forEach(id => {
-    const v = veiculosMap[id];
-    if (!v?.posicao) return;
-    _renderAlarmeBadge(id, v);
-  });
-}
-
-function _renderAlarmeBadge(id, v) {
-  if (_alarmeBadges[id]) {
-    if (map.hasLayer(_alarmeBadges[id])) map.removeLayer(_alarmeBadges[id]);
-    delete _alarmeBadges[id];
-  }
-  if (!_overlay.alarmes) return;
-  if (!v?.posicao?.alarme) return;
-
-  // "Corte de energia" (powerCut) não deve ser exibido como label no mapa
-  const rotuloAlarme = v.posicao.alarme.split(', ').filter(r => r !== 'Corte de energia').join(', ');
-  if (!rotuloAlarme) return;
-
-  const badge = L.marker([v.posicao.latitude, v.posicao.longitude], {
-    icon: L.divIcon({
-      html: `<div style="
-        background:#e74c3c;color:#fff;
-        border-radius:20px;padding:2px 8px;
-        font-size:10px;font-weight:700;
-        white-space:nowrap;
-        box-shadow:0 2px 6px rgba(0,0,0,0.3);
-        display:flex;align-items:center;gap:4px;
-      "><i class="fa fa-bell" style="font-size:9px"></i> ${rotuloAlarme}</div>`,
-      className: '',
-      iconAnchor: [0, 36],
-      iconSize: null,
-    }),
-    zIndexOffset: 800,
-    interactive: false,
-  });
-  badge.addTo(map);
-  _alarmeBadges[id] = badge;
-}
-
 // ── Snapshot inicial via REST ─────────────────────────────────────────────────
 
 async function carregarPosicoes() {
@@ -1973,7 +1917,6 @@ async function carregarPosicoes() {
     if (!boundsAjustados) { ajustarBounds(); boundsAjustados = true; }
     _restaurarFocoAdmin();
 
-    if (_overlay.alarmes) _atualizarAlarmeBadges();
     if (_overlay.rastro) _carregarRastros();
     if (_overlay.cercas) carregarCercas().then(mostrarCercas);
   } catch (err) {
@@ -2064,9 +2007,6 @@ function processarMensagemWs(msg) {
       atualizarMarcador(dispositivoId);
       atualizarCardAtivo(dispositivoId);
       _agendarAtualizacaoAtributos(dispositivoId);
-
-      // Atualiza badge de alarme
-      if (_overlay.alarmes) _renderAlarmeBadge(dispositivoId, veiculosMap[dispositivoId]);
 
       // Atualiza rastro global em tempo real
       if (_overlay.rastro && _rastros[dispositivoId]?.linha) {

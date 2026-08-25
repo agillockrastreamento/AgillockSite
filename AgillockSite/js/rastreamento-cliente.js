@@ -67,13 +67,11 @@ const _eventPopupOffsetPx = 60;
 
 // ── Camadas de overlay ────────────────────────────────────────────────────────
 const _overlay = {
-  alarmes: true,
   labels: true,
   cercas: false,
   rastro: false,
 };
 const _rastros = {};
-const _alarmeBadges = {};
 const _rotasIndividuais = {};
 let _cercasLayer = null;
 let _modoDesenho = null; // null | { dispositivoId, circle }
@@ -1203,7 +1201,7 @@ function _salvarPreferenciasOverlay() {
   try {
     localStorage.setItem('al-overlay-pref', JSON.stringify({
       labels: _overlay.labels, cercas: _overlay.cercas,
-      rastro: _overlay.rastro, alarmes: _overlay.alarmes,
+      rastro: _overlay.rastro,
     }));
   } catch(e) {}
 }
@@ -1214,11 +1212,9 @@ function _aplicarPreferenciasOverlay() {
     if (pref.labels  !== undefined) { _overlay.labels  = pref.labels;  _mostrarPopup = _overlay.labels; }
     if (pref.cercas  !== undefined)   _overlay.cercas  = pref.cercas;
     if (pref.rastro  !== undefined)   _overlay.rastro  = pref.rastro;
-    if (pref.alarmes !== undefined)   _overlay.alarmes = pref.alarmes;
     document.getElementById('ml-labels') ?.classList.toggle('ativo', _overlay.labels);
     document.getElementById('ml-cercas') ?.classList.toggle('ativo', _overlay.cercas);
     document.getElementById('ml-rastro') ?.classList.toggle('ativo', _overlay.rastro);
-    document.getElementById('ml-alarmes')?.classList.toggle('ativo', _overlay.alarmes);
     if (_overlay.cercas) carregarCercas().then(mostrarCercas);
   } catch(e) {}
 }
@@ -1273,13 +1269,6 @@ function _adicionarBotoesCamadas() {
   });
   window.addEventListener('resize', function () {
     if (tray.classList.contains('aberta')) posicionarTrayCamadas();
-  });
-
-  document.getElementById('ml-alarmes').addEventListener('click', function () {
-    _overlay.alarmes = !_overlay.alarmes;
-    this.classList.toggle('ativo', _overlay.alarmes);
-    _atualizarAlarmeBadges();
-    _salvarPreferenciasOverlay();
   });
 
   document.getElementById('ml-dispositivos').addEventListener('click', function () {
@@ -1338,37 +1327,6 @@ async function _carregarRastros() {
       }
     } catch {}
   }
-}
-
-// ── Badges de alarme ──────────────────────────────────────────────────────────
-
-function _atualizarAlarmeBadges() {
-  Object.keys(veiculosMap).forEach(id => {
-    const v = veiculosMap[id];
-    if (!v?.posicao) return;
-    _renderAlarmeBadge(id, v);
-  });
-}
-
-function _renderAlarmeBadge(id, v) {
-  if (_alarmeBadges[id]) {
-    if (map.hasLayer(_alarmeBadges[id])) map.removeLayer(_alarmeBadges[id]);
-    delete _alarmeBadges[id];
-  }
-  if (!_overlay.alarmes || !v?.posicao?.alarme) return;
-  if (!_veiculoNoMapaAtivo(v)) return;
-  // "Corte de energia" (powerCut) não deve ser exibido como label no mapa
-  const rotuloAlarme = v.posicao.alarme.split(', ').filter(r => r !== 'Corte de energia').join(', ');
-  if (!rotuloAlarme) return;
-  const badge = L.marker([v.posicao.latitude, v.posicao.longitude], {
-    icon: L.divIcon({
-      html: `<div style="background:#e74c3c;color:#fff;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;gap:4px;"><i class="fa fa-bell" style="font-size:9px"></i> ${rotuloAlarme}</div>`,
-      className: '', iconAnchor: [0, 36], iconSize: null,
-    }),
-    zIndexOffset: 800, interactive: false,
-  });
-  badge.addTo(map);
-  _alarmeBadges[id] = badge;
 }
 
 function _adicionarBotaoLocalizacao(mapInst) {
@@ -1449,13 +1407,6 @@ function setMapaAtivo(novo) {
     if (card) { card.style.display = 'none'; card.innerHTML = ''; }
   }
 
-  // Remove badges de alarme dos veículos que saíram do mapa visível
-  Object.keys(_alarmeBadges).forEach(id => {
-    if (!_veiculoNoMapaAtivo(veiculosMap[id])) {
-      if (map && map.hasLayer(_alarmeBadges[id])) map.removeLayer(_alarmeBadges[id]);
-      delete _alarmeBadges[id];
-    }
-  });
   // Remove rastros dos veículos que saíram do mapa visível
   Object.keys(_rastros).forEach(id => {
     if (!_veiculoNoMapaAtivo(veiculosMap[id])) {
@@ -1473,7 +1424,6 @@ function setMapaAtivo(novo) {
   renderBarraVeiculos();
   renderEventosLista();
   ajustarBounds();
-  if (_overlay.alarmes) _atualizarAlarmeBadges();
   if (_overlay.rastro) _carregarRastros();
   // Recarrega as cercas para mostrar apenas as do mapa ativo.
   if (_overlay.cercas) mostrarCercas();
@@ -1537,7 +1487,6 @@ async function carregarPosicoes() {
       if (ajustarBounds()) boundsAjustados = true;
     }
     _restaurarFocoCliente();
-    if (_overlay.alarmes) _atualizarAlarmeBadges();
     if (_overlay.rastro) _carregarRastros();
   } catch (err) {
     if (err.message === 'acesso_bloqueado') { verificarAcesso(); return; }
@@ -1608,7 +1557,6 @@ function processarMensagemWs(msg) {
       // Motorista do cartão RFID: acompanha a troca de motorista sem recarregar
       if ('motorista' in pos) veiculosMap[did].motorista = pos.motorista;
       atualizarMarcador(did); atualizarCardAtivo(did); atualizarCardBarra(did);
-      if (_overlay.alarmes) _renderAlarmeBadge(did, veiculosMap[did]);
       if (_overlay.rastro && _rastros[did]) _rastros[did].linha.addLatLng([pos.latitude, pos.longitude]);
       if (_rotasIndividuais[did]) _rotasIndividuais[did].polyline.addLatLng([pos.latitude, pos.longitude]);
     });
