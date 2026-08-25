@@ -88,6 +88,7 @@ router.get('/', requirePermission('multas.ver'), async (req: ClienteRequest, res
       licenciamentoPendente: s.licenciamentoPendente,
       ultimaConsultaEm: s.ultimaConsultaEm,
       ultimaConsultaStatus: s.ultimaConsultaStatus,
+      ultimaConsultaErro: s.ultimaConsultaErro,
       multas: s.multas.map((m) => ({
         ait: m.ait,
         motivo: m.motivo,

@@ -274,11 +274,14 @@
       var tb = document.getElementById('tbody-historico');
       AL.apiGet('/api/multas/historico').then(function(d){
         if (!d.itens.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888;">Nenhuma consulta registrada.</td></tr>'; return; }
-        tb.innerHTML = d.itens.map(function(l){
+        tb.innerHTML = d.itens.map(function(l, i){
           var stb = l.status==='OK'?'b-ok':(l.status==='ERRO'?'b-err':(l.status==='PARCIAL'?'b-warn':'b-neutral'));
           var dur = l.duracaoMs!=null ? (Math.round(l.duracaoMs/1000)+'s') : '—';
-          return '<tr>'+
-            '<td>'+AL.fmtDate(l.inicioEm)+'</td>'+
+          var det = Array.isArray(l.detalhes) ? l.detalhes : [];
+          var temDet = det.length > 0;
+          var caret = temDet ? '<i class="fa fa-caret-right" style="margin-right:6px;transition:.15s;"></i>' : '<span style="display:inline-block;width:12px;"></span>';
+          var linha = '<tr class="hist-row" data-idx="'+i+'"'+(temDet?' style="cursor:pointer;"':'')+'>'+
+            '<td>'+caret+AL.fmtDate(l.inicioEm)+'</td>'+
             '<td>'+(l.origem==='AGENDADA'?'Agendada':'Manual')+'</td>'+
             '<td style="text-align:center;"><span class="mini-badge '+stb+'">'+esc(l.status)+'</span></td>'+
             '<td>'+dur+'</td>'+
@@ -286,7 +289,40 @@
             '<td style="text-align:center;">'+l.veiculosConsultados+' ('+l.veiculosComSucesso+'/'+l.veiculosComErro+')</td>'+
             '<td style="text-align:center;">'+l.multasColetadas+'</td>'+
           '</tr>';
+          if (!temDet) return linha;
+          // Ordena: erros primeiro; monta a sub-tabela por veículo.
+          var ordenado = det.slice().sort(function(a,b){ return (a.status==='OK'?1:0)-(b.status==='OK'?1:0); });
+          var sub = ordenado.map(function(v){
+            var ok = v.status==='OK';
+            var cor = ok ? '#2e7d32' : '#b71c1c';
+            var st = ok ? ('OK'+(v.qtdMultas!=null?(' · '+v.qtdMultas+' multa'+(v.qtdMultas===1?'':'s')):'')) : esc(v.status||'ERRO');
+            return '<tr>'+
+              '<td style="padding:2px 8px;font-weight:600;">'+esc(v.placa||'—')+'</td>'+
+              '<td style="padding:2px 8px;color:'+cor+';white-space:nowrap;">'+st+'</td>'+
+              '<td style="padding:2px 8px;color:#b71c1c;">'+esc(v.erro||'')+'</td>'+
+            '</tr>';
+          }).join('');
+          var detalheHtml = '<tr class="hist-det" data-for="'+i+'" style="display:none;">'+
+            '<td colspan="7" style="background:#fafafa;padding:8px 16px;">'+
+              '<table style="width:100%;font-size:12px;border-collapse:collapse;">'+
+                '<thead><tr style="color:#888;"><th style="padding:2px 8px;text-align:left;">Placa</th><th style="padding:2px 8px;text-align:left;">Resultado</th><th style="padding:2px 8px;text-align:left;">Erro</th></tr></thead>'+
+                '<tbody>'+sub+'</tbody>'+
+              '</table>'+
+            '</td></tr>';
+          return linha + detalheHtml;
         }).join('');
+        // Expandir/recolher ao clicar na linha.
+        Array.prototype.forEach.call(tb.querySelectorAll('.hist-row'), function(row){
+          row.addEventListener('click', function(){
+            var idx = row.getAttribute('data-idx');
+            var det = tb.querySelector('.hist-det[data-for="'+idx+'"]');
+            if (!det) return;
+            var aberto = det.style.display !== 'none';
+            det.style.display = aberto ? 'none' : '';
+            var ic = row.querySelector('.fa-caret-right, .fa-caret-down');
+            if (ic){ ic.className = aberto ? 'fa fa-caret-right' : 'fa fa-caret-down'; ic.style.marginRight='6px'; }
+          });
+        });
       }).catch(function(err){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#b71c1c;">'+esc(err.message)+'</td></tr>'; });
     }
 

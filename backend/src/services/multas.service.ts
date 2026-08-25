@@ -85,14 +85,16 @@ export async function recuperarJobsTravados(): Promise<void> {
   // resumo nunca chega ao admin.
   const desistidos = await prisma.consultaJob.findMany({
     where: { status: 'PROCESSANDO', claimedEm: { lt: limite }, tentativas: { gte: MAX_TENTATIVAS } },
-    select: { id: true, logId: true },
+    select: { id: true, logId: true, placa: true },
   });
   for (const job of desistidos) {
     const upd = await prisma.consultaJob.updateMany({
       where: { id: job.id, status: 'PROCESSANDO' },
       data: { status: 'ERRO', erro: 'Excedeu tentativas (worker travou?)' },
     });
-    if (upd.count === 1 && job.logId) await contabilizarNoLog(job.logId, false, 0);
+    if (upd.count === 1 && job.logId) await contabilizarNoLog(job.logId, false, 0, 1, false, [
+      { placa: job.placa, status: 'ERRO', erro: 'Excedeu tentativas (worker travou?)' },
+    ]);
   }
 }
 
@@ -107,12 +109,19 @@ export async function fecharLotesExpirados(): Promise<void> {
     where: { status: 'EM_ANDAMENTO', inicioEm: { lt: limite } },
     select: { id: true },
   });
+  const msgExpirado = `Lote expirado após ${LOTE_TIMEOUT_MIN} min (worker offline?)`;
   for (const lote of lotes) {
-    const orfaos = await prisma.consultaJob.updateMany({
+    // Busca as placas dos órfãos ANTES de marcá-los como ERRO, para o detalhe do histórico.
+    const orfaosJobs = await prisma.consultaJob.findMany({
       where: { logId: lote.id, status: { in: ['PENDENTE', 'PROCESSANDO'] } },
-      data: { status: 'ERRO', erro: `Lote expirado após ${LOTE_TIMEOUT_MIN} min (worker offline?)` },
+      select: { placa: true },
     });
-    await contabilizarNoLog(lote.id, false, 0, orfaos.count, true);
+    await prisma.consultaJob.updateMany({
+      where: { logId: lote.id, status: { in: ['PENDENTE', 'PROCESSANDO'] } },
+      data: { status: 'ERRO', erro: msgExpirado },
+    });
+    await contabilizarNoLog(lote.id, false, 0, orfaosJobs.length, true,
+      orfaosJobs.map((j) => ({ placa: j.placa, status: 'ERRO', erro: msgExpirado })));
   }
 }
 
@@ -143,7 +152,9 @@ export async function concluirJobComResultado(jobId: string, resultado: unknown)
     await persistirConsulta(job.dispositivoId, job.uf, r);
     // não guardamos o PDF em base64 no job (fica em VeiculoMultaSituacao.boletoArquivo)
     resultadoFinal = { ...r, boletoPdfBase64: r.boletoPdfBase64 ? '[salvo]' : null };
-    if (job.logId) await contabilizarNoLog(job.logId, true, r.multas?.length ?? 0);
+    if (job.logId) await contabilizarNoLog(job.logId, true, r.multas?.length ?? 0, 1, false, [
+      { placa: job.placa, status: 'OK', qtdMultas: r.multas?.length ?? 0 },
+    ]);
   } else if (job.tipo === 'GERAR_PAGAMENTO') {
     const r = resultado as PagamentoJobResult;
     let boletoUrl: string | null = null;
@@ -168,15 +179,33 @@ export async function registrarErroJob(jobId: string, mensagem: string, permanen
   const encerrar = permanente || job.tentativas >= MAX_TENTATIVAS;
 
   if (encerrar && job.tipo === 'CONSULTA_VEICULO' && job.dispositivoId) {
-    // registra o status de falha na situação do veículo (mantém o último dado bom)
-    await prisma.veiculoMultaSituacao.updateMany({
-      where: { dispositivoId: job.dispositivoId },
-      data: {
+    // Registra o status de falha na situação do veículo. UPSERT (não updateMany): se a
+    // PRIMEIRA consulta do veículo falha e ainda não existe situação, criamos uma já com o
+    // erro — senão o veículo ficaria preso em "aguardando" e nunca apareceria no seletor de
+    // multas (site/app). Assim ele aparece com o motivo (ex.: "Veículo não encontrado").
+    const disp = await prisma.dispositivo.findUnique({
+      where: { id: job.dispositivoId },
+      select: { clienteId: true, placa: true },
+    });
+    if (disp?.clienteId) {
+      const falha = {
         ultimaConsultaEm: new Date(),
         ultimaConsultaStatus: permanente ? 'DADOS_INVALIDOS' : 'ERRO',
         ultimaConsultaErro: mensagem.slice(0, 500),
-      },
-    });
+      };
+      await prisma.veiculoMultaSituacao.upsert({
+        where: { dispositivoId: job.dispositivoId },
+        update: falha,
+        create: {
+          dispositivoId: job.dispositivoId,
+          clienteId: disp.clienteId,
+          placa: disp.placa ?? job.placa,
+          renavam: job.renavam,
+          uf: job.uf,
+          ...falha,
+        },
+      });
+    }
   }
 
   await prisma.consultaJob.update({
@@ -184,7 +213,9 @@ export async function registrarErroJob(jobId: string, mensagem: string, permanen
     data: encerrar ? { status: 'ERRO', erro: mensagem } : { status: 'PENDENTE', erro: mensagem },
   });
 
-  if (encerrar && job.logId) await contabilizarNoLog(job.logId, false, 0);
+  if (encerrar && job.logId) await contabilizarNoLog(job.logId, false, 0, 1, false, [
+    { placa: job.placa, status: permanente ? 'DADOS_INVALIDOS' : 'ERRO', erro: mensagem.slice(0, 500) },
+  ]);
 }
 
 // ─────────────────────────── Persistência da consulta ───────────────────────────
@@ -369,12 +400,16 @@ export async function listarVeiculosIncompletos() {
  * terminam. `quantidade` > 1 e `forcarFechamento` servem ao fechamento por expiração,
  * onde vários jobs órfãos caem de uma vez e o lote fecha mesmo incompleto.
  */
+/** Detalhe por veículo, anexado ao `detalhes` do log (visível no histórico expansível do admin). */
+type DetalheVeiculo = { placa: string | null; status: string; qtdMultas?: number; erro?: string };
+
 async function contabilizarNoLog(
   logId: string,
   sucesso: boolean,
   multasCount: number,
   quantidade = 1,
   forcarFechamento = false,
+  detalhes?: DetalheVeiculo[],
 ): Promise<void> {
   if (quantidade > 0) {
     await prisma.consultaMultaLog.update({
@@ -385,6 +420,16 @@ async function contabilizarNoLog(
         multasColetadas: sucesso && multasCount ? { increment: multasCount } : undefined,
       },
     });
+  }
+
+  // Anexa o detalhe por veículo de forma atômica (concatenação jsonb, segura sob concorrência
+  // — vários jobs do mesmo lote podem concluir ao mesmo tempo).
+  if (detalhes && detalhes.length) {
+    await prisma.$executeRaw`
+      UPDATE "ConsultaMultaLog"
+      SET detalhes = COALESCE(detalhes, '[]'::jsonb) || ${JSON.stringify(detalhes)}::jsonb
+      WHERE id = ${logId}
+    `;
   }
 
   const log = await prisma.consultaMultaLog.findUnique({ where: { id: logId } });
