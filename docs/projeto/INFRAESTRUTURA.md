@@ -203,17 +203,14 @@ ssh root@2.25.131.149 'curl -s -c /tmp/c -d "email=admin@agillock.com.br&passwor
 
 ## 9. Deploy / atualização
 
-### Backend (179) — atenção: NÃO é um clone git
-O código foi transferido por `tar` (sem `.git`). Para atualizar código:
+### Backend (179) — clone git (sparse-checkout do `backend/`)
+`/opt/agillock` é um **clone git** do monorepo com **sparse-checkout** ativo só no `backend/` (os outros diretórios do repo — `AgillockSite/`, `app/`, `docs/`… — ficam fora da árvore de trabalho). Rastreia `origin/main`. Deploy normal:
 ```bash
-# Opção recomendada (fazer 1×): transformar em clone git p/ deploys futuros
-#   ssh root@179.198.102.3 'cd /opt && mv agillock/backend agillock/backend.bak && \
-#     git clone <repo> agillock/backend && cp backend.bak/.env agillock/backend/ && \
-#     cp -r backend.bak/cert backend.bak/uploads backend.bak/nginx agillock/backend/'
-# Deploy normal depois disso:
 ssh root@179.198.102.3 'cd /opt/agillock/backend && git pull && docker compose up -d --build backend'
 ```
-Enquanto não virar clone git: subir o código novo por `tar`/rsync e `docker compose up -d --build backend`.
+- **Arquivos só-de-produção** (`.env*`, `uploads/`, `cert/*.p12`, `nginx/ssl/*.pem`) não estão no repo e são preservados; os `.bak-*`/`uploads/` estão em `.git/info/exclude` (ignore local, não commitado) para o `git status` ficar limpo. O `git pull` **não** os toca.
+- O `docker-compose.yml` do repo **é o de produção** (split-arch: backend+nginx na rede externa `traccar_traccar_net`; postgres+traccar estão no 2.25). Não confundir com o `docker-compose.dev.yml` (dev local).
+- **Cuidado com skip-worktree:** o sparse-checkout usa o mesmo bit, então `git update-index --skip-worktree` num arquivo do cone não gruda. Para pinar um arquivo divergente, o certo é commitá-lo no repo (foi o que se fez com o compose).
 - **Migrations Prisma** rodam no boot do container (CMD faz `prisma migrate deploy`). Fazer **snapshot do volume do postgres** (no 179) antes de deploy com migração nova.
 - Mudou `TRACCAR_URL`/`.env`? `docker compose up -d --force-recreate backend`.
 
@@ -267,7 +264,6 @@ Sequência executada em 2026‑08‑19/20 (para referência/repetição):
 
 ## 12. Pendências e futuro
 
-- **Backend no 179 não é clone git** — para deploys confortáveis, transformar em clone git (ver §9). Baixo risco, alto conforto.
 - **Renovação SSL:** o certbot antigo no VPS renovava via porta 80. Como 80 agora encaminha p/ 179, configurar a **renovação no 179** (certbot lá, com o DNS já apontando pro 179). Cert atual válido ~até out/2026.
 - **Retirar o VPS no futuro:** só é possível quando os dispositivos deixarem de apontar p/ `72.62.13.73` (provisionar novos com domínio `rastreamento.agillock.com.br` → 2.25, e migrar os antigos aos poucos). Enquanto isso, o VPS precisa ficar de pé como encaminhador.
 - **Crescimento:** cada servidor está a ~15‑20%. Reavaliar (upgrade p/ 4 vCPU ou rebalancear) quando a frota ativa dobrar (~3.000 dispositivos).
