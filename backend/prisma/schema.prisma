@@ -991,10 +991,14 @@ model NotificacaoMultaEnvio {
 // Fila de tarefas para o worker (máquina que alcança o Detran).
 model ConsultaJob {
   id            String    @id @default(uuid())
-  tipo          String // CONSULTA_VEICULO | GERAR_PAGAMENTO
+  tipo          String // CONSULTA_VEICULO | GERAR_PAGAMENTO | CONSULTA_PONTUACAO
   uf            String    @default("CE")
   placa         String
   renavam       String?
+  // CONSULTA_PONTUACAO (pontuação de CNH, sem veículo): usa cpf + numeroFormulario
+  // no lugar de placa/renavam. Consumido por integrações externas (SafeLock).
+  cpf              String?
+  numeroFormulario String?
   dispositivoId String?
   aits          Json? // GERAR_PAGAMENTO: AITs selecionados (null/[] = todas)
   origem        String // AGENDADA | MANUAL_ADMIN | CLIENTE

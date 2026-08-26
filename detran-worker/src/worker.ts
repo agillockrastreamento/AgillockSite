@@ -3,7 +3,12 @@
 // claim → executa o fluxo do Detran → devolve o resultado. Ver docs/multas/ARQUITETURA_WORKER.md.
 
 import 'dotenv/config';
-import { consultarVeiculoCompleto, gerarPagamento, DadosInvalidosError } from './detran-ce.js';
+import {
+  consultarVeiculoCompleto,
+  gerarPagamento,
+  consultarPontuacao,
+  DadosInvalidosError,
+} from './detran-ce.js';
 
 const BACKEND_URL = process.env.BACKEND_URL;
 const WORKER_API_KEY = process.env.WORKER_API_KEY;
@@ -21,10 +26,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Job {
   id: string;
-  tipo: 'CONSULTA_VEICULO' | 'GERAR_PAGAMENTO';
+  tipo: 'CONSULTA_VEICULO' | 'GERAR_PAGAMENTO' | 'CONSULTA_PONTUACAO';
   placa: string;
   renavam: string | null;
   aits: string[] | null;
+  cpf: string | null;
+  numeroFormulario: string | null;
 }
 
 async function api(pathname: string, body?: unknown, timeoutMs = 120_000): Promise<any> {
@@ -46,16 +53,20 @@ async function processarJob(job: Job): Promise<void> {
       resultado = await consultarVeiculoCompleto(job.placa, job.renavam ?? '');
     } else if (job.tipo === 'GERAR_PAGAMENTO') {
       resultado = await gerarPagamento(job.placa, job.renavam ?? '', job.aits ?? undefined);
+    } else if (job.tipo === 'CONSULTA_PONTUACAO') {
+      resultado = await consultarPontuacao(job.cpf ?? '', job.numeroFormulario ?? '');
     } else {
       throw new Error(`Tipo de job desconhecido: ${(job as Job).tipo}`);
     }
     await api(`/api/worker/jobs/${job.id}/resultado`, { resultado });
-    console.log(`[${job.id}] ${job.tipo} ${job.placa} → OK (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+    const alvo = job.tipo === 'CONSULTA_PONTUACAO' ? `cpf ${job.cpf}` : job.placa;
+    console.log(`[${job.id}] ${job.tipo} ${alvo} → OK (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   } catch (e: any) {
     const permanente = e instanceof DadosInvalidosError;
     const mensagem = e?.message ?? String(e);
     await api(`/api/worker/jobs/${job.id}/erro`, { mensagem, permanente }).catch(() => {});
-    console.warn(`[${job.id}] ${job.tipo} ${job.placa} → ERRO${permanente ? ' (permanente)' : ''}: ${mensagem}`);
+    const alvo = job.tipo === 'CONSULTA_PONTUACAO' ? `cpf ${job.cpf}` : job.placa;
+    console.warn(`[${job.id}] ${job.tipo} ${alvo} → ERRO${permanente ? ' (permanente)' : ''}: ${mensagem}`);
   }
 }
 

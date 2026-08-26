@@ -6,6 +6,8 @@ import * as cheerio from 'cheerio';
 import { fetch, Agent, type Response } from 'undici';
 
 const BASE = 'https://sistemas.detran.ce.gov.br/central';
+// Pontuação de CNH mora em `sistemas2` (com "2"), host distinto do de veículos/multas.
+const BASE2 = 'https://sistemas2.detran.ce.gov.br/central';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36';
 
@@ -346,4 +348,173 @@ export async function gerarPagamento(
   const pagamento = await s.emitirExtrato(alvo.map((m) => ({ ait: m.ait, selecaoValue: m.selecaoValue })));
   const boletoPdfBase64 = (await s.gerarBoleto()).toString('base64');
   return { pagamento, boletoPdfBase64 };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Pontuação da CNH (guia Habilitação → "Consultar Pontuação")
+//
+// Fluxo bem mais simples que o de veículos: SEM login, SEM cookie de sessão,
+// SEM captcha. Em `sistemas2` (host distinto). Confirmado por HAR real:
+//   1) GET  /central                       → <meta name="csrf-token">
+//   2) POST /central/habilitacoes/consulta_pontuacao
+//        header X-CSRF-Token: <token do meta>  (NÃO o authenticity_token do form,
+//        que é um decoy que muda a cada render)
+//        body  cpf=<formatado>&numero_formulario=<10 díg.>   (nomes "planos",
+//        não `habilitacao[...]`) → fragmento HTML com os panels do resultado.
+//
+// O WAF do Detran devolve 403 para requisições sem Origin/Referer de navegação
+// (por isso é enviado explicitamente aqui). `numero_formulario` é o nº da CNH
+// que o Detran chama de "Nº da CNH ou PPD" (o de 10 dígitos ao lado da foto),
+// NÃO o Nº de Registro (11 dígitos).
+// ─────────────────────────────────────────────────────────────
+
+export interface MultaCondutor {
+  placa: string;
+  data: string | null; // dd/mm/aaaa
+  hora: string | null; // hh:mm
+  pontos: number;
+  descricao: string;
+}
+
+export interface PontuacaoCondutor {
+  nome: string;
+  cpf: string; // como o Detran devolve (11 dígitos, sem máscara)
+  pontos: number; // total de pontos do condutor
+  multas: MultaCondutor[];
+  consultadoEm: string; // ISO
+}
+
+function formatarCpf(digitos: string): string {
+  return digitos.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+/** Localiza o `.panel` cujo cabeçalho contém `needle` (case-insensitive). */
+function panelPorCabecalho($: cheerio.CheerioAPI, needle: string) {
+  return $('.panel')
+    .filter((_i, el) => $(el).find('.panel-heading').text().trim().toLowerCase().includes(needle))
+    .first();
+}
+
+function parsePontuacao(html: string, cpfConsultado: string): PontuacaoCondutor {
+  const $ = cheerio.load(html);
+
+  const painelCondutor = panelPorCabecalho($, 'dados condutor');
+  if (!painelCondutor.length) {
+    // Sem o painel do condutor não há resultado válido (CNH/CPF divergentes ou
+    // condutor não localizado). Usa o texto enxuto como mensagem, se houver.
+    const msg = $('body').text().replace(/\s+/g, ' ').trim().slice(0, 200);
+    throw new DadosInvalidosError(msg || 'Condutor não encontrado (CPF/CNH divergentes?)');
+  }
+
+  // Painel "Dados Condutor": header em <th>, dados em <td> (Nome | CPF | Pontos).
+  const linhaDados = painelCondutor
+    .find('table tr')
+    .filter((_i, tr) => $(tr).find('td').length >= 3)
+    .first();
+  const tdc = linhaDados.find('td');
+  const nome = $(tdc[0]).text().trim();
+  const cpf = ($(tdc[1]).text().replace(/\D/g, '') || cpfConsultado) as string;
+  const pontos = parseInt($(tdc[2]).text().replace(/\D/g, '') || '0', 10);
+
+  // Painel "Multas": linhas em pares — uma com 4 <td> (Placa|Data|Hora|Pontos)
+  // seguida de uma <td colspan="4"> com "Descrição da Infração: ...".
+  const multas: MultaCondutor[] = [];
+  const painelMultas = panelPorCabecalho($, 'multas');
+  let atual: MultaCondutor | null = null;
+  painelMultas.find('table tr').each((_i, tr) => {
+    const tds = $(tr).find('td');
+    if (tds.length >= 4) {
+      atual = {
+        placa: $(tds[0]).text().trim(),
+        data: $(tds[1]).text().trim() || null,
+        hora: $(tds[2]).text().trim() || null,
+        pontos: parseInt($(tds[3]).text().replace(/\D/g, '') || '0', 10),
+        descricao: '',
+      };
+      multas.push(atual);
+    } else if (tds.length === 1 && /descri[çc][ãa]o da infra/i.test($(tr).text()) && atual) {
+      atual.descricao = $(tds[0])
+        .text()
+        .replace(/.*?Descri[çc][ãa]o da Infra[çc][ãa]o:\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+  });
+
+  return { nome, cpf, pontos, multas, consultadoEm: new Date().toISOString() };
+}
+
+/**
+ * Consulta a pontuação e as multas associadas a um condutor pela CNH.
+ * @param cpf CPF do condutor (com ou sem máscara).
+ * @param numeroFormulario Nº da CNH ou PPD (o de 10 dígitos ao lado da foto),
+ *   NÃO o Nº de Registro (11 dígitos).
+ */
+export async function consultarPontuacao(cpf: string, numeroFormulario: string): Promise<PontuacaoCondutor> {
+  const cpfLimpo = cpf.replace(/\D/g, '');
+  const numero = numeroFormulario.replace(/\D/g, '');
+  if (cpfLimpo.length !== 11) throw new DadosInvalidosError('CPF inválido (esperado 11 dígitos)');
+  if (numero.length < 9 || numero.length > 11) {
+    throw new DadosInvalidosError('Número da CNH inválido (esperado ~10 dígitos)');
+  }
+
+  const jar = new CookieJar();
+  const req = async (url: string, init: Parameters<typeof fetch>[1] = {}): Promise<Response> => {
+    const res = await fetch(url, {
+      redirect: 'manual',
+      dispatcher: detranAgent,
+      ...init,
+      headers: {
+        'User-Agent': UA,
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+        Cookie: jar.header(),
+        ...(init.headers as Record<string, string> | undefined),
+      },
+    });
+    jar.capture(res);
+    return res;
+  };
+
+  // 1) Home do sistemas2 → token CSRF (o do <meta>, que é o aceito no POST).
+  const home = await req(BASE2);
+  const $home = cheerio.load(await home.text());
+  const csrf = $home('meta[name="csrf-token"]').attr('content') ?? '';
+  if (!csrf) throw new Error('Token CSRF não encontrado (sistemas2, layout mudou?)');
+
+  // 2) POST da consulta. Origin/Referer explícitos: sem eles o WAF devolve 403.
+  const body = new URLSearchParams();
+  body.set('cpf', formatarCpf(cpfLimpo));
+  body.set('numero_formulario', numero);
+  const res = await req(`${BASE2}/habilitacoes/consulta_pontuacao`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'X-CSRF-Token': csrf,
+      'X-Requested-With': 'XMLHttpRequest',
+      Origin: 'https://sistemas2.detran.ce.gov.br',
+      Referer: BASE2,
+      Accept: '*/*',
+    },
+    body: body.toString(),
+  });
+
+  const txt = await res.text();
+  // Erro de validação volta como JSON: {"status":false,"errors":{...}}.
+  if (txt.trimStart().startsWith('{')) {
+    let json: any = {};
+    try {
+      json = JSON.parse(txt);
+    } catch {
+      /* resposta inesperada */
+    }
+    let msg = 'CPF/CNH recusados pelo Detran';
+    const errs = json?.errors;
+    if (errs && typeof errs === 'object') {
+      const vals = Object.values(errs as Record<string, unknown>).flat().filter(Boolean);
+      if (vals.length) msg = vals.join('; ');
+    }
+    throw new DadosInvalidosError(msg);
+  }
+
+  return parsePontuacao(txt, cpfLimpo);
 }

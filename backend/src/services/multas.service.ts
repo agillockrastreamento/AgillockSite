@@ -767,6 +767,44 @@ export async function criarJobPagamento(
   return job.id;
 }
 
+/**
+ * Cria um job CONSULTA_PONTUACAO (pontuação de CNH — sem veículo). Consumido por
+ * integrações externas (SafeLock). Idempotente por (cpf, numeroFormulario) enquanto
+ * houver job aberto. `placa` fica vazia (a fila exige a coluna, mas não se aplica aqui).
+ */
+export async function criarJobPontuacao(
+  cpf: string,
+  numeroFormulario: string,
+  origem: 'MANUAL_ADMIN' | 'CLIENTE' = 'CLIENTE',
+): Promise<string> {
+  const aberto = await prisma.consultaJob.findFirst({
+    where: { tipo: 'CONSULTA_PONTUACAO', cpf, numeroFormulario, status: { in: ['PENDENTE', 'PROCESSANDO'] } },
+    select: { id: true },
+  });
+  if (aberto) return aberto.id;
+  const job = await prisma.consultaJob.create({
+    data: { tipo: 'CONSULTA_PONTUACAO', uf: 'CE', placa: '', cpf, numeroFormulario, origem },
+    select: { id: true },
+  });
+  return job.id;
+}
+
+/** Estado + resultado de um job (para o consumidor externo poll-ar a pontuação). */
+export async function getEstadoJob(
+  jobId: string,
+): Promise<{ status: string; resultado: unknown; erro: string | null } | null> {
+  const job = await prisma.consultaJob.findUnique({
+    where: { id: jobId },
+    select: { status: true, resultado: true, erro: true },
+  });
+  if (!job) return null;
+  return {
+    status: job.status,
+    resultado: job.status === 'CONCLUIDO' ? job.resultado : null,
+    erro: job.status === 'ERRO' ? job.erro : null,
+  };
+}
+
 /** Aguarda um job terminar (CONCLUIDO/ERRO) por até timeoutMs. Retorna o job (pode estar ainda em andamento). */
 export async function aguardarJob(jobId: string, timeoutMs = 40_000) {
   const ate = Date.now() + timeoutMs;
