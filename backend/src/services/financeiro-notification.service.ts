@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
 import ExpoPushService from './expo-push.service';
+import VozChatService, { CobrancaItem } from './vozchat.service';
+import * as efiService from './efi.service';
 
 const TZ = 'America/Sao_Paulo';
 
@@ -106,11 +108,34 @@ class FinanceiroNotificationService {
         if (ok) totalVencendo++;
       }
 
+      // Add-on "Ágil Lock": empurra para o WhatsApp (VozChat) os boletos que completam
+      // 1 ou 3 dias de atraso — dois toques só. O VozChat move o card p/ "Clientes em
+      // atraso", grava o chip do boleto e envia a mensagem neutra. Best-effort (não pode
+      // derrubar o cron de notificações do app).
+      const vozItens: CobrancaItem[] = [];
+
       let totalAtrasados = 0;
       for (const boleto of atrasados) {
         const login = boleto.carne.cliente.logins[0];
         if (!login?.ativo) continue;
         const dias = diasAtraso(boleto.vencimento, hojeInicio);
+
+        if ((dias === 1 || dias === 3) && VozChatService.configurado()) {
+          const cliente = boleto.carne.cliente;
+          const tel = cliente.telefone ? String(cliente.telefone).replace(/\D/g, '') : '';
+          if (tel) {
+            vozItens.push({
+              telefone: tel,
+              nome: cliente.nome,
+              diasAtraso: dias,
+              valor: String(boleto.valor),
+              vencimento: boleto.vencimento.toLocaleDateString('en-CA', { timeZone: TZ }),
+              codigoBarras: await this.obterCodigoBarras(boleto.efiChargeId),
+              linkBoleto: boleto.linkBoleto,
+            });
+          }
+        }
+
         const ok = await this.notificarBoleto(login.id, boleto.id, 'boletoAtrasado', hojeInicio, {
           title: 'Boleto em atraso',
           body: `Voce tem um boleto em atraso ha ${dias} dia${dias === 1 ? '' : 's'}. Mantenha-se em dia para continuar acessando a area de monitoramento.`,
@@ -120,6 +145,15 @@ class FinanceiroNotificationService {
         if (ok) totalAtrasados++;
       }
 
+      if (vozItens.length) {
+        try {
+          const r = await VozChatService.syncCobrancas(vozItens);
+          console.log(`[Financeiro Notif] VozChat: ${vozItens.length} boleto(s) 1/3 dias empurrado(s) (enviados=${r?.enviados ?? '?'}).`);
+        } catch (err: any) {
+          console.error('[Financeiro Notif] falha ao empurrar cobranças para o VozChat:', err?.message || err);
+        }
+      }
+
       if (totalVencendo || totalAtrasados) {
         console.log(`[Financeiro Notif] ${dataIso}: vencendoHoje=${totalVencendo}, atrasados=${totalAtrasados}`);
       }
@@ -127,6 +161,23 @@ class FinanceiroNotificationService {
       return { vencendoHoje: totalVencendo, atrasados: totalAtrasados };
     } finally {
       this.running = false;
+    }
+  }
+
+  /** Linha digitável (47 dígitos) do boleto, buscada ao vivo no EFI. Best-effort → null em erro. */
+  private async obterCodigoBarras(efiChargeId: string | null): Promise<string | null> {
+    if (!efiChargeId) return null;
+    try {
+      const detalhe: any = await efiService.obterDetalheCharge(Number(efiChargeId));
+      const raw: string | null =
+        detalhe?.payment?.carnet?.barcode ??
+        detalhe?.payment?.banking_billet?.barcode ??
+        detalhe?.barcode ??
+        null;
+      return raw ? String(raw).replace(/\D/g, '') : null;
+    } catch (err: any) {
+      console.error('[Financeiro Notif] falha ao obter código de barras p/ VozChat:', err?.message || err);
+      return null;
     }
   }
 

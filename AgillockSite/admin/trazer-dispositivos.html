@@ -461,6 +461,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-default" data-dismiss="modal">Fechar</button>
+          <button type="button" class="btn btn-success" id="wa-enviar-auto" title="Define a senha e envia a mensagem + guia automaticamente pelo WhatsApp"><i class="fa fa-paper-plane"></i> Enviar mensagem</button>
           <button type="button" class="btn btn-wa" id="wa-abrir"><i class="fa fa-whatsapp"></i> Abrir no WhatsApp</button>
         </div>
       </div>
@@ -941,6 +942,21 @@
       if (tel.length <= 11) tel = '55' + tel; // adiciona DDI Brasil se veio só com DDD
       var msg = encodeURIComponent(document.getElementById('wa-msg').value);
       window.open('https://wa.me/'+tel+'?text='+msg, '_blank');
+    });
+    // Envio AUTOMÁTICO pelo VozChat (Baileys): define a senha e manda a mensagem + o PDF do guia,
+    // sem abrir o WhatsApp. Requer a integração VozChat configurada no backend.
+    document.getElementById('wa-enviar-auto').addEventListener('click', function(){
+      if (!waClienteId){ AL.showAlert('Cliente sem cadastro aqui.'); return; }
+      var tel = (document.getElementById('wa-tel').value || '').replace(/\D/g,'');
+      if (!tel){ AL.showAlert('Informe o telefone.'); return; }
+      var senha = document.getElementById('wa-senha').value;
+      if (!senha || senha.length<6){ AL.showAlert('A senha deve ter ao menos 6 caracteres.'); return; }
+      var btn=this; var old=btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa fa-spinner fa-spin"></i> Enviando…';
+      AL.apiPost('/api/clientes/'+waClienteId+'/enviar-boas-vindas', { telefone: tel, senha: senha }).then(function(){
+        AL.showAlert('Mensagem e guia enviados pelo WhatsApp! ✅', 'success');
+        $('#modal-wa').modal('hide');
+      }).catch(function(err){ AL.showAlert(err.message || 'Falha ao enviar pelo WhatsApp.'); })
+      .then(function(){ btn.disabled=false; btn.innerHTML=old; });
     });
 
     // ── Histórico ──

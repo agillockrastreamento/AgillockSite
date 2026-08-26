@@ -10,6 +10,7 @@ import { param } from '../utils/params';
 import prisma from '../utils/prisma';
 import { cifrarSenha, decifrarSenha } from '../utils/senha-cifrada';
 import { CLIENTE_LOGO_UPLOADS_DIR, UPLOADS_DIR } from '../utils/upload-paths';
+import VozChatService from '../services/vozchat.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -75,6 +76,80 @@ router.get('/:id/login/senha', async (req: AuthRequest, res: Response): Promise<
   // Null quando a senha foi definida antes deste recurso (só existe o hash) — nesse
   // caso não há como recuperá-la, o admin precisa definir uma nova.
   res.json({ senha: decifrarSenha(login.senhaCifrada) });
+});
+
+// ── POST /api/clientes/:id/enviar-boas-vindas ─────────────────────────────────
+// Add-on "Ágil Lock": botão "Enviar mensagem" da tela de reapontamento. Dispara pelo
+// WhatsApp (VozChat/Baileys) a mensagem de boas-vindas (apps + web + login/senha) e o PDF
+// do guia. Se `senha` vier no corpo (>=6), define-a antes de enviar (une "definir senha" +
+// "enviar" num clique). A senha é decifrada no servidor e repassada server-to-server ao
+// VozChat — nunca volta para o navegador.
+router.post('/:id/enviar-boas-vindas', async (req: AuthRequest, res: Response): Promise<void> => {
+  if (req.user!.role === 'COLABORADOR' && req.user!.podeEditarLoginCliente === false) {
+    res.status(403).json({ error: 'Sem permissão para enviar credenciais ao cliente.' });
+    return;
+  }
+
+  const id = param(req, 'id');
+  const { telefone, senha } = req.body as { telefone?: string; senha?: string };
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id },
+    select: { id: true, nome: true, telefone: true },
+  });
+  if (!cliente) {
+    res.status(404).json({ error: 'Cliente não encontrado.' });
+    return;
+  }
+
+  const login = await prisma.clienteLogin.findFirst({
+    where: { clienteId: id, tipo: 'responsavel' },
+    select: { id: true, email: true, senhaCifrada: true },
+  });
+  if (!login) {
+    res.status(404).json({ error: 'Este cliente ainda não tem login cadastrado.' });
+    return;
+  }
+
+  if (senha && senha.length < 6) {
+    res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
+    return;
+  }
+
+  // Se veio uma senha nova, grava antes de enviar (hash + cifra reversível).
+  let senhaAtual = decifrarSenha(login.senhaCifrada);
+  if (senha) {
+    await prisma.clienteLogin.update({
+      where: { id: login.id },
+      data: { senhaHash: await bcrypt.hash(senha, 10), senhaCifrada: cifrarSenha(senha) },
+    });
+    senhaAtual = senha;
+  }
+
+  const tel = String(telefone || cliente.telefone || '').replace(/\D/g, '');
+  if (!tel) {
+    res.status(400).json({ error: 'Informe o telefone do cliente.' });
+    return;
+  }
+
+  if (!VozChatService.configurado()) {
+    res.status(503).json({ error: 'Integração WhatsApp não configurada.' });
+    return;
+  }
+
+  const r = await VozChatService.enviarBoasVindas({
+    telefone: tel,
+    nome: cliente.nome,
+    login: login.email,
+    senha: senhaAtual,
+    incluirGuia: true,
+  });
+
+  if (r.success === false) {
+    res.status(502).json({ error: 'Não foi possível enviar a mensagem pelo WhatsApp.' });
+    return;
+  }
+  res.json({ ok: true, enviado: r.enviado !== false });
 });
 
 // ── POST /api/clientes/:id/login ──────────────────────────────────────────────
