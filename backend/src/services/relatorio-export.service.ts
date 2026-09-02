@@ -10,6 +10,7 @@ import {
   traccarGetEvents,
   traccarGetSummary,
   traccarGetPositionHistory,
+  traccarGetPositions,
   normalizeAttributes,
   cartaoDaPosicao,
   EVENT_TYPE_LABELS,
@@ -21,6 +22,7 @@ import {
   aplicarViagensComMedidores,
   aplicarParadasComMedidores,
   aplicarResumoComMedidores,
+  usaOdometroSistema,
 } from './medidores.service';
 import { carregarResolvedorMotoristas, cartaoDaViagem, cartaoAntesDe } from './motoristas.service';
 import { htmlParaPdf } from './pdf.service';
@@ -134,13 +136,14 @@ export interface RelatorioDataset {
 
 export async function coletarDadosRelatorio(traccarIds: number[], fromIso: string, toIso: string): Promise<RelatorioDataset> {
   const fromDate = new Date(fromIso), toDate = new Date(toIso);
-  const [devices, trips, stops, events, summaries, positions, resolver] = await Promise.all([
+  const [devices, trips, stops, events, summaries, positions, posicoesAtuais, resolver] = await Promise.all([
     traccarGetDevices(),
     traccarGetTrips(traccarIds, fromDate, toDate).catch(() => []),
     traccarGetStops(traccarIds, fromDate, toDate).catch(() => []),
     traccarGetEvents(traccarIds, fromDate, toDate).catch(() => []),
     traccarGetSummary(traccarIds, fromDate, toDate).catch(() => []),
     traccarGetPositionHistory(traccarIds, fromDate, toDate).catch(() => []),
+    traccarGetPositions(traccarIds).catch(() => [] as TraccarPosition[]),
     carregarResolvedorMotoristas(),
   ]);
 
@@ -153,6 +156,33 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
   });
   const localPorUnique = new Map(locais.map(l => [l.identificador, l]));
   const localPorId = new Map(devFiltrados.map(d => [d.id, localPorUnique.get(d.uniqueId)]));
+
+  // ── Odômetro exibido na rota ──────────────────────────────────────────────
+  // O card do rastreamento mostra o odômetro do SISTEMA (semeado com o km real do
+  // veículo na instalação e acumulado a cada posição), enquanto as posições do
+  // Traccar carregam apenas o `totalDistance` acumulado pelo rastreador — os dois
+  // diferem pelo km que o veículo já tinha. Para o relatório não contradizer o card,
+  // aplica-se a cada posição o mesmo deslocamento observado agora:
+  //   offset = odometroSistema(agora) - totalDistance(posição atual).
+  // `ignorarOdometro` mantém a coluna vazia, como no card.
+  const totalDistanceAtual = new Map<number, number>();
+  for (const p of posicoesAtuais) {
+    const td = p.attributes?.totalDistance;
+    if (typeof td === 'number') totalDistanceAtual.set(p.deviceId, td);
+  }
+  // deviceId -> offset em metros; ausente = coluna vazia (odômetro ignorado)
+  const offsetOdometro = new Map<number, number>();
+  const semOdometro = new Set<number>();
+  for (const d of devFiltrados) {
+    const disp = localPorId.get(d.id);
+    if (disp?.ignorarOdometro === true) { semOdometro.add(d.id); continue; }
+    if (disp && usaOdometroSistema(disp)) {
+      const atual = totalDistanceAtual.get(d.id);
+      offsetOdometro.set(d.id, (disp.odometroSistemaMetros as number) - (atual ?? 0));
+    } else {
+      offsetOdometro.set(d.id, 0);
+    }
+  }
 
   const posPorId = new Map<number, TraccarPosition[]>();
   for (const p of positions) {
@@ -238,7 +268,10 @@ export async function coletarDadosRelatorio(traccarIds: number[], fromIso: strin
     return {
       veiculo: nomePorId.get(p.deviceId) || String(p.deviceId), dataHora: p.deviceTime || p.fixTime,
       lat: p.latitude, lon: p.longitude, velKmh: Math.round((p.speed || 0) * 1.852), curso: Math.round(p.course || 0),
-      ignicao: norm.ignicao, odometroKm: norm.odometro != null ? Math.round(norm.odometro / 1000) : null,
+      ignicao: norm.ignicao,
+      odometroKm: semOdometro.has(p.deviceId) || norm.odometro == null
+        ? null
+        : Math.round((norm.odometro + (offsetOdometro.get(p.deviceId) ?? 0)) / 1000),
       motorista: nomeMotorista(cartao ? cartao.cartao : null),
       endereco: p.address || geoCache.get(coordKey(p.latitude, p.longitude)) || coordsFallback(p.latitude, p.longitude),
     };
