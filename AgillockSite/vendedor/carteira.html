@@ -138,6 +138,19 @@
     }
     .btn-pagar:hover { background: rgba(255,255,255,.35); }
     .btn-pagar:disabled { opacity: .6; cursor: default; }
+    .btn-pagar.btn-pagar-perigo {
+      background: rgba(220,53,69,.35);
+      border-color: rgba(255,255,255,.6);
+    }
+    .btn-pagar.btn-pagar-perigo:hover { background: rgba(220,53,69,.6); }
+    /* Área do comprovante pode ter até 3 botões (ver / substituir / excluir) */
+    #pag-comprovante-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     .pago-badge {
       display: flex;
       align-items: center;
@@ -393,7 +406,7 @@
             statusArea.appendChild(btnPagar);
           }
 
-          // Botão comprovante (direita)
+          // Botões de comprovante (direita)
           if (temComprovante) {
             var btnVerAnexo = document.createElement('button');
             btnVerAnexo.type = 'button';
@@ -401,6 +414,23 @@
             btnVerAnexo.innerHTML = '<i class="fa fa-file-text-o"></i> Ver / Baixar Comprovante';
             btnVerAnexo.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); abrirComprovante(); });
             compArea.appendChild(btnVerAnexo);
+
+            // Substituir: mesmo input file do "Anexar"; o backend troca o arquivo
+            var lblTrocar = document.createElement('label');
+            lblTrocar.htmlFor = 'input-comprovante';
+            lblTrocar.className = 'btn-pagar';
+            lblTrocar.style.cursor = 'pointer';
+            lblTrocar.title = 'Enviar um novo arquivo no lugar do atual';
+            lblTrocar.innerHTML = '<i class="fa fa-exchange"></i> Substituir';
+            compArea.appendChild(lblTrocar);
+
+            var btnExcluirAnexo = document.createElement('button');
+            btnExcluirAnexo.type = 'button';
+            btnExcluirAnexo.className = 'btn-pagar btn-pagar-perigo';
+            btnExcluirAnexo.title = 'Excluir o comprovante anexado';
+            btnExcluirAnexo.innerHTML = '<i class="fa fa-trash"></i> Excluir';
+            btnExcluirAnexo.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); excluirComprovante(); });
+            compArea.appendChild(btnExcluirAnexo);
           } else {
             // Usar <label> associado ao input file para evitar click() programático
             var lblAnexar = document.createElement('label');
@@ -473,11 +503,20 @@
 
         // Captura o arquivo e reseta o input imediatamente para permitir reenvio
         var fileCapturado = file;
+        var temComprovanteAtual = !!pagamentoData.comprovante; // substituição x primeiro anexo
         this.value = '';
 
-        // Feedback: desabilitar o label durante o upload
-        var lbl = document.querySelector('#pag-comprovante-area label');
+        // Feedback: desabilitar os botões da área durante o upload
+        var compArea = document.getElementById('pag-comprovante-area');
+        var lbl = compArea.querySelector('label');
+        var lblHtmlOriginal = lbl ? lbl.innerHTML : '';
         if (lbl) { lbl.style.pointerEvents = 'none'; lbl.style.opacity = '0.6'; lbl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando…'; }
+        compArea.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+
+        function restaurarBotoes() {
+          if (lbl) { lbl.style.pointerEvents = ''; lbl.style.opacity = '1'; lbl.innerHTML = lblHtmlOriginal; }
+          compArea.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+        }
 
         var formData = new FormData();
         formData.append('comprovante', fileCapturado);
@@ -489,24 +528,56 @@
 
         xhr.onload = function () {
           if (xhr.status >= 200 && xhr.status < 300) {
+            var jaTinha = temComprovanteAtual;
             try { pagamentoData = JSON.parse(xhr.responseText); } catch (e) {}
             renderPagamentoBar();
-            AL.showAlert('Comprovante anexado com sucesso!', 'success');
+            AL.showAlert(jaTinha ? 'Comprovante substituído com sucesso!' : 'Comprovante anexado com sucesso!', 'success');
           } else {
             var msg = 'Erro ao enviar comprovante.';
             try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
-            if (lbl) { lbl.style.pointerEvents = ''; lbl.style.opacity = '1'; lbl.innerHTML = '<i class="fa fa-paperclip"></i> Anexar Comprovante'; }
+            restaurarBotoes();
             AL.showAlert(msg, 'danger');
           }
         };
 
         xhr.onerror = function () {
-          if (lbl) { lbl.style.pointerEvents = ''; lbl.style.opacity = '1'; lbl.innerHTML = '<i class="fa fa-paperclip"></i> Anexar Comprovante'; }
+          restaurarBotoes();
           AL.showAlert('Erro de conexão ao enviar comprovante.', 'danger');
         };
 
         xhr.send(formData);
       });
+
+      function excluirComprovante() {
+        if (!pagamentoData || !pagamentoData.comprovante) return;
+
+        AL.confirmar({
+          titulo: 'Excluir Comprovante',
+          mensagem: 'Excluir o comprovante da comissão de <strong>' + (nomeVendedor || 'o vendedor') +
+                    '</strong> referente ao mês <strong>' + fmtMesPT(currentMes) + '</strong>?',
+          consequencias: 'O arquivo será apagado permanentemente e o vendedor deixará de conseguir baixá-lo. ' +
+                         'O pagamento continua registrado — você pode anexar um novo comprovante depois.',
+          btnTexto: '<i class="fa fa-trash"></i> Excluir comprovante',
+        }).then(function (ok) {
+          if (!ok) return;
+
+          var compArea = document.getElementById('pag-comprovante-area');
+          compArea.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+          var lblTrocar = compArea.querySelector('label');
+          if (lblTrocar) { lblTrocar.style.pointerEvents = 'none'; lblTrocar.style.opacity = '0.6'; }
+
+          AL.apiDelete('/api/vendedor/pagamentos/' + pagamentoData.id + '/comprovante')
+            .then(function (data) {
+              pagamentoData = data;
+              renderPagamentoBar();
+              AL.showAlert('Comprovante excluído.', 'success');
+            })
+            .catch(function (err) {
+              renderPagamentoBar();
+              AL.showAlert(err.message || 'Erro ao excluir comprovante.', 'danger');
+            });
+        });
+      }
 
       function abrirComprovante() {
         if (!pagamentoData || !pagamentoData.comprovante) return;

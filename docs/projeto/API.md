@@ -366,6 +366,7 @@ Permissões principais de colaborador:
 | GET | `/vendedor/pagamentos` | VENDEDOR, ADMIN | Registro de pagamento do mês |
 | POST | `/vendedor/pagamentos` | ADMIN | Cria/atualiza pagamento |
 | POST | `/vendedor/pagamentos/:id/comprovante` | ADMIN | Upload de comprovante |
+| DELETE | `/vendedor/pagamentos/:id/comprovante` | ADMIN | Exclui o comprovante anexado |
 | GET | `/vendedor/comprovante/:id` | VENDEDOR, ADMIN | Visualiza comprovante |
 
 `GET /vendedor/carteira?mes=2026-05&vendedorId=uuid`

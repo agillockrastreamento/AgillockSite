@@ -622,4 +622,41 @@ router.post(
   }
 );
 
+// ─── DELETE /api/vendedor/pagamentos/:id/comprovante — excluir comprovante (ADMIN) ──
+router.delete(
+  '/pagamentos/:id/comprovante',
+  requireRoles('ADMIN'),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const id = param(req, 'id');
+
+    const pagamento = await prisma.pagamentoComissao.findUnique({ where: { id } });
+    if (!pagamento) {
+      res.status(404).json({ error: 'Pagamento não encontrado.' });
+      return;
+    }
+
+    if (!pagamento.comprovante) {
+      res.status(404).json({ error: 'Este pagamento não possui comprovante.' });
+      return;
+    }
+
+    // Remove o arquivo do disco (se ainda existir)
+    const filePath = resolveComprovantePath(pagamento.comprovante);
+    if (filePath && fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        // Arquivo inacessível: segue e limpa a referência no banco mesmo assim
+      }
+    }
+
+    const updated = await prisma.pagamentoComissao.update({
+      where: { id },
+      data: { comprovante: null, comprovanteMime: null },
+    });
+
+    res.json(updated);
+  }
+);
+
 export default router;
